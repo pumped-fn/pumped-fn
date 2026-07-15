@@ -9,11 +9,12 @@ Put your app behind a scope, and it becomes fully testable, fully traceable, wit
 
 ```text
 createScope({ presets, tags, extensions })
-  ├─ scope-owned graph -> execution context -> flows, resources, tags
-  └─ SDK session resource -> work attempt -> role resource -> turn flow
-                                               └─ tool resource -> effect flow
-  Claude CLI, Codex CLI/ACP, and pi-ai bind the shared provider-attempt edge.
+  └─ execution context -> session.run -> agent.turn
+                                       ├─ role + selected capability flows
+                                       └─ provider + backend adapters
 ```
+
+Executing the entry flow activates its complete recursively declared dependency tree before the entry factory starts. Required tags are checked at runtime during activation. A missing provider, tool backend, validation engine, or session binding fails before semantic work begins. Tests replace the same graph edges at `createScope`; they do not mock the tree.
 
 ## Test without mocking modules
 
@@ -104,6 +105,8 @@ The core package has zero runtime dependencies and ~12 kB min+gzip.
 ## Mental model
 
 A `scope` is the composition and test boundary. `atom` values live in the scope. `flow` executions live in an execution context. `resource` values are owned by that context. `tag` values carry request facts and role choices. `preset` replaces an edge for tests or alternate roots. `extension` wraps resolution and execution. Streaming flows use `execStream`.
+
+SDK applications use stable `session.run`, `agent.turn`, `agent.role`, and `agent.fromModel` definitions. Composition selects configuration and implementations through namespaced tags such as `agent.config.*`, `agent.impl.*`, and `session.execution.*`. Tool, skill, and subagent flows remain ordinary declared graph edges.
 
 ## Request context without AsyncLocalStorage
 

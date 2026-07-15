@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer"
 import { posix } from "node:path"
 import { Bash } from "just-bash"
-import { abortSignal } from "@pumped-fn/sdk"
+import { step } from "@pumped-fn/sdk"
 import * as sandbox from "@pumped-fn/sdk/sandbox"
 import * as session from "@pumped-fn/sdk/session"
 import { atom, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
@@ -58,6 +58,13 @@ export const clock = atom({
   }),
 })
 
+export const platform = atom({
+  factory: () => ({
+    byteLength: Buffer.byteLength,
+    normalize: posix.normalize,
+  }),
+})
+
 export const authority = resource({
   name: "just-bash.authority",
   ownership: "current",
@@ -79,21 +86,21 @@ export const engine = resource({
     engine: tags.required(config.engine),
     workspace: tags.required(config.workspace),
   },
-  factory: (_ctx, deps) => {
-    const options = deps.engine.options ?? {}
+  factory: (_ctx, { authority, engine, workspace }) => {
+    const options = engine.options ?? {}
     const executionLimits = {
       ...options.executionLimits,
       maxOutputSize: Math.min(
-        options.executionLimits?.maxOutputSize ?? deps.authority.policy.maxOutputBytes,
-        deps.authority.policy.maxOutputBytes,
+        options.executionLimits?.maxOutputSize ?? authority.policy.maxOutputBytes,
+        authority.policy.maxOutputBytes,
       ),
     }
-    return (deps.engine.create ?? ((value) => new Bash(value)))({
+    return (engine.create ?? ((value) => new Bash(value)))({
       ...options,
-      cwd: deps.workspace.root,
+      cwd: workspace.root,
       executionLimits,
-      fetch: deps.authority.policy.network ? options.fetch : undefined,
-      network: deps.authority.policy.network ? options.network : undefined,
+      fetch: authority.policy.network ? options.fetch : undefined,
+      network: authority.policy.network ? options.network : undefined,
     })
   },
 })
@@ -105,14 +112,15 @@ export const workspace = resource({
     authority,
     engine,
     config: tags.required(config.workspace),
+    platform,
   },
-  factory: (_ctx, deps) => {
-    if (!deps.config.root.startsWith("/")) throw new WorkspaceError("Sandbox workspace root must be absolute")
-    const root = posix.normalize(deps.config.root)
-    if (!deps.authority.policy.roots.some((allowed) => within(root, posix.normalize(allowed)))) {
+  factory: (_ctx, { authority, config, engine, platform }) => {
+    if (!config.root.startsWith("/")) throw new WorkspaceError("Sandbox workspace root must be absolute")
+    const root = platform.normalize(config.root)
+    if (!authority.policy.roots.some((allowed) => within(root, platform.normalize(allowed)))) {
       throw new WorkspaceError("Sandbox workspace root is outside allowed roots")
     }
-    return Object.freeze({ root, bash: deps.engine })
+    return Object.freeze({ root, bash: engine })
   },
 })
 
@@ -120,9 +128,9 @@ export const readiness = resource({
   name: "just-bash.readiness",
   ownership: "current",
   deps: { authority, workspace },
-  factory: (_ctx, deps) => Object.freeze({
-    authorityFingerprint: deps.authority.fingerprint,
-    root: deps.workspace.root,
+  factory: (_ctx, { authority, workspace }) => Object.freeze({
+    authorityFingerprint: authority.fingerprint,
+    root: workspace.root,
   }),
 })
 
@@ -145,37 +153,39 @@ export const run: sandbox.Run = flow({
   parse: typed<sandbox.ExecInput>(),
   deps: {
     clock,
+    platform,
     policy: tags.required(sandbox.policy),
     readiness,
-    signal: tags.optional(abortSignal),
     workspace,
   },
-  factory: async function* (ctx, deps): AsyncGenerator<sandbox.ExecEvent, sandbox.ExecResult, unknown> {
-    deps.signal?.throwIfAborted()
+  tags: [step({ workflow: true, kind: "sandbox" })],
+  factory: async function* (ctx, { clock, platform, policy, workspace }): AsyncGenerator<sandbox.ExecEvent, sandbox.ExecResult, unknown> {
+    const signal = ctx.signal
+    signal.throwIfAborted()
     const controller = new AbortController()
-    const abort = () => controller.abort(deps.signal?.reason)
-    deps.signal?.addEventListener("abort", abort, { once: true })
+    const abort = () => controller.abort(signal.reason)
+    signal.addEventListener("abort", abort, { once: true })
     const unregister = ctx.onClose(() => controller.abort(new DOMException("Sandbox stream closed", "AbortError")))
     let timedOut = false
-    const timer = deps.clock.set(() => {
+    const timer = clock.set(() => {
       timedOut = true
-      controller.abort(new Error(`Sandbox command timed out after ${deps.policy.timeoutMs}ms`))
-    }, deps.policy.timeoutMs)
+      controller.abort(new Error(`Sandbox command timed out after ${policy.timeoutMs}ms`))
+    }, policy.timeoutMs)
     let result: Awaited<ReturnType<Bash["exec"]>>
     try {
-      result = await deps.workspace.bash.exec(
+      result = await workspace.bash.exec(
         [ctx.input.command, ...(ctx.input.args ?? [])].map(quote).join(" "),
         { signal: controller.signal },
       )
       if (timedOut) throw controller.signal.reason
-      deps.signal?.throwIfAborted()
+      signal.throwIfAborted()
     } finally {
-      deps.clock.clear(timer)
-      deps.signal?.removeEventListener("abort", abort)
+      clock.clear(timer)
+      signal.removeEventListener("abort", abort)
       unregister()
     }
-    if (Buffer.byteLength(result.stdout) + Buffer.byteLength(result.stderr) > deps.policy.maxOutputBytes) {
-      throw new OutputLimitError(deps.policy.maxOutputBytes)
+    if (platform.byteLength(result.stdout) + platform.byteLength(result.stderr) > policy.maxOutputBytes) {
+      throw new OutputLimitError(policy.maxOutputBytes)
     }
     if (result.stdout) yield { type: "stdout", content: result.stdout }
     if (result.stderr) yield { type: "stderr", content: result.stderr }

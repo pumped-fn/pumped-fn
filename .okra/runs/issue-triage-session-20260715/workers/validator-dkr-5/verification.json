@@ -1,0 +1,368 @@
+{
+  "verification_id": "validator-dkr-5",
+  "worker_id": "validator-dkr-5",
+  "candidate_checkpoint_ref": "workers/dkr-5/checkpoint.json",
+  "observed_at": "2026-07-15T05:50:36Z",
+  "dispositions": {
+    "candidate_checkpoint": "rejected_semantic_gate_bypass_and_stale_frame_evidence",
+    "candidate_root_replay": "accepted_mechanical_only",
+    "fixture_schema_hash_and_wall_counts": "accepted_mechanical_only",
+    "repository_containment": "rejected_traversal_reaches_adapters_and_publication",
+    "verifier_target_binding": "rejected_wrong_hypothesis_verdict_reaches_publication",
+    "checkpoint_freshness": "rejected_30m_candidate_age_widens_10m_frame_contract",
+    "product_progression": "blocked",
+    "remediation_authorization": "not_made"
+  },
+  "audit_traces": [
+    {
+      "claim_id": "DKR-5.recorded-root-replay",
+      "check": "The checkpoint-recorded command runs from the repository root.",
+      "metric_or_check": "recorded_replay_exit_code",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/dkr-5/checkpoint.json and workers/dkr-5/replay.sh",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:2dd2c6ebd15e964a9be83365df55f84c4bd7787fc111a100e12423f90c360b40",
+        "sha256:65610763eec1514a3bd03816c660cfd28bbdc606f695b2747d2bc7edd634ac93"
+      ],
+      "observed_at": "2026-07-15T05:46:06Z",
+      "decision": "accepted",
+      "evidence": "14/14 fixtures; 6/6 Standard Schema shapes; 16/16 objective contracts; 8/8 hashes; 7/7 wall entries"
+    },
+    {
+      "claim_id": "DKR-5.fixture-denominator",
+      "check": "The fixed fixture list contains one success and thirteen named denials.",
+      "metric_or_check": "fixture_pass_count",
+      "threshold": 14,
+      "value": 14,
+      "source_of_truth": "workers/dkr-5/evidence-publication-contract.json and validator semantic audit",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:9d42d437e5454a8eb57531761d79d1503e3a1e1ab2bd3ef1d4ab699a4253def9",
+        "sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"
+      ],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "fixturePassCount=14/14; denialFixturePassCount=13/13"
+    },
+    {
+      "claim_id": "DKR-5.standard-schema-shapes",
+      "check": "Six validation shapes expose Standard Schema validate functions.",
+      "metric_or_check": "standard_schema_compatible_shape_count",
+      "threshold": 6,
+      "value": 6,
+      "source_of_truth": "workers/dkr-5/evidence-publication-probe.mjs",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+        "sha256:0ed0e104938580c604afcc7c7c7a143c4bf353ac8424c847328a3de9d6aa091b"
+      ],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "capability, intake, evidence, hypothesis, verifier verdict, and publication receipt shapes each expose ~standard.validate"
+    },
+    {
+      "claim_id": "DKR-5.fixed-objective-contracts",
+      "check": "The exact sixteen named contracts instantiate the unchanged frame target.",
+      "metric_or_check": "named_objective_contract_count",
+      "threshold": 16,
+      "value": 16,
+      "source_of_truth": "frame/frame.v2.json and workers/dkr-5/objective-contracts.json",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:8a21f143c6d009d84632c360ec1a3073a26e2caef215886c8c3ac7a50f280cd0",
+        "sha256:7f3717195985dc3265cc7fb5b4b746fe0ed2e93de9e86892c01b13d829620d63"
+      ],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "objectiveContracts=16/16; target=16; denominatorChangeCount=0"
+    },
+    {
+      "claim_id": "DKR-5.evidence-metadata-and-freshness",
+      "check": "Evidence schemas carry source, citation, capture time, expiry or maximum age, query identity, relevant revision identity, and capability scope; missing and stale evidence deny publication.",
+      "metric_or_check": "evidence_metadata_and_denial_gap_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/dkr-5/evidence-publication-probe.mjs and evidence-publication-contract.json",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+        "sha256:9d42d437e5454a8eb57531761d79d1503e3a1e1ab2bd3ef1d4ab699a4253def9"
+      ],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "missing-citation and stale-evidence fixtures deny with zero publisher writes"
+    },
+    {
+      "claim_id": "DKR-5.sql-window-and-authority-preflight",
+      "check": "Mutating SQL, unbounded Victoria windows, and missing publication authority stop before adapters.",
+      "metric_or_check": "preflight_denial_gap_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/dkr-5/evidence-publication-probe.mjs fake call records",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+        "sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"
+      ],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "unauthorized fixture adapterCalls=0 and writes=0; SQL and window denial fixtures write=0"
+    },
+    {
+      "claim_id": "DKR-5.publication-idempotency",
+      "check": "Duplicate, conflicting-key, and lost-response retry paths do not make a second publication write.",
+      "metric_or_check": "idempotency_extra_publication_write_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/dkr-5/evidence-publication-probe.mjs fake publisher receipts and write counters",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+        "sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"
+      ],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "duplicate=0 extra writes; conflict=0 extra writes; known-receipt retry=0 extra writes"
+    },
+    {
+      "claim_id": "DKR-5.repository-containment",
+      "check": "Lexically escaping paths cannot reach the repository adapter or publication.",
+      "metric_or_check": "repository_containment_bypass_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "validator instrumented execution of the candidate flow",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+        "sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"
+      ],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "rejected",
+      "failure_mode": "semantic-gate-bypass",
+      "evidence": "/repo/../secret is accepted; all six effect ports run; publisher writes=1"
+    },
+    {
+      "claim_id": "DKR-5.verifier-target-binding",
+      "check": "A verifier verdict must name the hypothesis being published.",
+      "metric_or_check": "wrong_hypothesis_verdict_publish_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "validator instrumented verifier adapter against the candidate flow",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+        "sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"
+      ],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "rejected",
+      "failure_mode": "semantic-gate-bypass",
+      "evidence": "verdict.hypothesisId=hyp-other while hypothesis.id=hyp-1; candidate accepts and publisher writes=1"
+    },
+    {
+      "claim_id": "DKR-5.public-scope-seam",
+      "check": "Eight inputs are required tags, six effects are tag ports, and execution uses createScope with public Lite flow APIs.",
+      "metric_or_check": "scope_seam_escape_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/dkr-5/evidence-publication-probe.mjs declared graph",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+        "sha256:a208869ca9eeb3d8f2407d399d01394ed01c86dda46ee2df0b41899f72b86b34"
+      ],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "requiredTagPorts=8; effectPorts=6; moduleMocks=0; internalReaches=0; globalPatches=0"
+    },
+    {
+      "claim_id": "DKR-5.no-real-external-access",
+      "check": "The probe imports only Node built-ins and repository-local modules and uses in-memory adapters.",
+      "metric_or_check": "real_external_access_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "candidate source import audit and fake adapter implementation",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+        "sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"
+      ],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "externalImports=0; realExternalAccessCount=0"
+    },
+    {
+      "claim_id": "DKR-5.evidence-hash-set",
+      "check": "All eight named evidence hashes resolve to the current bytes.",
+      "metric_or_check": "resolved_evidence_hash_count",
+      "threshold": 8,
+      "value": 8,
+      "source_of_truth": "workers/dkr-5/checkpoint.json evidence_refs_or_hashes",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+        "sha256:9d42d437e5454a8eb57531761d79d1503e3a1e1ab2bd3ef1d4ab699a4253def9",
+        "sha256:7f3717195985dc3265cc7fb5b4b746fe0ed2e93de9e86892c01b13d829620d63",
+        "sha256:65610763eec1514a3bd03816c660cfd28bbdc606f695b2747d2bc7edd634ac93",
+        "sha256:8a21f143c6d009d84632c360ec1a3073a26e2caef215886c8c3ac7a50f280cd0",
+        "sha256:28a698375b2fb46e536fbd986ba922cde9b576d8333a053193488cd2ab542a88",
+        "sha256:a208869ca9eeb3d8f2407d399d01394ed01c86dda46ee2df0b41899f72b86b34",
+        "sha256:0ed0e104938580c604afcc7c7c7a143c4bf353ac8424c847328a3de9d6aa091b"
+      ],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "evidenceHashes=8/8"
+    },
+    {
+      "claim_id": "DKR-5.checkpoint-freshness",
+      "check": "The candidate checkpoint must remain within the frame anti-goal maximum age without widening it.",
+      "metric_or_check": "checkpoint_age_minutes",
+      "threshold": 10,
+      "value": 10.4,
+      "source_of_truth": "frame/frame.v2.json metric_contracts.anti_goals.max_age, workers/dkr-5/checkpoint.json, and validator UTC clock",
+      "replay": "date -u +%Y-%m-%dT%H:%M:%SZ",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:8a21f143c6d009d84632c360ec1a3073a26e2caef215886c8c3ac7a50f280cd0",
+        "sha256:2dd2c6ebd15e964a9be83365df55f84c4bd7787fc111a100e12423f90c360b40"
+      ],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "rejected",
+      "failure_mode": "stale-and-threshold-widened",
+      "evidence": "frame max_age=10m; candidate declares 30m; age at validation=10m24s"
+    }
+  ],
+  "wall_audit_traces": [
+    {
+      "claim_id": "wall.scope_seam_escape_count",
+      "check": "All candidate logic and effects remain substitutable at createScope.",
+      "metric_or_check": "scope_seam_escape_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "candidate declared graph and validator source audit",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "scopeSeamEscapeCount=0"
+    },
+    {
+      "claim_id": "wall.undeclared_effect_edge_count",
+      "check": "Every candidate effect comes from one of six declared required tag ports.",
+      "metric_or_check": "undeclared_effect_edge_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "candidate flow dependencies and validator source audit",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "undeclaredEffectEdgeCount=0"
+    },
+    {
+      "claim_id": "wall.unapproved_external_write_count",
+      "check": "Unsafe repository paths and invalid verifier targets must stop before the publication adapter.",
+      "metric_or_check": "unapproved_external_write_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "validator fake backend call and write records",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "rejected",
+      "failure_mode": "breached",
+      "evidence": "wrong-hypothesis verifier target reaches fake publisher and records one write; realExternalAccessCount remains 0"
+    },
+    {
+      "claim_id": "wall.unsupported_hypothesis_publish_count",
+      "check": "Publication requires a verified verdict targeting the actual hypothesis.",
+      "metric_or_check": "unsupported_hypothesis_publish_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "validator wrong-hypothesis-verdict execution",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "rejected",
+      "failure_mode": "breached",
+      "evidence": "verdict target hyp-other is accepted for published hypothesis hyp-1; publisher writes=1"
+    },
+    {
+      "claim_id": "wall.single_llm_truth_acceptance_count",
+      "check": "No writer-only claim is accepted without a separate deterministic validator decision.",
+      "metric_or_check": "single_llm_truth_acceptance_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "this independent semantic audit and explicit candidate rejection",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "separate validator completed; candidate remains rejected"
+    },
+    {
+      "claim_id": "wall.ungoverned_write_or_read_count",
+      "check": "Validator writes remain inside workers/validator-dkr-5 and governed progress verifies.",
+      "metric_or_check": "ungoverned_write_or_read_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "validator output paths, governed worker report, and OKRA store verification",
+      "replay": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/scripts/okra-store.sh verify .okra/runs/issue-triage-session-20260715",
+      "exit_code": 0,
+      "sha256": ["sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "accepted",
+      "evidence": "authorized validator directory only; baseline store verification exit=0; final verification required after worker-report"
+    },
+    {
+      "claim_id": "wall.anti_goal_bypass_or_dishonesty_count",
+      "check": "Mechanical passes do not override semantic safety failures.",
+      "metric_or_check": "anti_goal_bypass_or_dishonesty_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "verification dispositions and blocked wall gate",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-5/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:2d9306199c3a24c8e377c64655f430df1773113ea0907f4d8a232246a6c38f37"],
+      "observed_at": "2026-07-15T05:50:36Z",
+      "decision": "rejected",
+      "failure_mode": "breached",
+      "evidence": "candidate max_age=30m widens the frame 10m contract; semantic failures retained; denominator unchanged; no remediation performed"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "reason": "The root replay passes mechanically, but repository traversal and wrong-hypothesis verifier targets reach publication, and the candidate widened the frame freshness contract from 10m to 30m and was stale at validation."
+  },
+  "summary": {
+    "accepted_claims": 14,
+    "rejected_claims": 6,
+    "rejected_claim_ids": [
+      "DKR-5.repository-containment",
+      "DKR-5.verifier-target-binding",
+      "DKR-5.checkpoint-freshness",
+      "wall.unapproved_external_write_count",
+      "wall.unsupported_hypothesis_publish_count",
+      "wall.anti_goal_bypass_or_dishonesty_count"
+    ]
+  }
+}

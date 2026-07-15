@@ -91,6 +91,45 @@ describe("role-tag flow projection", () => {
     await scope.dispose()
   })
 
+  it("all tag: preserves multiple bindings at the same scope level", async () => {
+    const second = flow({
+      parse: typed<string>(),
+      factory: (ctx) => `second:${ctx.input}`,
+    })
+    const model = tag<typeof respond>({ label: "model-all-same-level" })
+    const run = flow({
+      deps: { models: tags.all(model) },
+      factory: (_ctx, { models }) => Promise.all(models.map((handle) => handle.exec({ input: "all" }))),
+    })
+    const scope = createScope({ tags: [model(respond), model(second)] })
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({ flow: run })).resolves.toEqual(["hello:all", "second:all"])
+    await ctx.close({ ok: true })
+    await scope.dispose()
+  })
+
+  it("all tag: preserves multiple bindings at the same execution level", async () => {
+    const second = flow({
+      parse: typed<string>(),
+      factory: (ctx) => `second:${ctx.input}`,
+    })
+    const model = tag<typeof respond>({ label: "model-all-same-execution-level" })
+    const run = flow({
+      deps: { models: tags.all(model) },
+      factory: (_ctx, { models }) => Promise.all(models.map((handle) => handle.exec({ input: "all" }))),
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({
+      flow: run,
+      tags: [model(respond), model(second)],
+    })).resolves.toEqual(["hello:all", "second:all"])
+    await ctx.close({ ok: true })
+    await scope.dispose()
+  })
+
   it("handle.flow is the bound flow value", async () => {
     const model = tag<typeof respond>({ label: "model-identity" })
     const run = flow({
@@ -117,7 +156,7 @@ describe("role-tag flow projection", () => {
       deps: { model: tags.required(model) },
       factory: (_ctx, { model }) => model.exec({ input: "call", tags: [marker("layered")] }),
     })
-    const scope = createScope({ tags: [model(echoMarker)] })
+    const scope = createScope({ tags: [model(echoMarker), marker("activation")] })
     const ctx = scope.createContext()
 
     await expect(ctx.exec({ flow: run })).resolves.toBe("call:layered")

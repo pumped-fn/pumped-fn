@@ -1,0 +1,8 @@
+{
+  "type": "estimation_record",
+  "phase": "estimate",
+  "unit_id": "DKR-1",
+  "estimate": { "time_min": 90, "turns": 2, "tokens": null },
+  "observed_at": "2026-07-15T04:15:31Z",
+  "dispatch_ref": "worker-packets/dkr-1.json"
+}

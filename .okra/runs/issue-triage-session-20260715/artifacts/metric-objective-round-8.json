@@ -1,0 +1,10 @@
+{
+  "type": "objective_metric_read",
+  "metric_kind": "objective",
+  "metric_id": "issue_triage_public_contract_pass_count",
+  "value": 0,
+  "target": 16,
+  "observed_at": "2026-07-15T05:30:35Z",
+  "source": "Current PR head d8dc7e84 still has no issue-triage verifier; three breaking flags keep implementation paused while DKR-0 and DKR-4 validation runs.",
+  "freshness": "observed_at=2026-07-15T05:30:35Z -> status=fresh against max_age=10m"
+}

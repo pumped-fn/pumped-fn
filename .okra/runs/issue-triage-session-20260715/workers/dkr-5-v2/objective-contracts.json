@@ -1,0 +1,28 @@
+{
+  "contract_version": "issue-triage.public-contracts.v2-candidate",
+  "type": "named_objective_contract_set",
+  "unit_id": "DKR-5",
+  "revision": 2,
+  "metric_id": "issue_triage_public_contract_pass_count",
+  "target": 16,
+  "denominator_change_count": 0,
+  "contracts": [
+    { "id": "issue-intake-valid", "proof": "Standard Schema validates the complete issue and query request" },
+    { "id": "repository-path-contained", "proof": "canonical root and candidate resolution rejects lexical escape before every effect port" },
+    { "id": "code-evidence-cited", "proof": "code evidence carries citation, revision, freshness, identity, and scope" },
+    { "id": "postgresql-read-only", "proof": "mutating statements are denied before adapters" },
+    { "id": "database-evidence-cited", "proof": "database evidence carries citation, query identity, freshness, and read-only scope" },
+    { "id": "victoria-window-bounded", "proof": "log and trace reads use a positive bounded time window" },
+    { "id": "telemetry-evidence-cited", "proof": "Victoria evidence carries citation, query identity, freshness, and bounded-read scope" },
+    { "id": "evidence-fresh", "proof": "expired or over-age evidence cannot reach publication" },
+    { "id": "hypothesis-supported", "proof": "unsupported hypotheses cannot reach publication" },
+    { "id": "citations-complete", "proof": "every published hypothesis evidence id resolves to collected evidence" },
+    { "id": "verdict-independent", "proof": "verifier identity differs from writer identity and verdict hypothesisId equals the published hypothesis id" },
+    { "id": "verdict-covers-citations", "proof": "verified verdict covers every published evidence id" },
+    { "id": "publication-authorized", "proof": "issues:write authority is checked before adapters" },
+    { "id": "publication-idempotent", "proof": "duplicate keys reuse one receipt and conflict keys reject" },
+    { "id": "known-receipt-retry-safe", "proof": "retry after a lost response returns the stored receipt without a second write" },
+    { "id": "scope-seam-substitutable", "proof": "all logic runs through createScope and declared required tag ports with public API only" }
+  ],
+  "decision": "same sixteen names and frame target; two proofs strengthened; no denominator change"
+}

@@ -1,7 +1,7 @@
 import { createScope, flow, resource, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
 import * as z from "zod"
-import type { ModelRequest, ModelResponse } from "../src/index.js"
+import { model as modelImpl, type ModelRequest, type ModelResponse } from "../src/index.js"
 import * as agent from "../src/agent.js"
 import * as session from "../src/session.js"
 import * as validation from "../src/validation.js"
@@ -68,7 +68,7 @@ describe("database analysis", () => {
       parse: typed<ModelRequest>(),
       factory: (ctx) => ({ content: ctx.input.agentName, stop: true }),
     })
-    const scope = createScope({ tags: [agent.attempt(agent.fromModel(scalar))] })
+    const scope = createScope({ tags: [agent.impl.attempt(agent.fromModel), modelImpl(scalar)] })
     const ctx = scope.createContext()
 
     await expect(ctx.exec({
@@ -89,54 +89,7 @@ describe("database analysis", () => {
     await scope.dispose()
   })
 
-  it("keeps reserved tool and skill runtime dependencies unoverrideable", async () => {
-    const authority = session.createAuthority({
-      tenant: "tenant-a",
-      roots: ["/workspace"],
-      permissions: [],
-      tools: ["inspect_schema"],
-      sandbox: { roots: ["/workspace"], commands: [], write: false, network: false },
-    })
-    const poison = resource({
-      name: "database.poison-runtime",
-      factory: () => { throw new Error("poison runtime resolved") },
-    })
-    const inspectSchema = agent.tool({
-      name: "inspect_schema",
-      version: "1",
-      description: "Inspect schema.",
-      input: z.object({ schema: z.string() }),
-      flow: flow({
-        name: "database.reserved-inspect",
-        parse: typed<{ schema: string }>(),
-        factory: (ctx) => ctx.input.schema,
-      }),
-      deps: { runtime: poison } as never,
-    })
-    const guide = agent.skill({
-      name: "guide",
-      version: "1",
-      description: "Guide.",
-      content: "safe",
-      deps: { runtime: poison } as never,
-    })
-    const scope = createScope({ tags: [
-      session.authority(authority),
-      session.record(initial(authority)),
-      session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
-      validation.engine(validation.standard<z.ZodType>({ id: "zod@4", toJsonSchema: (schema) => z.toJSONSchema(schema) })),
-    ] })
-    const ctx = scope.createContext()
-    await ctx.resolve(session.session)
-
-    await expect(ctx.resolve(inspectSchema)).resolves.toMatchObject({ snapshot: { name: "inspect_schema" } })
-    await expect(ctx.resolve(guide)).resolves.toMatchObject({ name: "guide" })
-
-    await ctx.close()
-    await scope.dispose()
-  })
-
-  it("filters cached broad tools before advertising or dispatch", async () => {
+  it("filters tools by work authority before advertising or dispatch", async () => {
     const authority = session.createAuthority({
       tenant: "tenant-a",
       roots: ["/workspace"],
@@ -147,54 +100,17 @@ describe("database analysis", () => {
     const schema = z.object({ schema: z.string() })
     const toolEffects: string[] = []
     const advertised: string[][] = []
-    const cachedRole = resource<agent.Role>({
-      name: "database.cached-role",
-      ownership: "current",
-      deps: {
-        runtime: session.session,
-        engine: tags.required(validation.engine),
-        epoch: tags.required(session.current.epoch),
-      },
-      factory: (_ctx, { runtime, engine, epoch }) => {
-        const resolvedTool = (id: string): agent.AnyResolvedTool => {
-          const identity = {
-            id,
-            version: "1",
-            schemaDigest: engine.schemaDigest(schema),
-            validationEngine: engine.id,
-            readiness: "ready",
-            flow: `database.cached-${id}`,
-          }
-          const permit = runtime.tools.permit(identity, runtime.authority, epoch)
-          return {
-            snapshot: {
-              identity,
-              name: identity.id,
-              description: `${id}.`,
-              inputSchema: engine.jsonSchema(schema),
-              authorityFingerprint: permit.authorityFingerprint,
-              permitEpoch: permit.epoch,
-              branchId: "main",
-              snapshotEpoch: epoch,
-            },
-            schema,
-            flow: flow({
-              name: identity.flow,
-              parse: typed<{ schema: string }>(),
-              factory: () => { toolEffects.push(id) },
-            }),
-          }
-        }
-        return {
-          name: "cached",
-          version: "1",
-          instructions: "",
-          maxRounds: 1,
-          skills: [],
-          subagents: [],
-          tools: [resolvedTool("apply_schema"), resolvedTool("inspect_schema")],
-        }
-      },
+    const applySchema = flow({
+      name: "apply_schema",
+      tags: [agent.config.tool({ version: "1", description: "Apply schema.", input: schema })],
+      parse: typed<{ schema: string }>(),
+      factory: () => { toolEffects.push("apply_schema") },
+    })
+    const inspectSchema = flow({
+      name: "inspect_schema",
+      tags: [agent.config.tool({ version: "1", description: "Inspect schema.", input: schema })],
+      parse: typed<{ schema: string }>(),
+      factory: () => { toolEffects.push("inspect_schema") },
     })
     const model = flow({
       name: "database.cached-model",
@@ -208,35 +124,43 @@ describe("database analysis", () => {
         }
       },
     })
-    const execute = session.run({
-      name: "database.cached-run",
-      turn: agent.turn({ name: "database.cached-turn", role: cachedRole }),
-    })
     const scope = createScope({ tags: [
       session.authority(authority),
       session.record(initial(authority)),
       session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
       validation.engine(validation.standard<z.ZodType>({ id: "zod@4", toJsonSchema: (value) => z.toJSONSchema(value) })),
-      agent.attempt(agent.fromModel(model)),
+      agent.impl.attempt(agent.fromModel),
+      modelImpl(model),
+      session.execution.turn({ flow: agent.turn }),
     ] })
     const ctx = scope.createContext()
     await ctx.resolve(session.session)
 
     await expect(ctx.exec({
-      flow: execute,
+      flow: session.run,
+      tags: [
+        agent.config.role({ name: "cached", version: "1", maxRounds: 1 }),
+        agent.impl.tool(applySchema),
+        agent.impl.tool(inspectSchema),
+      ],
       input: {
         work: {
           id: "narrowed",
           branchId: "main",
           role: "cached",
           policy: "all",
-          authority: { permissions: ["database:read"], tools: ["inspect_schema"] },
+          authority: { permissions: ["database:read"] },
         },
         input: { prompt: "Inspect." },
       },
     })).resolves.toMatchObject({ toolResults: [{ name: "inspect_schema" }] })
     await expect(ctx.exec({
-      flow: execute,
+      flow: session.run,
+      tags: [
+        agent.config.role({ name: "cached", version: "1", maxRounds: 1 }),
+        agent.impl.tool(applySchema),
+        agent.impl.tool(inspectSchema),
+      ],
       input: {
         work: {
           id: "denied",
@@ -248,7 +172,7 @@ describe("database analysis", () => {
         input: { prompt: "Deny." },
       },
     })).rejects.toThrow('tool "inspect_schema" not found')
-    expect(advertised).toEqual([["inspect_schema"], []])
+    expect(advertised).toEqual([["apply_schema", "inspect_schema"], []])
     expect(toolEffects).toEqual(["inspect_schema"])
 
     await ctx.close()
@@ -263,7 +187,6 @@ describe("database analysis", () => {
       tools: [],
       sandbox: { roots: ["/workspace"], commands: [], write: false, network: false },
     })
-    const analyst = agent.role({ name: "steered", version: "1", maxRounds: 2 })
     let modelStarted!: () => void
     const started = new Promise<void>((resolve) => { modelStarted = resolve })
     let releaseModel!: () => void
@@ -286,31 +209,28 @@ describe("database analysis", () => {
       session.record(initial(authority)),
       session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
       validation.engine(validation.standard<z.ZodType>({ id: "zod@4", toJsonSchema: (schema) => z.toJSONSchema(schema) })),
-      agent.attempt(agent.fromModel(model)),
+      agent.config.role({ name: "steered", version: "1", maxRounds: 2 }),
+      agent.impl.attempt(agent.fromModel),
+      modelImpl(model),
+      session.execution.turn({ flow: agent.turn }),
     ] })
     const ctx = scope.createContext()
     const runtime = await ctx.resolve(session.session)
-    const active = runtime.work.admit({ id: "steered-work", branchId: "main", role: "steered", policy: "all" })
-    const work = runtime.record.work.find((value) => value.id === "steered-work")!
-    const branch = runtime.branches.current()
     const running = ctx.exec({
-      flow: agent.turn({ name: "database.steered-turn", role: analyst }),
-      input: { prompt: "Analyze." },
-      tags: [
-        session.current.session(runtime),
-        session.current.work(work),
-        session.current.attempt(active.record),
-        session.current.branch(branch),
-        session.current.authority(work.authority),
-        session.current.epoch(active.record.snapshotEpoch),
-      ],
+      flow: session.run,
+      input: {
+        work: { id: "steered-work", branchId: "main", role: "steered", policy: "all" },
+        input: { prompt: "Analyze." },
+      },
     })
     await started
+    const work = runtime.record.work.find((value) => value.id === "steered-work")!
+    const active = runtime.record.attempts.find((value) => value.workId === work.id)!
     runtime.controls.enqueue({
       id: "steer-1",
       workId: work.id,
-      attempt: active.record.attempt,
-      expectedEpoch: active.record.snapshotEpoch,
+      attempt: active.attempt,
+      expectedEpoch: active.snapshotEpoch,
       sequence: 1,
       mode: "queue",
       source: "human",
@@ -320,7 +240,6 @@ describe("database analysis", () => {
     const result = await running
     expect(result.rounds).toBe(2)
     expect(result.events.some((value) => value.type === "agent_control")).toBe(true)
-    runtime.work.settle(work.id, active.record.attempt, { status: "completed" })
 
     await ctx.close()
     await scope.dispose()
@@ -334,42 +253,50 @@ describe("database analysis", () => {
       tools: ["inspect_schema"],
       sandbox: { roots: ["/workspace"], commands: [], write: false, network: false },
     })
-    const inspectSchema = agent.tool({
-      name: "inspect_schema",
-      version: "1",
-      description: "Inspect schema.",
-      input: z.object({ schema: z.string() }),
-      flow: flow({
-        name: "database.parallel-inspect",
-        parse: typed<{ schema: string }>(),
-        factory: (ctx) => ctx.input.schema,
-      }),
-    })
     let resolved = 0
     let release!: () => void
     const both = new Promise<void>((done) => { release = done })
-    const snapshot = flow({
-      name: "database.parallel-snapshot",
-      deps: { tool: inspectSchema },
-      factory: async (_ctx, { tool }) => {
+    const inspectSchema = flow({
+      name: "inspect_schema",
+      tags: [agent.config.tool({
+        version: "1",
+        description: "Inspect schema.",
+        input: z.object({ schema: z.string() }),
+      })],
+      parse: typed<{ schema: string }>(),
+      factory: async (ctx) => {
         resolved++
         if (resolved === 2) release()
         await both
-        return tool.snapshot
+        return ctx.input.schema
       },
     })
-    const execute = session.run({ name: "database.parallel-permit", turn: snapshot })
+    const attempt: agent.Attempt = flow({
+      name: "database.parallel-attempt",
+      parse: typed<ModelRequest>(),
+      factory: (): ModelResponse => ({
+        content: "inspect",
+        toolCalls: [{ name: "inspect_schema", input: { schema: "public" } }],
+        stop: true,
+      }),
+    })
     const scope = createScope({ tags: [
       session.authority(authority),
       session.record(initial(authority)),
       session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
       validation.engine(validation.standard<z.ZodType>({ id: "zod@4", toJsonSchema: (schema) => z.toJSONSchema(schema) })),
+      agent.impl.attempt(attempt),
+      session.execution.turn({ flow: agent.turn }),
     ] })
     const ctx = scope.createContext()
     const runtime = await ctx.resolve(session.session)
     const [left, right] = await Promise.all([
       ctx.exec({
-        flow: execute,
+        flow: session.run,
+        tags: [
+          agent.config.role({ name: "parallel", version: "1", maxRounds: 1 }),
+          agent.impl.tool(inspectSchema),
+        ],
         input: {
           work: {
             id: "read-work",
@@ -378,11 +305,15 @@ describe("database analysis", () => {
             policy: "all",
             authority: { permissions: ["database:read"] },
           },
-          input: undefined,
+          input: { prompt: "Inspect as reader." },
         },
       }),
       ctx.exec({
-        flow: execute,
+        flow: session.run,
+        tags: [
+          agent.config.role({ name: "parallel", version: "1", maxRounds: 1 }),
+          agent.impl.tool(inspectSchema),
+        ],
         input: {
           work: {
             id: "write-work",
@@ -391,19 +322,16 @@ describe("database analysis", () => {
             policy: "all",
             authority: { permissions: ["database:write"] },
           },
-          input: undefined,
+          input: { prompt: "Inspect as writer." },
         },
       }),
     ])
 
-    expect(left.authorityFingerprint).not.toBe(right.authorityFingerprint)
-    expect(runtime.tools.authorize(left.identity, left.permitEpoch, left.authorityFingerprint).authorityFingerprint).toBe(
-      left.authorityFingerprint,
-    )
-    expect(runtime.tools.authorize(right.identity, right.permitEpoch, right.authorityFingerprint).authorityFingerprint).toBe(
-      right.authorityFingerprint,
-    )
-    expect(() => runtime.tools.authorize(left.identity, left.permitEpoch, right.authorityFingerprint)).toThrow("not authorized")
+    const readWork = runtime.record.work.find((value) => value.id === "read-work")!
+    const writeWork = runtime.record.work.find((value) => value.id === "write-work")!
+    expect(readWork.authority.fingerprint).not.toBe(writeWork.authority.fingerprint)
+    expect(left.toolResults).toMatchObject([{ name: "inspect_schema", output: "public" }])
+    expect(right.toolResults).toMatchObject([{ name: "inspect_schema", output: "public" }])
 
     await ctx.close()
     await scope.dispose()
@@ -417,7 +345,6 @@ describe("database analysis", () => {
       tools: [],
       sandbox: { roots: ["/workspace"], commands: [], write: false, network: false },
     })
-    const analyst = agent.role({ name: "abandoned", version: "1" })
     const model = flow({
       name: "database.abandoned-model",
       parse: typed<ModelRequest>(),
@@ -432,22 +359,21 @@ describe("database analysis", () => {
         return { version: ctx.input.expectedVersion + 1 }
       },
     })
-    const execute = session.run({
-      name: "database.abandoned-run",
-      turn: agent.turn({ name: "database.abandoned-turn", role: analyst }),
-    })
     const scope = createScope({ tags: [
       session.authority(authority),
       session.record(initial(authority)),
       session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
       session.store.commit(commit),
       validation.engine(validation.standard<z.ZodType>({ id: "zod@4", toJsonSchema: (schema) => z.toJSONSchema(schema) })),
-      agent.attempt(agent.fromModel(model)),
+      agent.config.role({ name: "abandoned", version: "1" }),
+      agent.impl.attempt(agent.fromModel),
+      modelImpl(model),
+      session.execution.turn({ flow: agent.turn }),
     ] })
     const ctx = scope.createContext()
     const runtime = await ctx.resolve(session.session)
     const stream = ctx.execStream({
-      flow: execute,
+      flow: session.run,
       input: {
         work: { id: "abandoned-work", branchId: "main", role: "abandoned", policy: "all" },
         input: { prompt: "Analyze." },
@@ -506,23 +432,16 @@ describe("database analysis", () => {
         return impl
       },
     })
-    const inspectSchema = agent.tool({
+    const inspectSchema = flow({
       name: "inspect_schema",
-      version: "1",
-      description: "Read the current schema.",
-      input: z.object({ schema: z.string() }),
-      flow: flow({
-        name: "database.missing-ready-inspect-schema",
-        parse: typed<InspectSchemaInput>(),
-        deps: { inspect },
-        factory: (ctx, { inspect }) => inspect.exec({ input: ctx.input }),
-      }),
-      deps: { ready },
-    })
-    const analyst = agent.role({
-      name: "missing-ready-analyst",
-      version: "1",
-      tools: { inspectSchema },
+      tags: [agent.config.tool({
+        version: "1",
+        description: "Read the current schema.",
+        input: z.object({ schema: z.string() }),
+      })],
+      parse: typed<InspectSchemaInput>(),
+      deps: { inspect },
+      factory: (ctx, { inspect }) => inspect.exec({ input: ctx.input }),
     })
     const model = flow({
       name: "database.missing-ready-model",
@@ -532,23 +451,23 @@ describe("database analysis", () => {
         return { content: "unreachable", stop: true }
       },
     })
-    const execute = session.run({
-      name: "database.missing-ready-run",
-      turn: agent.turn({ name: "database.missing-ready-turn", role: analyst }),
-    })
     const scope = createScope({ tags: [
       session.authority(authority),
       session.record(initial(authority)),
       session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
       database.inspect(physicalInspect),
       validation.engine(validation.standard<z.ZodType>({ id: "zod@4", toJsonSchema: (schema) => z.toJSONSchema(schema) })),
-      agent.attempt(agent.fromModel(model)),
+      agent.config.role({ name: "missing-ready-analyst", version: "1" }),
+      agent.impl.tool(inspectSchema),
+      agent.impl.attempt(agent.fromModel),
+      modelImpl(model),
+      session.execution.turn({ flow: agent.turn }),
     ] })
     const ctx = scope.createContext()
     await ctx.resolve(session.session)
 
     await expect(ctx.exec({
-      flow: execute,
+      flow: session.run,
       input: {
         work: { id: "missing-ready", branchId: "main", role: "missing-ready-analyst", policy: "all" },
         input: { prompt: "Inspect public." },
@@ -644,49 +563,33 @@ describe("database analysis", () => {
         return impl
       },
     })
-    const inspectSchema = agent.tool({
+    const inspectSchema = flow({
       name: "inspect_schema",
-      version: "1",
-      description: "Read the current schema.",
-      input: z.object({ schema: z.string() }),
-      flow: flow({
-        name: "database.inspect_schema",
-        parse: typed<InspectSchemaInput>(),
-        deps: { inspect },
-        factory: (ctx, { inspect }) => inspect.exec({ input: ctx.input }),
-      }),
-      deps: { ready },
+      tags: [agent.config.tool({
+        version: "1",
+        description: "Read the current schema.",
+        input: z.object({ schema: z.string() }),
+      })],
+      parse: typed<InspectSchemaInput>(),
+      deps: { inspect },
+      factory: (ctx, { inspect }) => inspect.exec({ input: ctx.input }),
     })
-    const explainQuery = agent.tool({
+    const explainQuery = flow({
       name: "explain_query",
-      version: "1",
-      description: "Explain a query without applying changes.",
-      input: z.object({ sql: z.string() }),
-      flow: flow({
-        name: "database.explain_query",
-        parse: typed<ExplainQueryInput>(),
-        deps: { explain },
-        factory: (ctx, { explain }) => explain.exec({ input: ctx.input }),
-      }),
-      deps: { ready },
-    })
-    const schemaRole = agent.role({
-      name: "schema-analyst",
-      version: "1",
-      instructions: "Inspect schema. Never apply DDL.",
-      tools: { inspectSchema },
-    })
-    const queryRole = agent.role({
-      name: "query-analyst",
-      version: "1",
-      instructions: "Explain queries. Never apply changes.",
-      tools: { explainQuery },
+      tags: [agent.config.tool({
+        version: "1",
+        description: "Explain a query without applying changes.",
+        input: z.object({ sql: z.string() }),
+      })],
+      parse: typed<ExplainQueryInput>(),
+      deps: { explain },
+      factory: (ctx, { explain }) => explain.exec({ input: ctx.input }),
     })
     const scripted: agent.Attempt = flow({
       name: "database.scripted-attempt",
       parse: typed<ModelRequest>(),
       factory: async function* (ctx): AsyncGenerator<agent.ModelEvent, ModelResponse, unknown> {
-        expect(databaseLeases).toBe(0)
+        expect(databaseLeases).toBe(2)
         expect(ctx.input.tools[0]?.inputSchema).toMatchObject({ type: "object" })
         advertised.push(ctx.input.tools.map((tool) => tool.name))
         providerActive++
@@ -776,7 +679,8 @@ describe("database analysis", () => {
         id: "zod@4",
         toJsonSchema: (schema) => z.toJSONSchema(schema),
       })),
-      agent.attempt(scripted),
+      agent.impl.attempt(scripted),
+      session.execution.turn({ flow: agent.turn }),
     ] })
     const ctx = scope.createContext()
     const runtime = await ctx.resolve(session.session)
@@ -790,17 +694,31 @@ describe("database analysis", () => {
       flow: session.fork,
       input: { id: "query", parentId: "main", workId: "parent", authority: { tools: ["explain_query"] } },
     })
-    const analyzeSchema = session.run({ name: "database.schema", turn: agent.turn({ name: "database.schema.turn", role: schemaRole }) })
-    const analyzeQuery = session.run({ name: "database.query", turn: agent.turn({ name: "database.query.turn", role: queryRole }) })
     const schemaResult = ctx.exec({
-      flow: analyzeSchema,
+      flow: session.run,
+      tags: [
+        agent.config.role({
+          name: "schema-analyst",
+          version: "1",
+          instructions: "Inspect schema. Never apply DDL.",
+        }),
+        agent.impl.tool(inspectSchema),
+      ],
       input: {
         work: { id: "schema-work", branchId: left.id, role: "schema-analyst", policy: "all", authority: { tools: ["inspect_schema"] } },
         input: { prompt: "Inspect public." },
       },
     })
     const queryResult = ctx.exec({
-      flow: analyzeQuery,
+      flow: session.run,
+      tags: [
+        agent.config.role({
+          name: "query-analyst",
+          version: "1",
+          instructions: "Explain queries. Never apply changes.",
+        }),
+        agent.impl.tool(explainQuery),
+      ],
       input: {
         work: { id: "query-work", branchId: right.id, role: "query-analyst", policy: "all", authority: { tools: ["explain_query"] } },
         input: { prompt: "Optimize invoices." },

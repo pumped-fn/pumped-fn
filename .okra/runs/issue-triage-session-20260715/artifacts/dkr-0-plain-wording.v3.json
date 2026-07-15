@@ -1,0 +1,7 @@
+{
+  "schema_version": "dkr-0.plain-wording.v3",
+  "observed_at": "2026-07-15T05:18:37Z",
+  "plain_wording_violation_count": 0,
+  "checker": "python3 /home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/scripts/check-plain-wording.py",
+  "scope": "v3 matrix, checkpoint, direct gate results, replay scripts, and worker generators"
+}

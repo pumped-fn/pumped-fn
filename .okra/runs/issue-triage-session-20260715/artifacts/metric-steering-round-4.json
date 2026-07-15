@@ -1,0 +1,10 @@
+{
+  "type": "metric_read",
+  "metric_kind": "ckr",
+  "metric_id": "steering_value_score",
+  "value": 1,
+  "target": 0.75,
+  "observed_at": "2026-07-15T04:42:18Z",
+  "source": "DKR-3 behavior and all six walls were independently verified while its stale hash kept the checkpoint blocked; DKR-1 produced a ten-case cleanup contract and received a separate validator; DKR-2 was activated for the only generic Lite uncertainty.",
+  "freshness": "observed_at=2026-07-15T04:42:18Z -> status=fresh against max_age=10m"
+}

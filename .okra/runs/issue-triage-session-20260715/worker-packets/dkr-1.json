@@ -1,0 +1,80 @@
+{
+  "role_header": "# Role: OKRA writer (progression / discovery worker)",
+  "model_phrasing": "Model phrasing: GPT-5.x detected from the system harness; Phrasing profile id RTM-PH6OCQ6MX4.",
+  "frame.objective": "issue_triage_public_contract_pass_count == 16/16 at the merge-ready PR 346 head",
+  "frame.anti_goals": [
+    "scope_seam_escape_count == 0",
+    "undeclared_effect_edge_count == 0",
+    "cleanup_business_state_mutation_count == 0",
+    "cross_session_leak_count == 0",
+    "unapproved_external_write_count == 0",
+    "unsupported_hypothesis_publish_count == 0",
+    "sensitive_context_export_count == 0",
+    "single_llm_truth_acceptance_count == 0",
+    "primitive_proof_gap_count == 0",
+    "touched_surface_regression_count == 0",
+    "slop_violation_count == 0",
+    "abstraction_level_jump_count == 0",
+    "ungoverned_write_or_read_count == 0",
+    "anti_goal_bypass_or_dishonesty_count == 0"
+  ],
+  "active_anti_goals": [
+    "cleanup_business_state_mutation_count == 0 because activation close semantics are under test",
+    "cross_session_leak_count == 0 because current ownership and per-exec tags are under test",
+    "primitive_proof_gap_count == 0 because a Lite ownership change is being considered",
+    "single_llm_truth_acceptance_count == 0 because this checkpoint needs later validation",
+    "ungoverned_write_or_read_count == 0 because probes must be replayable",
+    "anti_goal_bypass_or_dishonesty_count == 0 because this is a steering checkpoint"
+  ],
+  "frame.action_envelope": {
+    "allowed": [
+      "Read Lite and SDK source and tests",
+      "Write only DKR-1 probe, replay, checkpoint, and progress artifacts under the active run store",
+      "Run focused local probes without changing product files"
+    ],
+    "forbidden": [
+      "Edit product code, frame, tree, or another worker artifact",
+      "Add a Lite primitive, access external services, install dependencies, commit, push, release, or merge"
+    ],
+    "permission_owner": "User and runtime"
+  },
+  "frame.human_confirmation_boundary": "Only the human changes the frame; the orchestrator accepts or rejects this checkpoint after independent verification and challenge.",
+  "current_state": {
+    "run_id": "issue-triage-session-20260715",
+    "branch": "feat/session-kernel",
+    "head": "d8dc7e845d3a7618fdf41525b67b8bac83d05d28",
+    "hypothesis": "One controller(flow).exec call with per-exec tags is one observable activation context; a current-owned session resource resolved by the entry flow is reused by nested executions and isolated from sibling calls."
+  },
+  "previous_dkr_checkpoint": null,
+  "assignment": "DKR-1. Build replayable run-store probes that compare the current ownership model with the proposed activation-context model. Prove or refute: per-exec tags are visible to the entry flow and descendants; the entry flow can resolve one current-owned session resource; nested turn and tool flows reuse it; sibling exec calls do not; close without explicit finish causes no durable business-state transition; checkpoint-close-load-resume works without retaining ExecutionContext. Compare nearest-explicit-context ownership only if a named proof fails. Return the smallest steering decision, not implementation code.",
+  "budget_and_stop_rule": "At most two probe iterations or 90 minutes. Stop when all named claims are replayable, when one counterexample settles the ownership decision, or when an unknown requires another DKR.",
+  "hand_back_rule": "Do not redesign cancellation, observation, queue workers, or evidence publication. Hand those unknowns back to their named DKRs.",
+  "output_schema": {
+    "checkpoint_id": "dkr-1-activation-context-v1",
+    "conclusion_id": "activation-ownership",
+    "decision_target": "current ownership versus a new ownership primitive",
+    "source_of_truth": "saved activation probe and current source",
+    "read_method": "run the saved replay checker",
+    "observed_at": "ISO-8601",
+    "recorded_at": "ISO-8601",
+    "max_age": "10m",
+    "freshness_status": "fresh or stale",
+    "confidence": "number from 0 to 1",
+    "evidence_refs_or_hashes": [],
+    "replay_command_or_checker": "saved script path",
+    "questions_answered": [],
+    "questions_unanswered": [],
+    "decision": "candidate only; never accepted by this worker",
+    "flag_if_missing_or_stale": "cannot",
+    "reviewer_audit_status": "pending",
+    "active_anti_goals": [],
+    "active_anti_goal_verification": [],
+    "wall_gate": { "verdict": "pending", "downstream_advance": "blocked" },
+    "confidence_probability_update": "before and after",
+    "risk_or_anti_goal_implications": [],
+    "candidate_ckrs": [],
+    "candidate_pkrs": []
+  },
+  "worker_progress": ".okra/runs/issue-triage-session-20260715/workers/dkr-1/progress.jsonl at finish, unknown, or ten-minute heartbeat",
+  "in_progress_influence_rule": "In-progress worker narrative is not evidence; only worker progress, check-ins, metric reads, flags, or accepted checkpoints can influence the next dispatch."
+}

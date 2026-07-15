@@ -1,0 +1,10 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "slop_violation_count",
+  "value": 0,
+  "target": 0,
+  "observed_at": "2026-07-15T07:42:55Z",
+  "source": "Authoritative touched SDK and documentation lint scanned 82 files with zero diagnostics; example alignment and git diff checks passed.",
+  "freshness": "observed_at=2026-07-15T07:42:55Z -> status=fresh against max_age=10m"
+}

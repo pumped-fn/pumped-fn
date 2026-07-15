@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "worker_id": "validator-dkr-3-v2",
+  "unit_id": "DKR-3",
+  "observed_at": "2026-07-15T05:20:38Z",
+  "candidate_checkpoint": "workers/dkr-3-v2/checkpoint.v2.json",
+  "candidate_checkpoint_sha256": "05ff9190f7796ec7bbe2884f25ff0f9da302c7b37532bea20c47a91d3844d67c",
+  "disposition": {
+    "behavior": "accepted_from_candidate_and_prior_independent_replay",
+    "evidence_hashes": "accepted_11_of_11",
+    "api_boundary": "accepted_from_candidate_and_prior_independent_replay",
+    "checkpoint_v2": "rejected_pending_successful_independent_v2_replay",
+    "downstream_advance": "blocked"
+  },
+  "behavior_results": {
+    "trace_dimensions": "12/12",
+    "same_scope_cross_session_leak_count": 0,
+    "forbidden_export_count": 0,
+    "terminal_settlement_order": "2/2",
+    "projection_source_count": 1,
+    "arbitrary_tag_enumeration_path_count": 0,
+    "public_context_data_callback_count": 0,
+    "lite_projection_change_count": 0
+  },
+  "wall_dispositions": [
+    {
+      "metric_id": "sensitive_context_export_count",
+      "value": 0,
+      "threshold": 0,
+      "decision": "accepted",
+      "evidence": "Candidate and prior independent replay report zero forbidden exports."
+    },
+    {
+      "metric_id": "cross_session_leak_count",
+      "value": 0,
+      "threshold": 0,
+      "decision": "accepted",
+      "evidence": "Candidate and prior independent same-Scope replay report zero leaks."
+    },
+    {
+      "metric_id": "primitive_proof_gap_count",
+      "value": 0,
+      "threshold": 0,
+      "decision": "accepted",
+      "evidence": "Prior independent seam replay reports one safe source and no Lite projection change."
+    },
+    {
+      "metric_id": "single_llm_truth_acceptance_count",
+      "value": 1,
+      "threshold": 0,
+      "decision": "rejected",
+      "evidence": "The v2 independent checker failed before completing its wall-reference audit."
+    },
+    {
+      "metric_id": "ungoverned_write_or_read_count",
+      "value": 0,
+      "threshold": 0,
+      "decision": "accepted",
+      "evidence": "Writes are confined to the validator worker path and the run store verified before governed output."
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "value": 0,
+      "threshold": 0,
+      "decision": "accepted",
+      "evidence": "The failed independent checker and invalid recorded replay command remain explicit and blocking."
+    }
+  ],
+  "audit_traces": [
+    {
+      "claim_id": "dkr3-v2.candidate-replay",
+      "check": "The repaired candidate replay covers behavior, checkpoint fields, six walls, and eleven evidence hashes.",
+      "metric_or_check": "candidate_replay_exit_code",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/dkr-3-v2/replay.sh",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v2/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:aac5656db170c7406fc0c0473c29c0fae947e8d9afe4cfedd8526219e905a0d8",
+        "sha256:05ff9190f7796ec7bbe2884f25ff0f9da302c7b37532bea20c47a91d3844d67c"
+      ],
+      "observed_at": "2026-07-15T05:19:17Z",
+      "decision": "accepted",
+      "evidence": "traceDimensions=12/12; sameScopeCrossSessionLeakCount=0; forbiddenExportCount=0; terminalSettlementOrder=2/2; checkpointFields=20/20; wallEntries=6/6; evidenceHashes=11/11; unresolvedEvidenceHashes=0."
+    },
+    {
+      "claim_id": "dkr3-v2.safe-projection-behavior",
+      "check": "Safe projection covers twelve dimensions, isolates overlapping same-Scope sessions, drops forbidden values, and settles both terminal orders correctly.",
+      "metric_or_check": "behavior_contract_pass_count",
+      "threshold": 4,
+      "value": 4,
+      "source_of_truth": "candidate replay plus workers/validator-dkr-3/verification.json",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v2/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:d50115adef22565d2cf86c95918854fe856a70688436ff03941ef6bc46668b5c"
+      ],
+      "observed_at": "2026-07-15T05:19:17Z",
+      "decision": "accepted",
+      "evidence": "12/12 dimensions; cross-session leaks 0; forbidden matches empty; success and error settlement arrays both activation-close, flush, close."
+    },
+    {
+      "claim_id": "dkr3-v2.public-api-boundary",
+      "check": "Observation uses one named safe projection with no arbitrary enumeration, ContextData callback, or Lite projection primitive.",
+      "metric_or_check": "unsafe_observation_api_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "candidate seam replay and checkpoint observation_decision",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v2/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:9647ad58a0f61316d1daf87bd88144361c3fdd1d6795f788cffb9dd27cf2da63",
+        "sha256:05ff9190f7796ec7bbe2884f25ff0f9da302c7b37532bea20c47a91d3844d67c"
+      ],
+      "observed_at": "2026-07-15T05:19:17Z",
+      "decision": "accepted",
+      "evidence": "safeProjectionSourceCount=1; arbitraryTagEnumerationPathCount=0; publicContextDataCallbackCount=0; liteCoreChangeRequiredForProjection=false."
+    },
+    {
+      "claim_id": "dkr3-v2.evidence-hashes",
+      "check": "Every checkpoint evidence hash resolves to one named file.",
+      "metric_or_check": "resolved_checkpoint_evidence_hash_count",
+      "threshold": 11,
+      "value": 11,
+      "source_of_truth": "workers/dkr-3-v2/replay.sh evidencePaths",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v2/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:aac5656db170c7406fc0c0473c29c0fae947e8d9afe4cfedd8526219e905a0d8"],
+      "observed_at": "2026-07-15T05:19:17Z",
+      "decision": "accepted",
+      "evidence": "evidenceHashes=11/11; unresolvedEvidenceHashes=0."
+    },
+    {
+      "claim_id": "dkr3-v2.independent-wall-reference-audit",
+      "check": "All six active walls cite the prior independent behavior record rather than writer self-certification.",
+      "metric_or_check": "independent_wall_reference_pass_count",
+      "threshold": 6,
+      "value": 0,
+      "source_of_truth": "workers/validator-dkr-3-v2/independent-check.mjs",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-3-v2/replay.sh",
+      "exit_code": 1,
+      "sha256": [
+        "sha256:c213d9d5bf036a1895c8395518d31f13316b52725bf1450d94a7ad1548fb092b",
+        "sha256:fbbb5c7e865e7842c1b7dc61724be23202f8a3057f4439dcd90434f41f65985d"
+      ],
+      "observed_at": "2026-07-15T05:20:03Z",
+      "decision": "rejected",
+      "failure_mode": "checker-failed",
+      "evidence": "TypeError: Cannot read properties of undefined (reading safeProjectionSourceCount) at independent-check.mjs:42. The checker exited before the six-wall loop."
+    },
+    {
+      "claim_id": "dkr3-v2.independent-acceptance",
+      "check": "A separate v2 validator completes all required checks without relying only on prior or writer evidence.",
+      "metric_or_check": "successful_independent_v2_replay_count",
+      "threshold": 1,
+      "value": 0,
+      "source_of_truth": "workers/validator-dkr-3-v2/replay.sh",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-3-v2/replay.sh",
+      "exit_code": 1,
+      "sha256": ["sha256:fbbb5c7e865e7842c1b7dc61724be23202f8a3057f4439dcd90434f41f65985d"],
+      "observed_at": "2026-07-15T05:20:03Z",
+      "decision": "rejected",
+      "failure_mode": "checker-failed",
+      "evidence": "The independent v2 checker failed before completing its source, wall, and hash assertions."
+    },
+    {
+      "claim_id": "dkr3-v2.recorded-replay-command",
+      "check": "The checkpoint replay_command_or_checker resolves from the repository root.",
+      "metric_or_check": "missing_replay_path_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "checkpoint.v2.json replay_command_or_checker",
+      "replay": "workers/dkr-3-v2/replay.sh",
+      "exit_code": 127,
+      "sha256": ["sha256:05ff9190f7796ec7bbe2884f25ff0f9da302c7b37532bea20c47a91d3844d67c"],
+      "observed_at": "2026-07-15T05:20:15Z",
+      "decision": "rejected",
+      "failure_mode": "non-replayable",
+      "evidence": "zsh:1: no such file or directory: workers/dkr-3-v2/replay.sh"
+    },
+    {
+      "claim_id": "dkr3-v2.store-baseline",
+      "check": "The run store verifies before governed validator output.",
+      "metric_or_check": "store_verification_failure_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "okra-store.sh verify",
+      "replay": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/scripts/okra-store.sh verify .okra/runs/issue-triage-session-20260715",
+      "exit_code": 0,
+      "sha256": "n/a",
+      "observed_at": "2026-07-15T05:20:38Z",
+      "decision": "accepted",
+      "evidence": "OKRA store verified: .okra/runs/issue-triage-session-20260715"
+    }
+  ],
+  "summary": {
+    "accepted": 5,
+    "rejected": 3,
+    "rejected_claim_ids": [
+      "dkr3-v2.independent-wall-reference-audit",
+      "dkr3-v2.independent-acceptance",
+      "dkr3-v2.recorded-replay-command"
+    ]
+  }
+}

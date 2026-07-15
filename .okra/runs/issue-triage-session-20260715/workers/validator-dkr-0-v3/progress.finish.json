@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "worker_id": "validator-dkr-0-v3",
+  "status": "complete",
+  "unit_id": "DKR-0",
+  "matrix_disposition": "accepted",
+  "checkpoint_disposition": "rejected_stale_and_walls_breached",
+  "downstream_advance": "blocked",
+  "accepted_claim_count": 12,
+  "rejected_claim_count": 7,
+  "classified_touched_regression_count": 1,
+  "environment_only_failed_gate_count": 1,
+  "raw_lint_diagnostic_count": 72,
+  "confirmed_graph_violation_count": 2,
+  "valid_unique_in_scope_slop_count": "unresolved",
+  "verification_ref": "workers/validator-dkr-0-v3/verification.json",
+  "replay_ref": "workers/validator-dkr-0-v3/replay.sh",
+  "next_authority": "orchestrator",
+  "observed_at": "2026-07-15T05:35:14Z"
+}

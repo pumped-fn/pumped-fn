@@ -1,0 +1,275 @@
+{
+  "verification_id": "validator-dkr-1-cleanup-v1",
+  "worker_id": "validator-dkr-1-cleanup",
+  "packet_ref": "worker-packets/validator-dkr-1-cleanup.json",
+  "frame_ref": "frame/frame.v2.json",
+  "candidate_checkpoint": "workers/dkr-1-cleanup/checkpoint.v2.json",
+  "observed_at": "2026-07-15T04:48:15Z",
+  "disposition": {
+    "status": "blocked",
+    "learning_status": "partially_verified",
+    "contract_status": "rejected_pending_additional_executable_case",
+    "downstream_advance": "blocked",
+    "reason": "The saved model passes all ten named cases and preserves six activation behaviors, but it does not execute the claimed multiple-settlement AggregateError branch. The current product also reads cleanup_business_state_mutation_count 1 against threshold 0."
+  },
+  "replays": {
+    "candidate_contract": {
+      "command": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup/replay.sh",
+      "exit_code": 0
+    },
+    "validator_checker": {
+      "command": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-1-cleanup/replay.sh",
+      "exit_code": 1,
+      "failure": "All eight candidate hashes and checkpoint shape checks passed before a line-wrapped canonical-skill phrase check returned 1. The saved checker was corrected for future replay and was not rerun."
+    }
+  },
+  "hash_verification": {
+    "matched": 8,
+    "total": 8,
+    "decision": "accepted",
+    "hashes": [
+      "sha256:912c3874fb823655abf4e69a6ed9db16573de8d3640638aa41a8b4dfabdb7603",
+      "sha256:0d6a86e5d40573ef827767ed44bbc10c39aaa26eda317e5202449eae6eda6b4d",
+      "sha256:cfa9a363c400e6637e8537ba0ac5053fa96f70cf8dfca85d43deccede705b500",
+      "sha256:78b6500dee31b501644f3a528149e2efb3cb8f684a59373071cf9fdc5f5cfe06",
+      "sha256:7fb45a842db6233d61ee7f2d81e886c4ac2c8b5fc77549ff4db8bc41df8a725f",
+      "sha256:549e6b4096698a433f5a843dc4851d2ab9743c7b5e77e7497e0205c7d9aa3b0b",
+      "sha256:b8810fd41440692eb6390cb6efb954dbfcbc8af188a2e370c30975eca9944001",
+      "sha256:b0d98497cdf17e6f3b2c6062344fca910aa310f99104c6276159657d2bec5129"
+    ]
+  },
+  "exact_wall_reads": [
+    {
+      "metric_id": "cleanup_business_state_mutation_count",
+      "value": 1,
+      "threshold": 0,
+      "verdict": "breached",
+      "evidence": "current runtime status and record status become finishing on ordinary close; durable status remains open and commit count remains 0"
+    },
+    {
+      "metric_id": "cross_session_leak_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held",
+      "evidence": "the inherited independent activation replay preserves sibling runtime and tag isolation at 6 of 6 behaviors"
+    },
+    {
+      "metric_id": "primitive_proof_gap_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_for_discovery",
+      "evidence": "current Runtime owns attempts and controllers; existing Lite close already awaits LIFO execution and reverse-resolution resource cleanup; no Lite primitive is proposed"
+    },
+    {
+      "metric_id": "single_llm_truth_acceptance_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_for_validator_disposition",
+      "evidence": "this independent validator rejects the unexecuted aggregation claim and does not accept the writer checkpoint"
+    },
+    {
+      "metric_id": "ungoverned_write_or_read_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held",
+      "evidence": "writes are confined to workers/validator-dkr-1-cleanup and the governed worker report"
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held",
+      "evidence": "the current breach, failed validator checker, and missing multiple-error case remain explicit and blocking"
+    }
+  ],
+  "audit_traces": [
+    {
+      "claim_id": "DKR-1-cleanup.cited-hashes",
+      "check": "Every evidence hash cited by the checkpoint matches its current source.",
+      "metric_or_check": "matched_cited_hash_count",
+      "threshold": 8,
+      "value": 8,
+      "source_of_truth": "checkpoint.v2.json evidence_refs_or_hashes and the eight cited files",
+      "replay": "sha256sum .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup/cleanup-contract.json .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup/cleanup-contract-probe.mjs .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup/replay.sh pkg/sdk/core/src/session.ts pkg/sdk/core/tests/session-kernel.test.ts pkg/core/lite/src/scope.ts .okra/runs/issue-triage-session-20260715/workers/dkr-1/checkpoint.json .okra/runs/issue-triage-session-20260715/workers/validator-dkr-0-1/verification.json",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:9f76aad9ed47edeed27a7e9f439137c45424137169318736accd3468fc2e2b51"
+      ],
+      "observed_at": "2026-07-15T04:48:15Z",
+      "decision": "accepted",
+      "evidence": "All eight sha256sum checks printed OK before the later canonical phrase check failed."
+    },
+    {
+      "claim_id": "DKR-1-cleanup.preserved-activation",
+      "check": "The cleanup contract preserves the six independently verified current-owned activation behaviors.",
+      "metric_or_check": "activation_behavior_pass_count",
+      "threshold": 6,
+      "value": 6,
+      "source_of_truth": "workers/dkr-1/replay.sh and workers/validator-dkr-0-1/verification.json",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:b0d98497cdf17e6f3b2c6062344fca910aa310f99104c6276159657d2bec5129"
+      ],
+      "observed_at": "2026-07-15T04:48:15Z",
+      "decision": "accepted",
+      "evidence": "preservedActivationBehavior value=6, threshold=6, decision=accepted"
+    },
+    {
+      "claim_id": "DKR-1-cleanup.ten-cases",
+      "check": "The candidate runtime model passes all ten named cleanup cases.",
+      "metric_or_check": "candidate_cleanup_case_pass_count",
+      "threshold": 10,
+      "value": 10,
+      "source_of_truth": "workers/dkr-1-cleanup/cleanup-contract-probe.mjs",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:0d6a86e5d40573ef827767ed44bbc10c39aaa26eda317e5202449eae6eda6b4d"
+      ],
+      "observed_at": "2026-07-15T04:48:15Z",
+      "decision": "accepted",
+      "evidence": "candidateCaseCount=10; pass=true; ordinary close commit, durable status mutation, durable version mutation, repeated extra effect, deactivate-first commit, and new Lite primitive counts all equal 0; finish-first commit count equals 1"
+    },
+    {
+      "claim_id": "DKR-1-cleanup.arbitration-semantics",
+      "check": "The executable cases cover abort-all-before-wait, join-all, cached-promise idempotency, checkpoint, finish, and both race orders.",
+      "metric_or_check": "executable_arbitration_behavior_count",
+      "threshold": 7,
+      "value": 7,
+      "source_of_truth": "workers/dkr-1-cleanup/cleanup-contract-probe.mjs output traces and assertions",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:0d6a86e5d40573ef827767ed44bbc10c39aaa26eda317e5202449eae6eda6b4d"
+      ],
+      "observed_at": "2026-07-15T04:48:15Z",
+      "decision": "accepted",
+      "evidence": "multiple siblings trace abort:left, abort:right before either settlement; deactivation waits for both; repeated calls return one promise; checkpoint commits once; finish commits once; finish-first commits 1; deactivate-first commits 0"
+    },
+    {
+      "claim_id": "DKR-1-cleanup.multiple-error-aggregation",
+      "check": "Multiple rejected attempt settlements are joined and returned as AggregateError.",
+      "metric_or_check": "multiple_settlement_error_case_pass_count",
+      "threshold": 1,
+      "value": 0,
+      "source_of_truth": "workers/dkr-1-cleanup/cleanup-contract-probe.mjs cleanupSettlementError case",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:0d6a86e5d40573ef827767ed44bbc10c39aaa26eda317e5202449eae6eda6b4d"
+      ],
+      "observed_at": "2026-07-15T04:48:15Z",
+      "decision": "rejected",
+      "failure_mode": "non-replayable",
+      "evidence": "The only settlement-error case rejects bad once and settles good as cancelled. No case rejects two settlements or asserts AggregateError.errors."
+    },
+    {
+      "claim_id": "DKR-1-cleanup.activation-durable-boundary",
+      "check": "Activation-local cancelled settlement is distinct from durable business-state mutation under the frame metric.",
+      "metric_or_check": "ordinary_close_durable_mutation_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "frame.v2.json AG-CLEANUP-EFFECT and cleanup-contract-probe ordinary close cases",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:8a21f143c6d009d84632c360ec1a3073a26e2caef215886c8c3ac7a50f280cd0",
+        "sha256:0d6a86e5d40573ef827767ed44bbc10c39aaa26eda317e5202449eae6eda6b4d"
+      ],
+      "observed_at": "2026-07-15T04:48:15Z",
+      "decision": "accepted",
+      "evidence": "The frame read method checks durable status and version. Candidate ordinary close leaves durable status open, version 0, and commit count 0 while activation-local work settles cancelled."
+    },
+    {
+      "claim_id": "DKR-1-cleanup.sdk-placement",
+      "check": "The proposed deactivation placement is SDK-native and requires no Lite primitive.",
+      "metric_or_check": "new_lite_primitive_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "pkg/sdk/core/src/session.ts and pkg/core/lite/src/scope.ts",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:78b6500dee31b501644f3a528149e2efb3cb8f684a59373071cf9fdc5f5cfe06",
+        "sha256:549e6b4096698a433f5a843dc4851d2ab9743c7b5e77e7497e0205c7d9aa3b0b"
+      ],
+      "observed_at": "2026-07-15T04:48:15Z",
+      "decision": "accepted",
+      "evidence": "Runtime owns active controllers and settlement promises. Lite output order is execution:on-close, resource:second:start, resource:second:end, resource:first, proving ordered awaited resource cleanup already exists."
+    },
+    {
+      "claim_id": "DKR-1-cleanup.checkpoint-shape",
+      "check": "The candidate checkpoint carries every executable DKR field and one complete entry per active wall.",
+      "metric_or_check": "checkpoint_shape_check_pass_count",
+      "threshold": 2,
+      "value": 0,
+      "source_of_truth": "workers/dkr-1-cleanup/checkpoint.v2.json and validator replay.sh",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-1-cleanup/replay.sh",
+      "exit_code": 1,
+      "sha256": [
+        "sha256:09cc15c035a87299408c20b25bc596e47c0e66d5b79818a137b1be24522732df",
+        "sha256:9f76aad9ed47edeed27a7e9f439137c45424137169318736accd3468fc2e2b51"
+      ],
+      "observed_at": "2026-07-15T04:48:15Z",
+      "decision": "rejected",
+      "failure_mode": "checker-failed",
+      "evidence": "The checker printed checkpointFields=20/20 and wallEntries=6/6, then exited 1 on an unrelated line-wrapped skill phrase. Fail closed: the shape claim is not accepted from a failed checker."
+    },
+    {
+      "claim_id": "DKR-1-cleanup.current-product-wall",
+      "check": "Ordinary current product cleanup does not mutate session business state.",
+      "metric_or_check": "cleanup_business_state_mutation_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "currentBaseline in cleanup-contract-probe.mjs and pkg/sdk/core/src/session.ts",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:0d6a86e5d40573ef827767ed44bbc10c39aaa26eda317e5202449eae6eda6b4d",
+        "sha256:78b6500dee31b501644f3a528149e2efb3cb8f684a59373071cf9fdc5f5cfe06"
+      ],
+      "observed_at": "2026-07-15T04:48:15Z",
+      "decision": "rejected",
+      "failure_mode": "contradicted",
+      "evidence": "runtimeStatus=finishing; runtimeRecordStatus=finishing; durableStatus=open; durableVersion=0; commits=0"
+    },
+    {
+      "claim_id": "DKR-1-cleanup.remediation-authorization",
+      "check": "Verified discovery alone authorizes a product-changing remediation while the current wall is breached.",
+      "metric_or_check": "authorized_committing_move_count",
+      "threshold": 1,
+      "value": 0,
+      "source_of_truth": "canonical SKILL.md Step 6 and references/executable-claims.md",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-1-cleanup/replay.sh",
+      "exit_code": 1,
+      "sha256": [
+        "sha256:7e793233a2d765d99db84863d4c20142be438189cc6775bd999bfc16cf585445",
+        "sha256:75e39f86e5a4397e907113ac2dfb49b141935663643012ca4a04d447fc4e7c57"
+      ],
+      "observed_at": "2026-07-15T04:48:15Z",
+      "decision": "rejected",
+      "failure_mode": "not-authorized",
+      "evidence": "Canonical rules allow breached-wall learning to be saved only with downstream blocked, require every wall held for downstream work, and pause committing moves on breaking until a recorded in-frame resolution. This validator cannot create that resolution."
+    }
+  ],
+  "remediation_authority": {
+    "decision": "not_authorized_by_verified_discovery",
+    "reason": "A DKR can preserve useful learning while blocked. It cannot authorize a committing move through a breached wall. Only the orchestrator may proceed after a recorded in-frame breaking resolution that does not weaken the threshold or action envelope."
+  },
+  "required_next_evidence": [
+    "Add a saved executable case with two rejected settlement promises and assertions for AggregateError and its complete errors list.",
+    "Replay the corrected validator checker once as a new verification attempt; do not rewrite this failed trace.",
+    "Keep downstream progression blocked until the cleanup wall has a recorded in-frame resolution under the canonical skill."
+  ],
+  "summary": {
+      "accepted_claims": 6,
+    "rejected_claims": 4,
+    "rejected_claim_ids": [
+      "DKR-1-cleanup.multiple-error-aggregation",
+      "DKR-1-cleanup.checkpoint-shape",
+      "DKR-1-cleanup.current-product-wall",
+      "DKR-1-cleanup.remediation-authorization"
+    ]
+  }
+}

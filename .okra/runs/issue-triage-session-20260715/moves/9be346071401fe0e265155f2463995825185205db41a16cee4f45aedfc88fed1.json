@@ -1,0 +1,39 @@
+{
+  "committed_at": "2026-07-15T05:59:13Z",
+  "idempotency_key": "accept:DKR-0:v3-disposition-only",
+  "key_sha256": "9be346071401fe0e265155f2463995825185205db41a16cee4f45aedfc88fed1",
+  "payload": {
+    "accepted_claims": {
+      "changed_paths": "58/58",
+      "corrected_semantic_families": "3/3",
+      "negative_mutations": "12/12",
+      "public_concepts": "90/90",
+      "remove_rows": "4/4"
+    },
+    "blocking_effect": "The keep, reshape, and remove map may steer a later recorded correction corridor. No product change is authorized until the cleanup, regression, and style breakers are included in that corridor. All resulting walls must read zero before the flags resolve.",
+    "checkpoint_ref": "artifacts/dkr-0-current-pr-checkpoint.v3.json",
+    "claim_id": "accept.DKR-0.disposition-v3-only",
+    "decided_at": "2026-07-15T05:57:29Z",
+    "decision": "accepted_as_reducing_discovery_with_checkpoint_rejected",
+    "evidence": [
+      "workers/validator-dkr-0-v3/verification.json",
+      "workers/validator-dkr-0-v3/progress.jsonl",
+      "artifacts/dkr-0-disposition-matrix.v3.json",
+      "artifacts/dkr-0-regression-gates.v3.json",
+      "artifacts/dkr-0-slop-gate.v3.json"
+    ],
+    "implementation_authorized": false,
+    "rejected_or_blocking_claims": {
+      "agents_graph_violation_count": 2,
+      "checkpoint_freshness": "stale",
+      "confirmed_touched_regression_count": 1,
+      "environment_only_gate_count": 1,
+      "exact_unique_in_scope_slop_count": "unsupported",
+      "raw_lint_diagnostic_count": 72
+    },
+    "type": "claim_acceptance",
+    "unit_id": "DKR-0",
+    "verification_ref": "workers/validator-dkr-0-v3/verification.json"
+  },
+  "payload_sha256": "d6dbb5e8eced9e8d2453a58617073417f625a3dfd71c7c31529a3d77585e1b5b"
+}

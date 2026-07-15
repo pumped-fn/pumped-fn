@@ -1,0 +1,30 @@
+{
+  "type": "worker_finish",
+  "worker_id": "dkr-4-v2",
+  "worker_kind": "discovery",
+  "unit_id": "DKR-4",
+  "status": "checkpoint_written_pending_independent_v2_replay",
+  "recorded_at": "2026-07-15T05:41:56Z",
+  "next_check_at": "2026-07-15T05:51:56Z",
+  "checkpoint_ref": "workers/dkr-4-v2/checkpoint.v2.json",
+  "checkpoint_sha256": "da71b96b00df0123ee3f63ef56361b562bd7063c19274b8909715efa5f1b5df3",
+  "contract_ref": "workers/dkr-4-v2/queue-contract.json",
+  "contract_sha256": "9b79b71aaa89cf4961d8160e33dcebce7e77a195824324a12776277d9f10a814",
+  "replay_ref": "workers/dkr-4-v2/replay.sh",
+  "replay_sha256": "0e60f179f0e8958292dad699fd5d82cf139729e0382e70702e36c8a6b695ef0a",
+  "replay_exit_code": 0,
+  "case_result": "8 of 8 queue cases",
+  "graph_result": "5 of 5 required ports and 3 of 3 controller edges",
+  "runtime_result": "max concurrency 2 of 2, one activation per lease, zero active after graceful join, zero crossed session values",
+  "surface_result": "0 forbidden public surfaces and 0 hidden effect edges; checker fixture strings were not scanned",
+  "checkpoint_result": "23 of 23 fields, 8 of 8 wall entries, and 8 of 8 hashes",
+  "lifecycle_result": "ordinary graceful join preserved; forced ExecutionContext close remains conditional on accepted DKR-2 and later Lite implementation",
+  "checkpoint_disposition": "candidate_only_pending_separate_v2_validator",
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked"
+  },
+  "product_files_changed": false,
+  "decision": "writer evidence only; no self-acceptance and no remediation authorization",
+  "worker_progress": ".okra/runs/issue-triage-session-20260715/workers/dkr-4-v2/progress.jsonl at finish, unknown, and ten-minute heartbeat"
+}

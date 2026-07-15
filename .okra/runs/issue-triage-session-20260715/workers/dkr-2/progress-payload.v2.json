@@ -1,0 +1,36 @@
+{
+  "type": "worker_finish",
+  "unit_id": "DKR-2",
+  "worker_id": "dkr-2",
+  "status": "checkpoint_v2_written_pending_independent_review",
+  "observed_at": "2026-07-15T04:49:44Z",
+  "checkpoint_ref": "workers/dkr-2/checkpoint.v2.json",
+  "prior_checkpoint_ref": "workers/dkr-2/checkpoint.json",
+  "replay_ref": "workers/dkr-2/replay.sh",
+  "decision": "candidate_signal_only_structured_lifetime_without_public_cancel",
+  "mechanical_repairs": {
+    "contract_version_added": true,
+    "type_added": true,
+    "unit_id_added": true,
+    "resolved_evidence_hash_count": 6,
+    "active_wall_count": 5,
+    "numeric_wall_count": 5,
+    "distinct_wall_reference_count": 5,
+    "behavior_decision_changed": false
+  },
+  "active_wall_reads": {
+    "primitive_proof_gap_count": 0,
+    "touched_surface_regression_count": 0,
+    "single_llm_truth_acceptance_count": 1,
+    "ungoverned_write_or_read_count": 0,
+    "anti_goal_bypass_or_dishonesty_count": 0
+  },
+  "evidence_refs_or_hashes": [
+    "sha256:6c3a183edd003175c839ada032c98a64accacc8d5a977f26f522c1c94dd456e0",
+    "sha256:1c26074f581760377bb3c6bf98ac0fac500977de6e492ef5412e6d1c6040f8cf",
+    "sha256:85b59f11bdd3aa8638fa34d5c436c90505059ebf557df260e05059a30d39377a",
+    "sha256:050a1169d1ad6ab722f4d4e74e202b04a67226dbd374c6775f9bb659274ec6f7"
+  ],
+  "downstream_advance": "blocked",
+  "reason": "V2 mechanics replay, but independent validation remains the only acceptance gate."
+}

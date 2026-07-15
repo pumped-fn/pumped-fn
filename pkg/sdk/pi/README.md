@@ -29,7 +29,7 @@ the session runtime owns the resulting model lifecycle event.
 
 `piAttempt` maps pi-ai text, thinking, and lifecycle events to the provider-neutral SDK `ModelEvent`
 stream. Its final result is the same `ModelResponse` returned by `piTurn`; the scalar turn drains the
-attempt. `piAttemptBinding` injects the stream through the SDK `agent.attempt` tag.
+attempt. `piAttemptBinding` injects the stream through `agent.impl.attempt`.
 
 ---
 Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

@@ -1,0 +1,201 @@
+{
+  "contract_version": "okra.executable-dkr-checkpoint.v1",
+  "type": "dkr_learning_checkpoint",
+  "unit_id": "DKR-3",
+  "checkpoint_id": "dkr-3-context-observation-v3",
+  "conclusion_id": "safe-context-observation",
+  "model_phrasing": "Model phrasing: GPT-5.x detected from the system harness; Phrasing profile id RTM-PH6OCQ6MX4.",
+  "decision_target": "Preserve the accepted safe observation projection while repairing repository-root replay and direct independent wall references.",
+  "source_of_truth": "The saved DKR-3 trace probe and contract, prior independent same-Scope and seam probes, prior independent validator record, and current Lite and observable source.",
+  "read_method": "Run bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v3/replay.sh from the repository root and compare 12 dimensions, same-Scope isolation, forbidden exports, terminal order, safe API boundary, eleven hashes, complete checkpoint fields, and six independent wall references.",
+  "observed_at": "2026-07-15T05:24:12Z",
+  "recorded_at": "2026-07-15T05:24:12Z",
+  "max_age": "30m",
+  "freshness_status": "fresh",
+  "confidence": 0.98,
+  "evidence_refs_or_hashes": [
+    "sha256:1dccc7f0a197eb8aed10902f213427c45eed857701bc9896d6ac997961ec80ed",
+    "sha256:2a8be8f49a82d3c95be6ba6045c5f6b9d5a8615e402b51225a4eb7c4eeeb23a1",
+    "sha256:cba03a82b701d8d91911333f1c699e1456f8f60b99ba420d621c6949af568c4e",
+    "sha256:1f3d4f982ed331d4d3ec5a7c93f3676a58a745b0ebb71103da65d4e41d117e57",
+    "sha256:d50115adef22565d2cf86c95918854fe856a70688436ff03941ef6bc46668b5c",
+    "sha256:324ed2a33b9b7d3dfd52bb8b100ff5af00b100cb04df72b44ba0882e53b7192e",
+    "sha256:9647ad58a0f61316d1daf87bd88144361c3fdd1d6795f788cffb9dd27cf2da63",
+    "sha256:31bce0ad8de755703692b971a34fb5948c2de3ecd1ea04d452d827ae2979aae7",
+    "sha256:a208869ca9eeb3d8f2407d399d01394ed01c86dda46ee2df0b41899f72b86b34",
+    "sha256:549e6b4096698a433f5a843dc4851d2ab9743c7b5e77e7497e0205c7d9aa3b0b",
+    "sha256:c6c71ffe27787683e4429f5f397d417d6774b46cd8603630c31110e7fa5a8366"
+  ],
+  "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v3/replay.sh",
+  "questions_answered": [
+    "The observation behavior remains 12 of 12 dimensions with same-Scope leak count zero and forbidden export count zero.",
+    "Success and error activations emit activation close before sink flush and close.",
+    "The public boundary remains one named SDK projection tag with no arbitrary tag enumeration, ContextData callback, or Lite projection change.",
+    "All eleven evidence hashes resolve to exact named files.",
+    "Every active wall verification record resolves to the prior independent DKR-3 validator and differs from its evidence reference.",
+    "The exact v3 replay command resolves from the repository root."
+  ],
+  "questions_unanswered": [
+    "Public namespace and event-context field names remain implementation choices.",
+    "A separate validator has not accepted v3 mechanics."
+  ],
+  "decision": "candidate only; preserve one named safe SDK observation projection, zero arbitrary tag enumeration, zero public ContextData callbacks, zero Lite projection changes, same-Scope isolation, forbidden export count zero, and activation close before sink settlement; never accepted by this worker",
+  "flag_if_missing_or_stale": "cannot: fail closed when behavior, evidence hashes, source, wall references, freshness, or independent review changes",
+  "reviewer_audit_status": "pending_independent_v3_acceptance",
+  "observation_decision": {
+    "projectionSourceCount": 1,
+    "arbitraryTagEnumerationPathCount": 0,
+    "publicContextDataCallbackCount": 0,
+    "liteProjectionChangeCount": 0
+  },
+  "active_anti_goals": [
+    "sensitive_context_export_count",
+    "cross_session_leak_count",
+    "primitive_proof_gap_count",
+    "single_llm_truth_acceptance_count",
+    "ungoverned_write_or_read_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "anti_goal_id": "AG-SENSITIVE-CONTEXT",
+      "metric_id": "sensitive_context_export_count",
+      "source_of_truth": "Saved forbidden-value trace plus prior independent sentinel scan",
+      "read_method": "Replay the observation artifact and independent same-Scope probe, then count forbidden values.",
+      "observed_at": "2026-07-15T05:24:12Z",
+      "recorded_at": "2026-07-15T05:24:12Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held",
+      "evidence_ref": "workers/dkr-3/artifacts/context-observation-probe.v1.json#candidate.forbiddenValueMatches",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v3/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-3/verification.json#dkr3.forbidden-export"
+    },
+    {
+      "anti_goal_id": "AG-SESSION-ISOLATION",
+      "metric_id": "cross_session_leak_count",
+      "source_of_truth": "Prior independent same-Scope overlap probe",
+      "read_method": "Replay two overlapping activations and compare session correlation, sinks, and sentinels.",
+      "observed_at": "2026-07-15T05:24:12Z",
+      "recorded_at": "2026-07-15T05:24:12Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held",
+      "evidence_ref": "workers/validator-dkr-3/same-scope-probe.mjs",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v3/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-3/verification.json#dkr3.same-scope-isolation"
+    },
+    {
+      "anti_goal_id": "AG-PRIMITIVE-PROOF",
+      "metric_id": "primitive_proof_gap_count",
+      "source_of_truth": "Prior independent seam probe over Lite and observable source",
+      "read_method": "Replay current context, parent, onClose, named tag, observable owner, and close seams.",
+      "observed_at": "2026-07-15T05:24:12Z",
+      "recorded_at": "2026-07-15T05:24:12Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held",
+      "evidence_ref": "workers/validator-dkr-3/seam-probe.mjs",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v3/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-3/verification.json#dkr3.lite-core-necessity"
+    },
+    {
+      "anti_goal_id": "AG-INDEPENDENCE",
+      "metric_id": "single_llm_truth_acceptance_count",
+      "source_of_truth": "Prior independent DKR-3 behavior record",
+      "read_method": "Require the prior independent behavior record and a separate validator for v3 mechanics.",
+      "observed_at": "2026-07-15T05:24:12Z",
+      "recorded_at": "2026-07-15T05:24:12Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held",
+      "evidence_ref": "workers/dkr-3/checkpoint.candidate.v1.json#reviewer_audit_status",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v3/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-3/verification.json#summary"
+    },
+    {
+      "anti_goal_id": "AG-STORAGE",
+      "metric_id": "ungoverned_write_or_read_count",
+      "source_of_truth": "Exact named evidence paths and governed worker reports",
+      "read_method": "Resolve every checkpoint hash and compare writes with the v3 allowlist.",
+      "observed_at": "2026-07-15T05:24:12Z",
+      "recorded_at": "2026-07-15T05:24:12Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held",
+      "evidence_ref": "worker-packets/dkr-3-v3.json#authorized_writes",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v3/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-3/verification.json#dkr3.active-walls"
+    },
+    {
+      "anti_goal_id": "AG-INTEGRITY",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "source_of_truth": "Prior independent rejection plus repaired candidate checkpoint",
+      "read_method": "Confirm the failed v2 validation is preserved, mechanics are repaired, and this writer makes no acceptance claim.",
+      "observed_at": "2026-07-15T05:24:12Z",
+      "recorded_at": "2026-07-15T05:24:12Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held",
+      "evidence_ref": "workers/validator-dkr-3-v2/verification.json#summary",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v3/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-3/verification.json#dkr3.checkpoint-evidence-completeness"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "held",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-15T05:24:12Z",
+    "reason": "All six behavior walls use prior independent evidence; downstream remains blocked until a separate validator accepts v3 mechanics."
+  },
+  "worked_checkpoint_trace": {
+    "metric_read": "independent_wall_reference_pass_count",
+    "threshold": 6,
+    "value": 6,
+    "evidence_sha256": "sha256:d50115adef22565d2cf86c95918854fe856a70688436ff03941ef6bc46668b5c",
+    "confidence": 0.98,
+    "decision": "candidate only pending independent v3 acceptance"
+  },
+  "confidence_probability_update": "0.97 after v2 evidence repair; 0.98 after root replay and all six independent wall references became executable",
+  "risk_or_anti_goal_implications": [
+    "The accepted observation behavior and public boundary are unchanged.",
+    "All wall references now resolve through the exact root replay.",
+    "No arbitrary export, ContextData callback, Lite projection primitive, product change, or hidden effect is introduced."
+  ],
+  "candidate_ckrs": [
+    {
+      "id": "CKR-SAFE-OBSERVATION-CONTRACT",
+      "metric": "github_issue_trace_contract_pass_count",
+      "target": "12/12 with forbidden exports 0 and same-Scope leaks 0"
+    }
+  ],
+  "candidate_pkrs": [
+    {
+      "id": "PKR-SDK-OBSERVATION-TAGS",
+      "scope": "Preserved candidate only; blocked pending independent v3 acceptance."
+    }
+  ],
+  "checkpoint_rejection_policy": "Superficial, tautological, false-positive, fabricated, unsupported, or single-LLM-truth checkpoints are rejected. Missing, stale, wrong-source, non-replayable, or contradicted evidence fails closed. An empty result remains valid only with a replayable probe trace.",
+  "role_grammar": [
+    "CKRs are measurable contribution context, not worker work.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  ]
+}

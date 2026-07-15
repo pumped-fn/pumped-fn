@@ -1,0 +1,10 @@
+{
+  "type": "metric_read",
+  "metric_kind": "ckr",
+  "metric_id": "steering_value_score",
+  "value": 1,
+  "target": 0.75,
+  "observed_at": "2026-07-15T05:04:01Z",
+  "source": "Independent reviews found three PR inventory misclassifications, a broken DKR-2 replay plus ambiguous error classification, and one stale DKR-3 hash; each received a bounded evidence-only revision while product work stayed blocked.",
+  "freshness": "observed_at=2026-07-15T05:04:01Z -> status=fresh against max_age=10m"
+}

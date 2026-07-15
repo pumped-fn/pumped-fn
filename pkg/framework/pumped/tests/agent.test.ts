@@ -32,17 +32,10 @@ const validator = validation.standard({
   toJsonSchema: () => true,
 })
 
-const greeterRole = agent.role({
-  name: "greeter",
-  version: "1",
-  instructions: "Greet the caller.",
-})
-const greeterTurn = agent.turn({ name: "greeter.turn", role: greeterRole })
-const runGreeter = session.run({ name: "greeter.run", turn: greeterTurn })
 const greeterEntry = flow({
   name: "greeter",
   parse: typed<agent.TurnInput>(),
-  deps: { session: session.session, run: controller(runGreeter) },
+  deps: { session: session.session, run: controller(session.run) },
   factory: (ctx, { run }) => run.exec({
     input: {
       work: { id: "greeter-work", branchId: "main", role: "greeter", policy: "all", authority: {} },
@@ -121,7 +114,13 @@ function sessionTags() {
     session.authority(authority),
     session.record(sessionRecord()),
     session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
-    agent.attempt(agent.fromModel(scripted)),
+    agent.config.role({
+      name: "greeter",
+      version: "1",
+      instructions: "Greet the caller.",
+    }),
+    agent.impl.attempt(scripted),
+    session.execution.turn({ flow: agent.turn }),
     validation.engine(validator),
   ]
 }

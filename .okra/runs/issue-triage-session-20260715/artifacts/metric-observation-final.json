@@ -1,0 +1,10 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "sensitive_context_export_count",
+  "value": 0,
+  "target": 0,
+  "observed_at": "2026-07-15T07:42:55Z",
+  "source": "Extensions receive only session.observation.current; tests prove no prompt, tool input, memory, credential, or arbitrary tag export.",
+  "freshness": "observed_at=2026-07-15T07:42:55Z -> status=fresh against max_age=10m"
+}

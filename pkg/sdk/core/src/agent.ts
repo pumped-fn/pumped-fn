@@ -1,6 +1,6 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec"
 import { controller, flow, isStreamingExec, resource, tag, tags, typed, type Lite } from "@pumped-fn/lite"
-import { abortSignal, type Capability, type LoadedSkill, type Message, type Model, type ModelRequest, type ModelResponse } from "./index.js"
+import { model, type Capability, type LoadedSkill, type Message, type ModelRequest, type ModelResponse } from "./index.js"
 import * as session from "./session.js"
 import * as validation from "./validation.js"
 
@@ -11,12 +11,54 @@ export type ModelEvent =
 
 export type Attempt = Lite.Flow<ModelResponse, ModelRequest, never, ModelEvent>
 
-export const attempt = tag<Attempt>({ label: "agent.attempt" })
+export interface RoleConfig {
+  readonly name: string
+  readonly version: string
+  readonly description?: string
+  readonly instructions?: string
+  readonly maxRounds?: number
+}
+
+export interface ToolConfig {
+  readonly version: string
+  readonly description: string
+  readonly input: StandardSchemaV1
+}
+
+export interface SkillConfig {
+  readonly name: string
+  readonly version: string
+  readonly description: string
+}
+
+export interface SubagentConfig {
+  readonly name: string
+  readonly version: string
+  readonly description: string
+}
+
+type Tool = Lite.AnyFlow
+type Skill = Lite.Flow<string, void>
+type Subagent = Lite.Flow<TurnResult, session.RunInput<TurnInput>, never, session.SessionEvent>
+
+export const config = Object.freeze({
+  role: tag<RoleConfig>({ label: "agent.config.role" }),
+  tool: tag<ToolConfig>({ label: "agent.config.tool" }),
+  skill: tag<SkillConfig>({ label: "agent.config.skill" }),
+  subagent: tag<SubagentConfig>({ label: "agent.config.subagent" }),
+})
+
+export const impl = Object.freeze({
+  attempt: tag<Attempt>({ label: "agent.impl.attempt" }),
+  tool: tag<Tool>({ label: "agent.impl.tool" }),
+  skill: tag<Skill>({ label: "agent.impl.skill" }),
+  subagent: tag<Subagent>({ label: "agent.impl.subagent" }),
+})
 
 export const invoke = flow({
   name: "agent.invoke",
   parse: typed<ModelRequest>(),
-  deps: { impl: tags.required(attempt) },
+  deps: { impl: tags.required(impl.attempt) },
   factory: async function* (ctx, { impl }): AsyncGenerator<ModelEvent, ModelResponse, unknown> {
     if (!isStreamingExec(impl.flow as unknown as Lite.ExecTarget)) return impl.exec({ input: ctx.input })
     const stream = impl.execStream({ input: ctx.input })
@@ -25,14 +67,12 @@ export const invoke = flow({
   },
 })
 
-export function fromModel(provider: Model): Attempt {
-  return flow({
-    name: provider.name,
-    parse: typed<ModelRequest>(),
-    deps: { provider: controller(provider) },
-    factory: (ctx, { provider }) => provider.exec({ input: ctx.input }),
-  })
-}
+export const fromModel: Attempt = flow({
+  name: "agent.from-model",
+  parse: typed<ModelRequest>(),
+  deps: { provider: tags.required(model) },
+  factory: (ctx, { provider }) => provider.exec({ input: ctx.input }),
+})
 
 export interface ToolSnapshot {
   readonly identity: session.ToolIdentity
@@ -48,80 +88,7 @@ export interface ToolSnapshot {
 export interface ResolvedTool<Output, Input, Fault = never, Yield = never> {
   readonly snapshot: ToolSnapshot
   readonly schema: StandardSchemaV1
-  readonly flow: Lite.Flow<Output, Input, Fault, Yield>
-}
-
-export interface ToolOptions<
-  Output,
-  Schema extends StandardSchemaV1,
-  Fault = never,
-  Yield = never,
-  D extends Record<string, Lite.ResourceDependency> = Record<string, never>,
-> {
-  readonly name: string
-  readonly version: string
-  readonly description: string
-  readonly input: Schema
-  readonly flow: Lite.Flow<Output, StandardSchemaV1.InferOutput<Schema>, Fault, Yield>
-  readonly deps?: D & {
-    readonly runtime?: never
-    readonly engine?: never
-    readonly authority?: never
-    readonly branch?: never
-    readonly epoch?: never
-  }
-}
-
-export function tool<
-  Output,
-  const Schema extends StandardSchemaV1,
-  Fault = never,
-  Yield = never,
-  const D extends Record<string, Lite.ResourceDependency> = Record<string, never>,
->(options: ToolOptions<Output, Schema, Fault, Yield, D>): Lite.Resource<
-  ResolvedTool<Output, StandardSchemaV1.InferOutput<Schema>, Fault, Yield>
-> {
-  return resource({
-    name: options.name,
-    ownership: "current",
-    deps: {
-      ...options.deps,
-      runtime: session.session,
-      engine: tags.required(validation.engine),
-      authority: tags.optional(session.current.authority),
-      branch: tags.optional(session.current.branch),
-      epoch: tags.optional(session.current.epoch),
-    },
-    factory: (_ctx, deps) => {
-      const identity: session.ToolIdentity = {
-        id: options.name,
-        version: options.version,
-        schemaDigest: deps.engine.schemaDigest(options.input),
-        validationEngine: deps.engine.id,
-        readiness: "ready",
-        flow: options.flow.name ?? options.name,
-      }
-      const authority = deps.authority ?? deps.runtime.authority
-      const epoch = deps.epoch ?? deps.runtime.record.nextEventSequence
-      const permit = authority.tools.includes(identity.id)
-        ? deps.runtime.tools.permit(identity, authority, epoch)
-        : undefined
-      return Object.freeze({
-        snapshot: Object.freeze({
-          identity,
-          name: options.name,
-          description: options.description,
-          inputSchema: deps.engine.jsonSchema(options.input),
-          authorityFingerprint: permit?.authorityFingerprint ?? authority.fingerprint,
-          permitEpoch: permit?.epoch ?? epoch,
-          branchId: (deps.branch ?? deps.runtime.branches.current()).id,
-          snapshotEpoch: epoch,
-        }),
-        schema: options.input,
-        flow: options.flow,
-      })
-    },
-  })
+  readonly flow: Lite.FlowHandle<Output, Input, Yield>
 }
 
 export class ToolInputError extends Error {
@@ -136,61 +103,18 @@ export class ToolInputError extends Error {
   }
 }
 
-export interface SkillOptions<D extends Record<string, Lite.ResourceDependency>> {
-  readonly name: string
-  readonly version: string
-  readonly description: string
-  readonly content: string | Lite.Flow<string, void>
-  readonly deps?: D & { readonly runtime?: never }
-}
-
 export interface ResolvedSkill {
   readonly name: string
   readonly version: string
   readonly description: string
-  readonly content: Lite.Flow<string, void>
+  readonly content: Lite.FlowHandle<string, void>
 }
 
-export function skill<const D extends Record<string, Lite.ResourceDependency> = Record<string, never>>(
-  options: SkillOptions<D>,
-): Lite.Resource<ResolvedSkill> {
-  const content = typeof options.content === "string"
-    ? flow({ name: `${options.name}.content`, factory: () => options.content as string })
-    : options.content
-  return resource({
-    name: options.name,
-    ownership: "current",
-    deps: { ...options.deps, runtime: session.session },
-    factory: () => Object.freeze({
-      name: options.name,
-      version: options.version,
-      description: options.description,
-      content,
-    }),
-  })
-}
-
-export interface SubagentOptions<Output, Input, Fault, Yield> {
+export interface ResolvedSubagent {
   readonly name: string
   readonly version: string
   readonly description: string
-  readonly role: Lite.Resource<Role>
-  readonly turn: Lite.Flow<Output, Input, Fault, Yield>
-}
-
-export interface SubagentDefinition<Output, Input, Fault, Yield> {
-  readonly name: string
-  readonly version: string
-  readonly description: string
-  readonly role: Lite.Resource<Role>
-  readonly turn: Lite.Flow<Output, Input, Fault, Yield>
-  readonly run: Lite.Flow<Output, session.RunInput<Input>, Fault, Yield | session.SessionEvent>
-}
-
-export function subagent<Output, Input, Fault = never, Yield = never>(
-  options: SubagentOptions<Output, Input, Fault, Yield>,
-): SubagentDefinition<Output, Input, Fault, Yield> {
-  return Object.freeze({ ...options, run: session.run({ name: options.name, turn: options.turn }) })
+  readonly run: Lite.FlowHandle<TurnResult, session.RunInput<TurnInput>, session.SessionEvent>
 }
 
 export interface Role {
@@ -201,66 +125,46 @@ export interface Role {
   readonly maxRounds: number
   readonly tools: readonly AnyResolvedTool[]
   readonly skills: readonly ResolvedSkill[]
-  readonly subagents: readonly AnySubagentDefinition[]
+  readonly subagents: readonly ResolvedSubagent[]
 }
 
 export type AnyResolvedTool = ResolvedTool<any, any, any, any>
-export type AnySubagentDefinition = SubagentDefinition<any, any, any, any>
 
-export interface RoleOptions<
-  Tools extends Record<string, Lite.Resource<AnyResolvedTool>>,
-  Skills extends Record<string, Lite.Resource<ResolvedSkill>>,
-  Subagents extends Record<string, AnySubagentDefinition>,
-> {
-  readonly name: string
-  readonly version: string
-  readonly description?: string
-  readonly instructions?: string
-  readonly maxRounds?: number
-  readonly tools?: Tools
-  readonly skills?: Skills
-  readonly subagents?: Subagents
-}
-
-export function role<
-  const Tools extends Record<string, Lite.Resource<AnyResolvedTool>> = Record<string, never>,
-  const Skills extends Record<string, Lite.Resource<ResolvedSkill>> = Record<string, never>,
-  const Subagents extends Record<string, AnySubagentDefinition> = Record<string, never>,
->(options: RoleOptions<Tools, Skills, Subagents>): Lite.Resource<Role> {
-  const toolEntries = Object.entries(options.tools ?? {})
-  const skillEntries = Object.entries(options.skills ?? {})
-  const deps = Object.fromEntries([
-    ...toolEntries.map(([name, dependency]) => [`tool:${name}`, dependency]),
-    ...skillEntries.map(([name, dependency]) => [`skill:${name}`, dependency]),
-    ["runtime", session.session],
-    ["authority", tags.optional(session.current.authority)],
-  ]) as Record<string, Lite.ResourceDependency>
-  return resource({
-    name: options.name,
-    ownership: "current",
-    deps,
-    factory: (_ctx, resolved) => {
-      const authority = (resolved["authority"] as session.Authority | undefined)
-        ?? (resolved["runtime"] as session.SessionRuntime).authority
-      const tools = toolEntries
-        .map(([name]) => resolved[`tool:${name}`] as AnyResolvedTool)
-        .filter((tool) => authority.tools.includes(tool.snapshot.identity.id))
-      const skills = skillEntries.map(([name]) => resolved[`skill:${name}`] as ResolvedSkill)
-      const subagents = Object.values(options.subagents ?? {})
-      assertUnique([...tools, ...skills, ...subagents])
-      return Object.freeze({
-        name: options.name,
-        version: options.version,
-        ...(options.description === undefined ? {} : { description: options.description }),
-        instructions: options.instructions ?? "",
-        maxRounds: options.maxRounds ?? 4,
-        tools,
-        skills,
-        subagents,
-      })
-    },
-  })
-}
+export const role = resource({
+  name: "agent.role",
+  ownership: "current",
+  deps: {
+    config: tags.required(config.role),
+    runtime: session.session,
+    engine: tags.required(validation.engine),
+    authority: tags.optional(session.current.authority),
+    branch: tags.optional(session.current.branch),
+    epoch: tags.optional(session.current.epoch),
+    tools: tags.all(impl.tool),
+    skills: tags.all(impl.skill),
+    subagents: tags.all(impl.subagent),
+  },
+  factory: (_ctx, { config: value, runtime, engine, authority: boundAuthority, branch, epoch: boundEpoch, tools: toolFlows, skills: skillFlows, subagents: subagentFlows }) => {
+    const authority = boundAuthority ?? runtime.authority
+    const epoch = boundEpoch ?? runtime.record.nextEventSequence
+    const tools = toolFlows
+      .map((tool) => resolveTool(tool, runtime, engine, authority, branch ?? runtime.branches.current(), epoch))
+      .filter((tool) => authority.tools.includes(tool.snapshot.identity.id))
+    const skills = skillFlows.map(resolveSkill)
+    const subagents = subagentFlows.map(resolveSubagent)
+    assertUnique([...tools, ...skills, ...subagents])
+    return Object.freeze({
+      name: value.name,
+      version: value.version,
+      ...(value.description === undefined ? {} : { description: value.description }),
+      instructions: value.instructions ?? "",
+      maxRounds: value.maxRounds ?? 4,
+      tools,
+      skills,
+      subagents,
+    })
+  },
+})
 
 export interface TurnInput {
   readonly prompt?: string
@@ -299,27 +203,20 @@ export interface TurnResult {
   readonly events: readonly session.SessionEvent[]
 }
 
-export interface TurnOptions {
-  readonly name: string
-  readonly role: Lite.Resource<Role>
-}
-
-export function turn(options: TurnOptions): Lite.Flow<TurnResult, TurnInput, never, session.SessionEvent> {
-  return flow({
-    name: options.name,
+export const turn: Lite.Flow<TurnResult, TurnInput, never, session.SessionEvent> = flow({
+    name: "agent.turn",
     parse: typed<TurnInput>(),
     deps: {
-      role: options.role,
+      role,
       invoke: controller(invoke),
       runtime: session.session,
-      engine: tags.required(validation.engine),
+      validate: controller(validation.validate),
       work: tags.optional(session.current.work),
       attempt: tags.optional(session.current.attempt),
       branch: tags.optional(session.current.branch),
       epoch: tags.optional(session.current.epoch),
-      signal: tags.optional(abortSignal),
     },
-    factory: async function* (ctx, deps): AsyncGenerator<session.SessionEvent, TurnResult, unknown> {
+    factory: async function* (ctx, { role, invoke, runtime, validate, work, attempt, branch, epoch }): AsyncGenerator<session.SessionEvent, TurnResult, unknown> {
       const messages = initialMessages(ctx.input)
       const loadedSkills: LoadedSkill[] = []
       const skillResults: SkillResult[] = []
@@ -330,182 +227,182 @@ export function turn(options: TurnOptions): Lite.Flow<TurnResult, TurnInput, nev
       let rounds = 0
       let controlSequence = -1
       const activeInvocations = new Set<string>()
+      const signal = ctx.signal
       const bound: BoundSession = {
-        work: deps.work,
-        attempt: deps.attempt,
-        branch: deps.branch ?? deps.runtime.branches.current(),
-        epoch: deps.epoch ?? deps.attempt?.snapshotEpoch ?? 0,
+        work,
+        attempt,
+        branch: branch ?? runtime.branches.current(),
+        epoch: epoch ?? attempt?.snapshotEpoch ?? 0,
       }
-      const toolAuthority = bound.work?.authority ?? deps.runtime.authority
-      const tools = deps.role.tools.flatMap((tool) => bindTool(tool, deps.runtime, bound, toolAuthority))
+      const toolAuthority = bound.work?.authority ?? runtime.authority
+      const tools = role.tools.flatMap((tool) => bindTool(tool, runtime, bound, toolAuthority))
 
       try {
-        const roleStarted = sessionEvent(bound, deps.runtime, "agent_role_start", deps.role.name, 0, undefined, deps.role.name)
+        const roleStarted = sessionEvent(bound, runtime, "agent_role_start", role.name, 0, undefined, role.name)
         events.push(roleStarted)
         yield roleStarted
-        deps.signal?.throwIfAborted()
+        signal?.throwIfAborted()
 
-        for (let round = 0; round < deps.role.maxRounds; round++) {
+        for (let round = 0; round < role.maxRounds; round++) {
           rounds = round + 1
           if (bound.work) {
-            for (const control of deps.runtime.controls.drain(bound.work.id, controlSequence)) {
+            for (const control of runtime.controls.drain(bound.work.id, controlSequence)) {
               controlSequence = control.sequence
               const controlled = sessionEvent(
                 bound,
-                deps.runtime,
+                runtime,
                 "agent_control",
-                deps.role.name,
+                role.name,
                 round,
                 control,
                 control.source,
               )
               events.push(controlled)
               yield controlled
-              deps.signal?.throwIfAborted()
+              signal?.throwIfAborted()
               if (control.mode === "queue" || control.mode === "input") {
                 messages.push({ role: "user", name: "steering", content: stringify(control.payload) })
               }
             }
           }
-          const invocation = beginInvocation(bound, deps.runtime, activeInvocations, "model", deps.role.name, round)
+          const invocation = beginInvocation(bound, runtime, activeInvocations, "model", role.name, round)
           const started = sessionEvent(
             bound,
-            deps.runtime,
+            runtime,
             "agent_model_start",
-            deps.role.name,
+            role.name,
             round,
             undefined,
-            deps.role.name,
+            role.name,
             invocation.id,
           )
           events.push(started)
           yield started
           let response: ModelResponse
           try {
-            deps.signal?.throwIfAborted()
-            const stream = deps.invoke.execStream({
+            signal?.throwIfAborted()
+            const stream = invoke.execStream({
               input: {
-                agentName: deps.role.name,
-                instructions: deps.role.instructions,
+                agentName: role.name,
+                instructions: role.instructions,
                 messages,
                 tools: tools.map(toolCapability),
-                skills: deps.role.skills.map(skillCapability),
+                skills: role.skills.map(skillCapability),
                 loadedSkills,
-                subagents: deps.role.subagents.map(subagentCapability),
+                subagents: role.subagents.map(subagentCapability),
                 round,
               },
             })
             for await (const delta of stream) {
               const event = sessionEvent(
                 bound,
-                deps.runtime,
+                runtime,
                 `model.${delta.type}`,
-                deps.role.name,
+                role.name,
                 round,
                 delta,
-                deps.role.name,
+                role.name,
                 invocation.id,
               )
               events.push(event)
               yield event
-              deps.signal?.throwIfAborted()
+              signal?.throwIfAborted()
             }
             response = await stream.result
-            deps.signal?.throwIfAborted()
-            settleInvocation(deps.runtime, activeInvocations, invocation.id, "completed")
+            signal?.throwIfAborted()
+            settleInvocation(runtime, activeInvocations, invocation.id, "completed")
           } catch (error) {
-            settleInvocation(deps.runtime, activeInvocations, invocation.id, isAbort(error) ? "cancelled" : "failed")
+            settleInvocation(runtime, activeInvocations, invocation.id, isAbort(error) ? "cancelled" : "failed")
             throw error
           }
           content = response.content
           if (content) messages.push({ role: "assistant", content })
 
           for (const call of response.skillCalls ?? []) {
-            const selected = findByName(deps.role.skills, call.name, "skill")
-            const selectedInvocation = beginInvocation(bound, deps.runtime, activeInvocations, "skill", selected.name, round)
+            const selected = findByName(role.skills, call.name, "skill")
+            const selectedInvocation = beginInvocation(bound, runtime, activeInvocations, "skill", selected.name, round)
             const selectedStarted = sessionEvent(
-              bound, deps.runtime, "agent_skill_start", deps.role.name, round, call, selected.name, selectedInvocation.id,
+              bound, runtime, "agent_skill_start", role.name, round, call, selected.name, selectedInvocation.id,
             )
             events.push(selectedStarted)
             yield selectedStarted
             let loaded: string
             try {
-              deps.signal?.throwIfAborted()
-              loaded = await ctx.exec({ flow: selected.content })
-              deps.signal?.throwIfAborted()
-              settleInvocation(deps.runtime, activeInvocations, selectedInvocation.id, "completed")
+              signal?.throwIfAborted()
+              loaded = await selected.content.exec()
+              signal?.throwIfAborted()
+              settleInvocation(runtime, activeInvocations, selectedInvocation.id, "completed")
             } catch (error) {
-              settleInvocation(deps.runtime, activeInvocations, selectedInvocation.id, isAbort(error) ? "cancelled" : "failed")
+              settleInvocation(runtime, activeInvocations, selectedInvocation.id, isAbort(error) ? "cancelled" : "failed")
               throw error
             }
             skillResults.push({ name: selected.name, ...(call.id === undefined ? {} : { callId: call.id }), content: loaded })
             loadedSkills.push({ name: selected.name, description: selected.description, content: loaded })
             messages.push({ role: "skill", name: selected.name, content: loaded, ...(call.id === undefined ? {} : { id: call.id }) })
             const selectedEnded = sessionEvent(
-              bound, deps.runtime, "agent_skill_end", deps.role.name, round, loaded, selected.name, selectedInvocation.id,
+              bound, runtime, "agent_skill_end", role.name, round, loaded, selected.name, selectedInvocation.id,
             )
             events.push(selectedEnded)
             yield selectedEnded
-            deps.signal?.throwIfAborted()
+            signal?.throwIfAborted()
           }
 
           for (const call of response.toolCalls ?? []) {
             const selected = findByName(tools, call.name, "tool")
-            const selectedInvocation = beginInvocation(bound, deps.runtime, activeInvocations, "tool", selected.snapshot.name, round)
+            const selectedInvocation = beginInvocation(bound, runtime, activeInvocations, "tool", selected.snapshot.name, round)
             const selectedStarted = sessionEvent(
-              bound, deps.runtime, "agent_tool_start", deps.role.name, round, call.input, selected.snapshot.name, selectedInvocation.id,
+              bound, runtime, "agent_tool_start", role.name, round, call.input, selected.snapshot.name, selectedInvocation.id,
             )
             events.push(selectedStarted)
             yield selectedStarted
             let output: unknown
             try {
-              deps.signal?.throwIfAborted()
+              signal?.throwIfAborted()
               if (
                 selected.snapshot.authorityFingerprint !== toolAuthority.fingerprint
                 || selected.snapshot.permitEpoch !== bound.epoch
                 || !toolAuthority.tools.includes(selected.snapshot.identity.id)
               ) throw new session.AuthorityEscalationError("tools")
-              deps.runtime.tools.authorize(
+              runtime.tools.authorize(
                 selected.snapshot.identity,
                 selected.snapshot.permitEpoch,
                 selected.snapshot.authorityFingerprint,
               )
-              const parsed = await deps.engine.validate(selected.schema, call.input)
+              const parsed = await validate.exec({ input: { schema: selected.schema, input: call.input } })
               if (parsed.issues) throw new ToolInputError(selected.snapshot.name, parsed.issues)
-              deps.signal?.throwIfAborted()
-              output = await ctx.exec({ flow: selected.flow as Lite.Flow<unknown, unknown>, rawInput: parsed.value })
-              deps.signal?.throwIfAborted()
-              settleInvocation(deps.runtime, activeInvocations, selectedInvocation.id, "completed")
+              signal?.throwIfAborted()
+              output = await selected.flow.exec({ rawInput: parsed.value })
+              signal?.throwIfAborted()
+              settleInvocation(runtime, activeInvocations, selectedInvocation.id, "completed")
             } catch (error) {
-              settleInvocation(deps.runtime, activeInvocations, selectedInvocation.id, isAbort(error) ? "cancelled" : "failed")
+              settleInvocation(runtime, activeInvocations, selectedInvocation.id, isAbort(error) ? "cancelled" : "failed")
               throw error
             }
             toolResults.push({ name: selected.snapshot.name, ...(call.id === undefined ? {} : { callId: call.id }), input: call.input, output })
             messages.push({ role: "tool", name: selected.snapshot.name, content: stringify(output), ...(call.id === undefined ? {} : { id: call.id, input: call.input }) })
             const selectedEnded = sessionEvent(
-              bound, deps.runtime, "agent_tool_end", deps.role.name, round, output, selected.snapshot.name, selectedInvocation.id,
+              bound, runtime, "agent_tool_end", role.name, round, output, selected.snapshot.name, selectedInvocation.id,
             )
             events.push(selectedEnded)
             yield selectedEnded
-            deps.signal?.throwIfAborted()
+            signal?.throwIfAborted()
           }
 
           for (const call of response.subagentCalls ?? []) {
-            const selected = findByName(deps.role.subagents, call.name, "subagent")
+            const selected = findByName(role.subagents, call.name, "subagent")
             const parent = bound.work
             const branch = bound.branch
             const workId = call.id ?? `${parent?.id ?? "work"}.${selected.name}.${round}`
-            const selectedInvocation = beginInvocation(bound, deps.runtime, activeInvocations, "subagent", selected.name, round)
+            const selectedInvocation = beginInvocation(bound, runtime, activeInvocations, "subagent", selected.name, round)
             const selectedStarted = sessionEvent(
-              bound, deps.runtime, "agent_subagent_start", deps.role.name, round, call.input, selected.name, selectedInvocation.id,
+              bound, runtime, "agent_subagent_start", role.name, round, call.input, selected.name, selectedInvocation.id,
             )
             events.push(selectedStarted)
             yield selectedStarted
             let output: TurnResult
             try {
-              deps.signal?.throwIfAborted()
-              output = await ctx.exec({
-                flow: selected.run as Lite.Flow<TurnResult, session.RunInput<TurnInput>>,
+              signal?.throwIfAborted()
+              output = await selected.run.exec({
                 input: {
                   work: {
                     id: workId,
@@ -517,49 +414,49 @@ export function turn(options: TurnOptions): Lite.Flow<TurnResult, TurnInput, nev
                   input: call.input,
                 },
               })
-              deps.signal?.throwIfAborted()
-              settleInvocation(deps.runtime, activeInvocations, selectedInvocation.id, "completed")
+              signal?.throwIfAborted()
+              settleInvocation(runtime, activeInvocations, selectedInvocation.id, "completed")
             } catch (error) {
-              settleInvocation(deps.runtime, activeInvocations, selectedInvocation.id, isAbort(error) ? "cancelled" : "failed")
+              settleInvocation(runtime, activeInvocations, selectedInvocation.id, isAbort(error) ? "cancelled" : "failed")
               throw error
             }
             subagentResults.push({ name: selected.name, workId, input: call.input, output })
             messages.push({ role: "subagent", name: selected.name, content: output.content, ...(call.id === undefined ? {} : { id: call.id, input: call.input }) })
             const selectedEnded = sessionEvent(
-              bound, deps.runtime, "agent_subagent_end", deps.role.name, round, output, selected.name, selectedInvocation.id,
+              bound, runtime, "agent_subagent_end", role.name, round, output, selected.name, selectedInvocation.id,
             )
             events.push(selectedEnded)
             yield selectedEnded
-            deps.signal?.throwIfAborted()
+            signal?.throwIfAborted()
           }
 
           const ended = sessionEvent(
             bound,
-            deps.runtime,
+            runtime,
             "agent_model_end",
-            deps.role.name,
+            role.name,
             round,
             response,
-            deps.role.name,
+            role.name,
             invocation.id,
           )
           events.push(ended)
           yield ended
-          deps.signal?.throwIfAborted()
+          signal?.throwIfAborted()
           const queued = bound.work
-            ? deps.runtime.controls.drain(bound.work.id, controlSequence).some(
+            ? runtime.controls.drain(bound.work.id, controlSequence).some(
                 (control) => control.mode === "queue" || control.mode === "input",
               )
             : false
           if ((response.stop === true || noCalls(response)) && !queued) break
         }
 
-        const roleEnded = sessionEvent(bound, deps.runtime, "agent_role_end", deps.role.name, rounds, undefined, deps.role.name)
+        const roleEnded = sessionEvent(bound, runtime, "agent_role_end", role.name, rounds, undefined, role.name)
         events.push(roleEnded)
         yield roleEnded
 
         return {
-          role: deps.role.name,
+          role: role.name,
           content,
           messages,
           rounds,
@@ -569,10 +466,59 @@ export function turn(options: TurnOptions): Lite.Flow<TurnResult, TurnInput, nev
           events,
         }
       } finally {
-        for (const id of activeInvocations) deps.runtime.invocations.settle(id, "cancelled")
+        for (const id of activeInvocations) runtime.invocations.settle(id, "cancelled")
       }
     },
   })
+
+function resolveTool(
+  flow: Lite.FlowHandle<any, any, any>,
+  runtime: session.SessionRuntime,
+  engine: validation.Engine,
+  authority: session.Authority,
+  branch: session.BranchRecord,
+  epoch: number,
+): AnyResolvedTool {
+  const value = config.tool.find(flow.flow)
+  const name = flow.flow.name
+  if (!value || !name) throw new Error("Agent tool requires a name and agent.config.tool metadata")
+  const identity: session.ToolIdentity = {
+    id: name,
+    version: value.version,
+    schemaDigest: engine.schemaDigest(value.input),
+    validationEngine: engine.id,
+    readiness: "ready",
+    flow: name,
+  }
+  const permit = authority.tools.includes(identity.id)
+    ? runtime.tools.permit(identity, authority, epoch)
+    : undefined
+  return Object.freeze({
+    snapshot: Object.freeze({
+      identity,
+      name,
+      description: value.description,
+      inputSchema: engine.jsonSchema(value.input),
+      authorityFingerprint: permit?.authorityFingerprint ?? authority.fingerprint,
+      permitEpoch: permit?.epoch ?? epoch,
+      branchId: branch.id,
+      snapshotEpoch: epoch,
+    }),
+    schema: value.input,
+    flow,
+  })
+}
+
+function resolveSkill(content: Lite.FlowHandle<string, void>): ResolvedSkill {
+  const value = config.skill.find(content.flow)
+  if (!value) throw new Error("Agent skill requires agent.config.skill metadata")
+  return Object.freeze({ ...value, content })
+}
+
+function resolveSubagent(run: Lite.FlowHandle<TurnResult, session.RunInput<TurnInput>, session.SessionEvent>): ResolvedSubagent {
+  const value = config.subagent.find(run.flow)
+  if (!value) throw new Error("Agent subagent requires agent.config.subagent metadata")
+  return Object.freeze({ ...value, run })
 }
 
 function initialMessages(input: TurnInput): Message[] {
@@ -617,7 +563,7 @@ function skillCapability(value: ResolvedSkill): Capability {
   return { name: value.name, description: value.description }
 }
 
-function subagentCapability(value: AnySubagentDefinition): Capability {
+function subagentCapability(value: ResolvedSubagent): Capability {
   return { name: value.name, description: value.description }
 }
 

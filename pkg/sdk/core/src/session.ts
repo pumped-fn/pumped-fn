@@ -1,5 +1,4 @@
 import { controller, flow, isStreamingExec, resource, tag, tags, typed, type Lite } from "@pumped-fn/lite"
-import { abortSignal } from "./index.js"
 import { sha256 as digestSha256 } from "./internal/digest.js"
 
 export type SessionId = string
@@ -227,6 +226,16 @@ export interface SessionEvent {
   readonly observedAt: string
 }
 
+export interface ObservationProjection {
+  readonly sessionId: SessionId
+  readonly activationId: string
+  readonly workId: WorkId
+  readonly parentWorkId?: WorkId
+  readonly channel?: string
+  readonly role: string
+  readonly tool?: string
+}
+
 export type SessionEventInput = Omit<SessionEvent, "sessionId" | "sequence" | "observedAt">
 
 export interface WorkRegistry {
@@ -288,8 +297,8 @@ export interface SessionRuntime {
   readonly memory: MemoryRegistry
   readonly continuations: ProviderContinuationRegistry
   snapshot(status: SessionRecord["status"]): SessionRecord
+  deactivate(): Promise<void>
   beginFinish(): Promise<void>
-  shutdown(): Promise<void>
   completeFinish(version: number): void
   eventsFor(workId: WorkId): readonly SessionEvent[]
   emit(input: SessionEventInput): SessionEvent
@@ -369,9 +378,8 @@ export interface RunInput<Input> {
   readonly input: Input
 }
 
-export interface RunOptions<Output, Input, Fault, Yield> {
-  readonly name: string
-  readonly turn: Lite.Flow<Output, Input, Fault, Yield>
+export interface TurnSelection {
+  readonly flow: Lite.AnyFlow
 }
 
 export type Load = Lite.Flow<SessionRecord, { id: SessionId }>
@@ -584,9 +592,21 @@ export function narrowAuthority(parent: Authority, constraints: AuthorityConstra
   })
 }
 
-function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
+function deferred<T>(): {
+  readonly promise: Promise<T>
+  readonly resolve: (value: T) => void
+  readonly reject: (reason: unknown) => void
+} {
   let resolve!: (value: T) => void
-  return { promise: new Promise<T>((done) => { resolve = done }), resolve }
+  let reject!: (reason: unknown) => void
+  return {
+    promise: new Promise<T>((done, fail) => {
+      resolve = done
+      reject = fail
+    }),
+    resolve,
+    reject,
+  }
 }
 
 function jsonError(error: unknown): Lite.JsonValue {
@@ -633,12 +653,15 @@ function isSettled(status: WorkRecord["status"]): boolean {
 class Runtime implements SessionRuntime {
   #record: SessionRecord
   #status: SessionRuntime["status"]
+  #activation: "active" | "deactivating" | "deactivated" = "active"
+  #deactivation: Promise<void> | undefined
   #finish: Promise<void> | undefined
   #completion: Promise<SessionRecord> | undefined
   #active = new Map<string, {
     readonly value: ActiveAttempt
     readonly controller: AbortController
     readonly resolve: (value: AttemptSettlement) => void
+    readonly reject: (reason: unknown) => void
   }>()
   #permits = new Map<string, ToolPermit>()
   #controls: ControlEvent[] = []
@@ -757,7 +780,14 @@ class Runtime implements SessionRuntime {
         if (this.#record.invocations.some((item) => item.id === record.id)) {
           throw new Error(`Invocation ${record.id} already exists`)
         }
-        const started = Object.freeze({ ...record, status: "working" as const })
+        const started = Object.freeze({
+          id: record.id,
+          workId: record.workId,
+          attempt: record.attempt,
+          kind: record.kind,
+          status: "working" as const,
+          idempotencyKey: record.idempotencyKey,
+        })
         this.#record = Object.freeze({
           ...this.#record,
           invocations: Object.freeze([...this.#record.invocations, started]),
@@ -827,20 +857,40 @@ class Runtime implements SessionRuntime {
     return Object.freeze({ ...this.#record, status })
   }
 
+  deactivate(): Promise<void> {
+    if (this.#deactivation) return this.#deactivation
+    this.#activation = "deactivating"
+    const active = [...this.#active.values()]
+    const result = deferred<void>()
+    this.#deactivation = result.promise
+    const settlement = this.#completion?.then(() => undefined) ?? (() => {
+      const reason = new DOMException("Session deactivated", "AbortError")
+      for (const entry of active) entry.controller.abort(reason)
+      return this.joinAttempts(active)
+    })()
+    settlement.then(
+      () => {
+        this.#activation = "deactivated"
+        result.resolve(undefined)
+      },
+      (error) => {
+        this.#activation = "deactivated"
+        result.reject(error)
+      },
+    )
+    return this.#deactivation
+  }
+
   beginFinish(): Promise<void> {
     if (this.#finish) return this.#finish
+    this.assertActive()
     this.assertOpenMutation()
     this.#status = "finishing"
     this.#record = this.snapshot("finishing")
     const active = [...this.#active.values()]
     for (const entry of active) entry.controller.abort()
-    this.#finish = Promise.all(active.map((entry) => entry.value.settled)).then(() => undefined)
+    this.#finish = this.joinAttempts(active)
     return this.#finish
-  }
-
-  shutdown(): Promise<void> {
-    if (this.#status === "open") return this.beginFinish()
-    return this.#finish ?? Promise.resolve()
   }
 
   completeFinish(version: number): void {
@@ -850,6 +900,9 @@ class Runtime implements SessionRuntime {
 
   finishWith(commit: (record: SessionRecord, expectedVersion: number) => Promise<number>): Promise<SessionRecord> {
     if (this.#completion) return this.#completion
+    if (this.#activation !== "active") {
+      return Promise.reject(new Error(`Session activation is ${this.#activation}`))
+    }
     this.#completion = this.finishNow(commit)
     return this.#completion
   }
@@ -962,6 +1015,7 @@ class Runtime implements SessionRuntime {
   }
 
   private admit(input: AdmitWorkInput): ActiveAttempt {
+    this.assertActive()
     if (this.#status !== "open") throw new Error(`Session ${this.#record.id} does not admit work while ${this.#status}`)
     const existing = this.#record.work.find((item) => item.id === input.id)
     if (existing) {
@@ -983,7 +1037,12 @@ class Runtime implements SessionRuntime {
     const controller = new AbortController()
     const settlement = deferred<AttemptSettlement>()
     const value = Object.freeze({ record: attempt, signal: controller.signal, settled: settlement.promise })
-    this.#active.set(this.attemptKey(work.id, work.attempt), { value, controller, resolve: settlement.resolve })
+    this.#active.set(this.attemptKey(work.id, work.attempt), {
+      value,
+      controller,
+      resolve: settlement.resolve,
+      reject: settlement.reject,
+    })
     this.#record = Object.freeze({
       ...this.#record,
       work: Object.freeze([...this.#record.work, work]),
@@ -1021,7 +1080,12 @@ class Runtime implements SessionRuntime {
     const controller = new AbortController()
     const settlement = deferred<AttemptSettlement>()
     const value = Object.freeze({ record: attempt, signal: controller.signal, settled: settlement.promise })
-    this.#active.set(this.attemptKey(work.id, work.attempt), { value, controller, resolve: settlement.resolve })
+    this.#active.set(this.attemptKey(work.id, work.attempt), {
+      value,
+      controller,
+      resolve: settlement.resolve,
+      reject: settlement.reject,
+    })
     this.#record = Object.freeze({
       ...this.#record,
       work: Object.freeze(this.#record.work.map((item) => item.id === work.id ? work : item)),
@@ -1048,6 +1112,19 @@ class Runtime implements SessionRuntime {
     return this.#record
   }
 
+  private async joinAttempts(active: readonly {
+    readonly value: ActiveAttempt
+  }[]): Promise<void> {
+    const results = await Promise.allSettled(active.map((entry) => entry.value.settled))
+    const errors = results.flatMap((result) => result.status === "rejected" ? [result.reason] : [])
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1) throw new AggregateError(errors, "session deactivation settlement failed")
+  }
+
+  private assertActive(): void {
+    if (this.#activation !== "active") throw new Error(`Session activation is ${this.#activation}`)
+  }
+
   private settle(workId: WorkId, attemptNumber: number, settlement: AttemptSettlement): void {
     const key = this.attemptKey(workId, attemptNumber)
     const active = this.#active.get(key)
@@ -1055,7 +1132,15 @@ class Runtime implements SessionRuntime {
     const work = this.workRecord(workId)
     const status = settlement.status === "completed" ? "completed" : settlement.status
     const settledWork = Object.freeze({ ...work, status })
-    const settledAttempt = Object.freeze({ ...active.value.record, status, settledAt: this.clock.now() })
+    let settledAt: string
+    try {
+      settledAt = this.clock.now()
+    } catch (error) {
+      this.#active.delete(key)
+      active.reject(error)
+      throw error
+    }
+    const settledAttempt = Object.freeze({ ...active.value.record, status, settledAt })
     this.#record = Object.freeze({
       ...this.#record,
       work: Object.freeze(this.#record.work.map((item) => item.id === workId ? settledWork : item)),
@@ -1112,6 +1197,16 @@ export const current = Object.freeze({
   epoch: tag<number>({ label: "sdk.session.current.epoch" }),
 })
 
+export const observation = Object.freeze({
+  current: tag<ObservationProjection>({ label: "sdk.session.observation.current" }),
+})
+
+export const execution = Object.freeze({
+  turn: tag<TurnSelection>({ label: "sdk.session.execution.turn" }),
+})
+
+const selectedTurn = tag<Lite.AnyFlow>({ label: "sdk.session.execution.selectedTurn" })
+
 export const store = Object.freeze({
   load: tag<Load>({ label: "sdk.session.store.load" }),
   commit: tag<Commit>({ label: "sdk.session.store.commit" }),
@@ -1141,7 +1236,7 @@ export const session = resource({
   },
   factory: (ctx, { record, authority, clock }) => {
     const runtime = new Runtime(record, authority, clock)
-    ctx.cleanup(() => runtime.shutdown())
+    ctx.cleanup(() => runtime.deactivate())
     return runtime
   },
 })
@@ -1160,10 +1255,38 @@ export const commit: Commit = flow({
   factory: (ctx, { impl }) => impl.exec({ input: ctx.input }),
 })
 
+const publish = flow({
+  name: "sdk.session.artifacts.dispatch",
+  parse: typed<PublishArtifactInput>(),
+  deps: { impl: tags.required(artifacts.publish) },
+  factory: (ctx, { impl }) => impl.exec({ input: ctx.input }),
+})
+
+const recall = flow({
+  name: "sdk.session.memory.recall.dispatch",
+  parse: typed<RecallMemoryInput>(),
+  deps: { impl: tags.required(memory.recall) },
+  factory: (ctx, { impl }) => impl.exec({ input: ctx.input }),
+})
+
+const writeMemory = flow({
+  name: "sdk.session.memory.commit.dispatch",
+  parse: typed<CommitMemoryInput>(),
+  deps: { impl: tags.required(memory.commit) },
+  factory: (ctx, { impl }) => impl.exec({ input: ctx.input }),
+})
+
+const accept = flow({
+  name: "sdk.session.memory.accept.dispatch",
+  parse: typed<AcceptMemoryInput>(),
+  deps: { impl: tags.required(memory.accept) },
+  factory: (ctx, { impl }) => impl.exec({ input: ctx.input }),
+})
+
 export const publishArtifact: PublishArtifact = flow({
   name: "sdk.session.artifacts.publish",
   parse: typed<PublishArtifactInput>(),
-  deps: { session, impl: tags.required(artifacts.publish) },
+  deps: { session, impl: controller(publish) },
   factory: async (ctx, { session, impl }) => {
     assertOpenBoundary(session, "artifact.publish")
     const work = boundaryWork(session, ctx.input.workId, "artifact.publish")
@@ -1191,7 +1314,7 @@ export const publishArtifact: PublishArtifact = flow({
 export const recallMemory: RecallMemory = flow({
   name: "sdk.session.memory.recall",
   parse: typed<RecallMemoryInput>(),
-  deps: { session, impl: tags.required(memory.recall) },
+  deps: { session, impl: controller(recall) },
   factory: async (ctx, { session, impl }) => {
     assertOpenBoundary(session, "memory.recall")
     if (!Number.isSafeInteger(ctx.input.limit) || ctx.input.limit <= 0) {
@@ -1219,7 +1342,7 @@ export const recallMemory: RecallMemory = flow({
 export const commitMemory: CommitMemory = flow({
   name: "sdk.session.memory.commit",
   parse: typed<CommitMemoryInput>(),
-  deps: { session, impl: tags.required(memory.commit) },
+  deps: { session, impl: controller(writeMemory) },
   factory: async (ctx, { session, impl }) => {
     assertOpenBoundary(session, "memory.commit")
     const work = boundaryWork(session, ctx.input.workId, "memory.commit")
@@ -1244,7 +1367,7 @@ export const commitMemory: CommitMemory = flow({
 export const acceptMemory: AcceptMemory = flow({
   name: "sdk.session.memory.accept",
   parse: typed<AcceptMemoryInput>(),
-  deps: { session, impl: tags.required(memory.accept) },
+  deps: { session, impl: controller(accept) },
   factory: async (ctx, { session, impl }) => {
     assertOpenBoundary(session, "memory.accept")
     const work = boundaryWork(session, ctx.input.workId, "memory.accept")
@@ -1381,71 +1504,87 @@ export const finish = flow({
   ),
 })
 
-export function run<Output, Input, Fault = never, Yield = never>(
-  options: RunOptions<Output, Input, Fault, Yield>,
-): Lite.Flow<Output, RunInput<Input>, Fault, Yield | SessionEvent> {
-  return flow({
-    name: options.name,
-    parse: typed<RunInput<Input>>(),
-    deps: { session, turn: controller(options.turn), parentSignal: tags.optional(abortSignal) },
-    factory: async function* (ctx, { session, turn, parentSignal }) {
-      const active = session.work.admit(ctx.input.work)
-      const work = session.record.work.find((item) => item.id === active.record.workId)!
-      const branch = session.record.branches.find((item) => item.id === work.branchId)!
-      const signal = parentSignal ? AbortSignal.any([active.signal, parentSignal]) : active.signal
-      const invocation = {
-        input: ctx.input.input,
-        tags: [
-          current.session(session),
-          current.work(work),
-          current.attempt(active.record),
-          current.branch(branch),
-          current.authority(work.authority),
-          current.epoch(active.record.snapshotEpoch),
-          abortSignal(signal),
-        ],
-      } as Lite.FlowExecOptions<Input>
-      let settled = false
-      try {
-        yield session.emit({
+const dispatch = flow({
+  name: "sdk.session.dispatch",
+  deps: { turn: tags.required(selectedTurn) },
+  factory: async function* (ctx, { turn }) {
+    if (!isStreamingExec(turn.flow)) return turn.exec({ rawInput: ctx.input })
+    const stream = turn.execStream({ rawInput: ctx.input })
+    for await (const value of stream) yield value
+    return stream.result
+  },
+})
+
+export const run = flow({
+  name: "sdk.session.run",
+  parse: typed<RunInput<unknown>>(),
+  deps: {
+    session,
+    selection: tags.required(execution.turn),
+    dispatch: controller(dispatch),
+  },
+  factory: async function* (ctx, { session, selection, dispatch }) {
+    const active = session.work.admit(ctx.input.work)
+    const work = session.record.work.find((item) => item.id === active.record.workId)!
+    const branch = session.record.branches.find((item) => item.id === work.branchId)!
+    const signal = AbortSignal.any([active.signal, ctx.signal])
+    const invocation = {
+      rawInput: ctx.input.input,
+      signal,
+      tags: [
+        selectedTurn(selection.flow),
+        current.session(session),
+        current.work(work),
+        current.attempt(active.record),
+        current.branch(branch),
+        current.authority(work.authority),
+        current.epoch(active.record.snapshotEpoch),
+        observation.current(Object.freeze({
+          sessionId: session.record.id,
+          activationId: `${session.record.id}:${work.id}:${work.attempt}`,
           workId: work.id,
-          attempt: work.attempt,
-          branchId: work.branchId,
-          snapshotEpoch: active.record.snapshotEpoch,
-          type: "work.started",
-        })
-        let output: Output
-        if (isStreamingExec(options.turn as Lite.ExecTarget)) {
-          signal.throwIfAborted()
-          const stream = turn.execStream(invocation)
-          for await (const value of stream) yield value
-          output = await stream.result
-        } else {
-          signal.throwIfAborted()
-          output = await turn.exec(invocation)
-        }
-        signal.throwIfAborted()
-        session.work.settle(work.id, work.attempt, { status: "completed" })
-        settled = true
-        return output
-      } catch (error) {
-        settleOpenInvocations(session, work.id, work.attempt, signal.aborted ? "cancelled" : "failed")
-        session.work.settle(work.id, work.attempt, {
-          status: signal.aborted ? "cancelled" : "failed",
-          error: jsonError(error),
-        })
-        settled = true
-        throw error
-      } finally {
-        if (!settled) {
-          settleOpenInvocations(session, work.id, work.attempt, "cancelled")
-          session.work.cancel(work.id, new DOMException("Work stream closed", "AbortError"))
-          session.work.settle(work.id, work.attempt, { status: "cancelled" })
-        }
+          ...(work.parentId === undefined ? {} : { parentWorkId: work.parentId }),
+          role: work.role,
+        })),
+      ],
+    }
+    let settled = false
+    try {
+      const prepared = dispatch.prepare(invocation)
+      await prepared.ready
+      signal.throwIfAborted()
+      yield session.emit({
+        workId: work.id,
+        attempt: work.attempt,
+        branchId: work.branchId,
+        snapshotEpoch: active.record.snapshotEpoch,
+        type: "work.started",
+      })
+      signal.throwIfAborted()
+      const stream = prepared.execStream()
+      for await (const value of stream) yield value
+      const output = await stream.result
+      signal.throwIfAborted()
+      session.work.settle(work.id, work.attempt, { status: "completed" })
+      settled = true
+      return output
+    } catch (error) {
+      settleOpenInvocations(session, work.id, work.attempt, signal.aborted ? "cancelled" : "failed")
+      session.work.settle(work.id, work.attempt, {
+        status: signal.aborted ? "cancelled" : "failed",
+        error: jsonError(error),
+      })
+      settled = true
+      throw error
+    } finally {
+      if (!settled) {
+        settleOpenInvocations(session, work.id, work.attempt, "cancelled")
+        session.work.cancel(work.id, new DOMException("Work stream closed", "AbortError"))
+        session.work.settle(work.id, work.attempt, { status: "cancelled" })
       }
-    },
-  }) as Lite.Flow<Output, RunInput<Input>, Fault, Yield | SessionEvent>
-}
+    }
+  },
+})
 
 function branchFrom(runtime: SessionRuntime, id: BranchId): BranchRecord {
   const branch = runtime.record.branches.find((value) => value.id === id)

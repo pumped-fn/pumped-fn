@@ -57,8 +57,8 @@ claude.config({
 ```
 
 `claudeAttempt` is the provider-neutral streaming edge. It emits `ModelEvent` deltas and returns the
-same `ModelResponse` shape as `claudeTurn`. `claudeAttemptBinding` injects it through the SDK
-`agent.attempt` tag. When a session record is present, a root-owned lease manager keeps one isolated
+same `ModelResponse` shape as `claudeTurn`. `claudeAttemptBinding` injects it through
+`agent.impl.attempt`. When a session record is present, a root-owned lease manager keeps one isolated
 sequential process for that logical session. Concurrent sessions never share a process, and abort
 releases only the selected session lease.
 
@@ -79,7 +79,7 @@ import * as claude from "@pumped-fn/sdk-claude"
 import { createScope } from "@pumped-fn/lite"
 
 const scope = createScope({
-  tags: [claude.provider, claude.config({
+  tags: [claude.config({
     auth: { kind: "global" },
     cwd: process.cwd(),
     roots: [],
@@ -100,8 +100,9 @@ await ctx.close()
 await scope.dispose()
 ```
 
-`config`, `engine`, `run`, `turn`, and `provider` are aliases to the same graph handles, not a
-facade object. Tests can preset `claudeAttempt`, `claudeLeases`, or `engine` through `createScope` without changing the caller.
+`config`, `engine`, `run`, `turn`, and `provider` are aliases to the same graph handles. Use
+`claudeAttemptBinding` when composing `agent.turn`; `provider` remains the scalar model tag. Tests
+can preset `claudeAttempt`, `claudeLeases`, or `engine` through `createScope` without changing the caller.
 
 ---
 Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

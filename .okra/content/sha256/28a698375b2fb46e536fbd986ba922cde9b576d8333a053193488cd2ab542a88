@@ -1,0 +1,37 @@
+{
+  "packet_version": 1,
+  "worker_id": "dkr-5",
+  "unit_id": "DKR-5",
+  "role": "evidence-publication discovery writer",
+  "role_contract": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/references/roles/writer.md",
+  "run_dir": ".okra/runs/issue-triage-session-20260715",
+  "frame_ref": "frame/frame.v2.json",
+  "tree_ref": "tree/tree.v7.json",
+  "assignment": "Define replayable evidence, independent verification, authority, idempotency, and public scope-seam contracts for the GitHub issue-triage example using only deterministic fake adapters.",
+  "required_checks": [
+    "Define the issue intake, code evidence, read-only PostgreSQL evidence, bounded Victoria evidence, hypothesis, verifier verdict, and publication receipt shapes using Standard Schema compatible validators.",
+    "Require evidence source, citation, captured_at, expires_at or max_age, query or revision identity, and capability scope where relevant.",
+    "Require every published hypothesis to cite fresh evidence and a separate verified verdict; reject writer-only acceptance.",
+    "Require repository containment, read-only database statements, bounded log or trace windows, publication authority, and idempotency key before any effect adapter runs.",
+    "Probe supported success plus unsupported hypothesis, missing citation, stale evidence, unsafe repository path, mutating SQL, unbounded Victoria query, unauthorized publication, duplicate publication, conflicting idempotency result, verifier failure, adapter failure, and retry after known receipt.",
+    "Express every effect as a declared controller flow or required tag port and prove all logic through createScope with public API only.",
+    "Derive a proposed named sixteen-contract objective set for the runnable example; do not change the frame denominator.",
+    "Return a complete executable checkpoint and active wall set; never self-accept."
+  ],
+  "authorized_writes": [
+    ".okra/runs/issue-triage-session-20260715/workers/dkr-5/**"
+  ],
+  "forbidden": [
+    "Product code, tests, docs, manifests, git history, PR state, external services, frame, tree, or another worker's artifacts",
+    "Real GitHub, PostgreSQL, Victoria, repository, network, or process access",
+    "Module mocks, internal reaches, global patches, hidden effects, shared scope factories, one-model acceptance, or denominator changes"
+  ],
+  "required_outputs": [
+    "workers/dkr-5/evidence-publication-contract.json",
+    "workers/dkr-5/objective-contracts.json",
+    "workers/dkr-5/checkpoint.json",
+    "workers/dkr-5/replay.sh",
+    "workers/dkr-5/progress.jsonl via the absolute OKRA store helper worker-report command"
+  ],
+  "terminal_condition": "Stop when all success and denial fixtures replay, the proposed sixteen contracts are named, and every effect remains scope-substitutable."
+}

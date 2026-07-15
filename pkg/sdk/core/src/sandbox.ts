@@ -62,10 +62,10 @@ export const read: Read = flow({
     policy: tags.required(policy),
     read: tags.required(impl.read),
   },
-  factory: (ctx, deps) => {
-    assertPolicy(deps.authority ?? deps.runtime.authority, deps.policy)
-    assertPath(deps.policy, ctx.input.path)
-    return deps.read.exec({ input: ctx.input })
+  factory: (ctx, { authority, runtime, policy: value, read: impl }) => {
+    assertPolicy(authority ?? runtime.authority, value)
+    assertPath(value, ctx.input.path)
+    return impl.exec({ input: ctx.input })
   },
 })
 
@@ -78,11 +78,11 @@ export const write: Write = flow({
     policy: tags.required(policy),
     write: tags.required(impl.write),
   },
-  factory: (ctx, deps) => {
-    assertPolicy(deps.authority ?? deps.runtime.authority, deps.policy)
-    if (!deps.policy.write) throw new PolicyError("write is disabled")
-    assertPath(deps.policy, ctx.input.path)
-    return deps.write.exec({ input: ctx.input })
+  factory: (ctx, { authority, runtime, policy: value, write: impl }) => {
+    assertPolicy(authority ?? runtime.authority, value)
+    if (!value.write) throw new PolicyError("write is disabled")
+    assertPath(value, ctx.input.path)
+    return impl.exec({ input: ctx.input })
   },
 })
 
@@ -95,12 +95,12 @@ export const exec: Run = flow({
     policy: tags.required(policy),
     run: tags.required(impl.run),
   },
-  factory: async function* (ctx, deps): AsyncGenerator<ExecEvent, ExecResult, unknown> {
-    assertPolicy(deps.authority ?? deps.runtime.authority, deps.policy)
-    if (!deps.policy.commands.includes(ctx.input.command)) {
+  factory: async function* (ctx, { authority, runtime, policy: value, run }): AsyncGenerator<ExecEvent, ExecResult, unknown> {
+    assertPolicy(authority ?? runtime.authority, value)
+    if (!value.commands.includes(ctx.input.command)) {
       throw new PolicyError(`command ${JSON.stringify(ctx.input.command)} is not allowed`)
     }
-    const stream = deps.run.execStream({ input: ctx.input })
+    const stream = run.execStream({ input: ctx.input })
     for await (const event of stream) yield event
     return stream.result
   },

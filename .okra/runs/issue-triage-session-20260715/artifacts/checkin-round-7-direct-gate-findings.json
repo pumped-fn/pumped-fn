@@ -1,0 +1,65 @@
+{
+  "type": "steering_checkin",
+  "checkin_id": "checkin.issue-triage.round-7.direct-gate-findings",
+  "round": 7,
+  "observed_at": "2026-07-15T05:14:21Z",
+  "next_check_at": "2026-07-15T05:24:21Z",
+  "inbound_signal": "DKR-0 direct gates found nonzero SDK slop; DKR-1 v3 independently passed 11 cleanup and 6 activation behaviors but its checkpoint records a missing root replay path.",
+  "decision_delta": "Kept both conclusions unaccepted, required root-resolvable evidence, and continued only read-only DKR-0, DKR-1, and DKR-4 work while the cleanup breaking flag stays open.",
+  "affected_units": ["DKR-0", "DKR-1", "DKR-4"],
+  "expected_effect": "Prevent passing behavioral evidence from masking an unusable public proof path or current style debt that the same PR must remove.",
+  "evidence_delta": "DKR-1 behavior reads 17 of 17 combined cases; its recorded replay path fails repository-root resolution. DKR-0 authoritative SDK lint reads a nonzero slop count pending governed checkpoint output. Objective remains 0 of 16.",
+  "problem_restatement": "Accept only root-replayable contracts, then make the product changes that restore cleanup and style walls without expanding the API surface.",
+  "alternatives_considered": [
+    "Accept the DKR-1 behavior and repair its path during implementation",
+    "Treat current SDK lint failures as unrelated baseline",
+    "Keep both walls blocking and record exact corrective scope before progression"
+  ],
+  "assumptions_at_risk": [
+    "The DKR-1 path defect is mechanical and does not change the contract",
+    "Current SDK slop can be removed inside the accepted PR reshape",
+    "DKR-4 bounded composition needs no additional public worker abstraction"
+  ],
+  "dkr_decision": "Continue discovery and direct gates; do not promote any CKR or PKR and do not dispatch product work.",
+  "hallucination_sweep": [
+    {
+      "claim": "A replay that only works from its worker directory is a repository-root executable claim.",
+      "evidence_ref": "worker-packets/validator-dkr-1-v3.json",
+      "verdict": "rejected; checkpoint must record the working root command"
+    }
+  ],
+  "missing_context_sweep": [
+    {
+      "claim": "The current lint failure can be classified as pre-existing and ignored.",
+      "evidence_ref": "worker-packets/dkr-0-v3.json",
+      "verdict": "rejected pending the governed direct gate; the PR owns its touched SDK surface"
+    }
+  ],
+  "unexpected_results": [
+    {
+      "claim": "Behavioral cleanup proof completed before its formal replay path became admissible.",
+      "evidence_ref": "workers/dkr-1-cleanup-v3/checkpoint.v3.json",
+      "verdict": "mechanical correction required before acceptance"
+    }
+  ],
+  "anti_goal_violation_review": [
+    {
+      "claim": "cleanup_business_state_mutation_count remains breached and SDK slop may add a second breaking wall.",
+      "evidence_ref": "flags.jsonl#seq=1",
+      "verdict": "cleanup breaking open; slop awaits governed direct read before flagging"
+    }
+  ],
+  "uncertainty_5why": {
+    "status": "open",
+    "terminal_metric_or_uncertainty_id": "uncertainty.root_replay_and_direct_wall_set",
+    "reducing_dkr": "DKR-0"
+  },
+  "open_flags": ["breaking.DKR-1.cleanup-business-state-mutation"],
+  "steering_value_score": 1,
+  "worker_progress_refs": [
+    "workers/dkr-1-cleanup-v3/progress.jsonl#seq=1",
+    "worker-packets/validator-dkr-1-v3.json",
+    "worker-packets/dkr-0-v3.json",
+    "worker-packets/dkr-4.json"
+  ]
+}

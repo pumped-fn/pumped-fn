@@ -1,0 +1,168 @@
+{
+  "checkpoint_id": "dkr-1-activation-context-v1",
+  "conclusion_id": "activation-ownership",
+  "decision_target": "current ownership versus a new ownership primitive",
+  "source_of_truth": "Saved activation probe, current Lite and SDK source, and focused current-source tests",
+  "read_method": "Run the saved replay checker and compare its JSON output with probe-result.json",
+  "observed_at": "2026-07-15T04:17:35Z",
+  "recorded_at": "2026-07-15T04:20:00Z",
+  "max_age": "10m",
+  "freshness_status": "fresh",
+  "confidence": 0.93,
+  "evidence_refs_or_hashes": [
+    "sha256:752e0fa95b753fec49b5b85b991524b0b28d52ea5576f2edd3db7178d4a5edd3",
+    "sha256:074d3aa0948b21e2fc404c80af0a39dce917945ed309cb8d6434991993fa3ef7",
+    "sha256:549e6b4096698a433f5a843dc4851d2ab9743c7b5e77e7497e0205c7d9aa3b0b",
+    "sha256:78b6500dee31b501644f3a528149e2efb3cb8f684a59373071cf9fdc5f5cfe06"
+  ],
+  "replay_command_or_checker": ".okra/runs/issue-triage-session-20260715/workers/dkr-1/replay.sh",
+  "questions_answered": [
+    "Per-exec tags are visible to the entry flow, nested controller flows, and execution extensions",
+    "An entry flow resolves one current-owned session resource and nested controller flows reuse the same runtime",
+    "Sibling entry-flow exec calls receive different current-owned runtimes and do not leak their tags",
+    "Explicit checkpointing can save an open durable record before activation cleanup",
+    "A later exec can load, bind, and resume the durable record without retaining an ExecutionContext",
+    "Current cleanup makes no store commit but does change the activation runtime and its record status to finishing"
+  ],
+  "questions_unanswered": [
+    "The exact deactivation cleanup contract after removing the finishing transition belongs to progression after acceptance",
+    "Parent cancellation and descendant joining remain DKR-2",
+    "Safe observation projection and terminal trace behavior remain DKR-3"
+  ],
+  "decision": "candidate only: keep current ownership for one top-level exec per activation; do not add nearest-explicit-context ownership; reshape session cleanup so activation close deactivates without beginning durable finish",
+  "flag_if_missing_or_stale": "cannot",
+  "reviewer_audit_status": "pending_independent_replay",
+  "active_anti_goals": [
+    "cleanup_business_state_mutation_count",
+    "cross_session_leak_count",
+    "primitive_proof_gap_count",
+    "single_llm_truth_acceptance_count",
+    "ungoverned_write_or_read_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "anti_goal_id": "AG-CLEANUP-EFFECT",
+      "metric_id": "cleanup_business_state_mutation_count",
+      "source_of_truth": "Activation probe runtime and store call trace",
+      "read_method": "Replay close without finish and count runtime record status transitions or store commits",
+      "observed_at": "2026-07-15T04:17:35Z",
+      "recorded_at": "2026-07-15T04:20:00Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 1,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "breached",
+      "evidence_ref": "workers/dkr-1/probe-result.json#claims.closeAvoidsRuntimeBusinessStateMutation",
+      "replay_command_or_checker": "workers/dkr-1/replay.sh",
+      "verification_record_ref": "workers/dkr-1/progress.jsonl#seq=1"
+    },
+    {
+      "anti_goal_id": "AG-SESSION-ISOLATION",
+      "metric_id": "cross_session_leak_count",
+      "source_of_truth": "Overlapping generic activation and SDK sibling-exec probe",
+      "read_method": "Replay and compare runtime identity and visible tags across sibling activations",
+      "observed_at": "2026-07-15T04:17:35Z",
+      "recorded_at": "2026-07-15T04:20:00Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_verification",
+      "evidence_ref": "workers/dkr-1/probe-result.json#claims.siblingExecResourcesIsolated",
+      "replay_command_or_checker": "workers/dkr-1/replay.sh",
+      "verification_record_ref": "workers/dkr-1/progress.jsonl#seq=1"
+    },
+    {
+      "anti_goal_id": "AG-PRIMITIVE-PROOF",
+      "metric_id": "primitive_proof_gap_count",
+      "source_of_truth": "Candidate decision and activation probe",
+      "read_method": "Confirm the decision proposes no new ownership primitive and all ownership claims replay",
+      "observed_at": "2026-07-15T04:17:35Z",
+      "recorded_at": "2026-07-15T04:20:00Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_verification",
+      "evidence_ref": "workers/dkr-1/checkpoint.json#decision",
+      "replay_command_or_checker": "workers/dkr-1/replay.sh",
+      "verification_record_ref": "workers/dkr-1/progress.jsonl#seq=1"
+    },
+    {
+      "anti_goal_id": "AG-INDEPENDENCE",
+      "metric_id": "single_llm_truth_acceptance_count",
+      "source_of_truth": "Independent validator record",
+      "read_method": "No independent DKR-1 replay exists yet",
+      "observed_at": "2026-07-15T04:17:35Z",
+      "recorded_at": "2026-07-15T04:20:00Z",
+      "max_age": "10m",
+      "freshness_status": "unknown",
+      "value": -1,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "unknown",
+      "evidence_ref": "workers/dkr-1/checkpoint.json#reviewer_audit_status",
+      "replay_command_or_checker": "workers/dkr-1/replay.sh",
+      "verification_record_ref": "workers/dkr-1/progress.jsonl#seq=1"
+    },
+    {
+      "anti_goal_id": "AG-STORAGE",
+      "metric_id": "ungoverned_write_or_read_count",
+      "source_of_truth": "Packet-authorized paths, content hashes, replay checker, and governed worker report",
+      "read_method": "Inspect changed paths and replay the hashed probe artifacts",
+      "observed_at": "2026-07-15T04:17:35Z",
+      "recorded_at": "2026-07-15T04:20:00Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_verification",
+      "evidence_ref": "workers/dkr-1/probe-result.json",
+      "replay_command_or_checker": "workers/dkr-1/replay.sh",
+      "verification_record_ref": "workers/dkr-1/progress.jsonl#seq=1"
+    },
+    {
+      "anti_goal_id": "AG-INTEGRITY",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "source_of_truth": "Independent checkpoint audit and deterministic replay",
+      "read_method": "Independent validator checks every claim, wall entry, hash, and replay result",
+      "observed_at": "2026-07-15T04:17:35Z",
+      "recorded_at": "2026-07-15T04:20:00Z",
+      "max_age": "10m",
+      "freshness_status": "unknown",
+      "value": -1,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "unknown",
+      "evidence_ref": "workers/dkr-1/checkpoint.json",
+      "replay_command_or_checker": "workers/dkr-1/replay.sh",
+      "verification_record_ref": "workers/dkr-1/progress.jsonl#seq=1"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-15T04:20:00Z",
+    "reason": "Cleanup changes activation business state, and independent replay is still pending"
+  },
+  "confidence_probability_update": "0.55 -> 0.93",
+  "risk_or_anti_goal_implications": [
+    "AG-SESSION-ISOLATION risk falls because sibling exec calls have separate runtimes and inherited tags remain activation-local",
+    "AG-PRIMITIVE-PROOF risk falls because no new ownership primitive is needed for the tested activation model",
+    "AG-CLEANUP-EFFECT is breached by runtime.shutdown calling beginFinish during ordinary activation cleanup even though no store commit occurs",
+    "AG-INDEPENDENCE and AG-INTEGRITY keep downstream work blocked until separate replay"
+  ],
+  "candidate_ckrs": [
+    "CKR-SESSION-ACTIVATION",
+    "CKR-LITE-LIFECYCLE"
+  ],
+  "candidate_pkrs": [
+    "PKR-SESSION-DEACTIVATION-CLEANUP",
+    "PKR-ACTIVATION-CONTEXT-CONTRACTS"
+  ]
+}

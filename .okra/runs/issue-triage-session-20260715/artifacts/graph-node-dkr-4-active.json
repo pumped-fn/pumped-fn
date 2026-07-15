@@ -1,0 +1,9 @@
+{
+  "type": "node_event",
+  "node_id": "DKR-4",
+  "node_kind": "dkr",
+  "observed_at": "2026-07-15T05:05:28Z",
+  "quadrant": { "certainty": 0.4, "level": "approach" },
+  "source_ref": "worker-packets/dkr-4.json",
+  "status": "active"
+}

@@ -1,0 +1,31 @@
+{
+  "packet_version": 2,
+  "worker_id": "dkr-2",
+  "unit_id": "DKR-2",
+  "role": "discovery writer revision",
+  "run_dir": ".okra/runs/issue-triage-session-20260715",
+  "frame_ref": "frame/frame.v2.json",
+  "prior_checkpoint": "workers/dkr-2/checkpoint.json",
+  "assignment": "Create a non-destructive v2 checkpoint for the already probed structured-cancellation conclusion. Preserve the substantive decision and add the complete executable DKR identity, evidence, freshness, and wall structure before independent validation.",
+  "required_checks": [
+    "Do not overwrite checkpoint.json; write checkpoint.v2.json.",
+    "Add contract_version, type, and unit_id and validate against the executable DKR checkpoint contract.",
+    "Resolve every evidence hash to a named current source or governed worker artifact.",
+    "Give every active wall a numeric value, fresh timestamp, distinct evidence_ref and verification_record_ref, and an honest pending validator verdict.",
+    "Update the saved replay so it validates v2 completeness as well as the existing behavior.",
+    "Keep downstream advance blocked and do not self-accept."
+  ],
+  "authorized_writes": [
+    ".okra/runs/issue-triage-session-20260715/workers/dkr-2/**"
+  ],
+  "forbidden": [
+    "Product code, tests, docs, manifests, git history, PR state, external services, frame, tree, or another worker's artifacts",
+    "Changing the signal-only decision, adding a public cancel or task surface, or weakening a wall"
+  ],
+  "required_outputs": [
+    "workers/dkr-2/checkpoint.v2.json",
+    "updated workers/dkr-2/replay.sh",
+    "a new governed workers/dkr-2/progress.jsonl record"
+  ],
+  "terminal_condition": "Finish when v2 behavior and checkpoint completeness replay, all hashes resolve, and independent validation remains the only acceptance gate."
+}

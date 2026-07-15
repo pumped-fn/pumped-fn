@@ -16,7 +16,6 @@ import {
 import { builtinModels } from "@earendil-works/pi-ai/providers/all"
 import { atom, controller, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
 import {
-  abortSignal,
   model,
   step,
   type Capability,
@@ -80,10 +79,10 @@ export const piAttempt: agent.Attempt = flow({
     config: tags.required(piConfig),
     environment,
     models,
-    signal: tags.optional(abortSignal),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async function* (ctx, { clock, config, environment, models, signal }) {
+  factory: async function* (ctx, { clock, config, environment, models }) {
+    const signal = ctx.signal
     const selected = requireModel(models, config)
     if (config.thinking && !getSupportedThinkingLevels(selected).includes(config.thinking)) {
       throw new PiProviderError(
@@ -100,9 +99,9 @@ export const piAttempt: agent.Attempt = flow({
     }
     const apiKey = config.apiKeyEnv ? requireEnvironment(environment, config.apiKeyEnv, config) : undefined
     const controller = new AbortController()
-    const abort = () => controller.abort(signal?.reason)
-    signal?.addEventListener("abort", abort, { once: true })
-    if (signal?.aborted) abort()
+    const abort = () => controller.abort(signal.reason)
+    signal.addEventListener("abort", abort, { once: true })
+    if (signal.aborted) abort()
     const stream = config.thinking
       ? models.streamSimple(selected, context, { reasoning: config.thinking, apiKey, signal: controller.signal })
       : models.stream(selected, context, { apiKey, signal: controller.signal })
@@ -122,13 +121,13 @@ export const piAttempt: agent.Attempt = flow({
       completed = true
       return responseOf(response, tools)
     } finally {
-      signal?.removeEventListener("abort", abort)
+      signal.removeEventListener("abort", abort)
       if (!completed) controller.abort(new DOMException("Pi attempt stream closed", "AbortError"))
     }
   },
 })
 
-export const piAttemptBinding = agent.attempt(piAttempt)
+export const piAttemptBinding = agent.impl.attempt(piAttempt)
 
 export const piTurn = flow({
   name: "pi.complete",

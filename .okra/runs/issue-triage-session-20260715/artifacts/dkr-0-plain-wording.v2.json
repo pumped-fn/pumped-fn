@@ -1,0 +1,6 @@
+{
+  "observed_at": "2026-07-15T04:38:38Z",
+  "read_method": "Run the canonical plain wording checker on the v2 disposition matrix, checkpoint, and replay script.",
+  "replay_command_or_checker": "python3 /home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/scripts/check-plain-wording.py .okra/runs/issue-triage-session-20260715/artifacts/dkr-0-disposition-matrix.v2.json .okra/runs/issue-triage-session-20260715/artifacts/dkr-0-current-pr-checkpoint.v2.json .okra/runs/issue-triage-session-20260715/replay/dkr-0-disposition-v2.sh",
+  "plain_wording_violation_count": 0
+}

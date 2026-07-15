@@ -1,104 +1,148 @@
 # SDK patterns
 
-## Authoring rule
+## Declare the whole graph
 
-Use tags for configuration and implementors. Group related tags in a namespace.
+Executing an entry flow recursively activates its complete declared dependency tree before the entry factory starts.
+
+```text
+session.run -> agent.turn -> agent.role -> selected capability flows
+                          -> provider + validation + backend readiness
+```
+
+This is the intended composition and testing model. Tests replace edges at `createScope`; they do not mock descendants. Missing required tags are runtime activation errors in this release. Static analysis can report them later.
+
+## Group tags by meaning
+
+Use namespaces for configuration, implementations, and execution facts.
 
 ```ts
 export const database = Object.freeze({
-  config: tag<DatabaseConfig>({ label: "database.config" }),
-  engine: tag<DatabaseEngine>({ label: "database.engine" }),
+  config: Object.freeze({
+    connection: tag<ConnectionConfig>({ label: "database.config.connection" }),
+  }),
+  impl: Object.freeze({
+    inspect: tag<Inspect>({ label: "database.impl.inspect" }),
+  }),
+  execution: Object.freeze({
+    tenant: tag<string>({ label: "database.execution.tenant" }),
+  }),
 })
 ```
 
-Declare the static graph. Required tags belong in `deps`. Do not supply a built-in implementation.
+The SDK follows the same split with `agent.config.*`, `agent.impl.*`, `session.execution.*`, `session.current.*`, and `session.observation.*`.
+
+## Prefer stable definitions
+
+`session.run`, `agent.turn`, `agent.role`, and `agent.fromModel` are stable module-level definitions. Select their behavior through tags.
 
 ```ts
-export const inspectSchema = flow({
-  name: "database.inspect_schema",
-  parse: typed<InspectInput>(),
+const tags = [
+  agent.config.role({ name: "triage", version: "1" }),
+  agent.impl.tool(inspectIssue),
+  agent.impl.skill(incidentPolicy),
+  agent.impl.subagent(reviewHypothesis),
+  agent.impl.attempt(agent.fromModel),
+  model(provider),
+  session.execution.turn({ flow: agent.turn }),
+]
+```
+
+Do not build per-use role, turn, tool, skill, subagent, or session handles. Do not store context-bound `FlowHandle` values in a registry.
+
+## Put readiness in the tool tree
+
+A tool is an ordinary flow carrying `agent.config.tool` metadata. Its dependencies prove the backend is ready.
+
+```ts
+const inspectIssue = flow({
+  name: "inspect_issue",
+  tags: [agent.config.tool({
+    version: "1",
+    description: "Read issue and repository evidence.",
+    input: issueSchema,
+  })],
   deps: {
-    config: tags.required(database.config),
-    engine: tags.required(database.engine),
+    repository: tags.required(repository.impl.inspect),
+    ready: tags.required(repository.ready),
   },
-  factory: (ctx, deps) => deps.engine.inspect(deps.config, ctx.input),
+  factory: (ctx, { repository }) => repository.exec({ input: ctx.input }),
 })
 ```
 
-Test at the needed radius through `createScope({ tags, presets, extensions })`. Preset direct dependencies for a unit test. Bind only edge adapters for an outside-in test.
+Because `agent.role` collects `agent.impl.tool` flows and activation is recursive, missing readiness fails before `session.run` emits `work.started` or the model is called.
 
-## Placement
+## Use controllers for composition
+
+Static child flows belong in `controller(flow)` dependencies.
+
+```ts
+const consumeIssue = flow({
+  name: "github.issue.consume",
+  deps: {
+    receive: controller(receiveIssue),
+    triage: controller(session.run),
+    ack: controller(ackIssue),
+    reject: controller(rejectIssue),
+  },
+  factory: async (_ctx, { receive, triage, ack, reject }) => {
+    const issue = await receive.exec()
+    try {
+      const verdict = await triage.exec({ input: issue.work })
+      await ack.exec({ input: { id: issue.id, verdict } })
+    } catch (error) {
+      await reject.exec({ input: { id: issue.id, error } })
+      throw error
+    }
+  },
+})
+```
+
+Awaiting the controller blocks. Starting several consumer executions provides concurrency. Joining their promises provides a join. A fixed number of consumers provides a bounded queue worker set without a public pool or worker registry.
+
+## Keep observation narrow
+
+`session.run` binds `session.observation.current` for the activation:
+
+```ts
+interface ObservationProjection {
+  readonly sessionId: string
+  readonly activationId: string
+  readonly workId: string
+  readonly parentWorkId?: string
+  readonly role: string
+}
+```
+
+Extensions may read this projection. Do not expose arbitrary tag enumeration, prompts, tool inputs, memory, credentials, or backend handles as observation context.
+
+## Separate finish from deactivation
+
+```text
+session.finish: fence -> join -> commit once -> finished
+deactivate:     fence -> abort -> join        -> no record mutation
+```
+
+The current-owned session resource calls `deactivate()` during cleanup. Cleanup never commits, schedules work, writes memory, or calls a model. Call `session.finish` explicitly when durable completion is required.
+
+## Place state and effects deliberately
 
 | Need | Primitive |
 |---|---|
 | Durable semantic state | Plain record |
-| Live owned coordination | Current-owned resource |
+| Live activation coordination | Current-owned resource |
 | One effect | Flow |
-| Config or implementor | Namespaced tag |
-| Model and dispatch loop | Turn flow |
-| Tool readiness | Resource containing an inert flow |
-| Physical shared adapter | Root-pre-resolved resource |
+| Static child execution | `controller(flow)` |
+| Config or implementation choice | Namespaced tag |
+| Per-execution binding | Execution tag |
+| Test substitution | `createScope({ presets, tags, extensions })` |
 
-## Session lifetime
+## Deliberate absences
 
-The host owns contexts. A session owns semantic state and live attempts.
-
-```text
-host context
-  ├─ physical provider
-  ├─ physical database
-  └─ session context
-       ├─ SessionRuntime
-       ├─ Role
-       └─ Tool readiness
-```
-
-Call `session.finish` before closing the session context. Finish fences, joins, commits, and seals. Cleanup only aborts or releases owned live resources.
-
-After finish begins, do not publish late provider reservations, continuations, branches, controls, tools, artifacts, or memory. The runtime rejects these mutations while allowing already-active work and invocations to settle.
-
-Resolve `session.session` in this context before calling a nested flow. Current ownership follows the context that first resolves the resource. A run that performs the first resolution owns only a temporary runtime, so its record is not a durable session checkpoint.
-
-## Admission
-
-Admit work before resolving the selected role, tool, provider, database, or sandbox dependency. Keep child roles and turns as inert definitions. `session.run()` owns the admission edge and invokes the supplied turn only after binding current work, attempt, branch, and epoch tags.
-
-## Tools
-
-A tool resource proves readiness. Its value contains schema metadata and the raw flow definition. Never store a `FlowHandle`; it belongs to the context that resolved it.
-
-The turn performs dispatch in this order:
-
-```text
-snapshot identity -> authority and epoch -> schema validation -> ctx.exec(raw flow)
-```
-
-## Branches and parallel work
-
-Start child runs first, then `session.join`. Join waits for execution only. Call `session.merge` with the target's expected version when durable branch state should move. Merge rejects unrelated branches and branches with active or unsettled work. Fail-fast cancellation aborts siblings and waits for their settlement.
-
-## Steering
-
-Fence controls with the current work attempt and snapshot epoch. Queue and input controls are delivered between model rounds. Interrupt and cancel controls abort the active attempt. Stale controls never cross a wake, retry, or resume boundary.
-
-## Waiting and scheduling
-
-Waiting owns no model, database, or sandbox lease. Persist the admitted work and full schedule intent in the same checkpoint. Wake by persisted intent id after a fresh load and authority rebind.
-
-## Memory and artifacts
-
-Publish artifact content before placing its immutable digest reference in a checkpoint. Model output may propose candidate memory. A separate host or policy flow must accept it.
-
-## Providers
-
-Keep scalar `Model` and `complete` for simple use. Bind `agent.attempt` when streaming, continuation, steering, or cancellation matters. Scalar and streaming wrappers must share one provider execution path.
-
-## Anti-patterns
-
-- A role object with `.turn()` or `.exec()` methods.
-- A session retaining an execution context.
-- A registry storing context-bound handles.
-- A tool advertised before readiness resolves.
-- A cleanup hook that commits, schedules, writes memory, or calls a model.
-- A shared scope builder.
-- An automatic tool collector.
+- No `WorkerRegistry` or automatic worker pool.
+- No material factory; durable state is plain data.
+- No `cliWorker`; use a declared flow around `runCli`.
+- No `channel`, `schedule`, or `http` handle factory; inbound adapters are application flows.
+- No built-in tools or automatic capability collection.
+- No shared scope builder.
+- No business effect in cleanup.
+- No single model verdict as authority for publication, memory acceptance, or permission expansion.

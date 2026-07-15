@@ -1,0 +1,111 @@
+{
+  "committed_at": "2026-07-15T05:28:53Z",
+  "idempotency_key": "accept:DKR-2:v3",
+  "key_sha256": "c8a1a067f870b72946fd462dff9abb8f0bb677c117fe52688ee464cad486867b",
+  "payload": {
+    "active_anti_goal_verification": [
+      {
+        "comparator": "==",
+        "evidence_ref": "workers/validator-dkr-2-v3/independent-probe.mjs",
+        "freshness_status": "fresh",
+        "max_age": "30m",
+        "metric_id": "primitive_proof_gap_count",
+        "observed_at": "2026-07-15T05:20:50Z",
+        "read_method": "Run the independent DKR-2 v3 replay and inspect generic surface assertions",
+        "recorded_at": "2026-07-15T05:23:21Z",
+        "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-2-v3/replay.sh",
+        "source_of_truth": "Fresh validator-owned sixteen-case generic lifecycle probe",
+        "threshold": 0,
+        "value": 0,
+        "verdict": "held",
+        "verification_record_ref": "workers/validator-dkr-2-v3/progress.jsonl#seq=1"
+      },
+      {
+        "comparator": "==",
+        "evidence_ref": "workers/dkr-2-v3/cancellation-contract.json",
+        "freshness_status": "fresh",
+        "max_age": "30m",
+        "metric_id": "touched_surface_regression_count",
+        "observed_at": "2026-07-15T05:20:50Z",
+        "read_method": "Run the independent DKR-2 v3 replay",
+        "recorded_at": "2026-07-15T05:23:21Z",
+        "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-2-v3/replay.sh",
+        "source_of_truth": "Pinned unchanged Lite source plus scalar and stream baseline replay",
+        "threshold": 0,
+        "value": 0,
+        "verdict": "held",
+        "verification_record_ref": "workers/validator-dkr-2-v3/progress.jsonl#seq=1"
+      },
+      {
+        "comparator": "==",
+        "evidence_ref": "workers/validator-dkr-2-v3/verification.json",
+        "freshness_status": "fresh",
+        "max_age": "30m",
+        "metric_id": "single_llm_truth_acceptance_count",
+        "observed_at": "2026-07-15T05:20:50Z",
+        "read_method": "Compare writer checkpoint with validator replay and disposition",
+        "recorded_at": "2026-07-15T05:23:21Z",
+        "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-2-v3/replay.sh",
+        "source_of_truth": "Separate validator-owned probe and governed verification",
+        "threshold": 0,
+        "value": 0,
+        "verdict": "held",
+        "verification_record_ref": "workers/validator-dkr-2-v3/progress.jsonl#seq=1"
+      },
+      {
+        "comparator": "==",
+        "evidence_ref": "workers/validator-dkr-2-v3/progress.jsonl#seq=2",
+        "freshness_status": "fresh",
+        "max_age": "30m",
+        "metric_id": "ungoverned_write_or_read_count",
+        "observed_at": "2026-07-15T05:23:38Z",
+        "read_method": "Verify worker paths and run store",
+        "recorded_at": "2026-07-15T05:23:53Z",
+        "replay_command_or_checker": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/scripts/okra-store.sh verify .okra/runs/issue-triage-session-20260715",
+        "source_of_truth": "Authorized validator paths and verified append-only run store",
+        "threshold": 0,
+        "value": 0,
+        "verdict": "held",
+        "verification_record_ref": "workers/validator-dkr-2-v3/progress.jsonl#seq=3"
+      },
+      {
+        "comparator": "==",
+        "evidence_ref": "workers/validator-dkr-2-v3/verification.json#disposition",
+        "freshness_status": "fresh",
+        "max_age": "30m",
+        "metric_id": "anti_goal_bypass_or_dishonesty_count",
+        "observed_at": "2026-07-15T05:23:38Z",
+        "read_method": "Confirm only reducing discovery is accepted and implementation remains unauthorized",
+        "recorded_at": "2026-07-15T05:24:59Z",
+        "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-2-v3/replay.sh",
+        "source_of_truth": "Validator boundary and orchestrator acceptance",
+        "threshold": 0,
+        "value": 0,
+        "verdict": "held",
+        "verification_record_ref": "workers/validator-dkr-2-v3/progress.jsonl#seq=1"
+      }
+    ],
+    "active_anti_goals": [
+      "primitive_proof_gap_count",
+      "touched_surface_regression_count",
+      "single_llm_truth_acceptance_count",
+      "ungoverned_write_or_read_count",
+      "anti_goal_bypass_or_dishonesty_count"
+    ],
+    "checkpoint_ref": "workers/dkr-2-v3/checkpoint.v3.json",
+    "claim_id": "accept.DKR-2.structured-cancellation-v3",
+    "decided_at": "2026-07-15T05:24:59Z",
+    "decision": "accepted_as_reducing_discovery",
+    "implementation_authorized": false,
+    "observed_at": "2026-07-15T05:20:50Z",
+    "type": "claim_acceptance",
+    "unit_id": "DKR-2",
+    "verification_ref": "workers/validator-dkr-2-v3/verification.json",
+    "wall_gate": {
+      "decided_at": "2026-07-15T05:24:59Z",
+      "downstream_advance": "allowed",
+      "verdict": "held"
+    }
+  },
+  "payload_sha256": "1ad25fab0d849eb9030e44f1da0dbd7b7528bf7d5039a1a529adaf44f9ca75b5"
+}

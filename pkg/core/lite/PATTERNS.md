@@ -127,8 +127,9 @@ const settlePayment = flow({
 > **Note:** Use `controller(flow, { name, tags, key })` only to preconfigure child-flow execution defaults. Do not mix flow controller options with atom/resource controller options: flows never accept `resolve`, `watch`, or `eq`; atoms and resources never accept flow execution defaults.
 
 `prepare()` creates an invocation object for resumability, loops, fanout, policy checks, or retries.
-`step.ready` is an optional prep point; `step.exec()` awaits readiness internally, then delegates to the
-captured parent `ctx.exec({ flow, ...options })`.
+`step.ready` activates the child's declared dependency tree in an isolated tagged lifetime without
+running the child factory or `wrapExec`. `step.exec()` or `step.execStream()` awaits readiness, executes
+once through the normal extension pipeline, then closes that lifetime.
 
 ```mermaid
 sequenceDiagram
@@ -141,16 +142,17 @@ sequenceDiagram
 
     Parent->>Handle: prepare({ key, input })
     Handle-->>Parent: invocation
-    Note over Handle,Ext: no child ctx, no parse, no wrapExec, no OTEL span
+    Handle->>Ctx: create isolated tagged lifetime
+    Ctx->>Flow: activate declared deps and resources
+    Note over Flow,Ext: no factory, parse, wrapExec, or OTEL span
     Parent->>Handle: invocation.exec()
-    Handle->>Ctx: ctx.exec({ flow, input, name, tags })
     Ctx->>Child: create child context
     Child->>Ext: wrapExec(next, flow, childCtx)
     Ext->>Flow: next() resolves deps + factory
     Flow-->>Parent: output
 ```
 
-> **Note:** Extension authors should not need a second hook or wrapper-specific span logic. Normal `wrapExec` must still see one child execution per child-flow `exec()` call; sequential and parallel child flow work should remain visible through ordinary child span parentage and timing.
+> **Note:** Extension authors do not need a readiness hook or wrapper-specific span logic. Normal `wrapExec` still sees one child execution per `exec()` or `execStream()` call; dependency resolution remains visible through the resolve pipeline.
 
 ### Scoped Isolation + Testing
 

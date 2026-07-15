@@ -1,0 +1,189 @@
+{
+  "contract_version": "okra.executable-dkr-checkpoint.v1",
+  "type": "dkr_learning_checkpoint",
+  "unit_id": "DKR-1",
+  "checkpoint_id": "dkr-1-cleanup-contract-v4",
+  "conclusion_id": "current-owned-deactivation-contract-with-deterministic-error-aggregation",
+  "model_phrasing": "Model phrasing: GPT-5.x detected from the system harness; Phrasing profile id RTM-PH6OCQ6MX4.",
+  "decision_target": "Repair only the repository-root replay command while preserving the accepted eleven-case SDK deactivation contract and open cleanup wall.",
+  "source_of_truth": "The byte-identical v3 and v4 cleanup contracts, v4 root replay, v3 checkpoint and validator record, and unchanged SDK and Lite source.",
+  "read_method": "Run bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup-v4/replay.sh from the repository root and require contract identity, 11 of 11 cleanup cases, 6 of 6 activation behaviors, six evidence hashes, and a blocked wall gate.",
+  "observed_at": "2026-07-15T05:16:56Z",
+  "recorded_at": "2026-07-15T05:16:56Z",
+  "max_age": "30m",
+  "freshness_status": "fresh",
+  "confidence": 0.97,
+  "evidence_refs_or_hashes": [
+    "sha256:430cf9264c3f0df2b5110c1a14842d75f82a8e9f29ae4f18c0595e4a9d2867e6",
+    "sha256:365d42db3b4a1ab8af035cdf8c7ef6b58c4df8103d557bc9ffc966a92be59d07",
+    "sha256:909ba54fd7cc80fdf588e6bf7f2086fb23c4fcd7a23126f6dca674e03c796a6e",
+    "sha256:de7336905977e7079f79c97b2ec932ff4ecc6ecfb3be6d1986f7d5a106fbe491",
+    "sha256:78b6500dee31b501644f3a528149e2efb3cb8f684a59373071cf9fdc5f5cfe06",
+    "sha256:549e6b4096698a433f5a843dc4851d2ab9743c7b5e77e7497e0205c7d9aa3b0b"
+  ],
+  "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup-v4/replay.sh",
+  "questions_answered": [
+    "The v4 cleanup contract is byte-identical to v3 and changes no behavior.",
+    "The exact repository-root replay command executes without relying on file mode.",
+    "The inherited replay still reports 11 of 11 cleanup cases, 6 of 6 activation behaviors, deterministic error aggregation, and zero hidden commits.",
+    "SDK placement, current ownership, and Lite source remain unchanged."
+  ],
+  "questions_unanswered": [
+    "A separate validator has not replayed v4.",
+    "The current product cleanup wall remains one against zero and the breaking flag remains open pending a separately recorded remediation resolution."
+  ],
+  "decision": "candidate only; mechanical replay-path revision with no contract, product, Lite, ownership, or wall change; never accepted by this worker",
+  "flag_if_missing_or_stale": "cannot: fail closed when contract identity, replay, source hashes, freshness, wall state, or independent review changes",
+  "reviewer_audit_status": "pending_independent_replay",
+  "active_anti_goals": [
+    "cleanup_business_state_mutation_count",
+    "cross_session_leak_count",
+    "primitive_proof_gap_count",
+    "single_llm_truth_acceptance_count",
+    "ungoverned_write_or_read_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "anti_goal_id": "AG-CLEANUP-EFFECT",
+      "metric_id": "cleanup_business_state_mutation_count",
+      "source_of_truth": "Current SDK baseline and open breaking flag",
+      "read_method": "Close the current session resource without finish and count runtime status or version changes and commits.",
+      "observed_at": "2026-07-15T05:16:56Z",
+      "recorded_at": "2026-07-15T05:16:56Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 1,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "breached",
+      "evidence_ref": "sha256:de7336905977e7079f79c97b2ec932ff4ecc6ecfb3be6d1986f7d5a106fbe491",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup-v4/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-1-v4/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-SESSION-ISOLATION",
+      "metric_id": "cross_session_leak_count",
+      "source_of_truth": "Inherited six activation behaviors",
+      "read_method": "Replay the preserved activation cases and sibling isolation evidence.",
+      "observed_at": "2026-07-15T05:16:56Z",
+      "recorded_at": "2026-07-15T05:16:56Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_verification",
+      "evidence_ref": "sha256:430cf9264c3f0df2b5110c1a14842d75f82a8e9f29ae4f18c0595e4a9d2867e6",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup-v4/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-1-v4/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-PRIMITIVE-PROOF",
+      "metric_id": "primitive_proof_gap_count",
+      "source_of_truth": "Unchanged SDK placement and Lite source",
+      "read_method": "Confirm v4 changes no contract, product, Lite primitive, or ownership behavior.",
+      "observed_at": "2026-07-15T05:16:56Z",
+      "recorded_at": "2026-07-15T05:16:56Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_verification",
+      "evidence_ref": "sha256:549e6b4096698a433f5a843dc4851d2ab9743c7b5e77e7497e0205c7d9aa3b0b",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup-v4/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-1-v4/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-INDEPENDENCE",
+      "metric_id": "single_llm_truth_acceptance_count",
+      "source_of_truth": "V4 writer checkpoint without a v4 validator record",
+      "read_method": "Require a separate validator to run the exact v4 replay before acceptance.",
+      "observed_at": "2026-07-15T05:16:56Z",
+      "recorded_at": "2026-07-15T05:16:56Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 1,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "breached",
+      "evidence_ref": "sha256:909ba54fd7cc80fdf588e6bf7f2086fb23c4fcd7a23126f6dca674e03c796a6e",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup-v4/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-1-v4/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-STORAGE",
+      "metric_id": "ungoverned_write_or_read_count",
+      "source_of_truth": "V4 packet, worker hashes, governed progress, and store verification",
+      "read_method": "Compare writes with the v4 allowlist, replay six hashes, append with the store helper, and verify the store.",
+      "observed_at": "2026-07-15T05:16:56Z",
+      "recorded_at": "2026-07-15T05:16:56Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_verification",
+      "evidence_ref": "sha256:365d42db3b4a1ab8af035cdf8c7ef6b58c4df8103d557bc9ffc966a92be59d07",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup-v4/replay.sh",
+      "verification_record_ref": "workers/dkr-1-cleanup-v4/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-INTEGRITY",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "source_of_truth": "Candidate v4 checkpoint with open breach and blocked gate",
+      "read_method": "Confirm only replay metadata changes, the product breach stays explicit, and downstream remains blocked.",
+      "observed_at": "2026-07-15T05:16:56Z",
+      "recorded_at": "2026-07-15T05:16:56Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_verification",
+      "evidence_ref": "sha256:de7336905977e7079f79c97b2ec932ff4ecc6ecfb3be6d1986f7d5a106fbe491",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup-v4/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-1-v4/progress.jsonl#pending"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-15T05:16:56Z",
+    "reason": "The current cleanup wall remains breached; independent v4 acceptance and a separately recorded breaking resolution are both missing."
+  },
+  "worked_checkpoint_trace": {
+    "metric_read": "cleanup_business_state_mutation_count",
+    "threshold": 0,
+    "value": 1,
+    "evidence_sha256": "sha256:de7336905977e7079f79c97b2ec932ff4ecc6ecfb3be6d1986f7d5a106fbe491",
+    "confidence": 0.97,
+    "decision": "candidate contract preserved; downstream rejected while the product wall remains breached"
+  },
+  "confidence_probability_update": "0.96 after v3 behavior proof; 0.97 after the repository-root replay command was repaired without changing the contract",
+  "risk_or_anti_goal_implications": [
+    "The cleanup contract and accepted reducing discovery are unchanged.",
+    "The recorded replay command now resolves from the repository root.",
+    "The current product cleanup wall remains one against zero and blocks downstream work.",
+    "No product, Lite, ownership, threshold, or remediation change is supported by this revision."
+  ],
+  "candidate_ckrs": [
+    {
+      "id": "CKR-SESSION-DEACTIVATION",
+      "metric": "session_deactivation_contract_pass_count",
+      "target": "11/11 cleanup cases while cleanup_business_state_mutation_count remains 0 after implementation"
+    }
+  ],
+  "candidate_pkrs": [
+    {
+      "id": "PKR-SESSION-DEACTIVATION-CLEANUP-V4",
+      "scope": "Preserved candidate only; requires independent v4 acceptance and a separately recorded breaking resolution before progression."
+    }
+  ],
+  "checkpoint_rejection_policy": "Superficial, tautological, false-positive, fabricated, unsupported, or single-LLM-truth checkpoints are rejected. Missing, stale, wrong-source, non-replayable, or contradicted evidence fails closed. An empty result remains valid only with a replayable probe trace.",
+  "role_grammar": [
+    "CKRs are measurable contribution context, not worker work.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  ]
+}

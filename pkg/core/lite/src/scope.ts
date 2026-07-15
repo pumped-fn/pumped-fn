@@ -41,6 +41,7 @@ type ListenerEvent = 'resolving' | 'resolved' | '*'
 
 class ContextDataImpl implements Lite.ContextData {
   private readonly map = new Map<string | symbol, unknown>()
+  private readonly tagValues = new Map<symbol, unknown[]>()
 
   constructor(
     private readonly parentData?: Lite.ContextData
@@ -52,6 +53,21 @@ class ContextDataImpl implements Lite.ContextData {
 
   set(key: string | symbol, value: unknown): void {
     this.map.set(key, value)
+    if (typeof key === "symbol" && this.tagValues.has(key)) this.tagValues.set(key, [value])
+  }
+
+  appendTagValue(key: symbol, value: unknown): void {
+    const values = this.tagValues.get(key)
+    if (values) {
+      values.push(value)
+      return
+    }
+    this.tagValues.set(key, [value])
+    this.map.set(key, value)
+  }
+
+  collectTag<T>(tag: Lite.Tag<T, boolean>): T[] {
+    return (this.tagValues.get(tag.key) ?? (this.map.has(tag.key) ? [this.map.get(tag.key)] : [])) as T[]
   }
 
   has(key: string | symbol): boolean {
@@ -59,11 +75,13 @@ class ContextDataImpl implements Lite.ContextData {
   }
 
   delete(key: string | symbol): boolean {
+    if (typeof key === "symbol") this.tagValues.delete(key)
     return this.map.delete(key)
   }
 
   clear(): void {
     this.map.clear()
+    this.tagValues.clear()
   }
 
   seek(key: string | symbol): unknown {
@@ -84,6 +102,7 @@ class ContextDataImpl implements Lite.ContextData {
 
   setTag<T>(tag: Lite.Tag<T, boolean>, value: T): void {
     this.map.set(tag.key, value)
+    this.tagValues.set(tag.key, [value])
   }
 
   hasTag<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
@@ -91,6 +110,7 @@ class ContextDataImpl implements Lite.ContextData {
   }
 
   deleteTag<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    this.tagValues.delete(tag.key)
     return this.map.delete(tag.key)
   }
 
@@ -109,7 +129,7 @@ class ContextDataImpl implements Lite.ContextData {
       return this.map.get(tag.key) as T
     }
     const storedValue = value !== undefined ? value : (tag.defaultValue as T)
-    this.map.set(tag.key, storedValue)
+    this.setTag(tag, storedValue)
     return storedValue
   }
 }
@@ -173,6 +193,7 @@ type ExecFlowRuntimeOptions = {
   rawInput?: unknown
   name?: string
   tags?: Lite.Tagged<any>[]
+  signal?: AbortSignal
 }
 
 function assertExecutionContextImpl(ctx: Lite.ExecutionContext): asserts ctx is ExecutionContextImpl {
@@ -188,6 +209,22 @@ function isAtomControllerDep(dep: Lite.ControllerDep<unknown>): dep is Lite.Atom
 function getAsyncIterator<T>(source: StreamSource<T>): AsyncIterator<T> {
   const iterate = (source as AsyncIterable<T>)[Symbol.asyncIterator]
   return iterate ? iterate.call(source) : source as AsyncIterator<T>
+}
+
+function combineAbortSignals(signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController()
+  const abort = (event: Event) => {
+    for (let i = 0; i < signals.length; i++) signals[i]!.removeEventListener("abort", abort)
+    controller.abort((event.target as AbortSignal).reason)
+  }
+  for (let i = 0; i < signals.length; i++) {
+    if (signals[i]!.aborted) {
+      controller.abort(signals[i]!.reason)
+      return controller.signal
+    }
+    signals[i]!.addEventListener("abort", abort, { once: true })
+  }
+  return controller.signal
 }
 
 function composeUpdate<T>(
@@ -966,6 +1003,8 @@ class ScopeImpl implements Lite.Scope {
     dependentAtom: Lite.Atom<unknown> | undefined,
     resourcePath?: Set<Lite.Resource<unknown>>,
     dependentResource?: ResourceDependencyConsumer,
+    flowPath: Set<Lite.Flow<unknown, unknown, any, unknown>> = new Set(),
+    activationTags: Lite.Tagged<any>[] = [],
   ): Record<string, unknown> | Promise<Record<string, unknown>> {
     if (!deps) return {}
 
@@ -993,6 +1032,10 @@ class ScopeImpl implements Lite.Scope {
       if (!ctx) throw new Error("Flow deps require an ExecutionContext")
       const [key, dep, options] = graph.flows[i]!
       result[key] = this.createFlowHandle(dep, ctx, options)
+      if (!options) {
+        const activation = this.activateFlowTree(dep, ctx, flowPath, activationTags)
+        if (activation) parallel.push(activation)
+      }
     }
 
     for (let i = 0; i < graph.controllers.length; i++) {
@@ -1056,30 +1099,43 @@ class ScopeImpl implements Lite.Scope {
       const [key, tagExecutor] = graph.tags[i]!
       switch (tagExecutor.mode) {
         case "required": {
-          const value = ctx
-            ? ctx.data.seekTag(tagExecutor.tag)
+          const activationValue = this.findActivationTag(activationTags, tagExecutor.tag)
+          const value = activationTags.length > 0
+            ? activationValue !== undefined ? activationValue : ctx?.data.seekTag(tagExecutor.tag)
+            : ctx
+              ? ctx.data.seekTag(tagExecutor.tag)
             : tagExecutor.tag.find(this.tags)
           if (value !== undefined) {
-            result[key] = this.projectTagValue(value, ctx)
+            result[key] = this.projectTagValue(value, ctx, flowPath, activationTags, parallel)
           } else if (tagExecutor.tag.hasDefault) {
-            result[key] = this.projectTagValue(tagExecutor.tag.defaultValue, ctx)
+            result[key] = this.projectTagValue(tagExecutor.tag.defaultValue, ctx, flowPath, activationTags, parallel)
           } else {
             throw new Error(`Tag "${tagExecutor.tag.label}" not found`)
           }
           break
         }
         case "optional": {
-          const value = ctx
-            ? ctx.data.seekTag(tagExecutor.tag)
+          const activationValue = this.findActivationTag(activationTags, tagExecutor.tag)
+          const value = activationTags.length > 0
+            ? activationValue !== undefined ? activationValue : ctx?.data.seekTag(tagExecutor.tag)
+            : ctx
+              ? ctx.data.seekTag(tagExecutor.tag)
             : tagExecutor.tag.find(this.tags)
-          result[key] = this.projectTagValue(value ?? tagExecutor.tag.defaultValue, ctx)
+          result[key] = this.projectTagValue(value ?? tagExecutor.tag.defaultValue, ctx, flowPath, activationTags, parallel)
           break
         }
         case "all": {
           const values = ctx
-            ? this.collectFromHierarchy(ctx, tagExecutor.tag)
+            ? [
+                ...tagExecutor.tag.collect(activationTags),
+                ...this.collectFromHierarchy(
+                  ctx,
+                  tagExecutor.tag,
+                  activationTags.some((value) => value.key === tagExecutor.tag.key),
+                ),
+              ]
             : tagExecutor.tag.collect(this.tags)
-          result[key] = values.map((value) => this.projectTagValue(value, ctx))
+          result[key] = values.map((value) => this.projectTagValue(value, ctx, flowPath, activationTags, parallel))
           break
         }
       }
@@ -1098,10 +1154,65 @@ class ScopeImpl implements Lite.Scope {
     return Promise.all(parallel).then(() => result)
   }
 
-  private projectTagValue(value: unknown, ctx: Lite.ExecutionContext | undefined): unknown {
+  private projectTagValue(
+    value: unknown,
+    ctx: Lite.ExecutionContext | undefined,
+    flowPath: Set<Lite.Flow<unknown, unknown, any, unknown>>,
+    activationTags: Lite.Tagged<any>[],
+    parallel: Promise<void>[]
+  ): unknown {
     if (!isFlow(value)) return value
     if (!ctx) throw new Error("Flow deps require an ExecutionContext")
+    const activation = this.activateFlowTree(value, ctx, flowPath, activationTags)
+    if (activation) parallel.push(activation)
     return this.createFlowHandle(value, ctx)
+  }
+
+  private findActivationTag<T>(
+    values: Lite.Tagged<any>[],
+    target: Lite.Tag<T, boolean>
+  ): T | undefined {
+    for (let i = 0; i < values.length; i++) {
+      if (values[i]!.key === target.key) return values[i]!.value as T
+    }
+    return undefined
+  }
+
+  private activateFlowTree(
+    flow: Lite.Flow<unknown, unknown, any, unknown>,
+    ctx: Lite.ExecutionContext,
+    path: Set<Lite.Flow<unknown, unknown, any, unknown>>,
+    inheritedTags: Lite.Tagged<any>[],
+    execTags?: Lite.Tagged<any>[]
+  ): Promise<void> | undefined {
+    if (path.has(flow)) {
+      throw new Error(`Circular flow dependency detected: ${flow.name ?? "anonymous"}`)
+    }
+
+    const nextPath = new Set(path)
+    nextPath.add(flow)
+    const presetValue = this.getFlowPreset(flow)
+    const localTags = execTags?.length || flow.tags?.length
+      ? [
+          ...(execTags ?? []),
+          ...(flow.tags ?? []).filter((tagged) => !execTags?.some((value) => value.key === tagged.key)),
+        ]
+      : []
+    const activation = presetValue === undefined
+      ? this.resolveDepsOptimistic(
+          flow.deps,
+          ctx,
+          undefined,
+          undefined,
+          undefined,
+          nextPath,
+          localTags.length > 0 ? [...localTags, ...inheritedTags] : inheritedTags
+        )
+      : isFlow(presetValue)
+        ? this.activateFlowTree(presetValue, ctx, nextPath, inheritedTags, execTags)
+        : undefined
+
+    return isPromiseLike(activation) ? Promise.resolve(activation).then(() => {}) : undefined
   }
 
   private createFlowHandle<Output, Input, Yield>(
@@ -1119,17 +1230,121 @@ class ScopeImpl implements Lite.Scope {
       },
       prepare: (...args: Lite.FlowPrepareArgs<Input>) => {
         const options = this.mergeFlowOptions(defaults, args[0] ?? {})
-        const ready = Promise.resolve()
+        const preparedOptions = options as Lite.FlowPrepareOptions<Input>
+        const preparedCtx = new ExecutionContextImpl(this, {
+          parent: ctx,
+          boundary: false,
+          execName: ctx.name,
+          signal: preparedOptions.signal,
+        })
+        const unregister = ctx.onClose((result) => preparedCtx.close(result))
+        if (preparedOptions.tags) {
+          for (let i = 0; i < preparedOptions.tags.length; i++) {
+            preparedCtx.appendTagValue(preparedOptions.tags[i]!.key, preparedOptions.tags[i]!.value)
+          }
+        }
+        const ready = Promise.resolve().then(async () => {
+          try {
+            await this.activateFlowTree(
+              flow as Lite.Flow<unknown, unknown, any, unknown>,
+              preparedCtx,
+              new Set(),
+              [],
+              preparedOptions.tags,
+            )
+          } catch (error) {
+            unregister()
+            await preparedCtx.close({ ok: false, error })
+            throw error
+          }
+        })
+        let consumed = false
+        const consume = () => {
+          if (consumed) throw new Error("Prepared flow invocations can be consumed only once")
+          consumed = true
+        }
         return {
           flow,
-          options: options as Lite.FlowPrepareOptions<Input>,
-          key: (options as Lite.FlowPrepareOptions<Input>).key,
+          options: preparedOptions,
+          key: preparedOptions.key,
           ready,
           exec: async () => {
+            consume()
             await ready
-            return this.execFlowHandle(flow, ctx, options)
+            try {
+              const output = await this.execFlowHandle(flow, preparedCtx, options)
+              unregister()
+              await preparedCtx.close({ ok: true })
+              return output
+            } catch (error) {
+              unregister()
+              await preparedCtx.close({ ok: false, error })
+              throw error
+            }
+          },
+          execStream: () => {
+            consume()
+            return this.execPreparedStream(flow, preparedCtx, options, ready, unregister)
           },
         }
+      },
+    }
+  }
+
+  private execPreparedStream<Output, Input, Yield>(
+    flow: Lite.Flow<Output, Input, any, Yield>,
+    preparedCtx: ExecutionContextImpl,
+    options: Lite.FlowPrepareOptions<Input> | Lite.FlowExecOptions<Input> | {},
+    ready: Promise<void>,
+    unregister: () => void,
+  ): Lite.FlowStream<Yield, Output> {
+    let started = false
+    let consumed = false
+    let settle!: (value: Output) => void
+    let fail!: (error: unknown) => void
+    const result = new Promise<Output>((resolve, reject) => {
+      settle = resolve
+      fail = reject
+    })
+    result.catch(() => {})
+    const { key: _key, ...execOptions } = options as Lite.FlowPrepareOptions<Input>
+
+    return {
+      get result() {
+        if (!started) throw streamResultBeforeStartError()
+        return result
+      },
+      [Symbol.asyncIterator]() {
+        if (consumed) throw new Error("execStream() results can be consumed only once.")
+        consumed = true
+        started = true
+        return (async function* () {
+          let settled = false
+          try {
+            await ready
+            const stream = preparedCtx.execStream({ flow, ...execOptions } as Lite.ExecFlowOptions<Output, Input, Yield>)
+            for await (const value of stream) yield value
+            const output = await stream.result
+            unregister()
+            await preparedCtx.close({ ok: true })
+            settle(output)
+            settled = true
+            return output
+          } catch (error) {
+            unregister()
+            await preparedCtx.close({ ok: false, error })
+            fail(error)
+            settled = true
+            throw error
+          } finally {
+            if (!settled) {
+              const error = new DOMException("Prepared flow stream aborted", "AbortError")
+              unregister()
+              await preparedCtx.close({ ok: false, error })
+              fail(error)
+            }
+          }
+        })()
       },
     }
   }
@@ -1223,15 +1438,19 @@ class ScopeImpl implements Lite.Scope {
       : r as Record<string, unknown>
   }
 
-  private collectFromHierarchy<T>(ctx: Lite.ExecutionContext, tag: Lite.Tag<T, boolean>): T[] {
+  private collectFromHierarchy<T>(
+    ctx: Lite.ExecutionContext,
+    tag: Lite.Tag<T, boolean>,
+    skipCurrent = false,
+  ): T[] {
     const results: T[] = []
     let current: Lite.ExecutionContext | undefined = ctx
+    let first = true
 
     while (current) {
-      const value = current.data.getTag(tag)
-      if (value !== undefined) {
-        results.push(value)
-      }
+      assertExecutionContextImpl(current)
+      if (!first || !skipCurrent) results.push(...current.dataImpl().collectTag(tag))
+      first = false
       current = current.parent
     }
 
@@ -1826,15 +2045,14 @@ class ScopeImpl implements Lite.Scope {
     const ctxTags = options?.tags
     if (ctxTags && ctxTags.length > 0) {
       for (let i = 0; i < ctxTags.length; i++) {
-        ctx.data.set(ctxTags[i]!.key, ctxTags[i]!.value)
+        ctx.appendTagValue(ctxTags[i]!.key, ctxTags[i]!.value)
       }
     }
 
     if (this.tags.length > 0) {
+      const blocked = new Set(this.tags.filter((tagged) => ctx.data.seekHas(tagged.key)).map((tagged) => tagged.key))
       for (let i = 0; i < this.tags.length; i++) {
-        if (!ctx.data.seekHas(this.tags[i]!.key)) {
-          ctx.data.set(this.tags[i]!.key, this.tags[i]!.value)
-        }
+        if (!blocked.has(this.tags[i]!.key)) ctx.appendTagValue(this.tags[i]!.key, this.tags[i]!.value)
       }
     }
 
@@ -1863,6 +2081,11 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private resources = new Map<Lite.Resource<unknown>, ResourceEntry<unknown>>()
   private resourceListeners = new Map<Lite.Resource<unknown>, ResourceListeners>()
   private resourceControllers = new Map<Lite.Resource<unknown>, ResourceControllerImpl<unknown>>()
+  private descendants = new Set<Promise<unknown>>()
+  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()
+  private children = new Set<ExecutionContextImpl>()
+  private readonly abortController = new AbortController()
+  private closePromise: Promise<void> | undefined
   private closed = false
   private readonly _input: unknown
   private _data: ContextDataImpl | undefined
@@ -1870,6 +2093,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private readonly _flowName: string | undefined
   private readonly boundary: boolean
   readonly parent: Lite.ExecutionContext | undefined
+  readonly signal: AbortSignal
 
   constructor(
     readonly scope: ScopeImpl,
@@ -1879,6 +2103,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       execName?: string
       flowName?: string
       boundary?: boolean
+      signal?: AbortSignal
     }
   ) {
     this.parent = options?.parent
@@ -1886,6 +2111,14 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     this._execName = options?.execName
     this._flowName = options?.flowName
     this.boundary = options?.boundary ?? true
+    const signals = [this.abortController.signal]
+    if (this.parent) signals.push(this.parent.signal)
+    if (options?.signal) signals.push(options.signal)
+    this.signal = signals.length === 1 ? signals[0]! : combineAbortSignals(signals)
+    if (this.parent) {
+      assertExecutionContextImpl(this.parent)
+      this.parent.children.add(this)
+    }
   }
 
   get input(): unknown {
@@ -1901,6 +2134,15 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       this._data = new ContextDataImpl(this.parent?.data)
     }
     return this._data
+  }
+
+  dataImpl(): ContextDataImpl {
+    void this.data
+    return this._data!
+  }
+
+  appendTagValue(key: symbol, value: unknown): void {
+    this.dataImpl().appendTagValue(key, value)
   }
 
   assertOpen(): void {
@@ -2034,6 +2276,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       get name() { return owner.name },
       get scope() { return owner.scope },
       get parent() { return owner.parent },
+      get signal() { return owner.signal },
       get data() { return owner.data },
       exec: owner.exec.bind(owner) as Lite.ResourceContext["exec"],
       execStream: owner.execStream.bind(owner) as Lite.ResourceContext["execStream"],
@@ -2081,9 +2324,16 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     this.emitResourceState(resource, "idle")
   }
 
-  async exec(options: ExecFlowRuntimeOptions | Lite.ExecFnOptions<unknown>): Promise<unknown> {
-    this.assertOpen()
+  exec(options: ExecFlowRuntimeOptions | Lite.ExecFnOptions<unknown>): Promise<unknown> {
+    try {
+      this.assertOpen()
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    return this.trackDescendant(this.runExec(options))
+  }
 
+  private async runExec(options: ExecFlowRuntimeOptions | Lite.ExecFnOptions<unknown>): Promise<unknown> {
     if ("flow" in options) {
       const invocation = this.createChildInvocation(options)
       const { flow, presetValue, childCtx, streaming } = isPromiseLike(invocation)
@@ -2111,7 +2361,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         execName: options.name,
         flowName: options.fn.name || undefined,
         input: options.params,
-        boundary: false
+        boundary: false,
+        signal: options.signal
       })
 
       this.seedTags(childCtx, options.tags)
@@ -2148,6 +2399,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
     const start = () => {
       started = true
+      owner.trackDescendant(result)
     }
     const owner = this
 
@@ -2159,15 +2411,40 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       [Symbol.asyncIterator]() {
         if (consumed) throw new Error("execStream() results can be consumed only once.")
         consumed = true
-        return owner.iterateExecStream(options, result, settleResult!, failResult!, start)
+        const iterator = owner.iterateExecStream(options, result, settleResult!, failResult!, start)
+        owner.activeIterators.add(iterator)
+        return {
+          async next(value?: unknown) {
+            try {
+              const step = await iterator.next(value)
+              if (step.done) owner.activeIterators.delete(iterator)
+              return step
+            } catch (error) {
+              owner.activeIterators.delete(iterator)
+              throw error
+            }
+          },
+          async return(value?: unknown) {
+            owner.activeIterators.delete(iterator)
+            return iterator.return?.(value) ?? { done: true, value }
+          },
+          async throw(error?: unknown) {
+            owner.activeIterators.delete(iterator)
+            if (iterator.throw) return iterator.throw(error)
+            throw error
+          },
+        }
       },
     } as Lite.FlowStream<unknown, unknown>
   }
 
   private seedTags(childCtx: ExecutionContextImpl, execTags?: Lite.Tagged<any>[], flowTags?: Lite.Tagged<any>[]): void {
-    if (execTags) for (let i = 0; i < execTags.length; i++) childCtx.data.set(execTags[i]!.key, execTags[i]!.value)
+    if (execTags) for (let i = 0; i < execTags.length; i++) {
+      childCtx.appendTagValue(execTags[i]!.key, execTags[i]!.value)
+    }
+    const blocked = new Set((execTags ?? []).map((tagged) => tagged.key))
     if (flowTags) for (let i = 0; i < flowTags.length; i++) {
-      if (!childCtx.data.has(flowTags[i]!.key)) childCtx.data.set(flowTags[i]!.key, flowTags[i]!.value)
+      if (!blocked.has(flowTags[i]!.key)) childCtx.appendTagValue(flowTags[i]!.key, flowTags[i]!.value)
     }
   }
 
@@ -2190,7 +2467,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         input: parsedInput,
         execName,
         flowName: flow.name,
-        boundary: false
+        boundary: false,
+        signal: options.signal
       })
 
       this.seedTags(childCtx, execTags, flow.tags)
@@ -2279,9 +2557,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         await childCtx.close({ ok: true })
         settleResult(value)
       } catch (error) {
-        await childCtx.close(error === abortError
-          ? { ok: false, error, aborted: true }
-          : { ok: false, error })
+        await childCtx.close({ ok: false, error })
         rejectSetup(error)
         failResult(error)
       } finally {
@@ -2315,7 +2591,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       throw error
     } finally {
       if (iterator) {
-        abortError = new Error("Flow stream aborted")
+        abortError = new DOMException("Flow stream aborted", "AbortError")
+        childCtx.abort(abortError)
         try {
           await iterator.return?.(undefined)
         } catch {}
@@ -2398,13 +2675,60 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 
   close(result: Lite.CloseResult = { ok: true }): Promise<void> {
+    if (this.closePromise) return this.closePromise
     if (this.closed) return Promise.resolve()
 
     this.closed = true
+    const closeResult = this.classifyCloseResult(result)
+    const reason = new DOMException("Execution context closed", "AbortError")
+    this.abort(reason)
+    const boundaryChildren = [...this.children].filter((child) => child.boundary)
+    this.closePromise = this.runStructuredClose(closeResult, boundaryChildren).finally(() => {
+      if (this.parent) {
+        assertExecutionContextImpl(this.parent)
+        this.parent.children.delete(this)
+      }
+    })
+    this.closePromise.then(
+      () => { this.closePromise = undefined },
+      () => { this.closePromise = undefined }
+    )
+    return this.closePromise
+  }
 
-    if (this.resources.size === 0 && this.cleanups.length === 0) return Promise.resolve()
+  private abort(reason: unknown): void {
+    if (!this.abortController.signal.aborted) this.abortController.abort(reason)
+  }
 
-    return this.runCloseCleanups(result)
+  private trackDescendant<T>(pending: Promise<T>): Promise<T> {
+    this.descendants.add(pending)
+    pending.then(
+      () => this.descendants.delete(pending),
+      () => this.descendants.delete(pending)
+    )
+    return pending
+  }
+
+  private classifyCloseResult(result: Lite.CloseResult): Lite.CloseResult {
+    if (result.ok) return result
+    const errorName = typeof result.error === "object" && result.error !== null && "name" in result.error
+      ? (result.error as { name?: unknown }).name
+      : undefined
+    return this.signal.aborted && (result.error === this.signal.reason || errorName === "AbortError")
+      ? { ok: false, error: result.error, aborted: true }
+      : { ok: false, error: result.error }
+  }
+
+  private async runStructuredClose(
+    result: Lite.CloseResult,
+    boundaryChildren: ExecutionContextImpl[]
+  ): Promise<void> {
+    const iterators = [...this.activeIterators]
+    this.activeIterators.clear()
+    await Promise.allSettled(iterators.map((iterator) => iterator.return?.()))
+    const boundaryCloses = boundaryChildren.map((child) => child.close({ ok: false, error: child.signal.reason }))
+    await Promise.allSettled([...this.descendants, ...boundaryCloses])
+    await this.runCloseCleanups(result)
   }
 
   private async runCloseCleanups(result: Lite.CloseResult): Promise<void> {

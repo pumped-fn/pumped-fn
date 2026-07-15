@@ -1,0 +1,12 @@
+{
+  "type": "node_event",
+  "node_id": "DKR-4",
+  "node_kind": "dkr",
+  "observed_at": "2026-07-15T06:17:20Z",
+  "quadrant": {
+    "certainty": 0.98,
+    "level": "approach"
+  },
+  "source_ref": "artifacts/accept-dkr-4-v4.json",
+  "status": "accepted"
+}

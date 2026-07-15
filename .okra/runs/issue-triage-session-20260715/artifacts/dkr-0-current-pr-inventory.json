@@ -1,0 +1,319 @@
+{
+  "artifact_id": "dkr-0-current-pr-inventory-v1",
+  "head": "d8dc7e845d3a7618fdf41525b67b8bac83d05d28",
+  "scope": "Public concepts and material workarounds introduced or materially changed by PR 346",
+  "disposition_rule": {
+    "keep": "The concept and its public placement fit the confirmed activation-context frame.",
+    "reshape": "The behavior matters, but its public shape, dependency graph, or lifecycle owner conflicts with the frame.",
+    "remove": "The item exists only to work around the current shape or duplicates a Lite responsibility.",
+    "missing": "The confirmed frame requires proof that the current PR does not provide."
+  },
+  "public_concepts": [
+    {
+      "id": "package-subpaths",
+      "symbols": ["@pumped-fn/sdk/agent", "@pumped-fn/sdk/session", "@pumped-fn/sdk/validation", "@pumped-fn/sdk/sandbox"],
+      "disposition": "keep",
+      "reason": "The namespaces group one meaning and keep the root entry small.",
+      "evidence": ["pkg/sdk/core/package.json:10", "pkg/sdk/core/README.md:5", "pkg/sdk/core/tests/package-exports.test.ts:37"]
+    },
+    {
+      "id": "root-workflow-model-eval",
+      "symbols": ["workflowExtension", "material", "cliWorker", "model", "complete", "channel", "schedule", "suite", "http"],
+      "disposition": "keep",
+      "reason": "These remain declared Lite graph edges and are outside the session activation correction.",
+      "evidence": ["pkg/sdk/core/README.md:197", "pkg/sdk/core/src/index.ts:123", "pkg/sdk/core/src/index.ts:1013", "pkg/sdk/core/src/index.ts:1029"]
+    },
+    {
+      "id": "provider-attempt-port",
+      "symbols": ["agent.Attempt", "agent.ModelEvent", "agent.attempt", "agent.invoke", "agent.fromModel"],
+      "disposition": "keep",
+      "reason": "One neutral streaming port plus a scalar adapter preserves provider choice without a second agent loop.",
+      "evidence": ["pkg/sdk/core/src/agent.ts:7", "pkg/sdk/core/src/agent.ts:12", "pkg/sdk/core/src/agent.ts:14", "pkg/sdk/core/src/agent.ts:16", "pkg/sdk/core/src/agent.ts:28"]
+    },
+    {
+      "id": "tool-readiness-resource",
+      "symbols": ["agent.ToolSnapshot", "agent.ResolvedTool", "agent.ToolOptions", "agent.tool", "agent.ToolInputError"],
+      "disposition": "keep",
+      "reason": "Readiness, identity, schema, the inert effect flow, and eager activation of every declared role tool are intended strengths. The helper adds framework dependencies to the returned resource's static graph; runtime-provided tags and missing-tag failure are accepted.",
+      "evidence": ["pkg/sdk/core/src/agent.ts:37", "pkg/sdk/core/src/agent.ts:54", "pkg/sdk/core/src/agent.ts:75", "pkg/sdk/core/src/agent.ts:84", "pkg/sdk/core/src/agent.ts:127"]
+    },
+    {
+      "id": "skill-resource",
+      "symbols": ["agent.SkillOptions", "agent.ResolvedSkill", "agent.skill"],
+      "disposition": "keep",
+      "reason": "Lazy skill content is a declared resource and its session dependency is present in the returned static graph. Runtime-provided tags and eager resolution through the role remain accepted.",
+      "evidence": ["pkg/sdk/core/src/agent.ts:139", "pkg/sdk/core/src/agent.ts:147", "pkg/sdk/core/src/agent.ts:154", "pkg/sdk/core/src/agent.ts:163"]
+    },
+    {
+      "id": "role-resource",
+      "symbols": ["agent.Role", "agent.RoleOptions", "agent.role"],
+      "disposition": "keep",
+      "reason": "Roles are resources whose complete declared tool and skill tree resolves before the model call. Authority filtering is encoded in the returned resource graph and does not hide a physical effect edge.",
+      "evidence": ["pkg/sdk/core/src/agent.ts:196", "pkg/sdk/core/src/agent.ts:210", "pkg/sdk/core/src/agent.ts:225", "pkg/sdk/core/src/agent.ts:232"]
+    },
+    {
+      "id": "turn-flow",
+      "symbols": ["agent.TurnInput", "agent.TurnResult", "agent.TurnOptions", "agent.turn"],
+      "disposition": "reshape",
+      "reason": "Keep a streaming flow for the model and dispatch loop, including its required and optional runtime tags. DKR-1 and DKR-2 must only reshape the activation binding and generic cancellation source; missing runtime tags remain an accepted runtime failure.",
+      "evidence": ["pkg/sdk/core/src/agent.ts:265", "pkg/sdk/core/src/agent.ts:291", "pkg/sdk/core/src/agent.ts:302", "pkg/sdk/core/src/agent.ts:307"]
+    },
+    {
+      "id": "subagent-definition",
+      "symbols": ["agent.SubagentOptions", "agent.SubagentDefinition", "agent.subagent", "agent.SubagentResult"],
+      "disposition": "keep",
+      "reason": "The definition declares its role, turn, and child session run as inert graph data. It preserves child-work admission without a context-bound method or an undeclared effect.",
+      "evidence": ["pkg/sdk/core/src/agent.ts:173", "pkg/sdk/core/src/agent.ts:181", "pkg/sdk/core/src/agent.ts:190", "pkg/sdk/core/src/agent.ts:284"]
+    },
+    {
+      "id": "authority-contract",
+      "symbols": ["session.AuthorityInput", "session.Authority", "session.AuthorityConstraints", "session.createAuthority", "session.narrowAuthority", "session.authorityFingerprint"],
+      "disposition": "keep",
+      "reason": "Canonical authority, narrowing, and stable fingerprints are independent of activation ownership and are already tested at the scope seam.",
+      "evidence": ["pkg/sdk/core/src/session.ts:17", "pkg/sdk/core/src/session.ts:25", "pkg/sdk/core/src/session.ts:29", "pkg/sdk/core/src/session.ts:543", "pkg/sdk/core/tests/session-kernel.test.ts:80"]
+    },
+    {
+      "id": "durable-session-record",
+      "symbols": ["SessionRecord", "BranchRecord", "WorkRecord", "AttemptRecord", "InvocationRecord", "ArtifactRef", "MemoryRef", "ScheduleIntent"],
+      "disposition": "keep",
+      "reason": "Plain durable data can outlive activations and supports checkpoint, resume, evidence, memory, and schedules.",
+      "evidence": ["pkg/sdk/core/src/session.ts:81", "pkg/sdk/core/src/session.ts:91", "pkg/sdk/core/src/session.ts:103", "pkg/sdk/core/src/session.ts:112", "pkg/sdk/core/src/session.ts:121", "pkg/sdk/core/src/session.ts:131", "pkg/sdk/core/src/session.ts:140", "pkg/sdk/core/src/session.ts:148"]
+    },
+    {
+      "id": "live-session-runtime",
+      "symbols": ["session.SessionRuntime", "session.session"],
+      "disposition": "reshape",
+      "reason": "Keep activation-local semantic registries and durable record mutation. Move generic child cancellation, joining, and activation shutdown to ExecutionContext timing, and make ordinary close distinct from durable finish.",
+      "evidence": ["pkg/sdk/core/src/session.ts:278", "pkg/sdk/core/src/session.ts:633", "pkg/sdk/core/src/session.ts:830", "pkg/sdk/core/src/session.ts:1134"]
+    },
+    {
+      "id": "session-configuration-tags",
+      "symbols": ["session.authority", "session.record", "session.clock"],
+      "disposition": "reshape",
+      "reason": "Keep per-exec bindings, but group activation configuration under one clear namespace so a channel can bind a session at controller.exec({ tags }).",
+      "evidence": ["pkg/sdk/core/src/session.ts:1102", "pkg/sdk/core/README.md:41"]
+    },
+    {
+      "id": "current-execution-tags",
+      "symbols": ["session.current.session", "session.current.work", "session.current.attempt", "session.current.branch", "session.current.authority", "session.current.epoch"],
+      "disposition": "reshape",
+      "reason": "The runtime-provided facts and missing-tag behavior are accepted. DKR-1 and DKR-3 should test whether the public grouping and repeated propagation can become more ergonomic while keeping all required tags visible to the static graph and extensions.",
+      "evidence": ["pkg/sdk/core/src/session.ts:1106", "pkg/sdk/core/src/session.ts:1398"]
+    },
+    {
+      "id": "session-effect-ports",
+      "symbols": ["session.store", "session.artifacts", "session.memory", "session.scheduler", "session.load", "session.commit", "session.publishArtifact", "session.recallMemory", "session.commitMemory", "session.acceptMemory", "session.wake"],
+      "disposition": "keep",
+      "reason": "Namespaced tags carrying flows make physical effects explicit, replaceable, and authority-checkable.",
+      "evidence": ["pkg/sdk/core/src/session.ts:1115", "pkg/sdk/core/src/session.ts:1120", "pkg/sdk/core/src/session.ts:1124", "pkg/sdk/core/src/session.ts:1130", "pkg/sdk/core/src/session.ts:1149", "pkg/sdk/core/src/session.ts:1163"]
+    },
+    {
+      "id": "load-and-bind",
+      "symbols": ["session.ResumeInput", "session.SessionBindings", "session.loadAndBind"],
+      "disposition": "keep",
+      "reason": "A flow that reloads durable state, verifies authority, and returns tags is a scope-native resume seam.",
+      "evidence": ["pkg/sdk/core/src/session.ts:356", "pkg/sdk/core/src/session.ts:361", "pkg/sdk/core/src/session.ts:1273", "pkg/sdk/core/tests/session-kernel.test.ts:138"]
+    },
+    {
+      "id": "session-run",
+      "symbols": ["session.RunInput", "session.RunOptions", "session.run"],
+      "disposition": "reshape",
+      "reason": "Keep work admission before turn execution and streaming settlement. Remove the nested { work, input } ceremony and manual signal/current-tag bridge if per-exec tags and context timing can carry the activation.",
+      "evidence": ["pkg/sdk/core/src/session.ts:367", "pkg/sdk/core/src/session.ts:372", "pkg/sdk/core/src/session.ts:1384"]
+    },
+    {
+      "id": "explicit-finish",
+      "symbols": ["session.finish", "SessionRuntime.beginFinish", "SessionRuntime.finishWith"],
+      "disposition": "reshape",
+      "reason": "Keep finish as the only fence, join, commit, and seal business flow. Remove its use from ordinary context cleanup.",
+      "evidence": ["pkg/sdk/core/src/session.ts:830", "pkg/sdk/core/src/session.ts:851", "pkg/sdk/core/src/session.ts:1376"]
+    },
+    {
+      "id": "wait-and-wake",
+      "symbols": ["session.wait", "session.wake", "session.WaitWorkInput", "session.WakeInput"],
+      "disposition": "keep",
+      "reason": "Persisted waiting work and authoritative wake are required for sessions that outlive one activation.",
+      "evidence": ["pkg/sdk/core/src/session.ts:328", "pkg/sdk/core/src/session.ts:333", "pkg/sdk/core/src/session.ts:1304", "pkg/sdk/core/src/session.ts:1311", "pkg/sdk/core/tests/session-kernel.test.ts:221"]
+    },
+    {
+      "id": "fork-join-merge",
+      "symbols": ["session.fork", "session.join", "session.merge", "session.ForkBranchInput", "session.JoinWorkInput", "session.MergeBranchesInput"],
+      "disposition": "reshape",
+      "reason": "Keep child branches, fail-fast policy, and versioned merge. Recheck whether execution joining belongs in context timing while semantic work settlement and merge remain session concerns.",
+      "evidence": ["pkg/sdk/core/src/session.ts:337", "pkg/sdk/core/src/session.ts:344", "pkg/sdk/core/src/session.ts:349", "pkg/sdk/core/src/session.ts:1323", "pkg/sdk/core/src/session.ts:1330", "pkg/sdk/core/src/session.ts:1360"]
+    },
+    {
+      "id": "steering-and-domain-events",
+      "symbols": ["session.ControlEvent", "session.SessionEvent", "session.steer", "session.events"],
+      "disposition": "reshape",
+      "reason": "Keep attempt and epoch fencing plus durable domain events. Add a safe context observation model for extensions instead of treating SessionEvent as the whole trace model.",
+      "evidence": ["pkg/sdk/core/src/session.ts:203", "pkg/sdk/core/src/session.ts:214", "pkg/sdk/core/src/session.ts:1297", "pkg/sdk/core/src/session.ts:1367", "pkg/sdk/core/README.md:152"]
+    },
+    {
+      "id": "validation-engine",
+      "symbols": ["validation.Engine", "validation.engine", "validation.standard", "validation.JsonSchema"],
+      "disposition": "keep",
+      "reason": "Configurable Standard Schema validation supports Zod and Valibot without a built-in engine.",
+      "evidence": ["pkg/sdk/core/src/validation.ts:7", "pkg/sdk/core/src/validation.ts:9", "pkg/sdk/core/src/validation.ts:24", "pkg/sdk/core/src/validation.ts:55", "pkg/sdk/core/tests/validation.test.ts:32"]
+    },
+    {
+      "id": "sandbox-ports",
+      "symbols": ["sandbox.Policy", "sandbox.policy", "sandbox.impl", "sandbox.read", "sandbox.write", "sandbox.exec"],
+      "disposition": "keep",
+      "reason": "Policy, session authority, and physical implementors are all declared dependencies of named effect flows. Runtime-provided tags may fail at execution, and policy still fails closed before the physical edge.",
+      "evidence": ["pkg/sdk/core/src/sandbox.ts:4", "pkg/sdk/core/src/sandbox.ts:48", "pkg/sdk/core/src/sandbox.ts:50", "pkg/sdk/core/src/sandbox.ts:56", "pkg/sdk/core/src/sandbox.ts:72", "pkg/sdk/core/src/sandbox.ts:89"]
+    },
+    {
+      "id": "provider-module-handles",
+      "symbols": ["claudeAttempt", "claudeAttemptBinding", "codexAttempt", "codexAttemptBinding", "codexAcpAttempt", "piAttempt", "piAttemptBinding", "scalar provider handles"],
+      "disposition": "reshape",
+      "reason": "Keep module-level attempts, scalar compatibility, and scope-owned physical adapters. Replace the SDK abortSignal tag bridge and align continuation ownership with the activation context without losing provider cancellation isolation.",
+      "evidence": ["pkg/sdk/claude/src/index.ts:278", "pkg/sdk/claude/src/index.ts:305", "pkg/sdk/codex/src/index.ts:97", "pkg/sdk/codex/src/index.ts:110", "pkg/sdk/codex/src/index.ts:305", "pkg/sdk/pi/src/index.ts:75", "pkg/sdk/pi/src/index.ts:131"]
+    },
+    {
+      "id": "test-kit",
+      "symbols": ["modelStub", "attemptStub", "sessionStoreStub", "kit"],
+      "disposition": "reshape",
+      "reason": "Keep public fakes and scope-owned setup, but make the common helper prove multiple session activations in one server scope without mandatory pre-resolution.",
+      "evidence": ["pkg/sdk/test/src/index.ts:28", "pkg/sdk/test/src/index.ts:50", "pkg/sdk/test/src/index.ts:64", "pkg/sdk/test/src/index.ts:158", "pkg/sdk/test/tests/session.test.ts:54"]
+    }
+  ],
+  "material_workarounds": [
+    {
+      "id": "manual-session-pre-resolution",
+      "disposition": "remove",
+      "reason": "The public docs require an ordering call that users can omit, producing a temporary runtime whose changes disappear.",
+      "evidence": ["pkg/sdk/core/README.md:39", "pkg/sdk/core/README.md:48", "pkg/sdk/core/tests/session-kernel.test.ts:419"]
+    },
+    {
+      "id": "cleanup-calls-begin-finish",
+      "disposition": "remove",
+      "reason": "Ordinary resource cleanup changes live and record status to finishing even though the docs say cleanup only releases owned resources.",
+      "evidence": ["pkg/sdk/core/src/session.ts:830", "pkg/sdk/core/src/session.ts:841", "pkg/sdk/core/src/session.ts:1144", "pkg/sdk/core/tests/session-kernel.test.ts:413"]
+    },
+    {
+      "id": "runtime-owned-parent-cancellation",
+      "disposition": "reshape",
+      "reason": "Targeted work cancellation is semantic session behavior. Parent-child cancellation and joining duplicate ExecutionContext timing and should be proven in Lite.",
+      "evidence": ["pkg/sdk/core/src/session.ts:638", "pkg/sdk/core/src/session.ts:666", "pkg/sdk/core/src/session.ts:835", "pkg/sdk/core/src/session.ts:1395"]
+    },
+    {
+      "id": "sdk-abort-signal-tag",
+      "disposition": "remove",
+      "reason": "The tag manually carries generic execution cancellation through session, turn, provider, and sandbox code. DKR-2 must test a context-native signal before removal.",
+      "evidence": ["pkg/sdk/core/src/index.ts:108", "pkg/sdk/core/src/session.ts:1390", "pkg/sdk/core/src/agent.ts:320", "pkg/sdk/pi/src/index.ts:83"]
+    },
+    {
+      "id": "reserved-framework-dependencies",
+      "disposition": "keep",
+      "reason": "Tool and skill helpers reserve framework dependency names, then place those dependencies in the returned resource's static graph. This prevents an author from replacing required session semantics inside a definition; it is not a hidden effect edge.",
+      "evidence": ["pkg/sdk/core/src/agent.ts:66", "pkg/sdk/core/src/agent.ts:88", "pkg/sdk/core/src/agent.ts:144", "pkg/sdk/core/tests/database-analysis.test.ts:92"]
+    },
+    {
+      "id": "manual-current-tag-fanout",
+      "disposition": "reshape",
+      "reason": "run and boundary flows repeatedly construct the same session, work, branch, authority, attempt, epoch, and signal tag set. The facts remain important, but the fanout is not the public model.",
+      "evidence": ["pkg/sdk/core/src/session.ts:1174", "pkg/sdk/core/src/session.ts:1204", "pkg/sdk/core/src/session.ts:1398"]
+    },
+    {
+      "id": "nested-run-input-wrapper",
+      "disposition": "reshape",
+      "reason": "Every channel must map domain input into { work, input } even though controller.exec already supports per-execution tags.",
+      "evidence": ["pkg/sdk/core/src/session.ts:367", "pkg/sdk/core/README.md:203"]
+    },
+    {
+      "id": "test-isolation-by-separate-scope",
+      "disposition": "reshape",
+      "reason": "One SDK test proves role isolation with two independent scopes. The server requirement is multiple sibling session contexts in one scope; the bash adapter test is the stronger existing seed.",
+      "evidence": ["pkg/sdk/test/tests/agent-runtime.test.ts:490", "pkg/sdk/test/tests/agent-runtime.test.ts:494", "pkg/sdk/test/tests/agent-runtime.test.ts:507", "pkg/sdk/bash/tests/just-bash.test.ts:123"]
+    }
+  ],
+  "missing_proofs": [
+    {
+      "id": "activation-lease",
+      "disposition": "missing",
+      "steering_owner": "DKR-1",
+      "reason": "Expected-version commit detects a later conflict, but the public session surface has no live activation acquisition or release edge before effects.",
+      "evidence": ["pkg/sdk/core/src/session.ts:378", "pkg/sdk/core/src/session.ts:1134"]
+    },
+    {
+      "id": "structured-descendant-close",
+      "disposition": "missing",
+      "steering_owner": "DKR-2",
+      "reason": "The SDK currently compensates with Runtime AbortControllers. The generic parent cancel-and-join rule is not proven by this PR.",
+      "evidence": ["pkg/sdk/core/src/session.ts:638", "pkg/sdk/core/src/session.ts:841"]
+    },
+    {
+      "id": "safe-context-observation",
+      "disposition": "missing",
+      "steering_owner": "DKR-3",
+      "reason": "SessionEvent records domain activity, but no public safe projection contract proves that extensions observe channel, session, work, turn, and tool context without sensitive tags.",
+      "evidence": ["pkg/sdk/core/src/session.ts:214", "pkg/sdk/core/src/agent.ts:631"]
+    },
+    {
+      "id": "bounded-queue-composition",
+      "disposition": "missing",
+      "steering_owner": "DKR-4",
+      "reason": "The PR has channel and schedule adapters but no durable issue queue, worker concurrency, acknowledge, reject, or graceful watcher proof.",
+      "evidence": ["pkg/sdk/core/src/index.ts:1021", "pkg/sdk/core/src/index.ts:1049", "pkg/sdk/core/tests/workflow-adapters.test.ts:19"]
+    },
+    {
+      "id": "hypothesis-publication-contract",
+      "disposition": "missing",
+      "steering_owner": "DKR-5",
+      "reason": "The database example proves read-only analysis and host-side memory acceptance, not evidence freshness, independent hypothesis verification, or authorized idempotent GitHub publication.",
+      "evidence": ["pkg/sdk/core/tests/database-analysis.test.ts:565", "pkg/sdk/core/README.md:148"]
+    }
+  ],
+  "already_proven": [
+    {
+      "claim": "Canonical subpaths pack and keep their types off the root entry.",
+      "evidence": ["pkg/sdk/core/tests/package-exports.test.ts:37", "pkg/sdk/core/tests/package-exports.test.ts:54", "pkg/sdk/core/tests/package-exports.test.ts:119"]
+    },
+    {
+      "claim": "Tool readiness can fail before model or database effects.",
+      "evidence": ["pkg/sdk/core/tests/database-analysis.test.ts:471"]
+    },
+    {
+      "claim": "Read-only parallel analysis, join-before-merge, and host-side acceptance have an executable example test.",
+      "evidence": ["pkg/sdk/core/tests/database-analysis.test.ts:565"]
+    },
+    {
+      "claim": "Two session contexts in one scope can isolate sandbox resources and cancellation.",
+      "evidence": ["pkg/sdk/bash/tests/just-bash.test.ts:123", "pkg/sdk/bash/tests/just-bash.test.ts:140"]
+    },
+    {
+      "claim": "Waiting state can be checkpointed, loaded, rebound, and woken.",
+      "evidence": ["pkg/sdk/core/tests/session-kernel.test.ts:221"]
+    },
+    {
+      "claim": "Provider attempt adapters preserve scalar compatibility and provider-specific streaming.",
+      "evidence": ["pkg/sdk/core/README.md:154", "pkg/sdk/pi/tests/pi.test.ts:126", "pkg/sdk/codex/tests/codex.test.ts:61"]
+    }
+  ],
+  "frame_clarifications": [
+    "Activating the complete statically declared dependency tree is intended because tests replace its leaves through the scope seam without mocking the tree.",
+    "Required tags are runtime-provided. Missing-tag runtime failure is accepted in this run.",
+    "Static analysis for missing runtime tags is deferred.",
+    "A framework helper may add declared resource dependencies. A physical effect that is absent from the graph remains forbidden."
+  ],
+  "must_not_be_lost": [
+    "One static role-tool-skill-subagent declaration before a model call.",
+    "Tool readiness and schema identity before advertisement, with validation repeated at dispatch.",
+    "Authority narrowing, attempt and epoch fencing, and fail-closed sandbox policy before physical effects.",
+    "Plain durable session, work, attempt, branch, invocation, artifact, memory, schedule, and continuation records.",
+    "Explicit checkpoint and finish flows; cleanup must not commit, schedule, publish, accept memory, or call a model.",
+    "Wait, reload, authority rebind, wake, retry, fork, join, merge, steering, and ordered domain-event semantics.",
+    "Provider scalar compatibility, streaming events, continuation isolation, consumer-stop cleanup, and scope-owned physical adapters.",
+    "The scope as the only test seam, with no shared scope factory or module mocks.",
+    "No built-in tools, automatic tool collection, MCP expansion, or model-authorized publication in this frame."
+  ],
+  "steering_decision": {
+    "summary": "Continue PR 346, but reshape its activation and lifecycle spine before adding the issue-triage slice.",
+    "dkr_1_input": "Test whether controller(flow).exec({ input, tags }) can own one complete activation without pre-resolution or temporary state while preserving required runtime tags and eager activation of the full declared dependency tree.",
+    "dkr_2_input": "Test the smallest generic ExecutionContext cancellation and descendant-settlement contract; do not assume spawn, start, or a task pool.",
+    "dkr_3_input": "Define a safe extension-visible observation projection over the same context hierarchy while retaining domain SessionEvent records.",
+    "dkr_4_input": "Express bounded queue consumers with controller(flow), awaited exec calls, and per-exec tags before proposing a new concurrency primitive.",
+    "dkr_5_input": "Specify evidence, independent verification, freshness, authority, and idempotency required before GitHub publication."
+  }
+}

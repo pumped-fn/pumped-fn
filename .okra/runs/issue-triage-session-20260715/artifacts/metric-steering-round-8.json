@@ -1,0 +1,10 @@
+{
+  "type": "metric_read",
+  "metric_kind": "ckr",
+  "metric_id": "steering_value_score",
+  "value": 1,
+  "target": 0.75,
+  "observed_at": "2026-07-15T05:30:35Z",
+  "source": "DKR-1 and DKR-2 were accepted only at discovery scope; direct regression and slop failures opened separate breaking flags; validators now classify DKR-0 and DKR-4 before any resolution corridor is recorded.",
+  "freshness": "observed_at=2026-07-15T05:30:35Z -> status=fresh against max_age=10m"
+}

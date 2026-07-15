@@ -104,7 +104,7 @@ await sessionCtx.close()
 await scope.dispose()
 ```
 
-`sandbox.exec` checks the session authority and policy before the implementation runs. `just-bash.run` forwards the active `abortSignal` and enforces the timeout and UTF-8 output cap. The physical `just-bash` API returns buffered output, so this adapter yields at most one stdout event and one stderr event after the command completes. Use another `sandbox.impl.run` implementation when live command deltas or backpressure are required. Each session pre-resolves its own current-owned `engine` and `workspace`, so closing or cancelling one session does not close another.
+`sandbox.exec` checks the session authority and policy before the implementation runs. Recursive entry activation reaches the selected sandbox implementation, authority, readiness, workspace, and engine before the sandbox flow starts. `just-bash.run` forwards the active `abortSignal` and enforces the timeout and UTF-8 output cap. The physical `just-bash` API returns buffered output, so this adapter yields at most one stdout event and one stderr event after the command completes. Use another `sandbox.impl.run` implementation when live command deltas or backpressure are required. Each session owns its current-owned `engine` and `workspace`, so deactivating one session does not close another.
 
 Replace `engine`, `workspace`, `readiness`, or any named flow with `preset()` in tests. No module mock or shared scope is needed.
 

@@ -69,7 +69,12 @@ the child process and transport to close, and clears request correlation state. 
 normalizes ACP message chunks and reuses the ACP session for the same SDK session and branch.
 Correlation, cancellation, and continuation are keyed per ACP session, so overlapping attempts do
 not consume each other's chunks or cancel each other. `codexAttemptBinding` and
-`codexAcpAttemptBinding` inject either implementation through the SDK `agent.attempt` tag.
+`codexAcpAttemptBinding` inject either implementation through `agent.impl.attempt`.
+
+Every ACP `session/new` response is an `ActiveSession`. The adapter extracts its continuation ID and
+disposes its update route immediately; the connection-level notification handler remains the single
+chunk router. Late session creation after cancellation is also disposed, so connection close leaves
+no rejected update queue.
 
 The stable CLI handles remain `codex`, `codexTurn`, and `codexRun`; ACP keeps `codexAcp`,
 `codexAcpTurn`, `codexAcpPrompt`, `codexAcpConfig`, and `acp`. Package-module imports expose the

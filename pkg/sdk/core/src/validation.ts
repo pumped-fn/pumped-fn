@@ -1,4 +1,4 @@
-import { tag } from "@pumped-fn/lite"
+import { flow, tag, tags, typed } from "@pumped-fn/lite"
 import type { StandardSchemaV1 } from "@standard-schema/spec"
 import { sha256 } from "./internal/digest.js"
 
@@ -22,6 +22,18 @@ export interface StandardOptions<Schema extends StandardSchemaV1> {
 }
 
 export const engine = tag<Engine>({ label: "sdk.validation.engine" })
+
+export interface ValidateInput {
+  readonly schema: StandardSchemaV1
+  readonly input: unknown
+}
+
+export const validate = flow({
+  name: "sdk.validation.validate",
+  parse: typed<ValidateInput>(),
+  deps: { engine: tags.required(engine) },
+  factory: (ctx, { engine }) => engine.validate(ctx.input.schema, ctx.input.input),
+})
 
 function canonical(value: unknown): unknown {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value

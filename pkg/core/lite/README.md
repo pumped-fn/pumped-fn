@@ -20,6 +20,7 @@ Lite owns the application boundary below framework adapters:
 
 - A `Scope` owns long-lived graph values and their cleanup.
 - An `ExecutionContext` owns one request, job, command, action, or UI boundary.
+- Every execution context exposes one effective `signal`; closing a context aborts and joins its descendants before resource cleanup.
 - `atom()` defines scope-owned transports, capabilities, state, derived data, and caches.
 - `flow()` defines execution work with optional typed or parsed input.
 - `resource()` defines execution-context-owned values such as transactions, request loggers, spans, action buffers, and drafts.
@@ -169,6 +170,8 @@ const plannedAudit = flow({
   },
 })
 ```
+
+Direct and tag-selected child flows activate their declared dependency trees before the parent factory runs. A `controller(flow)` edge is an execution boundary. `prepare().ready` activates that child tree inside an isolated lifetime with the prepared tags; `exec()` or `execStream()` then uses the same ready resources. No child factory or `wrapExec` effect runs during readiness.
 
 ## Execution-Scoped Resources
 
@@ -468,6 +471,8 @@ composition roots. See [Observability](../../../docs/observability.md).
 | `scope.resolveStream(atom)` / `ctx.resolveStream(atom)` | Consume an async-iterable atom through a scope-driven fan-out view |
 | `scope.drain(atom, options?)` | Collect an async-iterable atom into an array, optionally `take`-bounded |
 | `ctx.execStream(options)` | Consume a generator flow's yields; `result` carries the final output, break cancels |
+| `ctx.exec(options)` | Execute a child flow or function; optional `signal` joins caller cancellation with context lifetime |
+| `flowHandle.prepare(options)` | Activate a controller child with its tags; `ready` resolves after dependencies and resources, then `exec()` or `execStream()` runs once |
 
 Complete type reference: [`dist/index.d.mts`](./dist/index.d.mts)
 

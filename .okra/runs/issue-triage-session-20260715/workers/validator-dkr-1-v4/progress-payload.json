@@ -1,0 +1,27 @@
+{
+  "type": "worker_finish",
+  "worker_id": "validator-dkr-1-v4",
+  "worker_kind": "verification",
+  "unit_id": "DKR-1",
+  "status": "reducing_checkpoint_verified_product_blocked",
+  "recorded_at": "2026-07-15T05:23:42Z",
+  "next_check_at": "2026-07-15T05:33:42Z",
+  "candidate_checkpoint_ref": "workers/dkr-1-cleanup-v4/checkpoint.v4.json",
+  "verification_ref": "workers/validator-dkr-1-v4/verification.json",
+  "replay_ref": "workers/validator-dkr-1-v4/replay.sh",
+  "replay_sha256": "3df559cf9249d47e25ec65b5a2940d896d500b1f16b9257321ba5d260ab7fb4d",
+  "root_replay": "accepted_exit_0",
+  "contract_semantic_equality": "accepted",
+  "case_result": "11 of 11 cleanup cases and 6 of 6 activation behaviors",
+  "evidence_result": "6 of 6 hashes and 23 of 23 checkpoint fields",
+  "checkpoint_disposition": "accepted_for_orchestration_as_reducing_discovery",
+  "wall_disposition": {
+    "cleanup_business_state_mutation_count": "rejected_breached_value_1_threshold_0",
+    "breaking_flag": "open",
+    "product_progression": "blocked"
+  },
+  "remediation_authorization": "not_made",
+  "product_files_changed": false,
+  "summary": "6 accepted, 1 rejected: DKR-1-v4.current-cleanup-wall",
+  "worker_progress": ".okra/runs/issue-triage-session-20260715/workers/validator-dkr-1-v4/progress.jsonl at finish, unknown, and ten-minute heartbeat"
+}

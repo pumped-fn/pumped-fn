@@ -1,0 +1,33 @@
+{
+  "packet_version": 2,
+  "worker_id": "dkr-3-v2",
+  "unit_id": "DKR-3",
+  "role": "discovery writer revision",
+  "run_dir": ".okra/runs/issue-triage-session-20260715",
+  "frame_ref": "frame/frame.v2.json",
+  "prior_checkpoint": "workers/dkr-3/checkpoint.candidate.v1.json",
+  "validator_ref": "workers/validator-dkr-3/verification.json",
+  "assignment": "Create a non-destructive DKR-3 v2 checkpoint that preserves the independently verified safe-observation conclusion and removes every mechanical acceptance gap.",
+  "required_checks": [
+    "Write checkpoint.v2.json in a new dkr-3-v2 worker directory; never overwrite prior evidence.",
+    "Remove or replace the unresolved b075... evidence hash with an exact named current source and verify every cited hash.",
+    "Add contract_version, type, unit_id, complete freshness fields, and a real wall_gate decided_at.",
+    "Give every active wall a numeric value, fresh source, replay, distinct evidence_ref and verification_record_ref, using the independent DKR-3 validator record.",
+    "Preserve the decision: one named safe SDK projection tag, no arbitrary tag enumeration, no public ContextData callback, no Lite projection change.",
+    "Save a replay that validates 12 trace dimensions, same-Scope isolation, forbidden export count, terminal settlement order, hash resolution, checkpoint shape, and six wall entries.",
+    "Do not self-accept."
+  ],
+  "authorized_writes": [
+    ".okra/runs/issue-triage-session-20260715/workers/dkr-3-v2/**"
+  ],
+  "forbidden": [
+    "Product code, tests, docs, manifests, git history, PR state, external services, frame, tree, or another worker's artifacts",
+    "Arbitrary tag export, unrestricted ContextData, a Lite projection primitive, hidden effects, or wall weakening"
+  ],
+  "required_outputs": [
+    "workers/dkr-3-v2/checkpoint.v2.json",
+    "workers/dkr-3-v2/replay.sh",
+    "workers/dkr-3-v2/progress.jsonl via the absolute OKRA store helper worker-report command"
+  ],
+  "terminal_condition": "Finish when all verified behavior and six walls replay from a complete checkpoint with every evidence hash resolvable, leaving acceptance to another validator."
+}

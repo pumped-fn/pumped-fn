@@ -1,0 +1,37 @@
+{
+  "committed_at": "2026-07-15T06:19:42Z",
+  "idempotency_key": "accept:DKR-4:v4",
+  "key_sha256": "cc0e74b004ee0518b14df9fff0df05c989d15ede08afb036de977101718e4dfa",
+  "payload": {
+    "checkpoint_ref": "workers/dkr-4-v4/checkpoint.v4.json",
+    "claim_id": "accept.DKR-4.bounded-queue-v4",
+    "contract": {
+      "activation_per_lease_violation_count": 0,
+      "controller_edges": "3/3",
+      "cross_session_leak_count": 0,
+      "dkr_2_discovery_accepted": true,
+      "dkr_2_implementation_authorized": false,
+      "forbidden_public_surface_count": 0,
+      "graceful_join_failure_count": 0,
+      "maximum_concurrency": 2,
+      "queue_cases": "8/8",
+      "required_ports": "5/5",
+      "undeclared_effect_edge_count": 0
+    },
+    "decided_at": "2026-07-15T06:19:10Z",
+    "decision": "accepted_as_reducing_discovery",
+    "evidence": [
+      "workers/dkr-4-v4/checkpoint.v4.json",
+      "workers/dkr-4-v4/replay.sh",
+      "workers/validator-dkr-4-v4/verification.json",
+      "workers/validator-dkr-4-v4/independent-allowlist-audit.mjs"
+    ],
+    "implementation_authorized": false,
+    "implementation_boundary": "Compose a fixed bounded queue watcher from controller flows and five explicit physical ports. Execute one session activation per lease, await graceful joins, and rely on the later generic Lite lifetime implementation for forced context close. Do not add public spawn, start, pool, task, worker registry, or session primitives to Lite.",
+    "observed_at": "2026-07-15T06:17:20Z",
+    "type": "claim_acceptance",
+    "unit_id": "DKR-4",
+    "verification_ref": "workers/validator-dkr-4-v4/verification.json"
+  },
+  "payload_sha256": "5bfd7029d75ffd44fc609bee1a64cd5d28988aad3168261b2a87fc7854c0c3ac"
+}

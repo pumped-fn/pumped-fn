@@ -1,0 +1,9 @@
+{
+  "type": "dispatch_result",
+  "unit_id": "DKR-3",
+  "packet": "worker-packets/dkr-3.json",
+  "target": "/root/session_context_convergence",
+  "status": "dispatched",
+  "observed_at": "2026-07-15T04:08:44Z",
+  "admissibility": "allowed: run-store-only observation probes; no arbitrary tag export or product edit"
+}

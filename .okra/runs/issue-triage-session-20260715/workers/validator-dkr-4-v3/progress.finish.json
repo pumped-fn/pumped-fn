@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "worker_id": "validator-dkr-4-v3",
+  "status": "complete_with_rejections",
+  "unit_id": "DKR-4",
+  "checkpoint_disposition": "rejected_non_replayable",
+  "downstream_advance": "blocked",
+  "accepted_claim_count": 15,
+  "rejected_claim_count": 2,
+  "rejected_claim_ids": [
+    "DKR-4-v3.fresh-independent-same-process",
+    "DKR-4-v3.wall-gate"
+  ],
+  "candidate_case_pass_count": 8,
+  "candidate_case_target": 8,
+  "independent_audit_exit_code": 1,
+  "independently_held_wall_count": 0,
+  "independently_held_wall_target": 8,
+  "checkpoint_age_seconds": 559,
+  "frame_max_age_seconds": 600,
+  "verification_ref": "workers/validator-dkr-4-v3/verification.json",
+  "replay_ref": "workers/validator-dkr-4-v3/replay.sh",
+  "independent_audit_ref": "workers/validator-dkr-4-v3/independent-same-process.mjs",
+  "next_authority": "orchestrator",
+  "observed_at": "2026-07-15T06:09:48Z"
+}

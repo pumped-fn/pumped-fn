@@ -1,0 +1,371 @@
+{
+  "verification_id": "validator-dkr-4-v2",
+  "worker_id": "validator-dkr-4-v2",
+  "candidate_checkpoint_ref": "workers/dkr-4-v2/checkpoint.v2.json",
+  "observed_at": "2026-07-15T05:53:26Z",
+  "dispositions": {
+    "candidate_checkpoint": "rejected_contradicted_dkr2_status_and_independent_challenge_non_replayable",
+    "candidate_saved_behavior_replay": "accepted_mechanical_only",
+    "bounded_controller_conclusion": "accepted_intact",
+    "fresh_independent_behavior": "rejected_validator_execution_blocked",
+    "graph_edge_and_api_surface": "accepted",
+    "product_progression": "blocked",
+    "remediation_authorization": "not_made"
+  },
+  "audit_traces": [
+    {
+      "claim_id": "DKR-4-v2.recorded-root-replay",
+      "check": "The checkpoint-recorded replay resolves and passes from the feature worktree root.",
+      "metric_or_check": "recorded_replay_exit_code",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/dkr-4-v2/checkpoint.v2.json replay_command_or_checker",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-4-v2/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:da71b96b00df0123ee3f63ef56361b562bd7063c19274b8909715efa5f1b5df3",
+        "sha256:0e60f179f0e8958292dad699fd5d82cf139729e0382e70702e36c8a6b695ef0a"
+      ],
+      "observed_at": "2026-07-15T05:47:27Z",
+      "decision": "accepted",
+      "evidence": "queueCases=8/8; explicitPorts=5/5; controllerEdges=3/3; maxConcurrency=2/2; activationExecPerLease=1/1; crossSessionLeaks=0/0; forbiddenPublicSurfaces=0/0; hiddenEffectEdges=0/0; checkpointFields=23/23; wallEntries=8/8; evidenceHashes=8/8"
+    },
+    {
+      "claim_id": "DKR-4-v2.eight-queue-cases",
+      "check": "The saved behavior probe covers the eight named queue cases.",
+      "metric_or_check": "bounded_queue_case_pass_count",
+      "threshold": 8,
+      "value": 8,
+      "source_of_truth": "workers/dkr-4-v2/queue-probe.mjs exact root replay",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-4-v2/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:c243f5d8aaaf617fce46e0cef51f7c7558dea92a51f95e74229e599827a755fe"],
+      "observed_at": "2026-07-15T05:47:27Z",
+      "decision": "accepted",
+      "evidence": "zeroMessages, oneMessage, burstAboveConcurrency, handlerError, acknowledgementError, leaseLossRetry, shutdownWhileActive, and twoSessionsOneScope all emitted passing traces."
+    },
+    {
+      "claim_id": "DKR-4-v2.fresh-independent-behavior",
+      "check": "A separately authored validator challenge replays all behavior without relying on writer assertions.",
+      "metric_or_check": "independent_probe_exit_code",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "workers/validator-dkr-4-v2/independent-probe.mjs",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/independent-probe.mjs",
+      "exit_code": 1,
+      "sha256": ["sha256:383ae6509f4520647298e1c206b6dfd185634eeaad5cb458778866092199c352"],
+      "observed_at": "2026-07-15T05:50:24Z",
+      "decision": "rejected",
+      "failure_mode": "validator-execution-blocked",
+      "evidence": "Error: spawnSync /home/lagz0ne/.local/share/mise/installs/node/26.4.0/bin/node EPERM. The failed checker was preserved and was not repaired or rerun."
+    },
+    {
+      "claim_id": "DKR-4-v2.explicit-graph-edges",
+      "check": "Five physical ports and three controller edges cover the modeled queue graph.",
+      "metric_or_check": "explicit_port_and_controller_edge_count",
+      "threshold": 8,
+      "value": 8,
+      "source_of_truth": "workers/dkr-4-v2/queue-probe.mjs, modeled-surface.json, and validator source audit",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:c243f5d8aaaf617fce46e0cef51f7c7558dea92a51f95e74229e599827a755fe",
+        "sha256:6165ea2cc7b12c37064f5521002120e6d2d75ad0e94e04c2db523daceb2ee8af",
+        "sha256:531a9f9b88e732a80c8519dd7251ec9d5e506e81916f13efa1f05028e883614c"
+      ],
+      "observed_at": "2026-07-15T05:52:41Z",
+      "decision": "accepted",
+      "evidence": "explicitRequiredPortCount=5; declaredControllerEdgeCount=3; explicitEffectEdgeCount=5; hiddenEffectEdgeCount=0"
+    },
+    {
+      "claim_id": "DKR-4-v2.activation-per-lease",
+      "check": "Each received lease has exactly one activation execution and one terminal acknowledge or reject call.",
+      "metric_or_check": "activation_exec_per_lease",
+      "threshold": 1,
+      "value": 1,
+      "source_of_truth": "workers/dkr-4-v2/queue-probe.mjs exact replay output",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-4-v2/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:c243f5d8aaaf617fce46e0cef51f7c7558dea92a51f95e74229e599827a755fe"],
+      "observed_at": "2026-07-15T05:47:27Z",
+      "decision": "accepted",
+      "evidence": "activationExecCount=13; handlerStartCount=13; the retry trace has one activation for lease attempt 1 and one for attempt 2; every case ends with one acknowledge or reject per activation."
+    },
+    {
+      "claim_id": "DKR-4-v2.session-isolation",
+      "check": "Two activations in one Scope keep session, issue, lease, observation, and result ownership separate.",
+      "metric_or_check": "cross_session_leak_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "twoSessionsOneScope exact replay output",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-4-v2/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:c243f5d8aaaf617fce46e0cef51f7c7558dea92a51f95e74229e599827a755fe"],
+      "observed_at": "2026-07-15T05:47:27Z",
+      "decision": "accepted",
+      "evidence": "session-a/issue 41/lease issue-1/observation issue-1/result issue-1 and session-b/issue 42/lease issue-2/observation issue-2/result issue-2 remained distinct."
+    },
+    {
+      "claim_id": "DKR-4-v2.forbidden-public-surface",
+      "check": "The modeled API and Lite exports add no worker, pool, start, spawn, task, session, or WorkerRegistry surface.",
+      "metric_or_check": "forbidden_public_surface_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/dkr-4-v2/modeled-surface.json and pkg/core/lite/src/index.ts",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:6165ea2cc7b12c37064f5521002120e6d2d75ad0e94e04c2db523daceb2ee8af",
+        "sha256:c7dea3a0529247b9d67051a7c91a3832c3546c175e017cf426333c5f2fefb298"
+      ],
+      "observed_at": "2026-07-15T05:52:41Z",
+      "decision": "accepted",
+      "evidence": "forbiddenModeledPublicSurfaceCount=0; forbiddenLiteExportCount=0"
+    },
+    {
+      "claim_id": "DKR-4-v2.fixture-self-match",
+      "check": "The forbidden-surface checker cannot match its own fixture strings.",
+      "metric_or_check": "fixture_self_match_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/dkr-4-v2/surface-probe.mjs read target",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": ["sha256:0b78ab10f2b607f4088e50752334626d6f43b3500a0a7ddf4b41127cb75e30b8"],
+      "observed_at": "2026-07-15T05:52:41Z",
+      "decision": "accepted",
+      "evidence": "The checker reads modeled-surface.json and scans only its public_api and public_lifecycle_surface arrays; fixtureSelfMatchCount=0."
+    },
+    {
+      "claim_id": "DKR-4-v2.graceful-join",
+      "check": "Ordinary shutdown stops admission and joins active promises before return.",
+      "metric_or_check": "graceful_join_case_pass_count",
+      "threshold": 8,
+      "value": 8,
+      "source_of_truth": "eight exact queue replay traces and watch flow source",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-4-v2/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:c243f5d8aaaf617fce46e0cef51f7c7558dea92a51f95e74229e599827a755fe"],
+      "observed_at": "2026-07-15T05:47:27Z",
+      "decision": "accepted",
+      "evidence": "All eight cases report activeAfterJoin=0; shutdownWhileActive reports delivery then shutdown and handlerEnds issue-1 before return."
+    },
+    {
+      "claim_id": "DKR-4-v2.forced-close-boundary",
+      "check": "Forced ExecutionContext close is not queue behavior and depends on accepted DKR-2 discovery plus later Lite implementation.",
+      "metric_or_check": "forced_close_boundary_gap_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/dkr-4-v2/queue-contract.json and artifacts/accept-dkr-2-v3.json",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:9b79b71aaa89cf4961d8160e33dcebce7e77a195824324a12776277d9f10a814",
+        "sha256:5d4ee5265bb87f9d82416bdd500e4d06fec0f674e71650497b9b8dbe15fef7e1"
+      ],
+      "observed_at": "2026-07-15T05:52:41Z",
+      "decision": "accepted",
+      "evidence": "forced_context_close names accepted DKR-2 discovery and later Lite implementation; DKR-2 implementation_authorized=false."
+    },
+    {
+      "claim_id": "DKR-4-v2.dkr2-current-status",
+      "check": "The checkpoint reports the current DKR-2 discovery status from the accepted source.",
+      "metric_or_check": "contradicted_lifecycle_status_count",
+      "threshold": 0,
+      "value": 2,
+      "source_of_truth": "artifacts/accept-dkr-2-v3.json versus queue-contract.json and checkpoint.v2.json",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:5d4ee5265bb87f9d82416bdd500e4d06fec0f674e71650497b9b8dbe15fef7e1",
+        "sha256:9b79b71aaa89cf4961d8160e33dcebce7e77a195824324a12776277d9f10a814",
+        "sha256:da71b96b00df0123ee3f63ef56361b562bd7063c19274b8909715efa5f1b5df3"
+      ],
+      "observed_at": "2026-07-15T05:52:41Z",
+      "decision": "rejected",
+      "failure_mode": "contradicted-wrong-source",
+      "evidence": "DKR-2 was accepted_as_reducing_discovery at 05:24:59Z. V2 was observed at 05:40:06Z but says candidate_not_assumed_accepted and says DKR-2 forced-close discovery is not accepted."
+    },
+    {
+      "claim_id": "DKR-4-v2.frame-freshness",
+      "check": "The checkpoint and its wall reads are within the frame v2 ten-minute maximum age at validation.",
+      "metric_or_check": "stale_checkpoint_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "frame/frame.v2.json metric_contracts.anti_goals.max_age and checkpoint.v2.json observed_at",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": ["sha256:da71b96b00df0123ee3f63ef56361b562bd7063c19274b8909715efa5f1b5df3"],
+      "observed_at": "2026-07-15T05:53:26Z",
+      "decision": "rejected",
+      "failure_mode": "stale-frame-read",
+      "evidence": "Frame v2 max_age is 10m. Candidate observed_at is 05:40:06Z and validation decision time is 05:53:26Z, an age of 13m20s. Candidate max_age 30m cannot override the frame contract. Fresh validator replay and source audit still support the behavior claims at 05:47:27Z and 05:52:41Z."
+    },
+    {
+      "claim_id": "DKR-4-v2.fields-hashes-walls",
+      "check": "Required checkpoint fields, numeric walls, and pinned evidence hashes resolve.",
+      "metric_or_check": "checkpoint_structure_gap_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "checkpoint.v2.json and validator source audit",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:da71b96b00df0123ee3f63ef56361b562bd7063c19274b8909715efa5f1b5df3",
+        "sha256:531a9f9b88e732a80c8519dd7251ec9d5e506e81916f13efa1f05028e883614c"
+      ],
+      "observed_at": "2026-07-15T05:52:41Z",
+      "decision": "accepted",
+      "evidence": "checkpointFieldCount=23/23; wallEntryCount=8/8; evidenceHashMatchCount=8/8; all wall values and thresholds are numeric."
+    },
+    {
+      "claim_id": "DKR-4-v2.public-contract-command",
+      "check": "The public DKR checkpoint contract checker runs from the feature worktree with the recorded command.",
+      "metric_or_check": "public_contract_checker_exit_code",
+      "threshold": 0,
+      "value": 2,
+      "source_of_truth": "validator command execution",
+      "replay": "python3 .agents/skills/reverse-tornado-okr/scripts/okra-verify-artifact.py .okra/runs/issue-triage-session-20260715/workers/dkr-4-v2/checkpoint.v2.json --contract .agents/skills/reverse-tornado-okr/contracts/executable-dkr-checkpoint.v1.json --json",
+      "exit_code": 2,
+      "sha256": ["sha256:da71b96b00df0123ee3f63ef56361b562bd7063c19274b8909715efa5f1b5df3"],
+      "observed_at": "2026-07-15T05:51:03Z",
+      "decision": "rejected",
+      "failure_mode": "validator-command-non-replayable",
+      "evidence": "python3: cannot open .worktrees/session-kernel/.agents/skills/reverse-tornado-okr/scripts/okra-verify-artifact.py: no such file or directory. The failed command was not repaired or rerun."
+    }
+  ],
+  "wall_audit_traces": [
+    {
+      "claim_id": "wall.scope_seam_escape_count",
+      "check": "Queue and timer effects are supplied through five required ports and child calls through three controller edges.",
+      "metric_or_check": "scope_seam_escape_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "validator source audit",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": ["sha256:531a9f9b88e732a80c8519dd7251ec9d5e506e81916f13efa1f05028e883614c"],
+      "observed_at": "2026-07-15T05:52:41Z",
+      "decision": "accepted",
+      "evidence": "5 required ports; 3 controller edges; createScope tags supply the fake adapter seam."
+    },
+    {
+      "claim_id": "wall.undeclared_effect_edge_count",
+      "check": "No queue, timer, process, or network effect crosses the modeled graph outside a required port.",
+      "metric_or_check": "undeclared_effect_edge_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "validator source audit",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": ["sha256:531a9f9b88e732a80c8519dd7251ec9d5e506e81916f13efa1f05028e883614c"],
+      "observed_at": "2026-07-15T05:52:41Z",
+      "decision": "accepted",
+      "evidence": "5 explicit effect edges; 0 hidden effect edges. The one queueMicrotask is contained inside the substituted receive adapter."
+    },
+    {
+      "claim_id": "wall.cross_session_leak_count",
+      "check": "Two sessions sharing one Scope do not cross activation-local values.",
+      "metric_or_check": "cross_session_leak_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "exact candidate replay output",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-4-v2/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:c243f5d8aaaf617fce46e0cef51f7c7558dea92a51f95e74229e599827a755fe"],
+      "observed_at": "2026-07-15T05:47:27Z",
+      "decision": "accepted",
+      "evidence": "The exact trace preserves both activation records and both owned results without crossed fields."
+    },
+    {
+      "claim_id": "wall.unapproved_external_write_count",
+      "check": "Validation uses in-memory adapters and performs no real service write.",
+      "metric_or_check": "unapproved_external_write_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "validator source audit and restricted runtime",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": ["sha256:531a9f9b88e732a80c8519dd7251ec9d5e506e81916f13efa1f05028e883614c"],
+      "observed_at": "2026-07-15T05:52:41Z",
+      "decision": "accepted",
+      "evidence": "No child_process, net, HTTP, fetch, interval, or timeout use exists in the candidate; queue and timer adapters are local flows."
+    },
+    {
+      "claim_id": "wall.primitive_proof_gap_count",
+      "check": "The fixed loop covers bounded queue behavior without adding a public worker lifecycle primitive.",
+      "metric_or_check": "primitive_proof_gap_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "exact behavior replay plus validator source audit",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-4-v2/replay.sh and node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:c243f5d8aaaf617fce46e0cef51f7c7558dea92a51f95e74229e599827a755fe",
+        "sha256:531a9f9b88e732a80c8519dd7251ec9d5e506e81916f13efa1f05028e883614c"
+      ],
+      "observed_at": "2026-07-15T05:52:41Z",
+      "decision": "accepted",
+      "evidence": "8/8 cases; max concurrency 2; 0 modeled or Lite forbidden exports; forced close stays a separate later Lite implementation."
+    },
+    {
+      "claim_id": "wall.single_llm_truth_acceptance_count",
+      "check": "No checkpoint is accepted from writer evidence alone.",
+      "metric_or_check": "single_llm_truth_acceptance_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "this validator disposition and rejected candidate checkpoint",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": ["sha256:531a9f9b88e732a80c8519dd7251ec9d5e506e81916f13efa1f05028e883614c"],
+      "observed_at": "2026-07-15T05:53:26Z",
+      "decision": "accepted",
+      "evidence": "The bounded conclusion has deterministic support, but the candidate checkpoint remains rejected due contradicted status and the failed fresh challenge."
+    },
+    {
+      "claim_id": "wall.ungoverned_write_or_read_count",
+      "check": "Validator writes stay inside workers/validator-dkr-4-v2 and governed progress is store-verified.",
+      "metric_or_check": "ungoverned_write_or_read_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "validator files, governed worker progress, and store verification",
+      "replay": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/scripts/okra-store.sh verify .okra/runs/issue-triage-session-20260715",
+      "exit_code": 0,
+      "sha256": ["sha256:531a9f9b88e732a80c8519dd7251ec9d5e506e81916f13efa1f05028e883614c"],
+      "observed_at": "2026-07-15T05:53:26Z",
+      "decision": "accepted",
+      "evidence": "Only the authorized validator directory was written; final governed progress and store verification are recorded after this file."
+    },
+    {
+      "claim_id": "wall.anti_goal_bypass_or_dishonesty_count",
+      "check": "Contradicted and non-replayable evidence remains explicit and blocks checkpoint progression.",
+      "metric_or_check": "anti_goal_bypass_or_dishonesty_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "validator dispositions and rejected audit traces",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-4-v2/source-audit.mjs",
+      "exit_code": 0,
+      "sha256": ["sha256:531a9f9b88e732a80c8519dd7251ec9d5e506e81916f13efa1f05028e883614c"],
+      "observed_at": "2026-07-15T05:53:26Z",
+      "decision": "accepted",
+      "evidence": "The DKR-2 status contradiction and both validator command failures are retained; product progression is blocked."
+    }
+  ],
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "reason": "The bounded controller behavior and graph remain intact on fresh validator reads, but the v2 checkpoint is stale under the frame ten-minute contract, contradicts the already accepted DKR-2 status, and the separately authored behavior challenge could not execute under the sandbox."
+  },
+  "summary": {
+    "accepted_claims": 18,
+    "rejected_claims": 4,
+    "rejected_claim_ids": [
+      "DKR-4-v2.fresh-independent-behavior",
+      "DKR-4-v2.dkr2-current-status",
+      "DKR-4-v2.frame-freshness",
+      "DKR-4-v2.public-contract-command"
+    ],
+    "validator_disposition": "checkpoint_rejected_bounded_conclusion_intact",
+    "next_authority": "orchestrator"
+  }
+}

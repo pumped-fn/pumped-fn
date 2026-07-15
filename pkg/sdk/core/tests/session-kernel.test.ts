@@ -1,6 +1,5 @@
-import { createScope, flow, tags, typed } from "@pumped-fn/lite"
+import { createScope, flow, resource, tags, typed } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
-import { abortSignal } from "../src/index.js"
 import * as sandbox from "../src/sandbox.js"
 import {
   AuthorityEscalationError,
@@ -13,6 +12,7 @@ import {
   commitMemory,
   createAuthority,
   current,
+  execution,
   events,
   finish,
   fork,
@@ -21,6 +21,7 @@ import {
   merge,
   memory,
   narrowAuthority,
+  observation,
   record,
   recallMemory,
   run,
@@ -35,6 +36,14 @@ import {
   type SessionRecord,
   type Wake,
 } from "../src/session.js"
+
+class SchedulerUnavailableError extends Error {
+  readonly kind = "scheduler-unavailable"
+}
+
+class UnexpectedEffectError extends Error {
+  readonly kind = "unexpected-effect"
+}
 
 function initial(authority: Authority): SessionRecord {
   return Object.freeze({
@@ -187,18 +196,18 @@ describe("session runtime", () => {
       },
       factory: (ctx, { work, attempt, branch, epoch }) => `${ctx.input}:${work.id}:${attempt.attempt}:${branch.id}:${epoch}`,
     })
-    const execute = run({ name: "test.run", turn: inspect })
     const scope = createScope({ tags: [
       authority(bound),
       record(initial(bound)),
       clock(fixedClock),
+      execution.turn({ flow: inspect }),
       store.commit(commitImpl),
     ] })
     const ctx = scope.createContext()
     await ctx.resolve(session)
 
     await expect(ctx.exec({
-      flow: execute,
+      flow: run,
       input: {
         work: { id: "work-1", branchId: "main", role: "test", policy: "all" },
         input: "value",
@@ -213,6 +222,60 @@ describe("session runtime", () => {
     await expect(ctx.exec({ flow: finish })).resolves.toMatchObject({ status: "finished", version: 1 })
     expect(finishCalls).toBe(1)
     expect(committed).toMatchObject({ status: "finished" })
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("requires a turn binding when the run graph activates", async () => {
+    const bound = authorityValue()
+    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({
+      flow: run,
+      input: {
+        work: { id: "missing-turn", branchId: "main", role: "test", policy: "all" },
+        input: undefined,
+      },
+    })).rejects.toThrow("sdk.session.execution.turn")
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("activates the selected turn dependency tree before run starts", async () => {
+    const bound = authorityValue()
+    let activations = 0
+    const leaf = resource({
+      name: "test.selected-turn-leaf",
+      ownership: "current",
+      factory: () => ++activations,
+    })
+    const turn = flow({
+      name: "test.selected-turn",
+      deps: { leaf },
+      factory: (_ctx, { leaf }) => leaf,
+    })
+    const scope = createScope({ tags: [
+      authority(bound),
+      record(initial(bound)),
+      clock(fixedClock),
+      execution.turn({ flow: turn }),
+    ] })
+    const ctx = scope.createContext()
+    const stream = ctx.execStream({
+      flow: run,
+      input: {
+        work: { id: "eager-tree", branchId: "main", role: "test", policy: "all" },
+        input: undefined,
+      },
+    })
+    const iterator = stream[Symbol.asyncIterator]()
+
+    await expect(iterator.next()).resolves.toMatchObject({ value: { type: "work.started" } })
+    expect(activations).toBe(1)
+    await expect(iterator.next()).resolves.toMatchObject({ done: true, value: 1 })
 
     await ctx.close()
     await scope.dispose()
@@ -241,7 +304,7 @@ describe("session runtime", () => {
       parse: typed<{ id: string }>(),
       factory: () => {
         wakeCalls++
-        if (wakeMode === "fail") throw new Error("scheduler unavailable")
+        if (wakeMode === "fail") throw new SchedulerUnavailableError("scheduler unavailable")
         const work = stored.work.find((item) => item.id === "deferred")!
         return Object.freeze({
           ...work,
@@ -308,7 +371,8 @@ describe("session runtime", () => {
       factory: (_ctx, { attempt }) => attempt.attempt,
     })
     await expect(resumed.exec({
-      flow: run({ name: "test.resumed-run", turn: inspect }),
+      flow: run,
+      tags: [execution.turn({ flow: inspect })],
       input: {
         work: { id: "deferred", branchId: "main", role: "test", policy: "all" },
         input: undefined,
@@ -327,7 +391,7 @@ describe("session runtime", () => {
       parse: typed<{ id: string }>(),
       factory: () => {
         schedulerCalls++
-        throw new Error("must not run")
+        throw new UnexpectedEffectError("must not run")
       },
     })
     const scope = createScope({ tags: [
@@ -376,9 +440,10 @@ describe("session runtime", () => {
       store.commit(commitImpl),
     ] })
     const ctx = scope.createContext()
-    await ctx.resolve(session)
+    const runtime = await ctx.resolve(session)
     await ctx.close()
     expect(commits).toBe(0)
+    expect(runtime.record).toMatchObject({ status: "open", version: 0 })
     await scope.dispose()
   })
 
@@ -402,31 +467,238 @@ describe("session runtime", () => {
     const ctx = scope.createContext()
     const runtime = await ctx.resolve(session)
     const active = runtime.work.admit({ id: "cleanup", branchId: "main", role: "test", policy: "all" })
+    let reason: unknown
     active.signal.addEventListener("abort", () => {
+      reason = active.signal.reason
       runtime.work.settle("cleanup", active.record.attempt, { status: "cancelled" })
     }, { once: true })
 
     await ctx.close()
     expect(active.signal.aborted).toBe(true)
+    expect(reason).toMatchObject({ name: "AbortError", message: "Session deactivated" })
     await expect(active.settled).resolves.toEqual({ status: "cancelled" })
     expect(runtime.work.active()).toEqual([])
-    expect(runtime.status).toBe("finishing")
+    expect(runtime.status).toBe("open")
+    expect(runtime.record).toMatchObject({ status: "open", version: 0 })
     expect(commits).toBe(0)
 
     await scope.dispose()
   })
 
+  it("fences admission, aborts the active snapshot, joins all settlements, and caches deactivation", async () => {
+    const bound = authorityValue()
+    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+    const left = runtime.work.admit({ id: "left", branchId: "main", role: "test", policy: "all" })
+    const right = runtime.work.admit({ id: "right", branchId: "main", role: "test", policy: "all" })
+    let joined = false
+
+    const deactivation = runtime.deactivate()
+    deactivation.then(() => { joined = true })
+    expect(runtime.deactivate()).toBe(deactivation)
+    expect(left.signal.reason).toMatchObject({ name: "AbortError", message: "Session deactivated" })
+    expect(right.signal.reason).toMatchObject({ name: "AbortError", message: "Session deactivated" })
+    expect(() => runtime.work.admit({ id: "late", branchId: "main", role: "test", policy: "all" })).toThrow(
+      "deactivating",
+    )
+
+    runtime.work.settle("right", right.record.attempt, { status: "cancelled" })
+    await Promise.resolve()
+    expect(joined).toBe(false)
+    runtime.work.settle("left", left.record.attempt, { status: "cancelled" })
+    await deactivation
+    expect(joined).toBe(true)
+    expect(runtime.deactivate()).toBe(deactivation)
+    expect(runtime.record).toMatchObject({ status: "open", version: 0 })
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("lets finish win once and makes deactivation await its commit", async () => {
+    const bound = authorityValue()
+    let commits = 0
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const commitImpl = flow({
+      name: "test.finish-first-commit",
+      parse: typed<{ record: SessionRecord; expectedVersion: number }>(),
+      factory: async (ctx) => {
+        commits++
+        await gate
+        return { version: ctx.input.expectedVersion + 1 }
+      },
+    })
+    const scope = createScope({ tags: [
+      authority(bound),
+      record(initial(bound)),
+      clock(fixedClock),
+      store.commit(commitImpl),
+    ] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+    const active = runtime.work.admit({ id: "finish-first", branchId: "main", role: "test", policy: "all" })
+    active.signal.addEventListener("abort", () => {
+      runtime.work.settle("finish-first", active.record.attempt, { status: "cancelled" })
+    }, { once: true })
+
+    const finishing = ctx.exec({ flow: finish })
+    while (commits === 0) await Promise.resolve()
+    let deactivated = false
+    const deactivation = runtime.deactivate().then(() => { deactivated = true })
+    await Promise.resolve()
+    expect(deactivated).toBe(false)
+    release()
+
+    await expect(finishing).resolves.toMatchObject({ status: "finished", version: 1 })
+    await deactivation
+    expect(commits).toBe(1)
+    expect(runtime.record).toMatchObject({ status: "finished", version: 1 })
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("rejects finish after deactivation linearizes and commits zero times", async () => {
+    const bound = authorityValue()
+    let commits = 0
+    const commitImpl = flow({
+      name: "test.deactivate-first-commit",
+      parse: typed<{ record: SessionRecord; expectedVersion: number }>(),
+      factory: () => {
+        commits++
+        return { version: 1 }
+      },
+    })
+    const scope = createScope({ tags: [
+      authority(bound),
+      record(initial(bound)),
+      clock(fixedClock),
+      store.commit(commitImpl),
+    ] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+    const active = runtime.work.admit({ id: "deactivate-first", branchId: "main", role: "test", policy: "all" })
+    const deactivation = runtime.deactivate()
+
+    await expect(ctx.exec({ flow: finish })).rejects.toThrow("deactivating")
+    runtime.work.settle("deactivate-first", active.record.attempt, { status: "cancelled" })
+    await deactivation
+    expect(commits).toBe(0)
+    expect(runtime.record).toMatchObject({ status: "open", version: 0 })
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("joins every failed settlement and aggregates errors in admission order", async () => {
+    const bound = authorityValue()
+    const leftError = new Error("left settlement failed")
+    const rightError = new Error("right settlement failed")
+    let reads = 0
+    const settlementClock = { now: () => {
+      reads++
+      if (reads === 7) throw rightError
+      if (reads === 8) throw leftError
+      return "2026-07-14T00:00:00.000Z"
+    } }
+    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(settlementClock)] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+    const left = runtime.work.admit({ id: "left-error", branchId: "main", role: "test", policy: "all" })
+    const right = runtime.work.admit({ id: "right-error", branchId: "main", role: "test", policy: "all" })
+    const normal = runtime.work.admit({ id: "normal", branchId: "main", role: "test", policy: "all" })
+    let deactivated = false
+    const outcome = runtime.deactivate().catch((error: unknown) => {
+      deactivated = true
+      return error
+    })
+
+    expect(() => runtime.work.settle("right-error", right.record.attempt, { status: "cancelled" })).toThrow(rightError)
+    expect(() => runtime.work.settle("left-error", left.record.attempt, { status: "cancelled" })).toThrow(leftError)
+    await Promise.resolve()
+    expect(deactivated).toBe(false)
+    runtime.work.settle("normal", normal.record.attempt, { status: "cancelled" })
+
+    const error = await outcome
+    expect(error).toBeInstanceOf(AggregateError)
+    expect((error as AggregateError).errors).toEqual([leftError, rightError])
+    expect(runtime.record).toMatchObject({ status: "open", version: 0 })
+
+    await expect(ctx.close()).rejects.toBe(error)
+    await scope.dispose()
+  })
+
+  it("binds one safe observation projection per session run", async () => {
+    const bound = authorityValue()
+    const inspect = flow({
+      name: "test.session-observation",
+      deps: { projection: tags.required(observation.current) },
+      factory: (_ctx, { projection }) => projection,
+    })
+    const scope = createScope()
+    const left = scope.createContext({ tags: [
+      authority(bound),
+      record(Object.freeze({ ...initial(bound), id: "left-session" })),
+      clock(fixedClock),
+      execution.turn({ flow: inspect }),
+    ] })
+    const right = scope.createContext({ tags: [
+      authority(bound),
+      record(Object.freeze({ ...initial(bound), id: "right-session" })),
+      clock(fixedClock),
+      execution.turn({ flow: inspect }),
+    ] })
+
+    const [leftProjection, rightProjection] = await Promise.all([
+      left.exec({
+        flow: run,
+        input: {
+          work: { id: "left-work", branchId: "main", role: "writer", policy: "all" },
+          input: undefined,
+        },
+      }),
+      right.exec({
+        flow: run,
+        input: {
+          work: { id: "right-work", branchId: "main", role: "reviewer", policy: "all" },
+          input: undefined,
+        },
+      }),
+    ])
+
+    expect(leftProjection).toEqual({
+      sessionId: "left-session",
+      activationId: "left-session:left-work:1",
+      workId: "left-work",
+      role: "writer",
+    })
+    expect(rightProjection).toEqual({
+      sessionId: "right-session",
+      activationId: "right-session:right-work:1",
+      workId: "right-work",
+      role: "reviewer",
+    })
+
+    await left.close()
+    await right.close()
+    await scope.dispose()
+  })
+
   it("does not present invocation-owned session state as durable", async () => {
     const bound = authorityValue()
-    const execute = run({
-      name: "test.temporary-session-run",
-      turn: flow({ name: "test.temporary-session-turn", factory: () => "done" }),
-    })
-    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const turn = flow({ name: "test.temporary-session-turn", factory: () => "done" })
+    const scope = createScope({ tags: [
+      authority(bound),
+      record(initial(bound)),
+      clock(fixedClock),
+      execution.turn({ flow: turn }),
+    ] })
     const ctx = scope.createContext()
 
     await expect(ctx.exec({
-      flow: execute,
+      flow: run,
       input: {
         work: { id: "temporary", branchId: "main", role: "test", policy: "all" },
         input: undefined,
@@ -527,17 +799,17 @@ describe("session runtime", () => {
         attempt.signal.addEventListener("abort", () => resolve("aborted"), { once: true })
       }),
     })
-    const execute = run({ name: "test.blocking-run", turn: blocking })
     const scope = createScope({ tags: [
       authority(bound),
       record(initial(bound)),
       clock(fixedClock),
+      execution.turn({ flow: blocking }),
       store.commit(commitImpl),
     ] })
     const ctx = scope.createContext()
     const runtime = await ctx.resolve(session)
     const running = ctx.exec({
-      flow: execute,
+      flow: run,
       input: {
         work: { id: "active", branchId: "main", role: "test", policy: "all" },
         input: undefined,
@@ -565,8 +837,8 @@ describe("session runtime", () => {
     const parent = new AbortController()
     const blocking = flow({
       name: "test.parent-abort-turn",
-      deps: { signal: tags.required(abortSignal) },
-      factory: (_ctx, { signal }) => new Promise<void>((_resolve, reject) => {
+      factory: (ctx) => new Promise<void>((_resolve, reject) => {
+        const signal = ctx.signal
         if (signal.aborted) {
           reject(signal.reason)
           return
@@ -574,17 +846,17 @@ describe("session runtime", () => {
         signal.addEventListener("abort", () => reject(signal.reason), { once: true })
       }),
     })
-    const execute = run({ name: "test.parent-abort-run", turn: blocking })
     const scope = createScope({ tags: [
       authority(bound),
       record(initial(bound)),
       clock(fixedClock),
-      abortSignal(parent.signal),
+      execution.turn({ flow: blocking }),
     ] })
     const ctx = scope.createContext()
     const runtime = await ctx.resolve(session)
     const running = ctx.exec({
-      flow: execute,
+      flow: run,
+      signal: parent.signal,
       input: {
         work: { id: "parent-abort", branchId: "main", role: "test", policy: "all" },
         input: undefined,
@@ -596,6 +868,64 @@ describe("session runtime", () => {
     await expect(running).rejects.toMatchObject({ name: "AbortError" })
     expect(runtime.work.active()).toHaveLength(0)
     expect(runtime.record.work.find((value) => value.id === "parent-abort")?.status).toBe("cancelled")
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("does not emit work.started when cancellation arrives during readiness", async () => {
+    const bound = authorityValue()
+    const caller = new AbortController()
+    let readinessStarted!: () => void
+    let releaseReadiness!: () => void
+    const started = new Promise<void>((resolve) => {
+      readinessStarted = resolve
+    })
+    const release = new Promise<void>((resolve) => {
+      releaseReadiness = resolve
+    })
+    let turnCalls = 0
+    const backend = resource({
+      ownership: "current",
+      factory: async () => {
+        readinessStarted()
+        await release
+        return "ready"
+      },
+    })
+    const delayed = flow({
+      name: "test.delayed-readiness-turn",
+      deps: { backend },
+      factory: () => {
+        turnCalls++
+      },
+    })
+    const scope = createScope({ tags: [
+      authority(bound),
+      record(initial(bound)),
+      clock(fixedClock),
+      execution.turn({ flow: delayed }),
+    ] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+    const stream = ctx.execStream({
+      flow: run,
+      signal: caller.signal,
+      input: {
+        work: { id: "cancelled-readiness", branchId: "main", role: "test", policy: "all" },
+        input: undefined,
+      },
+    })
+    const next = stream[Symbol.asyncIterator]().next()
+
+    await started
+    caller.abort(new DOMException("cancelled during readiness", "AbortError"))
+    releaseReadiness()
+
+    await expect(next).rejects.toMatchObject({ name: "AbortError" })
+    await expect(stream.result).rejects.toMatchObject({ name: "AbortError" })
+    expect(turnCalls).toBe(0)
+    expect(runtime.eventsFor("cancelled-readiness").some((event) => event.type === "work.started")).toBe(false)
 
     await ctx.close()
     await scope.dispose()
@@ -681,12 +1011,13 @@ describe("session runtime", () => {
         maxOutputBytes: 1_024,
       }),
       sandbox.impl.write(write),
+      execution.turn({ flow: sandbox.write }),
     ] })
     const ctx = scope.createContext()
     await ctx.resolve(session)
 
     await expect(ctx.exec({
-      flow: run({ name: "test.sandbox-run", turn: sandbox.write }),
+      flow: run,
       input: {
         work: {
           id: "sandbox-work",
@@ -721,7 +1052,7 @@ describe("session runtime", () => {
         work: tags.required(current.work),
         authority: tags.required(current.authority),
       },
-      factory: (ctx, deps) => {
+      factory: (ctx, { authority }) => {
         recallEffects++
         return [{
           id: "memory",
@@ -729,7 +1060,7 @@ describe("session runtime", () => {
           status: "accepted" as const,
           source: "policy" as const,
           evidence: [],
-          authorityFingerprint: ctx.input.query === "foreign" ? foreign.fingerprint : deps.authority.fingerprint,
+          authorityFingerprint: ctx.input.query === "foreign" ? foreign.fingerprint : authority.fingerprint,
         }]
       },
     })
@@ -914,12 +1245,16 @@ describe("session runtime", () => {
         await new Promise(() => {})
       },
     })
-    const execute = run({ name: "test.yielding-run", turn: yielding })
-    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const scope = createScope({ tags: [
+      authority(bound),
+      record(initial(bound)),
+      clock(fixedClock),
+      execution.turn({ flow: yielding }),
+    ] })
     const ctx = scope.createContext()
     const runtime = await ctx.resolve(session)
     const stream = ctx.execStream({
-      flow: execute,
+      flow: run,
       input: {
         work: { id: "streamed", branchId: "main", role: "test", policy: "all" },
         input: undefined,
@@ -949,17 +1284,17 @@ describe("session runtime", () => {
       parse: typed<void>(),
       factory: () => undefined,
     })
-    const execute = run({ name: "test.registry-run", turn: inspect })
     const scope = createScope({ tags: [
       authority(bound),
       record(initial(bound)),
       clock(fixedClock),
+      execution.turn({ flow: inspect }),
     ] })
     const ctx = scope.createContext()
     const runtime = await ctx.resolve(session)
 
     await ctx.exec({
-      flow: execute,
+      flow: run,
       input: {
         work: { id: "registry-work", branchId: "main", role: "test", policy: "all" },
         input: undefined,
@@ -999,7 +1334,7 @@ describe("session runtime", () => {
       evidence: [{ id: "plan", kind: "query-plan", digest: "sha256:plan" }],
     })
     await ctx.exec({
-      flow: execute,
+      flow: run,
       input: {
         work: { id: "analysis-work", branchId: child.id, role: "test", policy: "all" },
         input: undefined,

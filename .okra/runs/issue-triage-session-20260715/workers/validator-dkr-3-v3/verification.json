@@ -1,0 +1,305 @@
+{
+  "schema_version": 1,
+  "worker_id": "validator-dkr-3-v3",
+  "unit_id": "DKR-3",
+  "observed_at": "2026-07-15T05:47:10Z",
+  "candidate_checkpoint": "workers/dkr-3-v3/checkpoint.v3.json",
+  "candidate_checkpoint_sha256": "9403324bf2e73588d1bb56452cd873a5f28399063c67fff4c22ab009d9ac7e2d",
+  "disposition": {
+    "behavior": "accepted",
+    "safe_projection_boundary": "accepted",
+    "evidence_hashes": "accepted_11_of_11",
+    "independent_wall_references": "accepted_6_of_6",
+    "candidate_checkpoint": "rejected_stale_against_frame_v2",
+    "downstream_advance": "blocked",
+    "acceptance_authority": "orchestrator_only",
+    "product_change_authorization": "not_made"
+  },
+  "behavior_results": {
+    "trace_dimensions": "12/12",
+    "same_scope_cross_session_leak_count": 0,
+    "forbidden_value_match_count": 0,
+    "arbitrary_tag_enumeration_export_count": 0,
+    "unrestricted_context_export_count": 0,
+    "terminal_event_ordering": "2/2",
+    "projection_source_count": 1,
+    "session_a_settlement": ["activation-close", "flush", "close"],
+    "session_b_settlement": ["activation-close", "flush", "close"]
+  },
+  "freshness_result": {
+    "checkpoint_observed_at": "2026-07-15T05:24:12Z",
+    "validator_observed_at": "2026-07-15T05:47:10Z",
+    "checkpoint_age_seconds": 1378,
+    "frame_wall_max_age_seconds": 600,
+    "candidate_wall_max_age_seconds": 1800,
+    "candidate_declared_status": "fresh",
+    "candidate_window_status": "fresh",
+    "frame_v2_status": "stale",
+    "decision": "rejected",
+    "failure_mode": "semantic_freshness_mismatch"
+  },
+  "wall_dispositions": [
+    {
+      "metric_id": "sensitive_context_export_count",
+      "threshold": 0,
+      "current_value": 0,
+      "current_measurement": "held",
+      "candidate_record": "rejected_stale",
+      "evidence": "Fresh validator probe found zero forbidden values, arbitrary tag exports, or unrestricted context exports. The candidate wall read is older than frame v2's 10-minute limit."
+    },
+    {
+      "metric_id": "cross_session_leak_count",
+      "threshold": 0,
+      "current_value": 0,
+      "current_measurement": "held",
+      "candidate_record": "rejected_stale",
+      "evidence": "Two overlapping activations in one scope produced zero cross-session leaks. The candidate wall read is older than frame v2's 10-minute limit."
+    },
+    {
+      "metric_id": "primitive_proof_gap_count",
+      "threshold": 0,
+      "current_value": 0,
+      "current_measurement": "held",
+      "candidate_record": "rejected_stale",
+      "evidence": "The fresh probe used one named SDK-level tag over current Lite extension and context seams with no Lite projection change. The candidate wall read is stale under frame v2."
+    },
+    {
+      "metric_id": "single_llm_truth_acceptance_count",
+      "threshold": 0,
+      "current_value": 0,
+      "current_measurement": "held",
+      "candidate_record": "rejected_stale",
+      "evidence": "A separate validator created and ran a fresh probe, then rejected the candidate checkpoint rather than self-accepting it."
+    },
+    {
+      "metric_id": "ungoverned_write_or_read_count",
+      "threshold": 0,
+      "current_value": 0,
+      "current_measurement": "held",
+      "candidate_record": "rejected_stale",
+      "evidence": "Validator writes are confined to workers/validator-dkr-3-v3, governed progress uses the absolute helper, and the store verifies afterward."
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "threshold": 0,
+      "current_value": 0,
+      "current_measurement": "held",
+      "candidate_record": "rejected_stale",
+      "evidence": "The frame's 10-minute wall contract overrides the candidate's 30-minute claim. The mismatch remains explicit and blocks checkpoint acceptance."
+    }
+  ],
+  "audit_traces": [
+    {
+      "claim_id": "DKR-3-v3.exact-root-replay",
+      "check": "The candidate root replay resolves and reproduces all saved behavior, hashes, fields, walls, and anchors.",
+      "metric_or_check": "candidate_replay_exit_code",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/dkr-3-v3/replay.sh",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v3/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:31bce0ad8de755703692b971a34fb5948c2de3ecd1ea04d452d827ae2979aae7",
+        "sha256:9403324bf2e73588d1bb56452cd873a5f28399063c67fff4c22ab009d9ac7e2d"
+      ],
+      "observed_at": "2026-07-15T05:43:47Z",
+      "decision": "accepted",
+      "evidence": "traceDimensions=12/12; sameScopeCrossSessionLeakCount=0; forbiddenExportCount=0; terminalSettlementOrder=2/2; evidenceHashes=11/11; checkpointFields=20/20; wallEntries=6/6; independentWallReferences=6/6."
+    },
+    {
+      "claim_id": "DKR-3-v3.independent-dimensions",
+      "check": "A fresh validator-owned probe covers all twelve required observation dimensions through one named projection tag.",
+      "metric_or_check": "independent_dimension_pass_count",
+      "threshold": 12,
+      "value": 12,
+      "source_of_truth": "workers/validator-dkr-3-v3/independent-projection.mjs",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-3-v3/independent-projection.mjs",
+      "exit_code": 0,
+      "sha256": ["sha256:0cc8c4c6a776aa73a79f974a8a22455988769a1321d8cecdea43939db5635002"],
+      "observed_at": "2026-07-15T05:46:26Z",
+      "decision": "accepted",
+      "evidence": "session, activation, work, channel, role, tool, parentage, success, error, cancellation, close, and sinkFlush all true; dimensionPassCount=12."
+    },
+    {
+      "claim_id": "DKR-3-v3.same-scope-privacy",
+      "check": "Two overlapping activations in one scope keep session correlation isolated and export no forbidden values or arbitrary context.",
+      "metric_or_check": "leak_or_forbidden_export_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/validator-dkr-3-v3/independent-projection.mjs",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-3-v3/independent-projection.mjs",
+      "exit_code": 0,
+      "sha256": ["sha256:0cc8c4c6a776aa73a79f974a8a22455988769a1321d8cecdea43939db5635002"],
+      "observed_at": "2026-07-15T05:46:26Z",
+      "decision": "accepted",
+      "evidence": "overlappingArrivalCount=2; sameScopeCrossSessionLeakCount=0; forbiddenValueMatchCount=0; arbitraryTagEnumerationExportCount=0; unrestrictedContextExportCount=0."
+    },
+    {
+      "claim_id": "DKR-3-v3.terminal-order",
+      "check": "Success and error activation close events occur before sink flush and close.",
+      "metric_or_check": "terminal_event_ordering_pass_count",
+      "threshold": 2,
+      "value": 2,
+      "source_of_truth": "workers/validator-dkr-3-v3/independent-projection.mjs",
+      "replay": "node .okra/runs/issue-triage-session-20260715/workers/validator-dkr-3-v3/independent-projection.mjs",
+      "exit_code": 0,
+      "sha256": ["sha256:0cc8c4c6a776aa73a79f974a8a22455988769a1321d8cecdea43939db5635002"],
+      "observed_at": "2026-07-15T05:46:26Z",
+      "decision": "accepted",
+      "evidence": "Both settlements equal activation-close, flush, close; terminalEventOrderingPassCount=2."
+    },
+    {
+      "claim_id": "DKR-3-v3.safe-api-boundary",
+      "check": "The observation contract needs one named SDK projection tag and no arbitrary enumeration, public ContextData callback, or Lite projection primitive.",
+      "metric_or_check": "unsafe_observation_api_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "fresh probe, current Lite source, current observable source, and trace contract",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-3-v3/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:0cc8c4c6a776aa73a79f974a8a22455988769a1321d8cecdea43939db5635002",
+        "sha256:2a8be8f49a82d3c95be6ba6045c5f6b9d5a8615e402b51225a4eb7c4eeeb23a1",
+        "sha256:a208869ca9eeb3d8f2407d399d01394ed01c86dda46ee2df0b41899f72b86b34",
+        "sha256:549e6b4096698a433f5a843dc4851d2ab9743c7b5e77e7497e0205c7d9aa3b0b",
+        "sha256:c6c71ffe27787683e4429f5f397d417d6774b46cd8603630c31110e7fa5a8366"
+      ],
+      "observed_at": "2026-07-15T05:47:10Z",
+      "decision": "accepted",
+      "evidence": "projectionSourceCount=1; arbitraryTagEnumerationExportCount=0; unrestrictedContextExportCount=0; existing wrapExec, parent, onClose, seekTag, owner, and close seams remain sufficient."
+    },
+    {
+      "claim_id": "DKR-3-v3.evidence-hashes",
+      "check": "All eleven checkpoint evidence hashes resolve to the exact named current files.",
+      "metric_or_check": "resolved_evidence_hash_count",
+      "threshold": 11,
+      "value": 11,
+      "source_of_truth": "candidate evidence path list and independent hash audit",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-3-v3/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:9403324bf2e73588d1bb56452cd873a5f28399063c67fff4c22ab009d9ac7e2d"],
+      "observed_at": "2026-07-15T05:47:10Z",
+      "decision": "accepted",
+      "evidence": "resolvedEvidenceHashCount=11; checkpoint evidence hash count=11."
+    },
+    {
+      "claim_id": "DKR-3-v3.independent-wall-anchors",
+      "check": "All six wall verification references resolve to distinct claims in the prior independent validator record.",
+      "metric_or_check": "independent_wall_reference_pass_count",
+      "threshold": 6,
+      "value": 6,
+      "source_of_truth": "checkpoint active wall entries and workers/validator-dkr-3/verification.json",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-3-v3/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:9403324bf2e73588d1bb56452cd873a5f28399063c67fff4c22ab009d9ac7e2d",
+        "sha256:d50115adef22565d2cf86c95918854fe856a70688436ff03941ef6bc46668b5c"
+      ],
+      "observed_at": "2026-07-15T05:47:10Z",
+      "decision": "accepted",
+      "evidence": "independentWallReferencePassCount=6; evidenceReferencePassCount=6; each verification ref differs from its evidence ref."
+    },
+    {
+      "claim_id": "DKR-3-v3.governed-progress-hashes",
+      "check": "The governed writer record pins the current checkpoint and replay hashes.",
+      "metric_or_check": "governed_progress_hash_mismatch_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/dkr-3-v3/progress.jsonl#seq=1",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-3-v3/replay.sh",
+      "exit_code": 0,
+      "sha256": ["sha256:170dbd64bc9953d88de4eb0042da7777c88b3253d05f88678a948257d54f7c60"],
+      "observed_at": "2026-07-15T05:47:10Z",
+      "decision": "accepted",
+      "evidence": "governedProgressCheckpointHashMatch=true; governedProgressReplayHashMatch=true."
+    },
+    {
+      "claim_id": "DKR-3-v3.frame-wall-freshness",
+      "check": "Candidate active wall reads obey frame v2's 10-minute freshness contract.",
+      "metric_or_check": "candidate_wall_age_seconds",
+      "threshold": 600,
+      "value": 1378,
+      "source_of_truth": "frame/frame.v2.json and workers/dkr-3-v3/checkpoint.v3.json",
+      "replay": "read frame metric_contracts.anti_goals.max_age, checkpoint observed_at, and validator clock",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:8a21f143c6d009d84632c360ec1a3073a26e2caef215886c8c3ac7a50f280cd0",
+        "sha256:9403324bf2e73588d1bb56452cd873a5f28399063c67fff4c22ab009d9ac7e2d"
+      ],
+      "observed_at": "2026-07-15T05:47:10Z",
+      "decision": "rejected",
+      "failure_mode": "stale_semantic_mismatch",
+      "evidence": "frame wall max_age=10m; candidate and all six walls use 30m; age=1378s. Candidate is fresh only under its widened window and stale under frame v2."
+    },
+    {
+      "claim_id": "DKR-3-v3.checkpoint-wall-gate",
+      "check": "The candidate checkpoint can be accepted with all six active wall records held and fresh.",
+      "metric_or_check": "fresh_active_wall_record_count",
+      "threshold": 6,
+      "value": 0,
+      "source_of_truth": "candidate checkpoint wall records evaluated against frame v2",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-3-v3/replay.sh",
+      "exit_code": 0,
+      "sha256": [
+        "sha256:9403324bf2e73588d1bb56452cd873a5f28399063c67fff4c22ab009d9ac7e2d",
+        "sha256:8a21f143c6d009d84632c360ec1a3073a26e2caef215886c8c3ac7a50f280cd0"
+      ],
+      "observed_at": "2026-07-15T05:47:10Z",
+      "decision": "rejected",
+      "failure_mode": "stale",
+      "evidence": "Fresh current behavior reads all six values at zero, but zero of six candidate wall records meet frame v2's 10-minute age limit. Downstream remains blocked."
+    },
+    {
+      "claim_id": "DKR-3-v3.independence-boundary",
+      "check": "The validator supplies a separate replay without creating its own acceptance record.",
+      "metric_or_check": "single_llm_truth_acceptance_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "workers/validator-dkr-3-v3 artifacts and acceptance protocol",
+      "replay": "read verification disposition and confirm no accept-dkr-3 artifact is written",
+      "exit_code": 0,
+      "sha256": ["sha256:0cc8c4c6a776aa73a79f974a8a22455988769a1321d8cecdea43939db5635002"],
+      "observed_at": "2026-07-15T05:47:10Z",
+      "decision": "accepted",
+      "evidence": "The validator accepts behavior, rejects the checkpoint, writes no claim_acceptance, and leaves the next decision to the orchestrator."
+    },
+    {
+      "claim_id": "DKR-3-v3.store-integrity",
+      "check": "The run store verifies after governed validator output.",
+      "metric_or_check": "store_verification_failure_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/scripts/okra-store.sh verify",
+      "replay": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/scripts/okra-store.sh verify .okra/runs/issue-triage-session-20260715",
+      "exit_code": 0,
+      "sha256": [],
+      "observed_at": "2026-07-15T05:47:10Z",
+      "decision": "accepted",
+      "evidence": "The governed result is appended first and the store verifies afterward."
+    },
+    {
+      "claim_id": "DKR-3-v3.integrity-boundary",
+      "check": "The validator preserves frame thresholds, stale evidence, and authority boundaries.",
+      "metric_or_check": "anti_goal_bypass_or_dishonesty_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "frame v2 and validator disposition",
+      "replay": "read freshness rejection, downstream block, and product-change status",
+      "exit_code": 0,
+      "sha256": ["sha256:8a21f143c6d009d84632c360ec1a3073a26e2caef215886c8c3ac7a50f280cd0"],
+      "observed_at": "2026-07-15T05:47:10Z",
+      "decision": "accepted",
+      "evidence": "The candidate's 30-minute window does not replace the frame's 10-minute contract. No product edit, threshold change, acceptance, or downstream authorization is made."
+    }
+  ],
+  "summary": {
+    "accepted": 11,
+    "rejected": 2,
+    "rejected_claim_ids": [
+      "DKR-3-v3.frame-wall-freshness",
+      "DKR-3-v3.checkpoint-wall-gate"
+    ],
+    "next_authority": "orchestrator",
+    "required_before_acceptance": "fresh checkpoint wall records using frame v2 max_age 10m"
+  }
+}

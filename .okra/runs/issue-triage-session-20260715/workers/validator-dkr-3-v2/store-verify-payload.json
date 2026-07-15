@@ -1,0 +1,13 @@
+{
+  "type": "worker_verification",
+  "worker_id": "validator-dkr-3-v2",
+  "claim_id": "RUN.store-integrity-after-validator-dkr-3-v2",
+  "check": "The run store verifies after the governed validator finish record.",
+  "replay": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/scripts/okra-store.sh verify .okra/runs/issue-triage-session-20260715",
+  "exit_code": 0,
+  "value": 0,
+  "threshold": 0,
+  "observed_at": "2026-07-15T05:22:12Z",
+  "decision": "accepted",
+  "evidence": "OKRA store verified: .okra/runs/issue-triage-session-20260715"
+}

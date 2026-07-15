@@ -1,0 +1,26 @@
+{
+  "type": "worker_finish",
+  "worker_id": "validator-dkr-4",
+  "worker_kind": "verification",
+  "unit_id": "DKR-4",
+  "status": "checkpoint_rejected_behavior_unverified",
+  "recorded_at": "2026-07-15T05:35:24Z",
+  "next_check_at": "2026-07-15T05:45:24Z",
+  "candidate_checkpoint_ref": "workers/dkr-4/checkpoint.json",
+  "verification_ref": "workers/validator-dkr-4/verification.json",
+  "replay_ref": "workers/validator-dkr-4/replay.sh",
+  "candidate_saved_replay": "accepted_exit_0_with_8_of_8_cases",
+  "recorded_root_replay": "rejected_exit_127",
+  "fresh_behavior_probe": "rejected_exit_1_self_matching_checker_assertion",
+  "static_graph_audit": "accepted_5_ports_3_controller_edges_0_forbidden_surfaces",
+  "checkpoint_disposition": "rejected_non_replayable_and_independent_behavior_unverified",
+  "lifecycle_disposition": "ordinary_graceful_join_supported; forced close remains conditional on accepted DKR-2",
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked"
+  },
+  "remediation_authorization": "not_made",
+  "product_files_changed": false,
+  "summary": "9 accepted, 5 rejected: DKR-4.recorded-root-replay, DKR-4.fresh-independent-behavior, wall.cross_session_leak_count, wall.primitive_proof_gap_count, wall.single_llm_truth_acceptance_count",
+  "worker_progress": ".okra/runs/issue-triage-session-20260715/workers/validator-dkr-4/progress.jsonl at finish, unknown, and ten-minute heartbeat"
+}

@@ -1,0 +1,32 @@
+{
+  "packet_version": 1,
+  "worker_id": "validator-dkr-2",
+  "role": "verification worker",
+  "role_contract": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/references/roles/validator.md",
+  "run_dir": ".okra/runs/issue-triage-session-20260715",
+  "frame_ref": "frame/frame.v2.json",
+  "candidate_checkpoint": "workers/dkr-2/checkpoint.v2.json",
+  "assignment": "Independently replay and challenge the generic Lite structured-cancellation conclusion and its complete v2 checkpoint.",
+  "required_checks": [
+    "Run the saved v2 replay and verify all hashes and executable checkpoint fields.",
+    "Independently probe scalar child, scalar error, stream normal completion, producer error, consumer break, parent close, and three-level nested close.",
+    "Challenge whether optional caller signal plus ExecutionContext.signal covers every real caller without a public cancel method.",
+    "Challenge abort descendants, return active stream iterators, join descendants, classify signal exits, then clean resources as the correct order.",
+    "Check sibling isolation, parent isolation, unhandled rejections, uncooperative scalar behavior, and original-error preservation.",
+    "Inspect whether the proposal is generic Lite behavior rather than session semantics and whether private bookkeeping can remain private.",
+    "Audit every active wall and run store verification after governed output."
+  ],
+  "authorized_writes": [
+    ".okra/runs/issue-triage-session-20260715/workers/validator-dkr-2/**"
+  ],
+  "forbidden": [
+    "Product code, tests, docs, manifests, git history, PR state, external services, frame, tree, or another worker's artifacts",
+    "Self-certification, public cancel, start, spawn, task handles, worker pools, session-specific Lite semantics, or wall weakening"
+  ],
+  "required_outputs": [
+    "workers/validator-dkr-2/verification.json",
+    "workers/validator-dkr-2/replay.sh",
+    "workers/validator-dkr-2/progress.jsonl via the absolute OKRA store helper worker-report command"
+  ],
+  "terminal_condition": "Finish with explicit behavior, API, ordering, and wall dispositions plus a governed progress record."
+}

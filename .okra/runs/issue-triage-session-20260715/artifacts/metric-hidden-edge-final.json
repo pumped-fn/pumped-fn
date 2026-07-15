@@ -1,0 +1,10 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "undeclared_effect_edge_count",
+  "value": 0,
+  "target": 0,
+  "observed_at": "2026-07-15T07:42:55Z",
+  "source": "SDK effects are declared flow, resource, controller, tag-selected, or adapter edges; removed registry and facade dispatch surfaces remain absent.",
+  "freshness": "observed_at=2026-07-15T07:42:55Z -> status=fresh against max_age=10m"
+}

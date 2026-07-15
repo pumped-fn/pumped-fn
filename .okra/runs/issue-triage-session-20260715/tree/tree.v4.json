@@ -1,0 +1,214 @@
+{
+  "ckrs": [
+    {
+      "id": "CKR-LITE-LIFECYCLE",
+      "metric_id": "lite_lifecycle_contract_pass_count",
+      "source_dkrs": [
+        "DKR-1",
+        "DKR-2"
+      ],
+      "status": "candidate",
+      "target": 6
+    },
+    {
+      "id": "CKR-SESSION-ACTIVATION",
+      "metric_id": "session_activation_contract_pass_count",
+      "source_dkrs": [
+        "DKR-0",
+        "DKR-1",
+        "DKR-4"
+      ],
+      "status": "candidate",
+      "target": 7
+    },
+    {
+      "id": "CKR-OBSERVATION",
+      "metric_id": "observation_contract_pass_count",
+      "source_dkrs": [
+        "DKR-3"
+      ],
+      "status": "candidate",
+      "target": 5
+    },
+    {
+      "id": "CKR-ISSUE-TRIAGE",
+      "metric_id": "issue_triage_public_contract_pass_count",
+      "source_dkrs": [
+        "DKR-4",
+        "DKR-5"
+      ],
+      "status": "candidate",
+      "target": 16
+    },
+    {
+      "id": "CKR-PUBLIC-TRUTH",
+      "metric_id": "public_contract_alignment_pass_count",
+      "source_dkrs": [
+        "DKR-0",
+        "DKR-5"
+      ],
+      "status": "candidate",
+      "target": 4
+    }
+  ],
+  "dkrs": [
+    {
+      "budget": {
+        "time_min": 45,
+        "turns": 1
+      },
+      "decision_target": "Reconcile the current PR into keep, reshape, and remove decisions without losing proven behavior.",
+      "id": "DKR-0",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-REGRESSION",
+        "AG-STYLE",
+        "AG-INTEGRITY",
+        "AG-INDEPENDENCE"
+      ],
+      "status": "active",
+      "stop_rule": "Stop when every public concept and lifecycle workaround in the current PR has a source-backed disposition or return an unresolved checkpoint."
+    },
+    {
+      "budget": {
+        "time_min": 90,
+        "turns": 2
+      },
+      "decision_target": "Decide whether controller(flow).exec with per-exec tags and a current-owned session resource fully models one activation.",
+      "id": "DKR-1",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-CLEANUP-EFFECT",
+        "AG-SESSION-ISOLATION",
+        "AG-PRIMITIVE-PROOF"
+      ],
+      "status": "active",
+      "stop_rule": "Stop after executable isolation, nested reuse, close-without-finish, checkpoint, and resume probes compare the current and nearest-context ownership options."
+    },
+    {
+      "budget": {
+        "time_min": 90,
+        "turns": 2
+      },
+      "decision_target": "Choose the minimum reusable Lite structured-cancellation behavior.",
+      "id": "DKR-2",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-PRIMITIVE-PROOF",
+        "AG-REGRESSION",
+        "AG-INTEGRITY"
+      ],
+      "status": "active",
+      "stop_rule": "Stop when scalar, streaming, error, consumer-break, and nested-close probes decide signal-only versus signal plus public cancel without adding start or spawn speculatively."
+    },
+    {
+      "budget": {
+        "time_min": 75,
+        "turns": 2
+      },
+      "decision_target": "Choose the safe context observation projection and terminal trace model.",
+      "id": "DKR-3",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-OBSERVATION-PRIVACY",
+        "AG-SESSION-ISOLATION",
+        "AG-PRIMITIVE-PROOF"
+      ],
+      "status": "active",
+      "stop_rule": "Stop when session, activation, work, channel, role, tool, parentage, terminal outcome, sink flush, and forbidden-value probes identify the smallest extension change."
+    },
+    {
+      "budget": {
+        "time_min": 75,
+        "turns": 2
+      },
+      "decision_target": "Prove bounded queue workers with controller(flow), per-exec tags, and awaited composition before considering start or spawn.",
+      "id": "DKR-4",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-HIDDEN-EDGE",
+        "AG-PRODUCTION-SAFETY",
+        "AG-PRIMITIVE-PROOF"
+      ],
+      "status": "candidate",
+      "stop_rule": "Stop when bounded concurrency, backpressure, lease, acknowledge, reject, graceful shutdown, and one activation per delivery pass or a named contract proves a missing primitive."
+    },
+    {
+      "budget": {
+        "time_min": 90,
+        "turns": 2
+      },
+      "decision_target": "Define the evidence, independent verification, publication, and public scope-seam contracts for the issue-triage example.",
+      "id": "DKR-5",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-SCOPE-SEAM",
+        "AG-PRODUCTION-SAFETY",
+        "AG-EVIDENCE",
+        "AG-INDEPENDENCE"
+      ],
+      "status": "candidate",
+      "stop_rule": "Stop with replayable schemas and denial fixtures for unsupported, stale, unsafe, unauthorized, and duplicate publication cases."
+    }
+  ],
+  "frame_version": 2,
+  "graph": {
+    "edges": [],
+    "nodes": [
+      {
+        "node_id": "DKR-0",
+        "node_kind": "dkr",
+        "observed_at": "2026-07-15T04:08:44Z",
+        "quadrant": {
+          "certainty": 0.45,
+          "level": "approach"
+        },
+        "source_ref": "worker-packets/dkr-0.json",
+        "status": "active",
+        "type": "node_event"
+      },
+      {
+        "node_id": "DKR-1",
+        "node_kind": "dkr",
+        "observed_at": "2026-07-15T04:08:44Z",
+        "quadrant": {
+          "certainty": 0.55,
+          "level": "approach"
+        },
+        "source_ref": "worker-packets/dkr-1.json",
+        "status": "active",
+        "type": "node_event"
+      },
+      {
+        "node_id": "DKR-2",
+        "node_kind": "dkr",
+        "observed_at": "2026-07-15T04:36:07Z",
+        "quadrant": {
+          "certainty": 0.45,
+          "level": "approach"
+        },
+        "source_ref": "worker-packets/dkr-2.json",
+        "status": "active",
+        "type": "node_event"
+      },
+      {
+        "node_id": "DKR-3",
+        "node_kind": "dkr",
+        "observed_at": "2026-07-15T04:08:44Z",
+        "quadrant": {
+          "certainty": 0.5,
+          "level": "approach"
+        },
+        "source_ref": "worker-packets/dkr-3.json",
+        "status": "active",
+        "type": "node_event"
+      }
+    ]
+  },
+  "orchestrator": {
+    "owner": "Codex /root",
+    "responsibilities": [
+      "objective checks",
+      "check-ins",
+      "OKR board",
+      "subagent steering"
+    ],
+    "terminal_condition": "Continue until the objective metric reaches target at 16 of 16 with every active anti-goal held, the human stops or changes the frame, or a blocking flag requires human resolution."
+  },
+  "pkrs": [],
+  "tree_version": 4
+}

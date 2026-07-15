@@ -1,0 +1,69 @@
+{
+  "type": "steering_checkin",
+  "checkin_id": "checkin.issue-triage.round-9.queue-and-evidence",
+  "round": 9,
+  "observed_at": "2026-07-15T05:40:25Z",
+  "next_check_at": "2026-07-15T05:50:25Z",
+  "inbound_signal": "DKR-4 saved behavior passes 8 of 8 with five ports and three controller edges, but root replay and independent behavior failed; DKR-0 regression classification and DKR-5 evidence contracts remain active.",
+  "decision_delta": "Dispatched DKR-4 v2 proof repair and activated DKR-5 to name all sixteen evidence and publication contracts; kept the implementation lane closed.",
+  "affected_units": ["DKR-0", "DKR-4", "DKR-5", "CKR-ISSUE-TRIAGE"],
+  "expected_effect": "Finish the remaining composition and publication decisions so the later corrective plan can implement one complete vertical slice rather than disconnected primitives.",
+  "evidence_delta": "Queue candidate reads 8 of 8 cases, 5 of 5 ports, 3 controller edges, and zero forbidden worker surfaces, but independent behavior is unread. DKR-0 confirms one touched Codex ACP defect and one environment-only gate provisionally. Objective remains 0 of 16.",
+  "problem_restatement": "Prove bounded activation delivery and evidence-gated publication using explicit graph edges, then repair the current branch and implement the example under one recorded breaker resolution.",
+  "alternatives_considered": [
+    "Accept DKR-4 from its saved writer replay",
+    "Start implementing lifecycle while evidence publication is still undefined",
+    "Repair DKR-4 proof and complete DKR-5 before opening the correction lane"
+  ],
+  "assumptions_at_risk": [
+    "Fixed worker loops cover all queue behavior without public pools",
+    "The sixteen objective contracts can cover both positive and denial paths",
+    "The confirmed Codex ACP regression is repairable inside the accepted cancellation design"
+  ],
+  "dkr_decision": "Continue DKR-0, DKR-4, and DKR-5 read-only work. DKR-1 and DKR-2 remain accepted discovery. No CKR or PKR promotion while breakers remain open.",
+  "hallucination_sweep": [
+    {
+      "claim": "Static queue graph proof is enough to accept runtime behavior.",
+      "evidence_ref": "workers/validator-dkr-4/verification.json",
+      "verdict": "rejected; fresh behavior replay must pass"
+    }
+  ],
+  "missing_context_sweep": [
+    {
+      "claim": "A successful issue hypothesis may publish without explicit denial contracts.",
+      "evidence_ref": "worker-packets/dkr-5.json",
+      "verdict": "rejected; stale, unsafe, unauthorized, duplicate, conflict, and verifier-failure cases are required"
+    }
+  ],
+  "unexpected_results": [
+    {
+      "claim": "Queue composition itself stayed simple; the repeated failures were proof-path defects, not missing worker primitives.",
+      "evidence_ref": "workers/validator-dkr-4/verification.json",
+      "verdict": "v2 proof repair only"
+    }
+  ],
+  "anti_goal_violation_review": [
+    {
+      "claim": "Cleanup, regression, and slop breakers remain open.",
+      "evidence_ref": "flags.jsonl#seq=3",
+      "verdict": "all committing moves paused"
+    }
+  ],
+  "uncertainty_5why": {
+    "status": "open",
+    "terminal_metric_or_uncertainty_id": "uncertainty.issue_triage_publication_contract",
+    "reducing_dkr": "DKR-5"
+  },
+  "open_flags": [
+    "breaking.DKR-1.cleanup-business-state-mutation",
+    "breaking.DKR-0.touched-surface-regressions",
+    "breaking.DKR-0.slop-violations"
+  ],
+  "steering_value_score": 1,
+  "worker_progress_refs": [
+    "workers/validator-dkr-4/progress.jsonl#seq=1",
+    "worker-packets/dkr-4-v2.json",
+    "worker-packets/dkr-5.json",
+    "worker-packets/validator-dkr-0-v3.json"
+  ]
+}

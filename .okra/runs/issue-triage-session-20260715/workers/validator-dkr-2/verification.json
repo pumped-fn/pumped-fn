@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "worker_id": "validator-dkr-2",
+  "unit_id": "DKR-2",
+  "observed_at": "2026-07-15T04:58:50Z",
+  "candidate_checkpoint": ".okra/runs/issue-triage-session-20260715/workers/dkr-2/checkpoint.v2.json",
+  "candidate_checkpoint_sha256": "6c3a183edd003175c839ada032c98a64accacc8d5a977f26f522c1c94dd456e0",
+  "checkpoint_disposition": "rejected: non-replayable",
+  "downstream_advance": "blocked",
+  "failure_modes": [
+    "The checkpoint records workers/dkr-2/replay.sh, which does not resolve from the repository root.",
+    "The saved replay file is mode 664 and direct execution returned exit 126 before any hash or checkpoint check ran.",
+    "The independent replay returned exit 1 on a SyntaxError before any behavioral case ran."
+  ],
+  "behavior_dispositions": {
+    "scalar_child": "rejected: independent replay did not execute",
+    "scalar_error": "rejected: independent replay did not execute",
+    "stream_normal_completion": "rejected: independent replay did not execute",
+    "stream_producer_error": "rejected: independent replay did not execute",
+    "stream_consumer_break": "rejected: independent replay did not execute",
+    "stream_parent_close": "rejected: independent replay did not execute",
+    "three_level_nested_close": "rejected: independent replay did not execute",
+    "unhandled_rejections": "rejected: independent replay did not execute",
+    "uncooperative_scalar": "rejected: independent replay did not execute",
+    "original_error_preservation": "rejected: independent replay did not execute"
+  },
+  "api_dispositions": {
+    "optional_caller_signal_plus_execution_context_signal": "rejected: unsupported by a completed independent replay",
+    "public_cancel_not_required": "rejected: unsupported by a completed independent replay",
+    "generic_lite_not_session_semantics": "rejected: unsupported by a completed independent replay",
+    "private_bookkeeping": "rejected: unsupported by a completed independent replay"
+  },
+  "ordering_dispositions": {
+    "abort_descendants": "rejected: independent replay did not execute",
+    "return_active_stream_iterators": "rejected: independent replay did not execute",
+    "join_descendants": "rejected: independent replay did not execute",
+    "classify_signal_exits": "rejected: the candidate does not pin a deterministic rule that distinguishes signal-driven exits from original errors thrown after abort",
+    "clean_resources_last": "rejected: independent replay did not execute"
+  },
+  "wall_dispositions": [
+    {
+      "metric_id": "primitive_proof_gap_count",
+      "threshold": 0,
+      "value": 1,
+      "decision": "rejected",
+      "failure_mode": "unsupported",
+      "reason": "Neither saved nor independent behavior replay completed."
+    },
+    {
+      "metric_id": "touched_surface_regression_count",
+      "threshold": 0,
+      "value": 1,
+      "decision": "rejected",
+      "failure_mode": "unsupported",
+      "reason": "The behavioral baseline did not replay."
+    },
+    {
+      "metric_id": "single_llm_truth_acceptance_count",
+      "threshold": 0,
+      "value": 1,
+      "decision": "rejected",
+      "failure_mode": "breached",
+      "reason": "The separate validator exists, but its independent replay did not complete and cannot replace writer-only evidence."
+    },
+    {
+      "metric_id": "ungoverned_write_or_read_count",
+      "threshold": 0,
+      "value": 0,
+      "decision": "accepted",
+      "failure_mode": null,
+      "reason": "Validator writes are confined to its authorized worker path and the run store verified before governed reporting."
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "threshold": 0,
+      "value": 0,
+      "decision": "accepted",
+      "failure_mode": null,
+      "reason": "Both replay failures are preserved and downstream advance remains blocked."
+    }
+  ],
+  "audit_traces": [
+    {
+      "claim_id": "dkr-2-saved-replay-operable",
+      "check": "The checkpoint replay command executes and validates its hashes and fields.",
+      "metric": "replay_exit_code",
+      "threshold": 0,
+      "value": 126,
+      "source_of_truth": ".okra/runs/issue-triage-session-20260715/workers/dkr-2/replay.sh",
+      "replay": ".okra/runs/issue-triage-session-20260715/workers/dkr-2/replay.sh",
+      "exit_code": 126,
+      "sha256": {
+        "replay_sh": "1c26074f581760377bb3c6bf98ac0fac500977de6e492ef5412e6d1c6040f8cf",
+        "checkpoint_v2": "6c3a183edd003175c839ada032c98a64accacc8d5a977f26f522c1c94dd456e0"
+      },
+      "observed_at": "2026-07-15T04:56:25Z",
+      "decision": "rejected",
+      "failure_mode": "non-replayable",
+      "evidence": "zsh:1: permission denied: .okra/runs/issue-triage-session-20260715/workers/dkr-2/replay.sh"
+    },
+    {
+      "claim_id": "dkr-2-checkpoint-fields-and-hashes",
+      "check": "All named hashes and executable checkpoint fields resolve through the saved replay.",
+      "metric": "unverified_checkpoint_field_or_hash_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": ".okra/runs/issue-triage-session-20260715/workers/dkr-2/replay.sh",
+      "replay": ".okra/runs/issue-triage-session-20260715/workers/dkr-2/replay.sh",
+      "exit_code": 126,
+      "sha256": {
+        "replay_sh": "1c26074f581760377bb3c6bf98ac0fac500977de6e492ef5412e6d1c6040f8cf",
+        "checkpoint_v2": "6c3a183edd003175c839ada032c98a64accacc8d5a977f26f522c1c94dd456e0"
+      },
+      "observed_at": "2026-07-15T04:56:25Z",
+      "decision": "rejected",
+      "failure_mode": "non-replayable",
+      "evidence": "The replay exited before sha256sum or validate-checkpoint-v2.mjs ran."
+    },
+    {
+      "claim_id": "dkr-2-independent-behavior",
+      "check": "Independent scalar, stream, nested, isolation, uncooperative, original-error, and unhandled-rejection cases pass.",
+      "metric": "independent_probe_failure_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": ".okra/runs/issue-triage-session-20260715/workers/validator-dkr-2/replay.sh",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-2/replay.sh",
+      "exit_code": 1,
+      "sha256": {
+        "replay_sh": "ff59142877517b0bc4a1431580da9584d4d0733b708f49f14d6d1bbea0398571",
+        "independent_probe": "f7d06411e96e4e3579a0ddfe607c05e67d5021ed80d502d56d6e3f6a919f0582",
+        "lite_types": "a208869ca9eeb3d8f2407d399d01394ed01c86dda46ee2df0b41899f72b86b34",
+        "lite_scope": "549e6b4096698a433f5a843dc4851d2ab9743c7b5e77e7497e0205c7d9aa3b0b"
+      },
+      "observed_at": "2026-07-15T04:57:47Z",
+      "decision": "rejected",
+      "failure_mode": "replay-failed",
+      "evidence": "SyntaxError: Unexpected token ')' at independent-probe.mjs:429; no behavioral case ran."
+    },
+    {
+      "claim_id": "dkr-2-signal-only-api",
+      "check": "Optional caller signal plus ExecutionContext.signal covers owner, caller, and running-flow control without public cancel.",
+      "metric": "uncovered_caller_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": ".okra/runs/issue-triage-session-20260715/workers/validator-dkr-2/replay.sh",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-2/replay.sh",
+      "exit_code": 1,
+      "sha256": {
+        "independent_probe": "f7d06411e96e4e3579a0ddfe607c05e67d5021ed80d502d56d6e3f6a919f0582"
+      },
+      "observed_at": "2026-07-15T04:57:47Z",
+      "decision": "rejected",
+      "failure_mode": "unsupported",
+      "evidence": "The independent replay failed before owner, targeted caller, sibling, or flow observation cases ran."
+    },
+    {
+      "claim_id": "dkr-2-close-order",
+      "check": "Close aborts descendants, returns active stream iterators, joins descendants, classifies signal exits, then cleans resources.",
+      "metric": "close_order_gap_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": ".okra/runs/issue-triage-session-20260715/workers/validator-dkr-2/replay.sh",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-2/replay.sh",
+      "exit_code": 1,
+      "sha256": {
+        "independent_probe": "f7d06411e96e4e3579a0ddfe607c05e67d5021ed80d502d56d6e3f6a919f0582"
+      },
+      "observed_at": "2026-07-15T04:57:47Z",
+      "decision": "rejected",
+      "failure_mode": "unsupported",
+      "evidence": "The independent replay failed before ordering assertions ran; the checkpoint also leaves signal classification underspecified for a distinct original error thrown after abort."
+    },
+    {
+      "claim_id": "dkr-2-generic-private-surface",
+      "check": "The proposal remains generic Lite behavior with private bookkeeping and no session, cancel, start, spawn, pool, or task surface.",
+      "metric": "forbidden_public_surface_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": ".okra/runs/issue-triage-session-20260715/workers/validator-dkr-2/replay.sh",
+      "replay": "bash .okra/runs/issue-triage-session-20260715/workers/validator-dkr-2/replay.sh",
+      "exit_code": 1,
+      "sha256": {
+        "independent_probe": "f7d06411e96e4e3579a0ddfe607c05e67d5021ed80d502d56d6e3f6a919f0582"
+      },
+      "observed_at": "2026-07-15T04:57:47Z",
+      "decision": "rejected",
+      "failure_mode": "unsupported",
+      "evidence": "The independent replay failed before its source-surface assertions ran."
+    },
+    {
+      "claim_id": "dkr-2-store-baseline",
+      "check": "The OKRA run store verifies before governed validator reporting.",
+      "metric": "store_verification_failure_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/scripts/okra-store.sh verify",
+      "replay": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/scripts/okra-store.sh verify .okra/runs/issue-triage-session-20260715",
+      "exit_code": 0,
+      "sha256": "n/a",
+      "observed_at": "2026-07-15T04:58:50Z",
+      "decision": "accepted",
+      "failure_mode": null,
+      "evidence": "OKRA store verified: .okra/runs/issue-triage-session-20260715"
+    }
+  ],
+  "summary": {
+    "accepted": 1,
+    "rejected": 6,
+    "rejected_claim_ids": [
+      "dkr-2-saved-replay-operable",
+      "dkr-2-checkpoint-fields-and-hashes",
+      "dkr-2-independent-behavior",
+      "dkr-2-signal-only-api",
+      "dkr-2-close-order",
+      "dkr-2-generic-private-surface"
+    ]
+  }
+}

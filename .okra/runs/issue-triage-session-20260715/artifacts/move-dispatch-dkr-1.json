@@ -1,0 +1,9 @@
+{
+  "type": "dispatch_result",
+  "unit_id": "DKR-1",
+  "packet": "worker-packets/dkr-1.json",
+  "target": "/root/dkr_1_activation",
+  "status": "dispatched",
+  "observed_at": "2026-07-15T04:08:44Z",
+  "admissibility": "allowed: run-store-only probes; no Lite or SDK product edit before checkpoint acceptance"
+}

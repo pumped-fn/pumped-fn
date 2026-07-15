@@ -1,0 +1,356 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "events": [
+      {
+        "id": "baseline-1",
+        "phase": "start",
+        "kind": "flow",
+        "name": "github.channel.issue",
+        "at": 1
+      },
+      {
+        "id": "baseline-2",
+        "parentId": "baseline-1",
+        "phase": "start",
+        "kind": "flow",
+        "name": "github.work.issue_42",
+        "at": 2
+      },
+      {
+        "id": "baseline-3",
+        "parentId": "baseline-2",
+        "phase": "start",
+        "kind": "flow",
+        "name": "github.role.issue_triage",
+        "at": 3
+      },
+      {
+        "id": "baseline-4",
+        "parentId": "baseline-3",
+        "phase": "start",
+        "kind": "flow",
+        "name": "github.tool.get_issue",
+        "at": 4
+      },
+      {
+        "id": "baseline-4",
+        "parentId": "baseline-3",
+        "phase": "success",
+        "kind": "flow",
+        "name": "github.tool.get_issue",
+        "at": 5,
+        "startedAt": 4,
+        "durationMs": 1
+      },
+      {
+        "id": "baseline-5",
+        "parentId": "baseline-3",
+        "phase": "start",
+        "kind": "flow",
+        "name": "github.tool.list_comments",
+        "at": 6
+      },
+      {
+        "id": "baseline-5",
+        "parentId": "baseline-3",
+        "phase": "error",
+        "kind": "flow",
+        "name": "github.tool.list_comments",
+        "at": 7,
+        "startedAt": 6,
+        "durationMs": 1,
+        "error": {
+          "name": "Error",
+          "message": "github read failed"
+        }
+      },
+      {
+        "id": "baseline-6",
+        "parentId": "baseline-3",
+        "phase": "start",
+        "kind": "flow",
+        "name": "github.tool.wait_for_review",
+        "at": 8
+      },
+      {
+        "id": "baseline-6",
+        "parentId": "baseline-3",
+        "phase": "error",
+        "kind": "flow",
+        "name": "github.tool.wait_for_review",
+        "at": 9,
+        "startedAt": 8,
+        "durationMs": 1,
+        "error": {
+          "name": "AbortError",
+          "message": "steered"
+        }
+      },
+      {
+        "id": "baseline-3",
+        "parentId": "baseline-2",
+        "phase": "success",
+        "kind": "flow",
+        "name": "github.role.issue_triage",
+        "at": 10,
+        "startedAt": 3,
+        "durationMs": 7
+      },
+      {
+        "id": "baseline-2",
+        "parentId": "baseline-1",
+        "phase": "success",
+        "kind": "flow",
+        "name": "github.work.issue_42",
+        "at": 11,
+        "startedAt": 2,
+        "durationMs": 9
+      },
+      {
+        "id": "baseline-1",
+        "phase": "success",
+        "kind": "flow",
+        "name": "github.channel.issue",
+        "at": 12,
+        "startedAt": 1,
+        "durationMs": 11
+      }
+    ],
+    "sinkLifecycle": [
+      "flush",
+      "close"
+    ],
+    "forbiddenValueMatches": [],
+    "eventContextFieldCount": 0,
+    "cancellationPhaseCount": 0,
+    "closePhaseCount": 0
+  },
+  "candidate": {
+    "events": [
+      {
+        "id": "candidate-1",
+        "phase": "start",
+        "kind": "flow",
+        "name": "github.channel.issue",
+        "at": 101,
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7",
+          "channel": "github.issue"
+        }
+      },
+      {
+        "id": "candidate-2",
+        "parentId": "candidate-1",
+        "phase": "start",
+        "kind": "flow",
+        "name": "github.work.issue_42",
+        "at": 102,
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7",
+          "workId": "work-42",
+          "channel": "github.issue"
+        }
+      },
+      {
+        "id": "candidate-3",
+        "parentId": "candidate-2",
+        "phase": "start",
+        "kind": "flow",
+        "name": "github.role.issue_triage",
+        "at": 103,
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7",
+          "workId": "work-42",
+          "channel": "github.issue",
+          "role": "issue-triage"
+        }
+      },
+      {
+        "id": "candidate-4",
+        "parentId": "candidate-3",
+        "phase": "start",
+        "kind": "flow",
+        "name": "github.tool.get_issue",
+        "at": 104,
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7",
+          "workId": "work-42",
+          "channel": "github.issue",
+          "role": "issue-triage",
+          "tool": "github.get_issue"
+        }
+      },
+      {
+        "id": "candidate-4",
+        "parentId": "candidate-3",
+        "phase": "success",
+        "kind": "flow",
+        "name": "github.tool.get_issue",
+        "at": 105,
+        "startedAt": 104,
+        "terminal": "success",
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7",
+          "workId": "work-42",
+          "channel": "github.issue",
+          "role": "issue-triage",
+          "tool": "github.get_issue"
+        }
+      },
+      {
+        "id": "candidate-5",
+        "parentId": "candidate-3",
+        "phase": "start",
+        "kind": "flow",
+        "name": "github.tool.list_comments",
+        "at": 106,
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7",
+          "workId": "work-42",
+          "channel": "github.issue",
+          "role": "issue-triage",
+          "tool": "github.list_comments"
+        }
+      },
+      {
+        "id": "candidate-5",
+        "parentId": "candidate-3",
+        "phase": "error",
+        "kind": "flow",
+        "name": "github.tool.list_comments",
+        "at": 107,
+        "startedAt": 106,
+        "terminal": "error",
+        "error": {
+          "name": "Error",
+          "message": "github read failed"
+        },
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7",
+          "workId": "work-42",
+          "channel": "github.issue",
+          "role": "issue-triage",
+          "tool": "github.list_comments"
+        }
+      },
+      {
+        "id": "candidate-6",
+        "parentId": "candidate-3",
+        "phase": "start",
+        "kind": "flow",
+        "name": "github.tool.wait_for_review",
+        "at": 108,
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7",
+          "workId": "work-42",
+          "channel": "github.issue",
+          "role": "issue-triage",
+          "tool": "github.wait_for_review"
+        }
+      },
+      {
+        "id": "candidate-6",
+        "parentId": "candidate-3",
+        "phase": "cancelled",
+        "kind": "flow",
+        "name": "github.tool.wait_for_review",
+        "at": 109,
+        "startedAt": 108,
+        "terminal": "cancelled",
+        "error": {
+          "name": "AbortError",
+          "message": "steered"
+        },
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7",
+          "workId": "work-42",
+          "channel": "github.issue",
+          "role": "issue-triage",
+          "tool": "github.wait_for_review"
+        }
+      },
+      {
+        "id": "candidate-3",
+        "parentId": "candidate-2",
+        "phase": "success",
+        "kind": "flow",
+        "name": "github.role.issue_triage",
+        "at": 110,
+        "startedAt": 103,
+        "terminal": "success",
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7",
+          "workId": "work-42",
+          "channel": "github.issue",
+          "role": "issue-triage"
+        }
+      },
+      {
+        "id": "candidate-2",
+        "parentId": "candidate-1",
+        "phase": "success",
+        "kind": "flow",
+        "name": "github.work.issue_42",
+        "at": 111,
+        "startedAt": 102,
+        "terminal": "success",
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7",
+          "workId": "work-42",
+          "channel": "github.issue"
+        }
+      },
+      {
+        "id": "candidate-1",
+        "phase": "success",
+        "kind": "flow",
+        "name": "github.channel.issue",
+        "at": 112,
+        "startedAt": 101,
+        "terminal": "success",
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7",
+          "channel": "github.issue"
+        }
+      },
+      {
+        "id": "activation-close",
+        "phase": "close",
+        "kind": "context",
+        "name": "session.activation",
+        "at": 113,
+        "terminal": "success",
+        "context": {
+          "sessionId": "session-github-42",
+          "activationId": "activation-7"
+        }
+      }
+    ],
+    "sinkLifecycle": [
+      "flush",
+      "close"
+    ],
+    "forbiddenValueMatches": [],
+    "contextKeys": [
+      "activationId",
+      "channel",
+      "role",
+      "sessionId",
+      "tool",
+      "workId"
+    ]
+  }
+}

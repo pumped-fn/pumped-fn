@@ -112,6 +112,7 @@ export namespace Lite {
   export interface FlowRunOptions {
     name?: string
     tags?: Tagged<any>[]
+    signal?: AbortSignal
   }
 
   export interface FlowControllerOptions<Input> extends FlowRunOptions {
@@ -143,6 +144,7 @@ export namespace Lite {
     readonly key: string | undefined
     readonly ready: Promise<void>
     exec(): Promise<Output>
+    execStream(): FlowStream<Yield, Output>
   }
 
   export interface FlowHandle<Output, Input, Yield = never> {
@@ -235,6 +237,7 @@ export namespace Lite {
     readonly name: string | undefined
     readonly scope: Scope
     readonly parent: ExecutionContext | undefined
+    readonly signal: AbortSignal
     readonly data: ContextData
     resolve<T>(target: Atom<T>): Promise<T>
     resolve<T>(target: Resource<T>): Promise<T>
@@ -261,6 +264,7 @@ export namespace Lite {
     flow: Flow<Output, Input, any, Yield>
     name?: string
     tags?: Tagged<any>[]
+    signal?: AbortSignal
   } & (
     | ([NoInfer<Input>] extends [void | undefined | null]
         ? { input?: undefined | null; rawInput?: never }
@@ -273,6 +277,7 @@ export namespace Lite {
     params: Args
     name?: string
     tags?: Tagged<any>[]
+    signal?: AbortSignal
   }
 
   export type ControllerEvent = 'resolving' | 'resolved' | '*'

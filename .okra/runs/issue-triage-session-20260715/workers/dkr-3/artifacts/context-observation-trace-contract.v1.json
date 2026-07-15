@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "contractId": "github-issue-session-observation-v1",
+  "scope": "one active GitHub issue session activation",
+  "safeProjection": {
+    "source": "one explicit SDK observation tag selected by observable extension configuration",
+    "allowedKeys": [
+      "sessionId",
+      "activationId",
+      "workId",
+      "parentWorkId",
+      "channel",
+      "role",
+      "tool"
+    ],
+    "allowedValueTypes": [
+      "string",
+      "number",
+      "boolean"
+    ],
+    "unknownKeys": "drop",
+    "missingProjection": "emit lifecycle without context fields"
+  },
+  "eventContract": {
+    "common": [
+      "id",
+      "phase",
+      "kind",
+      "name",
+      "at"
+    ],
+    "parentage": "nested work, role, tool, and subagent starts use the enclosing event id as parentId",
+    "terminalPhases": [
+      "success",
+      "error",
+      "cancelled"
+    ],
+    "activationClose": "emit one context close event from the explicit activation context before sink settlement",
+    "sinkSettlement": [
+      "flush",
+      "close"
+    ]
+  },
+  "requiredCoverage": [
+    "session",
+    "activation",
+    "work",
+    "channel",
+    "role",
+    "tool",
+    "parentage",
+    "success",
+    "error",
+    "cancellation",
+    "close",
+    "sink flush"
+  ],
+  "forbiddenExport": [
+    "arbitrary context tags",
+    "SessionRuntime",
+    "SessionRecord",
+    "Authority",
+    "sandbox roots",
+    "provider configuration",
+    "prompts",
+    "credentials",
+    "flow input or output unless separately enabled and redacted"
+  ],
+  "placement": {
+    "liteCore": "no change for projection; wrapExec, parent, ContextData.seekTag, and onClose are sufficient",
+    "observableExtension": "accept one named projection tag, copy only allowed scalar keys, classify AbortError as cancelled, and emit activation close before existing sink flush and close",
+    "sdk": "define the safe observation namespace; callers provide activation fields and declared flows explicitly compose work, channel, role, tool, and subagent fields through exec tags"
+  },
+  "unresolved": [
+    "public tag and event field names",
+    "activation id allocation and persistence boundary",
+    "whether cancellation extends Observable.Phase or uses a separate terminal field",
+    "two-session concurrency proof"
+  ]
+}

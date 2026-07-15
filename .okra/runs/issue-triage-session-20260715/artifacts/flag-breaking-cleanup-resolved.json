@@ -1,0 +1,10 @@
+{
+  "type": "breaking",
+  "flag_id": "breaking.DKR-1.cleanup-business-state-mutation",
+  "status": "resolved",
+  "resolved_at": "2026-07-15T07:42:55Z",
+  "current_value": 0,
+  "threshold": 0,
+  "resolution_ref": "artifacts/resolution-corridor-session-implementation-v1.json",
+  "evidence": ["artifacts/metric-cleanup-final.json", "pkg/sdk/core/tests/session-kernel.test.ts", "pkg/sdk/core/tests/session-review-regressions.test.ts"]
+}

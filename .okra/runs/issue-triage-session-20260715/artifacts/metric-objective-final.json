@@ -1,0 +1,10 @@
+{
+  "type": "objective_metric_read",
+  "metric_kind": "objective",
+  "metric_id": "issue_triage_public_contract_pass_count",
+  "value": 16,
+  "target": 16,
+  "observed_at": "2026-07-15T07:42:55Z",
+  "source": "The independent issue-triage verifier passed all 16 fixed contracts in pkg/sdk/test/tests/issue-triage.test.ts.",
+  "freshness": "observed_at=2026-07-15T07:42:55Z -> status=fresh against max_age=10m"
+}

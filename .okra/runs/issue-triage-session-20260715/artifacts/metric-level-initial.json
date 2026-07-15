@@ -1,0 +1,10 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "abstraction_level_jump_count",
+  "value": 0,
+  "target": 0,
+  "observed_at": "2026-07-15T04:08:44Z",
+  "source": "Initial tree has no promoted CKRs and no PKRs",
+  "freshness": "observed_at=2026-07-15T04:08:44Z -> status=fresh against max_age=10m"
+}

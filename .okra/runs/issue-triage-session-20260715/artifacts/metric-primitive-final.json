@@ -1,0 +1,10 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "primitive_proof_gap_count",
+  "value": 0,
+  "target": 0,
+  "observed_at": "2026-07-15T07:42:55Z",
+  "source": "Lite structured lifetime tests, SDK session tests, provider tests, and the vertical issue-triage proof cover the introduced primitives.",
+  "freshness": "observed_at=2026-07-15T07:42:55Z -> status=fresh against max_age=10m"
+}

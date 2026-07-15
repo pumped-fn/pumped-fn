@@ -1,0 +1,161 @@
+{
+  "tree_version": 7,
+  "frame_version": 2,
+  "orchestrator": {
+    "owner": "Codex /root",
+    "responsibilities": [
+      "objective checks",
+      "check-ins",
+      "OKR board",
+      "subagent steering"
+    ],
+    "terminal_condition": "Continue until the objective metric reaches target at 16 of 16 with every active anti-goal held, the human stops or changes the frame, or a blocking flag requires human resolution."
+  },
+  "dkrs": [
+    {
+      "id": "DKR-0",
+      "status": "active",
+      "decision_target": "Reconcile the current PR into keep, reshape, and remove decisions without losing proven behavior.",
+      "budget": { "turns": 1, "time_min": 45 },
+      "stop_rule": "Stop when every public concept and lifecycle workaround in the current PR has a source-backed disposition or return an unresolved checkpoint.",
+      "risk_or_anti_goal_uncertainty": ["AG-REGRESSION", "AG-STYLE", "AG-INTEGRITY", "AG-INDEPENDENCE"]
+    },
+    {
+      "id": "DKR-1",
+      "status": "accepted_blocked",
+      "decision_target": "Decide whether controller(flow).exec with per-exec tags and a current-owned session resource fully models one activation.",
+      "budget": { "turns": 2, "time_min": 90 },
+      "stop_rule": "Stop after executable isolation, nested reuse, close-without-finish, checkpoint, and resume probes compare the current and nearest-context ownership options.",
+      "risk_or_anti_goal_uncertainty": ["AG-CLEANUP-EFFECT", "AG-SESSION-ISOLATION", "AG-PRIMITIVE-PROOF"]
+    },
+    {
+      "id": "DKR-2",
+      "status": "accepted",
+      "decision_target": "Choose the minimum reusable Lite structured-cancellation behavior.",
+      "budget": { "turns": 2, "time_min": 90 },
+      "stop_rule": "Stop when scalar, streaming, error, consumer-break, and nested-close probes decide signal-only versus signal plus public cancel without adding start or spawn speculatively.",
+      "risk_or_anti_goal_uncertainty": ["AG-PRIMITIVE-PROOF", "AG-REGRESSION", "AG-INTEGRITY"]
+    },
+    {
+      "id": "DKR-3",
+      "status": "active",
+      "decision_target": "Choose the safe context observation projection and terminal trace model.",
+      "budget": { "turns": 2, "time_min": 75 },
+      "stop_rule": "Stop when session, activation, work, channel, role, tool, parentage, terminal outcome, sink flush, and forbidden-value probes identify the smallest extension change.",
+      "risk_or_anti_goal_uncertainty": ["AG-OBSERVATION-PRIVACY", "AG-SESSION-ISOLATION", "AG-PRIMITIVE-PROOF"]
+    },
+    {
+      "id": "DKR-4",
+      "status": "active",
+      "decision_target": "Prove bounded queue workers with controller(flow), per-exec tags, and awaited composition before considering start or spawn.",
+      "budget": { "turns": 2, "time_min": 75 },
+      "stop_rule": "Stop when bounded concurrency, backpressure, lease, acknowledge, reject, graceful shutdown, and one activation per delivery pass or a named contract proves a missing primitive.",
+      "risk_or_anti_goal_uncertainty": ["AG-HIDDEN-EDGE", "AG-PRODUCTION-SAFETY", "AG-PRIMITIVE-PROOF"]
+    },
+    {
+      "id": "DKR-5",
+      "status": "active",
+      "decision_target": "Define the evidence, independent verification, publication, and public scope-seam contracts for the issue-triage example.",
+      "budget": { "turns": 2, "time_min": 90 },
+      "stop_rule": "Stop with replayable schemas and denial fixtures for unsupported, stale, unsafe, unauthorized, and duplicate publication cases.",
+      "risk_or_anti_goal_uncertainty": ["AG-SCOPE-SEAM", "AG-PRODUCTION-SAFETY", "AG-EVIDENCE", "AG-INDEPENDENCE"]
+    }
+  ],
+  "ckrs": [
+    {
+      "id": "CKR-LITE-LIFECYCLE",
+      "status": "candidate",
+      "metric_id": "lite_lifecycle_contract_pass_count",
+      "target": 6,
+      "source_dkrs": ["DKR-1", "DKR-2"]
+    },
+    {
+      "id": "CKR-SESSION-ACTIVATION",
+      "status": "candidate",
+      "metric_id": "session_activation_contract_pass_count",
+      "target": 7,
+      "source_dkrs": ["DKR-0", "DKR-1", "DKR-4"]
+    },
+    {
+      "id": "CKR-OBSERVATION",
+      "status": "candidate",
+      "metric_id": "observation_contract_pass_count",
+      "target": 5,
+      "source_dkrs": ["DKR-3"]
+    },
+    {
+      "id": "CKR-ISSUE-TRIAGE",
+      "status": "candidate",
+      "metric_id": "issue_triage_public_contract_pass_count",
+      "target": 16,
+      "source_dkrs": ["DKR-4", "DKR-5"]
+    },
+    {
+      "id": "CKR-PUBLIC-TRUTH",
+      "status": "candidate",
+      "metric_id": "public_contract_alignment_pass_count",
+      "target": 4,
+      "source_dkrs": ["DKR-0", "DKR-5"]
+    }
+  ],
+  "pkrs": [],
+  "graph": {
+    "nodes": [
+      {
+        "node_id": "DKR-0",
+        "node_kind": "dkr",
+        "observed_at": "2026-07-15T04:08:44Z",
+        "quadrant": { "certainty": 0.45, "level": "approach" },
+        "source_ref": "worker-packets/dkr-0.json",
+        "status": "active",
+        "type": "node_event"
+      },
+      {
+        "node_id": "DKR-1",
+        "node_kind": "dkr",
+        "observed_at": "2026-07-15T05:24:59Z",
+        "quadrant": { "certainty": 0.98, "level": "approach" },
+        "source_ref": "artifacts/accept-dkr-1-v4.json",
+        "status": "accepted",
+        "type": "node_event"
+      },
+      {
+        "node_id": "DKR-2",
+        "node_kind": "dkr",
+        "observed_at": "2026-07-15T05:24:59Z",
+        "quadrant": { "certainty": 0.98, "level": "approach" },
+        "source_ref": "artifacts/accept-dkr-2-v3.json",
+        "status": "accepted",
+        "type": "node_event"
+      },
+      {
+        "node_id": "DKR-3",
+        "node_kind": "dkr",
+        "observed_at": "2026-07-15T04:08:44Z",
+        "quadrant": { "certainty": 0.5, "level": "approach" },
+        "source_ref": "worker-packets/dkr-3.json",
+        "status": "active",
+        "type": "node_event"
+      },
+      {
+        "node_id": "DKR-4",
+        "node_kind": "dkr",
+        "observed_at": "2026-07-15T05:05:28Z",
+        "quadrant": { "certainty": 0.4, "level": "approach" },
+        "source_ref": "worker-packets/dkr-4.json",
+        "status": "active",
+        "type": "node_event"
+      },
+      {
+        "node_id": "DKR-5",
+        "node_kind": "dkr",
+        "observed_at": "2026-07-15T05:35:26Z",
+        "quadrant": { "certainty": 0.4, "level": "approach" },
+        "source_ref": "worker-packets/dkr-5.json",
+        "status": "active",
+        "type": "node_event"
+      }
+    ],
+    "edges": []
+  }
+}

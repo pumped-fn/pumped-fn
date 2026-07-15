@@ -1,0 +1,10 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "touched_surface_regression_count",
+  "value": 0,
+  "target": 0,
+  "observed_at": "2026-07-15T07:42:55Z",
+  "source": "216 Lite, 52 SDK core, 15 SDK test, 49 provider, and 4 framework tests passed; four provider integration cases remain explicitly skipped.",
+  "freshness": "observed_at=2026-07-15T07:42:55Z -> status=fresh against max_age=10m"
+}

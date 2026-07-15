@@ -1,0 +1,9 @@
+{
+  "type": "dispatch_result",
+  "unit_id": "DKR-0",
+  "packet": "worker-packets/dkr-0.json",
+  "target": "/root/dkr_0_pr_disposition",
+  "status": "dispatched",
+  "observed_at": "2026-07-15T04:08:44Z",
+  "admissibility": "allowed: read-only product inspection with governed run writes; active walls fresh or funded"
+}

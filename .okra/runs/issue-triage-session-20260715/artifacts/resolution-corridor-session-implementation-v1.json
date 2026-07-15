@@ -1,0 +1,135 @@
+{
+  "type": "breaking_resolution_corridor",
+  "corridor_id": "resolution.issue-triage.session-implementation.v1",
+  "opened_at": "2026-07-15T06:20:50Z",
+  "frame_ref": "frame/frame.v2.json",
+  "tree_ref": "tree/tree.v11.json",
+  "authority": "Corrective product work is authorized only inside this corridor. The frame, thresholds, objective denominator, real external access boundary, release boundary, and merge boundary do not change.",
+  "accepted_inputs": [
+    "artifacts/accept-dkr-0-v3-disposition-only.json",
+    "artifacts/accept-dkr-1-v4.json",
+    "artifacts/accept-dkr-2-v3.json",
+    "artifacts/accept-dkr-3-v4.json",
+    "artifacts/accept-dkr-4-v4.json",
+    "artifacts/accept-dkr-5-v2.json"
+  ],
+  "breaking_flags": [
+    "breaking.DKR-1.cleanup-business-state-mutation",
+    "breaking.DKR-0.touched-surface-regressions",
+    "breaking.DKR-0.slop-violations"
+  ],
+  "pre_action_projection": [
+    {
+      "metric_id": "cleanup_business_state_mutation_count",
+      "current_value": 1,
+      "threshold": 0,
+      "permitted_direction": "decrease_to_zero"
+    },
+    {
+      "metric_id": "touched_surface_regression_count",
+      "current_value": 1,
+      "threshold": 0,
+      "permitted_direction": "decrease_to_zero"
+    },
+    {
+      "metric_id": "raw_sdk_lint_diagnostic_count",
+      "current_value": 72,
+      "threshold": 0,
+      "permitted_direction": "decrease_to_zero"
+    },
+    {
+      "metric_id": "agents_graph_violation_count",
+      "current_value": 2,
+      "threshold": 0,
+      "permitted_direction": "decrease_to_zero"
+    },
+    {
+      "metric_id": "issue_triage_public_contract_pass_count",
+      "current_value": 0,
+      "target": 16,
+      "permitted_direction": "increase_to_sixteen"
+    }
+  ],
+  "authorized_moves": [
+    {
+      "id": "PKR-LITE-STRUCTURED-LIFETIME",
+      "scope": "Add generic ExecutionContext.signal, optional caller signal on exec and execStream, private descendant and active-iterator bookkeeping, structured close ordering, exact cancellation classification, and generic Lite tests.",
+      "paths": [
+        "pkg/core/lite/src/types.ts",
+        "pkg/core/lite/src/scope.ts",
+        "pkg/core/lite/tests"
+      ]
+    },
+    {
+      "id": "PKR-SESSION-DEACTIVATION",
+      "scope": "Add idempotent SessionRuntime deactivation, replace cleanup-to-finish with deactivation, remove SDK abort-tag bridges in favor of ExecutionContext.signal, preserve explicit finish, and prove same-Scope isolation and cleanup ordering.",
+      "paths": [
+        "pkg/sdk/core/src/session.ts",
+        "pkg/sdk/core/src/agent.ts",
+        "pkg/sdk/core/tests"
+      ]
+    },
+    {
+      "id": "PKR-SAFE-OBSERVATION",
+      "scope": "Add one named safe SDK observation projection tag and observable integration, including same-Scope privacy and activation-close before sink settlement.",
+      "paths": [
+        "pkg/sdk/core/src",
+        "pkg/ext/observable/src",
+        "pkg/ext/observable/tests",
+        "pkg/ext/observable-otel/src",
+        "pkg/ext/observable-otel/tests"
+      ]
+    },
+    {
+      "id": "PKR-SDK-GRAPH-CLEANUP",
+      "scope": "Remove every authoritative SDK lint diagnostic, replace dynamic WorkerRegistry dispatch and direct child process execution with declared graph ports, and repair the touched Codex ACP lifecycle regression.",
+      "paths": [
+        "pkg/sdk/bash",
+        "pkg/sdk/claude",
+        "pkg/sdk/codex",
+        "pkg/sdk/core",
+        "pkg/sdk/pi",
+        "pkg/sdk/test",
+        "pkg/framework/pumped/tests/agent.test.ts"
+      ]
+    },
+    {
+      "id": "PKR-ISSUE-TRIAGE-VERTICAL",
+      "scope": "Add the runnable fake-backed GitHub issue queue, repository, PostgreSQL, Victoria, hypothesis, independent verifier, and idempotent publication example with fixed sixteen-contract machine verifier.",
+      "paths": [
+        "pkg/sdk/test/examples",
+        "pkg/sdk/test/tests",
+        "pkg/sdk/README.md",
+        "pkg/sdk/core/README.md",
+        "pkg/sdk/core/PATTERNS.md",
+        "README.md"
+      ]
+    }
+  ],
+  "forbidden_moves": [
+    "Change the frame or weaken any threshold",
+    "Change the fixed objective denominator of sixteen",
+    "Add public cancel, spawn, start, task, pool, WorkerRegistry, or session semantics to Lite",
+    "Add arbitrary tag enumeration, a public ContextData callback, or implicit built-in tags",
+    "Replace eager activation of the complete declared dependency tree with lazy or implicit resolution",
+    "Add static missing-tag analysis in this frame",
+    "Use module mocks, internal reaches, or global patches outside an adapter atom unit test",
+    "Access real GitHub, PostgreSQL, Victoria, networks, credentials, or production data",
+    "Release, merge, or retire a standing wall"
+  ],
+  "slice_gates": [
+    "Run focused tests and authoritative lint for every touched package after each slice",
+    "Keep every non-target wall at zero and every target breaker non-increasing",
+    "Use createScope presets, tags, and extensions as the sole logic test seam",
+    "Update README and public docs with shipped code and compile their examples",
+    "Require a separate final validator for zero-wall and 16-of-16 completion claims"
+  ],
+  "exit_conditions": {
+    "cleanup_business_state_mutation_count": 0,
+    "touched_surface_regression_count": 0,
+    "raw_sdk_lint_diagnostic_count": 0,
+    "agents_graph_violation_count": 0,
+    "issue_triage_public_contract_pass_count": 16,
+    "all_other_active_anti_goal_values": 0
+  }
+}

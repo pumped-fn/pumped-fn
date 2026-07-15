@@ -1,0 +1,92 @@
+{
+  "type": "steering_checkin",
+  "checkin_id": "checkin.issue-triage.round-10.validator-findings",
+  "round": 10,
+  "observed_at": "2026-07-15T05:59:23Z",
+  "next_check_at": "2026-07-15T06:09:23Z",
+  "problem_restatement": "Finish independently replayable observation, queue, and evidence contracts without widening the frame, then authorize only the product corrections that return cleanup, regression, and style walls to zero.",
+  "inbound_signal": "DKR-0 dispositions are independently accepted but its checkpoint remains blocked; DKR-3 and DKR-4 behavior hold while their checkpoints fail freshness or lifecycle facts; DKR-5 allows lexical path escape and wrong-hypothesis publication.",
+  "decision_delta": "Accepted only the DKR-0 keep, reshape, and remove map. Acknowledged one touched ACP regression and the raw style findings. Dispatched fresh evidence-only DKR-3 v4, DKR-4 v3, and DKR-5 v2 repairs. Kept all product changes paused.",
+  "dkr_decision": "Continue the three bounded repairs and their cross-validation. Do not promote CKRs or PKRs and do not record the implementation corridor until DKR-3 through DKR-5 are accepted under the frame's ten-minute wall freshness.",
+  "evidence_delta": "Objective remains 0 of 16. DKR-0 mechanical and semantic disposition coverage is 58 paths, 90 concepts, and 12 negative mutations. DKR-3 behavior is 12 of 12. DKR-4 behavior is 8 of 8. DKR-5 has two semantic bypasses and three breached walls.",
+  "expected_effect": "Produce one accepted architecture set whose implementation plan can remove every current breaker without adding hidden effects, public worker lifecycle methods, or unsafe publication paths.",
+  "steering_value_score": 1,
+  "affected_units": [
+    "DKR-0",
+    "DKR-3",
+    "DKR-4",
+    "DKR-5",
+    "CKR-PUBLIC-CONTRACT-ALIGNMENT"
+  ],
+  "open_flags": [
+    "breaking.DKR-1.cleanup-business-state-mutation",
+    "breaking.DKR-0.touched-surface-regressions",
+    "breaking.DKR-0.slop-violations"
+  ],
+  "assumptions_at_risk": [
+    "The DKR-3 v4 freshness-only repair remains semantically identical to accepted v3 behavior",
+    "The DKR-4 v3 repair can remove stale lifecycle claims without changing bounded queue behavior",
+    "Canonical path containment and hypothesis identity binding close both DKR-5 bypasses before any adapter call or publication"
+  ],
+  "unexpected_results": [
+    {
+      "claim": "A passing fixed fixture denominator proves repository containment.",
+      "evidence_ref": "workers/validator-dkr-5/verification.json#DKR-5.repository-containment",
+      "verdict": "rejected; dot-segment escape publishes once"
+    },
+    {
+      "claim": "A verified verdict necessarily targets the hypothesis being published.",
+      "evidence_ref": "workers/validator-dkr-5/verification.json#DKR-5.verifier-target-binding",
+      "verdict": "rejected; wrong hypothesis identity publishes once"
+    }
+  ],
+  "anti_goal_violation_review": [
+    {
+      "claim": "Current product cleanup changes business status during deactivation.",
+      "evidence_ref": "flags.jsonl#seq=1",
+      "verdict": "breaking open; product changes paused"
+    },
+    {
+      "claim": "Current touched Codex tests have one confirmed regression class.",
+      "evidence_ref": "artifacts/flag-breaking-regression-acknowledged.json",
+      "verdict": "breaking acknowledged; correction corridor not yet recorded"
+    },
+    {
+      "claim": "Current SDK surfaces produce 72 raw lint diagnostics and two graph violations.",
+      "evidence_ref": "artifacts/flag-breaking-slop-acknowledged.json",
+      "verdict": "breaking acknowledged; success requires fresh zero reads"
+    }
+  ],
+  "hallucination_sweep": [
+    {
+      "claim": "DKR-3 and DKR-4 checkpoints can be accepted because their behavior passed.",
+      "evidence_ref": "workers/validator-dkr-3-v3/verification.json and workers/validator-dkr-4-v2/verification.json",
+      "verdict": "rejected; checkpoint freshness and source facts remain governing claims"
+    }
+  ],
+  "missing_context_sweep": [
+    {
+      "claim": "The environment-only npm cache failure may be counted as a touched regression or dismissed without evidence.",
+      "evidence_ref": "workers/validator-dkr-0-v3/verification.json",
+      "verdict": "rejected; it is separately classified and excluded while the confirmed Codex defect remains counted"
+    }
+  ],
+  "alternatives_considered": [
+    "Widen freshness to thirty minutes",
+    "Accept passing behavior while ignoring checkpoint contradictions",
+    "Start product corrections before the complete DKR set is accepted",
+    "Repair only the rejected checkpoint and leave semantic denial gaps untested"
+  ],
+  "uncertainty_5why": {
+    "terminal_metric_or_uncertainty_id": "uncertainty.accepted_dkr_3_to_dkr_5_set",
+    "status": "open",
+    "reducing_dkr": "DKR-3, DKR-4, and DKR-5"
+  },
+  "worker_progress_refs": [
+    "workers/validator-dkr-0-v3/progress.jsonl",
+    "workers/validator-dkr-3-v3/progress.jsonl",
+    "workers/validator-dkr-4-v2/progress.jsonl",
+    "workers/validator-dkr-5/progress.jsonl",
+    "workers/dkr-3-v4/progress.jsonl"
+  ]
+}

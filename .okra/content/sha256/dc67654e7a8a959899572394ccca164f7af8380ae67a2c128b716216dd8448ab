@@ -1,0 +1,8 @@
+{
+  "type": "preflight",
+  "transport": "sequential",
+  "subagents": false,
+  "detected_via": "fallback:no-known-subagent-env",
+  "cross_model_writer": "codex-cli",
+  "observed_at": "2026-07-15T04:08:44Z"
+}

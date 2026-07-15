@@ -1,0 +1,10 @@
+{
+  "type": "metric_read",
+  "metric_kind": "ckr",
+  "metric_id": "steering_value_score",
+  "value": 1,
+  "target": 0.75,
+  "observed_at": "2026-07-15T04:30:53Z",
+  "source": "Independent verification rejected non-replayable and incomplete checkpoints; allocation changed to exhaustive disposition, exact cleanup-contract, and two-session observation probes while product edits stayed blocked.",
+  "freshness": "observed_at=2026-07-15T04:30:53Z -> status=fresh against max_age=10m"
+}

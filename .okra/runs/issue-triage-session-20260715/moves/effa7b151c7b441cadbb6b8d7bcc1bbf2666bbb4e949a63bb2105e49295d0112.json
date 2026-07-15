@@ -1,0 +1,87 @@
+{
+  "committed_at": "2026-07-15T05:28:53Z",
+  "idempotency_key": "accept:DKR-1:v4",
+  "key_sha256": "effa7b151c7b441cadbb6b8d7bcc1bbf2666bbb4e949a63bb2105e49295d0112",
+  "payload": {
+    "accepted_evidence": "Exact root replay, byte-identical contract, eleven cleanup cases, six activation behaviors, six hashes, and twenty-three fields passed independent validation.",
+    "active_anti_goal_verification": [
+      {
+        "comparator": "==",
+        "evidence_ref": "workers/validator-dkr-1-v4/verification.json#DKR-1-v4.current-cleanup-wall",
+        "metric_id": "cleanup_business_state_mutation_count",
+        "threshold": 0,
+        "value": 1,
+        "verdict": "breached",
+        "verification_record_ref": "workers/validator-dkr-1-v4/progress.jsonl#seq=1"
+      },
+      {
+        "comparator": "==",
+        "evidence_ref": "workers/validator-dkr-0-1/verification.json#DKR-1.activation-behavior",
+        "metric_id": "cross_session_leak_count",
+        "threshold": 0,
+        "value": 0,
+        "verdict": "held",
+        "verification_record_ref": "workers/validator-dkr-1-v4/progress.jsonl#seq=1"
+      },
+      {
+        "comparator": "==",
+        "evidence_ref": "workers/dkr-1-cleanup-v4/cleanup-contract.json",
+        "metric_id": "primitive_proof_gap_count",
+        "threshold": 0,
+        "value": 0,
+        "verdict": "held",
+        "verification_record_ref": "workers/validator-dkr-1-v4/progress.jsonl#seq=1"
+      },
+      {
+        "comparator": "==",
+        "evidence_ref": "workers/validator-dkr-1-v4/verification.json",
+        "metric_id": "single_llm_truth_acceptance_count",
+        "threshold": 0,
+        "value": 0,
+        "verdict": "held",
+        "verification_record_ref": "workers/validator-dkr-1-v4/progress.jsonl#seq=1"
+      },
+      {
+        "comparator": "==",
+        "evidence_ref": "workers/dkr-1-cleanup-v4/progress.jsonl#seq=1",
+        "metric_id": "ungoverned_write_or_read_count",
+        "threshold": 0,
+        "value": 0,
+        "verdict": "held",
+        "verification_record_ref": "workers/validator-dkr-1-v4/progress.jsonl#seq=1"
+      },
+      {
+        "comparator": "==",
+        "evidence_ref": "flags.jsonl#seq=1",
+        "metric_id": "anti_goal_bypass_or_dishonesty_count",
+        "threshold": 0,
+        "value": 0,
+        "verdict": "held",
+        "verification_record_ref": "workers/validator-dkr-1-v4/progress.jsonl#seq=1"
+      }
+    ],
+    "active_anti_goals": [
+      "cleanup_business_state_mutation_count",
+      "cross_session_leak_count",
+      "primitive_proof_gap_count",
+      "single_llm_truth_acceptance_count",
+      "ungoverned_write_or_read_count",
+      "anti_goal_bypass_or_dishonesty_count"
+    ],
+    "checkpoint_ref": "workers/dkr-1-cleanup-v4/checkpoint.v4.json",
+    "claim_id": "accept.DKR-1.session-deactivation-v4",
+    "decided_at": "2026-07-15T05:24:59Z",
+    "decision": "reducing_discovery_accepted_product_progression_blocked",
+    "observed_at": "2026-07-15T05:23:42Z",
+    "type": "dkr_learning_acceptance",
+    "unit_id": "DKR-1",
+    "verification_ref": "workers/validator-dkr-1-v4/verification.json",
+    "wall_gate": {
+      "decided_at": "2026-07-15T05:24:59Z",
+      "downstream_advance": "blocked",
+      "reason": "The cleanup contract is accepted as reducing discovery, but the current product wall remains one against zero and the breaking flag is open.",
+      "verdict": "blocked"
+    }
+  },
+  "payload_sha256": "cb6c492d70ae31877d06923f5cf424e0dc46c29c80e59616feba167b80b3b5ca"
+}

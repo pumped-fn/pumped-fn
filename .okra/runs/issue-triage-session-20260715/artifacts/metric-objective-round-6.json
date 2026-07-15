@@ -1,0 +1,10 @@
+{
+  "type": "objective_metric_read",
+  "metric_kind": "objective",
+  "metric_id": "issue_triage_public_contract_pass_count",
+  "value": 0,
+  "target": 16,
+  "observed_at": "2026-07-15T05:04:01Z",
+  "source": "Current PR head d8dc7e84 still has no GitHub issue-triage verifier; the cleanup breaking flag and unaccepted DKRs block implementation.",
+  "freshness": "observed_at=2026-07-15T05:04:01Z -> status=fresh against max_age=10m"
+}

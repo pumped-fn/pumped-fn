@@ -1,4 +1,4 @@
-import { atom, flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
+import { flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 import {
   extension as suspenseExtension,
   formatSuspenseStepKey,
@@ -12,7 +12,6 @@ import {
 import type { TurnInput, TurnResult } from "./agent.js"
 
 export type WorkerKind = "code" | "llm" | "cli" | string
-export type MaterialKind = "json" | "text" | "binary" | "reference"
 
 export type StepCounter = SuspenseStepCounter
 export type WorkflowStepKey = SuspenseStepKey
@@ -51,36 +50,6 @@ export interface ExtensionOptions {
 }
 
 export const step = tag<Step>({ label: "agent.step", default: {} })
-export const materialKind = tag<MaterialKind>({ label: "agent.materialKind" })
-export const workers = tag<WorkerRegistry>({ label: "agent.workerRegistry" })
-
-type WorkerFlow = Lite.AnyFlow
-
-export class WorkerRegistry {
-  private readonly flows = new Map<string, WorkerFlow>()
-
-  register(flow: WorkerFlow, name = flow.name): this {
-    if (!name) throw new Error("Worker flow must have a name")
-    this.flows.set(name, flow)
-    return this
-  }
-
-  get(name: string): WorkerFlow {
-    const found = this.flows.get(name)
-    if (!found) throw new Error(`Worker "${name}" not registered`)
-    return found
-  }
-
-  list(): string[] {
-    return [...this.flows.keys()]
-  }
-}
-
-export function workerRegistry(flows: readonly WorkerFlow[] = []): WorkerRegistry {
-  const registry = new WorkerRegistry()
-  for (const workerFlow of flows) registry.register(workerFlow)
-  return registry
-}
 
 export function formatStepKey(key: WorkflowStepKey): string {
   return formatSuspenseStepKey(key)
@@ -99,7 +68,6 @@ export interface WorkflowContext {
 export interface Runtime {
   readonly taskId: string
   readonly runId: string
-  delegate<Output = unknown, Input = unknown>(name: string, input: Input): Promise<Output>
 }
 
 export const workflowRun = tag<WorkflowRunOptions>({ label: "workflow.run" })
@@ -108,17 +76,6 @@ export const runtime = tag<Runtime>({ label: "agent.runtime" })
 export const abortSignal = tag<AbortSignal>({ label: "workflow.abortSignal" })
 
 const activeWorkflowEvent = tag<WorkflowExecEvent>({ label: "workflow.event" })
-
-async function delegateWorker<Output = unknown, Input = unknown>(
-  ctx: Lite.ExecutionContext,
-  name: string,
-  input: Input
-): Promise<Output> {
-  const registry = registryOf(ctx)
-  if (!registry) throw new Error("Worker registry not found")
-  const target = registry.get(name) as Lite.Flow<Output, Input>
-  return ctx.exec({ flow: target, input } as Lite.ExecFlowOptions<Output, Input>)
-}
 
 export function workflowExtension(options: WorkflowExtensionOptions): Lite.Extension {
   const base = createWorkflowExtension({
@@ -186,10 +143,6 @@ function createWorkflowExtension(options: {
   })
 }
 
-function registryOf(ctx: Lite.ExecutionContext): WorkerRegistry | undefined {
-  return ctx.data.seekTag(workers)
-}
-
 function execEvent(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): ExecEvent {
   const workflowEvent = ctx.data.seekTag(activeWorkflowEvent)
   return workflowEvent ?? {
@@ -232,8 +185,6 @@ function runtimeOf(ctx: Lite.ExecutionContext): Runtime {
   return {
     taskId: config.taskId,
     runId: config.runId,
-    delegate: <Output = unknown, Input = unknown>(name: string, input: Input) =>
-      delegateWorker<Output, Input>(ctx, name, input),
   }
 }
 
@@ -299,194 +250,6 @@ function stepOf(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): Step {
   return { ...flowStep, ...(ctx.data.seekTag(step) ?? {}) }
 }
 
-export type JsonPatchOperation =
-  | { op: "add"; path: string; value: Lite.JsonValue }
-  | { op: "replace"; path: string; value: Lite.JsonValue }
-  | { op: "remove"; path: string }
-
-export interface MaterialState<T> {
-  name: string
-  kind: MaterialKind
-  revision: number
-  state: T
-}
-
-export interface MaterialOptions<T> {
-  kind: MaterialKind
-  initialState: T
-  tags?: Lite.Tagged<any>[]
-  keepAlive?: boolean
-}
-
-const materialPatches = new WeakMap<object, WeakMap<object, Promise<void>>>()
-
-export class MaterialConflictError extends Error {
-  override readonly name = "MaterialConflictError"
-
-  constructor(readonly expectedRevision: number, readonly currentRevision: number) {
-    super(`Material revision conflict: expected ${expectedRevision}, current ${currentRevision}`)
-  }
-}
-
-export function material<T>(name: string, options: MaterialOptions<T>): Lite.Atom<MaterialState<T>> {
-  return atom({
-    keepAlive: options.keepAlive ?? true,
-    tags: [materialKind(options.kind), ...(options.tags ?? [])],
-    factory: () => ({
-      name,
-      kind: options.kind,
-      revision: 0,
-      state: clone(options.initialState),
-    }),
-  })
-}
-
-export async function patchMaterial<T>(
-  ctx: Lite.ExecutionContext,
-  target: Lite.Atom<MaterialState<T>>,
-  ops: JsonPatchOperation[],
-  options: { expectedRevision?: number } = {}
-): Promise<MaterialState<T>> {
-  return queueMaterialPatch(ctx, target, async () => {
-    const ctrl = ctx.scope.controller(target)
-    if (ctrl.state === "idle") await ctrl.resolve()
-    const current = ctrl.get()
-    if (current.kind !== "json") throw new Error(`Material "${current.name}" does not accept JSON Patch`)
-    if (options.expectedRevision !== undefined && options.expectedRevision !== current.revision) {
-      throw new MaterialConflictError(options.expectedRevision, current.revision)
-    }
-    ctrl.set({
-      ...current,
-      revision: current.revision + 1,
-      state: applyJsonPatch(current.state, ops),
-    })
-    return ctrl.get()
-  })
-}
-
-export function derivedMaterial<TSource, TOutput>(
-  name: string,
-  source: Lite.Atom<MaterialState<TSource>>,
-  derive: (state: TSource) => TOutput,
-  options: { kind: MaterialKind; tags?: Lite.Tagged<any>[]; keepAlive?: boolean }
-): Lite.Atom<MaterialState<TOutput>> {
-  return atom({
-    keepAlive: options.keepAlive ?? true,
-    deps: { source },
-    tags: [materialKind(options.kind), ...(options.tags ?? [])],
-    factory: (_ctx, deps) => ({
-      name,
-      kind: options.kind,
-      revision: deps.source.revision,
-      state: derive(deps.source.state),
-    }),
-  })
-}
-
-function queueMaterialPatch<T>(
-  ctx: Lite.ExecutionContext,
-  target: Lite.Atom<MaterialState<T>>,
-  run: () => Promise<MaterialState<T>>
-): Promise<MaterialState<T>> {
-  let scopePatches = materialPatches.get(ctx.scope)
-  if (!scopePatches) {
-    scopePatches = new WeakMap()
-    materialPatches.set(ctx.scope, scopePatches)
-  }
-  const previous = scopePatches.get(target) ?? Promise.resolve()
-  const current = previous.catch(() => undefined).then(run)
-  const lock = current.then(() => undefined, () => undefined)
-  scopePatches.set(target, lock)
-  void lock.then(() => {
-    if (scopePatches.get(target) === lock) scopePatches.delete(target)
-  })
-  return current
-}
-
-function applyJsonPatch<T>(source: T, ops: JsonPatchOperation[]): T {
-  let document: unknown = clone(source)
-  for (const op of ops) {
-    if (op.path === "") {
-      if (op.op === "remove") {
-        document = null
-      } else {
-        document = clone(op.value)
-      }
-      continue
-    }
-
-    const parts = splitPointer(op.path)
-    const key = parts.at(-1)
-    if (key === undefined) throw new Error("JSON Patch path cannot be empty")
-    const parent = findPatchParent(document, parts.slice(0, -1))
-
-    if (op.op === "remove") {
-      removeValue(parent, key)
-    } else {
-      setValue(parent, key, clone(op.value), op.op)
-    }
-  }
-  return document as T
-}
-
-function splitPointer(path: string): string[] {
-  if (!path.startsWith("/")) throw new Error(`Invalid JSON Pointer "${path}"`)
-  return path
-    .slice(1)
-    .split("/")
-    .map((part) => part.replace(/~1/g, "/").replace(/~0/g, "~"))
-}
-
-function findPatchParent(document: unknown, parts: string[]): unknown {
-  let current = document
-  for (const part of parts) {
-    if (Array.isArray(current)) {
-      current = current[Number(part)]
-      continue
-    }
-    if (isRecord(current)) {
-      current = current[part]
-      continue
-    }
-    throw new Error(`Cannot traverse JSON Patch path at "${part}"`)
-  }
-  return current
-}
-
-function setValue(parent: unknown, key: string, value: unknown, op: "add" | "replace"): void {
-  if (Array.isArray(parent)) {
-    if (key === "-") {
-      parent.push(value)
-      return
-    }
-    const index = Number(key)
-    if (op === "add") parent.splice(index, 0, value)
-    else parent[index] = value
-    return
-  }
-  if (!isRecord(parent)) throw new Error(`Cannot set JSON Patch path "${key}"`)
-  parent[key] = value
-}
-
-function removeValue(parent: unknown, key: string): void {
-  if (Array.isArray(parent)) {
-    parent.splice(Number(key), 1)
-    return
-  }
-  if (!isRecord(parent)) throw new Error(`Cannot remove JSON Patch path "${key}"`)
-  delete parent[key]
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function clone<T>(value: T): T {
-  return structuredClone(value)
-}
-
-type Resolvable<Input, T> = T | ((input: Input, ctx: Lite.ExecutionContext) => T)
-
 export interface CliBind {
   source: string
   target?: string
@@ -511,62 +274,12 @@ export interface CliResult {
   signal: string | null
 }
 
-export interface CliWorkerOptions<Input, Output> {
-  name: string
-  parse?: ((raw: unknown) => Input) | Lite.Typed<Input>
-  command: Resolvable<Input, string>
-  args?: Resolvable<Input, readonly string[]>
-  stdin?: Resolvable<Input, string | undefined>
-  cwd?: Resolvable<Input, string | undefined>
-  env?: Resolvable<Input, Record<string, string | undefined> | undefined>
-  isolate?: Resolvable<Input, boolean | CliIsolateOptions | undefined>
-  timeoutMs?: number
-  kind?: WorkerKind
-  parseOutput?: (result: CliResult, input: Input) => Output
-  tags?: Lite.Tagged<any>[]
-}
-
 export class CliWorkerError extends Error {
   override readonly name = "CliWorkerError"
 
   constructor(message: string, readonly result: CliResult) {
     super(message)
   }
-}
-
-export function cliWorker<Input = { prompt: string }, Output = string>(
-  options: CliWorkerOptions<Input, Output>
-): Lite.Flow<Output, Input> {
-  const config: Step = { kind: options.kind ?? "cli" }
-  if (options.timeoutMs !== undefined) config.timeoutMs = options.timeoutMs
-  const tags = [
-    step(config),
-    ...(options.tags ?? []),
-  ]
-  const factory = async (ctx: Lite.ExecutionContext & { readonly input: Input }) => {
-    const input = ctx.input
-    const result = await runCli({
-      command: resolveRequiredValue(options.command, input, ctx),
-      args: resolveValue(options.args ?? [], input, ctx),
-      stdin: resolveValue(options.stdin, input, ctx),
-      cwd: resolveValue(options.cwd, input, ctx),
-      env: resolveValue(options.env, input, ctx),
-      isolate: resolveValue(options.isolate, input, ctx),
-      timeoutMs: options.timeoutMs,
-      signal: ctx.data.seekTag(abortSignal),
-    })
-    return options.parseOutput ? options.parseOutput(result, input) : (result.stdout.trim() as Output)
-  }
-
-  const flowOptions = {
-    name: options.name,
-    tags,
-    factory,
-  }
-
-  return typeof options.parse === "function"
-    ? flow<Output, Input>({ ...flowOptions, parse: options.parse })
-    : flow<Output, Input>({ ...flowOptions, parse: options.parse ?? typed<Input>() })
 }
 
 export interface RunCliOptions {
@@ -780,37 +493,8 @@ type ExecFileError = Error & {
   killed?: boolean
 }
 
-function resolveValue<Input, T>(
-  value: Resolvable<Input, T> | undefined,
-  input: Input,
-  ctx: Lite.ExecutionContext
-): T | undefined {
-  if (typeof value === "function") return (value as (input: Input, ctx: Lite.ExecutionContext) => T)(input, ctx)
-  return value
-}
-
-function resolveRequiredValue<Input, T>(
-  value: Resolvable<Input, T>,
-  input: Input,
-  ctx: Lite.ExecutionContext
-): T {
-  if (typeof value === "function") return (value as (input: Input, ctx: Lite.ExecutionContext) => T)(input, ctx)
-  return value
-}
-
 export interface PromptInput {
   prompt: string
-}
-
-export interface GuardState {
-  text: string
-}
-
-export function guard(name: string, text = ""): Lite.Atom<MaterialState<GuardState>> {
-  return material(name, {
-    kind: "json",
-    initialState: { text },
-  })
 }
 
 export function formatModelPrompt(request: ModelRequest): string {
@@ -861,6 +545,10 @@ function readJson(output: string): unknown {
       return undefined
     }
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 function skillCallsOf(value: unknown): SkillCall[] | undefined {
@@ -1018,50 +706,6 @@ export const complete = flow({
   factory: (ctx, { impl }) => impl.exec({ input: ctx.input }),
 })
 
-export interface ChannelOptions<Output, FlowInput, Input> {
-  readonly name: string
-  readonly parse: ((raw: unknown) => MaybePromise<Input>) | Lite.Typed<Input>
-  readonly turn: Lite.Flow<Output, FlowInput>
-  readonly input: (ctx: Lite.ExecutionContext & { readonly input: Input }) => MaybePromise<FlowInput>
-  readonly tags?: Lite.Tagged<any>[]
-}
-
-export function channel<Output, FlowInput, Input>(
-  options: ChannelOptions<Output, FlowInput, Input>,
-): Lite.Flow<Output, Input> {
-  return typeof options.parse === "function"
-    ? flow<Output, Input, { turn: Lite.Flow<Output, FlowInput> }>({
-        name: options.name,
-        parse: options.parse,
-        tags: agentStepTags({ workflow: true, kind: "channel" }, options.tags),
-        deps: { turn: options.turn },
-        factory: async (ctx, deps) => deps.turn.exec({ rawInput: await options.input(ctx) }),
-      })
-    : flow<Output, Input, { turn: Lite.Flow<Output, FlowInput> }>({
-        name: options.name,
-        parse: options.parse,
-        tags: agentStepTags({ workflow: true, kind: "channel" }, options.tags),
-        deps: { turn: options.turn },
-        factory: async (ctx, deps) => deps.turn.exec({ rawInput: await options.input(ctx) }),
-      })
-}
-
-export interface ScheduleOptions<Output, Input> {
-  readonly name: string
-  readonly turn: Lite.Flow<Output, Input>
-  readonly input: (ctx: Lite.ExecutionContext) => MaybePromise<Input>
-  readonly tags?: Lite.Tagged<any>[]
-}
-
-export function schedule<Output, Input>(options: ScheduleOptions<Output, Input>): Lite.Flow<Output, void> {
-  return flow({
-    name: options.name,
-    tags: agentStepTags({ workflow: true, kind: "schedule" }, options.tags),
-    deps: { turn: options.turn },
-    factory: async (ctx, deps) => deps.turn.exec({ rawInput: await options.input(ctx) }),
-  })
-}
-
 export interface EvalCheckResult {
   name: string
   passed: boolean
@@ -1139,13 +783,6 @@ export interface RunRecord {
 
 export interface RunLog extends WorkflowEventLog {
   entries(query?: Partial<RunQuery>): MaybePromise<readonly WorkflowStepEntry[]>
-}
-
-export interface HttpOptions<Output = TurnResult, Input = TurnInput> {
-  name?: string
-  turn: Lite.Flow<Output, Input>
-  input?: (request: Request) => MaybePromise<Input>
-  tags?: (request: Request) => MaybePromise<Lite.Tagged<any>[]>
 }
 
 export function judge(options: Judge): Judge {
@@ -1249,28 +886,6 @@ export function summary(report: EvalReport): Lite.JsonValue {
       })),
     })),
   })
-}
-
-export function http<Output, Input>(options: HttpOptions<Output, Input>): Lite.Flow<Response, Request> {
-  return flow({
-    name: options.name ?? `${options.turn.name ?? "turn"}-http`,
-    parse: typed<Request>(),
-    tags: agentStepTags({ workflow: true, kind: "channel" }),
-    deps: { turn: options.turn },
-    factory: async (ctx: Lite.ExecutionContext & { readonly input: Request }, deps) => {
-      const request = ctx.input
-      const input = options.input ? await options.input(request) : await request.json() as Input
-      const tags = options.tags ? await options.tags(request) : []
-      return Response.json(jsonValue(await deps.turn.exec({ rawInput: input, tags })))
-    },
-  })
-}
-
-function agentStepTags(defaults: Step, source: Lite.Tagged<any>[] = []): Lite.Tagged<any>[] {
-  return [
-    step(Object.assign({}, defaults, ...step.collect(source))),
-    ...source.filter((tagged) => tagged.key !== step.key),
-  ]
 }
 
 function runStep(entry: WorkflowStepEntry): RunStep {

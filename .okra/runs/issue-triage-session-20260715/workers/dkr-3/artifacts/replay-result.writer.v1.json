@@ -1,0 +1,14 @@
+{
+  "verdict": "replayed",
+  "baselineEventCount": 12,
+  "candidateEventCount": 13,
+  "requiredContextKeys": [
+    "activationId",
+    "channel",
+    "role",
+    "sessionId",
+    "tool",
+    "workId"
+  ],
+  "forbiddenValueMatches": []
+}

@@ -1,0 +1,32 @@
+{
+  "packet_version": 1,
+  "worker_id": "validator-dkr-0-v2",
+  "role": "verification worker",
+  "role_contract": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/references/roles/validator.md",
+  "run_dir": ".okra/runs/issue-triage-session-20260715",
+  "frame_ref": "frame/frame.v2.json",
+  "candidate_checkpoint": "artifacts/dkr-0-current-pr-checkpoint.v2.json",
+  "assignment": "Independently replay the exhaustive PR disposition matrix and inspect the architectural judgement behind all keep, reshape, and remove rules. Decide mechanical coverage and judgement separately.",
+  "required_checks": [
+    "Run the saved v2 replay and all negative matrix mutations.",
+    "Verify the 58-path git diff universe, every cited hash, concept-row coverage for mixed source files, downstream owners, and all executable checkpoint fields.",
+    "Inspect every disposition rule family against the actual changed source, tests, docs, package surfaces, and frame v2 design intent.",
+    "Sample every rule family and inspect every remove decision; reject unsupported or incorrectly owned rows with exact ids.",
+    "Confirm required runtime tags, runtime missing-tag failures, and eager declared-tree activation are not classified as defects.",
+    "Confirm hidden effects, cleanup-to-finish coupling, speculative Lite primitives, shared scopes, and facade ceremony remain rejected or reshaped.",
+    "Audit all active walls and run store verification after governed output."
+  ],
+  "authorized_writes": [
+    ".okra/runs/issue-triage-session-20260715/workers/validator-dkr-0-v2/**"
+  ],
+  "forbidden": [
+    "Product code, tests, docs, manifests, git history, PR state, external services, frame, tree, or another worker's artifacts",
+    "Self-certification, marker-only acceptance, silent row correction, or wall weakening"
+  ],
+  "required_outputs": [
+    "workers/validator-dkr-0-v2/verification.json",
+    "workers/validator-dkr-0-v2/replay.sh",
+    "workers/validator-dkr-0-v2/progress.jsonl via the absolute OKRA store helper worker-report command"
+  ],
+  "terminal_condition": "Finish with explicit mechanical and judgement dispositions, exact rejected row ids if any, fresh wall reads, and a governed progress record."
+}

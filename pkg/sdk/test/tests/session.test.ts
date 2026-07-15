@@ -2,17 +2,17 @@ import { createScope } from "@pumped-fn/lite"
 import * as agent from "@pumped-fn/sdk/agent"
 import * as session from "@pumped-fn/sdk/session"
 import { expect, it } from "vitest"
-import { attemptStub, sessionStoreStub } from "../src/index"
+import { attemptStubConfig, sessionStoreStub } from "../src/index"
 
 it("streams attempt events and returns the final model response", async () => {
-  const attempt = attemptStub({
+  const attempt = attemptStubConfig({
     events: [
       { type: "content_delta", content: "hel" },
       { type: "content_delta", content: "lo" },
     ],
     result: { content: "hello", stop: true },
   })
-  const scope = createScope({ tags: [agent.attempt(attempt)] })
+  const scope = createScope({ tags: attempt })
   const ctx = scope.createContext()
   const stream = ctx.execStream({ flow: agent.invoke, input: request() })
   const events: agent.ModelEvent[] = []
@@ -32,7 +32,7 @@ it("provides isolated session stores through explicit flow bindings", async () =
   const record = sessionRecord("session-a")
   const first = sessionStoreStub([record])
   const second = sessionStoreStub([sessionRecord("session-b")])
-  const scope = createScope({ tags: [first.binding.load, first.binding.commit] })
+  const scope = createScope({ tags: [first.config, first.binding.load, first.binding.commit] })
   const ctx = scope.createContext()
 
   await expect(ctx.exec({ flow: session.load, input: { id: record.id } })).resolves.toBe(record)

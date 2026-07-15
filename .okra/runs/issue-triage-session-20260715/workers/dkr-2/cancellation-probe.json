@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "publicSignalPresent": false,
+    "publicCancelPresent": false,
+    "scalarParentClose": {
+      "atClose": {
+        "childSettled": false,
+        "childClosed": false,
+        "parentResourceCleaned": true
+      },
+      "events": [
+        "parent-resource-cleanup",
+        "child-close"
+      ]
+    },
+    "scalarError": {
+      "propagated": true,
+      "events": [
+        "child-error",
+        "resource-cleanup",
+        "parent-error"
+      ]
+    },
+    "streams": {
+      "normal": {
+        "values": [1, 2],
+        "result": "normal-done",
+        "events": ["close-success"]
+      },
+      "producerError": {
+        "propagated": true,
+        "events": ["close-error"]
+      },
+      "consumerBreak": {
+        "values": [1],
+        "events": ["producer-finally", "close-aborted:true"]
+      }
+    },
+    "streamParentClose": {
+      "atClose": {
+        "streamClosed": false,
+        "parentResourceCleaned": true
+      },
+      "events": ["parent-resource-cleanup", "stream-close"]
+    },
+    "nestedParentClose": {
+      "descendantLeakCountAtClose": 3,
+      "events": [
+        "parent-resource-cleanup",
+        "inner-close",
+        "middle-close",
+        "outer-close"
+      ]
+    }
+  },
+  "candidate": {
+    "scalarParentClose": {
+      "signalAborted": true,
+      "descendantLeakCountAfterClose": 0,
+      "events": ["child-aborted:false", "parent-resource-cleanup"]
+    },
+    "nestedParentClose": {
+      "descendantLeakCountAfterClose": 0,
+      "events": [
+        "inner-close",
+        "middle-close",
+        "outer-close",
+        "parent-resource-cleanup"
+      ]
+    },
+    "targetedSignal": {
+      "parentSignalAbortedAfterTargetedCancel": false,
+      "events": ["a:aborted", "b:completed"]
+    },
+    "streamParentClose": {
+      "descendantLeakCountAfterClose": 0,
+      "events": [
+        "producer-finally",
+        "stream-aborted:true",
+        "parent-resource-cleanup"
+      ]
+    },
+    "publicCancelRequired": false,
+    "scalarCloseAbortClassificationRequired": true,
+    "callerControl": {
+      "rootOwner": "close the explicit context",
+      "invocationCaller": "abort the signal supplied to exec",
+      "runningFlow": "observe ctx.signal and return or throw"
+    }
+  },
+  "unhandledRejectionCount": 0,
+  "decisionInputs": {
+    "signalOnlyContract": [
+      "ExecutionContext.signal",
+      "exec and execStream accept an optional caller signal",
+      "close aborts descendants, settles active streams, joins descendants, then cleans parent resources",
+      "signal-driven scalar and stream exits close as aborted"
+    ],
+    "publicCancelAddedValueCount": 0,
+    "rejectedSurface": [
+      "start",
+      "spawn",
+      "worker pool",
+      "session semantics",
+      "task handle"
+    ]
+  }
+}

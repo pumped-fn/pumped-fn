@@ -5,6 +5,7 @@ import {
   clock,
   createAuthority,
   current,
+  execution,
   record,
   run,
   scheduler,
@@ -61,21 +62,23 @@ describe("session review regressions", () => {
   it("checks cancellation after work.started before entering the turn", async () => {
     const bound = authorityValue()
     let effects = 0
-    const execute = run({
-      name: "review.cancel-safe-point",
-      turn: flow({
-        name: "review.cancel-safe-point.turn",
-        factory: () => {
-          effects++
-          return "effect"
-        },
-      }),
+    const turn = flow({
+      name: "review.cancel-safe-point.turn",
+      factory: () => {
+        effects++
+        return "effect"
+      },
     })
-    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const scope = createScope({ tags: [
+      authority(bound),
+      record(initial(bound)),
+      clock(fixedClock),
+      execution.turn({ flow: turn }),
+    ] })
     const ctx = scope.createContext()
     const runtime = await ctx.resolve(session)
     const stream = ctx.execStream({
-      flow: execute,
+      flow: run,
       input: {
         work: { id: "cancelled", branchId: "main", role: "review", policy: "all" },
         input: undefined,
@@ -126,11 +129,11 @@ describe("session review regressions", () => {
       },
       factory: (_ctx, { runtime, work }) => runtime.controls.drain(work.id, -1).map((value) => value.id),
     })
-    const execute = run({ name: "review.steering-fence", turn: inspect })
     const scope = createScope({ tags: [
       authority(bound),
       record(initial(bound)),
       clock(fixedClock),
+      execution.turn({ flow: inspect }),
       scheduler.wake(wakeImpl),
     ] })
     const ctx = scope.createContext()
@@ -162,7 +165,7 @@ describe("session review regressions", () => {
 
     await ctx.exec({ flow: wake, input: { id: "resume-work" } })
     await expect(ctx.exec({
-      flow: execute,
+      flow: run,
       input: {
         work: { id: "resumed", branchId: "main", role: "review", policy: "all" },
         input: undefined,

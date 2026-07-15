@@ -1,0 +1,192 @@
+{
+  "contract_version": "okra.executable-dkr-checkpoint.v1",
+  "type": "dkr_checkpoint_candidate",
+  "unit_id": "DKR-0",
+  "checkpoint_id": "dkr-0-current-pr-disposition-v1",
+  "conclusion_id": "current-pr-reconciliation",
+  "decision_target": "keep, reshape, and remove map for PR 346",
+  "source_of_truth": "current feature worktree and saved replay script",
+  "read_method": "Run the saved inventory checker at the pinned PR head, then inspect the grouped public-symbol and workaround dispositions with their file and line references.",
+  "observed_at": "2026-07-15T04:18:51Z",
+  "recorded_at": "2026-07-15T04:18:51Z",
+  "max_age": "10m",
+  "freshness_status": "fresh",
+  "confidence": 0.94,
+  "confidence_probability_update": {
+    "before": 0.65,
+    "after": 0.94,
+    "reason": "The current declarations, docs, tests, and provider adapters were grouped into a full public-concept inventory. A saved 39-marker replay pins the conclusion to the current PR head. Replacement details remain outside this DKR."
+  },
+  "evidence_refs_or_hashes": [
+    "sha256:e15c246ff2ec7a28d5189a9c2f7561a0c9003c02d572cefd2f1b189807931b1e",
+    "sha256:64e75cefcfae132c02bd93c98358f20a8bd538cee2afbddec655e09146bf082f",
+    "sha256:78b6500dee31b501644f3a528149e2efb3cb8f684a59373071cf9fdc5f5cfe06",
+    "sha256:622f7bb212cb9274338eac3613101345b5a4031db47e58e981e76d9c359255b0",
+    "sha256:d5a0798557a9af2f261844e041bb2059a2160892d98ef03d96c7ac1843e8aa33",
+    "sha256:7fb45a842db6233d61ee7f2d81e886c4ac2c8b5fc77549ff4db8bc41df8a725f",
+    "sha256:968e24c435354941623acbb29f7f84e68f9cb3722fed68928375192f5f3e6361",
+    "sha256:a53abbb36058e5f8f49845b3f0daa5fec05a3fad004ecbd8afdba9ac7394211f",
+    "sha256:bfe48c95db05653cb444c48f9e95082b713b5ce61901a8266f6b48d00e5f4ead"
+  ],
+  "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/replay/dkr-0-inventory.sh",
+  "questions_answered": [
+    "PR 346 should continue rather than be replaced because its durable records, authority contract, role and tool declarations, validation engine, effect ports, provider attempt seam, and database-analysis proof remain useful.",
+    "The activation and lifecycle spine must be reshaped before the issue-triage slice is added.",
+    "Manual session pre-resolution is a public footgun: first resolution inside session.run creates a temporary current-owned runtime whose state is not visible to later sibling execution.",
+    "Context cleanup currently calls Runtime.shutdown, which calls beginFinish and changes both live and record status to finishing without an explicit finish flow.",
+    "Session run and boundary flows manually fan out session, authority, epoch, branch, work, attempt, and abort tags. The runtime facts remain required; only their activation binding and repeated propagation need later ergonomic proof.",
+    "Required runtime tags and eager activation of the complete statically declared role, tool, and skill tree are intended strengths. Missing-tag runtime failure is accepted, and static missing-tag analysis is deferred.",
+    "SessionEvent remains valuable domain history but does not replace a safe extension-visible context observation model.",
+    "The current tests already seed same-scope session isolation, read-only parallel database analysis, readiness-before-effect, wait and resume, provider streaming, and packed namespace behavior.",
+    "The replacement must preserve authority narrowing, readiness, schema identity, semantic work settlement, wait and wake, fork and merge, steering fences, explicit checkpoint and finish, provider continuation isolation, and the scope seam."
+  ],
+  "questions_unanswered": [
+    "DKR-1 must decide the exact activation resource ownership and binding API after testing controller(flow).exec({ input, tags }) without pre-resolution.",
+    "DKR-2 must decide the smallest generic ExecutionContext cancellation and descendant-settlement contract and whether any Runtime controller remains for targeted work steering.",
+    "DKR-3 must decide the safe observation projection and terminal event contract for extensions.",
+    "DKR-4 must decide whether awaited controller executions and a fixed worker loop are enough for queue watching without spawn or start.",
+    "DKR-5 must decide the exact evidence, freshness, independent verification, authority, and idempotency contract for GitHub publication.",
+    "Independent validation must confirm that the grouped inventory covers every public concept and that each judgement-heavy disposition follows from the cited evidence."
+  ],
+  "decision": "candidate only; continue PR 346, preserve the listed contracts, and reshape the activation and lifecycle spine through DKR-1 to DKR-5; never accepted by this worker",
+  "flag_if_missing_or_stale": "cannot: fail closed, keep downstream advance blocked, and request a fresh DKR-0 replay when HEAD, any evidence hash, or any inventory marker changes.",
+  "reviewer_audit_status": "pending independent validator review; this writer did not accept its own classifications",
+  "active_anti_goals": [
+    "touched_surface_regression_count == 0 because the current PR is being classified",
+    "slop_violation_count == 0 because public API shape is being reviewed",
+    "single_llm_truth_acceptance_count == 0 because this checkpoint needs later validation",
+    "ungoverned_write_or_read_count == 0 because the evidence must be retained",
+    "anti_goal_bypass_or_dishonesty_count == 0 because this is a steering checkpoint"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "anti_goal_id": "touched_surface_regression_count",
+      "metric_id": "touched_surface_regression_count",
+      "source_of_truth": "Current feature worktree, focused package gates, and later implementation checks",
+      "read_method": "Confirm this DKR made no product edit, then require focused package tests and workspace checks after accepted implementation work.",
+      "observed_at": "2026-07-15T04:18:51Z",
+      "recorded_at": "2026-07-15T04:18:51Z",
+      "max_age": "10m",
+      "freshness_status": "pending",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending",
+      "evidence_ref": "sha256:e15c246ff2ec7a28d5189a9c2f7561a0c9003c02d572cefd2f1b189807931b1e",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/replay/dkr-0-inventory.sh",
+      "verification_record_ref": "workers/dkr-0-validator/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "slop_violation_count",
+      "metric_id": "slop_violation_count",
+      "source_of_truth": "Public declaration inventory, repository lint, and independent API review",
+      "read_method": "Inspect every kept or reshaped public concept against AGENTS.md, then run repository lint after implementation.",
+      "observed_at": "2026-07-15T04:18:51Z",
+      "recorded_at": "2026-07-15T04:18:51Z",
+      "max_age": "10m",
+      "freshness_status": "pending",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending",
+      "evidence_ref": "sha256:622f7bb212cb9274338eac3613101345b5a4031db47e58e981e76d9c359255b0",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/replay/dkr-0-inventory.sh",
+      "verification_record_ref": "workers/dkr-0-validator/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "single_llm_truth_acceptance_count",
+      "metric_id": "single_llm_truth_acceptance_count",
+      "source_of_truth": "Candidate writer checkpoint plus a separate deterministic validator record",
+      "read_method": "Require an independent validator to replay the checker, inspect the cited declarations, and return an audit record before orchestration accepts the checkpoint.",
+      "observed_at": "2026-07-15T04:18:51Z",
+      "recorded_at": "2026-07-15T04:18:51Z",
+      "max_age": "10m",
+      "freshness_status": "pending",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending",
+      "evidence_ref": "sha256:64e75cefcfae132c02bd93c98358f20a8bd538cee2afbddec655e09146bf082f",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/replay/dkr-0-inventory.sh",
+      "verification_record_ref": "workers/dkr-0-validator/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "ungoverned_write_or_read_count",
+      "metric_id": "ungoverned_write_or_read_count",
+      "source_of_truth": "Hash-pinned run artifacts and append-only worker report",
+      "read_method": "Verify the inventory and replay hashes, append this checkpoint with the absolute store helper, and run store verification.",
+      "observed_at": "2026-07-15T04:18:51Z",
+      "recorded_at": "2026-07-15T04:18:51Z",
+      "max_age": "10m",
+      "freshness_status": "pending",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending",
+      "evidence_ref": "sha256:e15c246ff2ec7a28d5189a9c2f7561a0c9003c02d572cefd2f1b189807931b1e",
+      "replay_command_or_checker": "/home/lagz0ne/dev/pumped-fn/.agents/skills/reverse-tornado-okr/scripts/okra-store.sh verify .okra/runs/issue-triage-session-20260715",
+      "verification_record_ref": "workers/dkr-0/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "anti_goal_bypass_or_dishonesty_count",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "source_of_truth": "Candidate checkpoint wall gate, worker report, and independent validator record",
+      "read_method": "Confirm every active wall remains pending in this writer checkpoint and downstream advance remains blocked until a separate validator supplies fresh evidence.",
+      "observed_at": "2026-07-15T04:18:51Z",
+      "recorded_at": "2026-07-15T04:18:51Z",
+      "max_age": "10m",
+      "freshness_status": "pending",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending",
+      "evidence_ref": "sha256:e15c246ff2ec7a28d5189a9c2f7561a0c9003c02d572cefd2f1b189807931b1e",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/replay/dkr-0-inventory.sh",
+      "verification_record_ref": "workers/dkr-0-validator/progress.jsonl#pending"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "pending",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-15T04:18:51Z",
+    "reasons": [
+      "This worker cannot accept its own public API classifications.",
+      "The replay script proves that the cited current shape is present; it does not prove that each judgement-heavy disposition is correct.",
+      "Every active anti-goal still requires a fresh independent validator record."
+    ]
+  },
+  "risk_or_anti_goal_implications": [
+    "Keeping the current PR unchanged would retain a mandatory pre-resolution ordering rule and temporary-session state loss.",
+    "Calling beginFinish from cleanup risks treating ordinary activation close as a durable business transition even when it does not commit.",
+    "Framework dependencies added by tool, skill, and role helpers remain declared in the returned resource graph and are not defects. Hidden physical effect edges remain forbidden.",
+    "Removing the Runtime wholesale would lose semantic work, branch, permit, steering, artifact, memory, schedule, and continuation behavior that the issue-triage example needs.",
+    "Adding spawn, start, a worker pool, or another resource ownership mode before DKR-1, DKR-2, and DKR-4 would create a primitive proof gap.",
+    "Publishing SessionEvent payloads as extension observations without a safe projection would risk sensitive context export."
+  ],
+  "candidate_ckrs": [
+    {
+      "id": "CKR-SESSION-ACTIVATION",
+      "metric_id": "session_activation_contract_pass_count",
+      "target": "7/7",
+      "status": "candidate_blocked_pending_dkr_1_and_dkr_2"
+    },
+    {
+      "id": "CKR-PUBLIC-CONTRACT-ALIGNMENT",
+      "metric_id": "public_contract_alignment_pass_count",
+      "target": "4/4",
+      "status": "candidate_blocked_pending_dkr_0_validation_and_later_dkrs"
+    }
+  ],
+  "candidate_pkrs": [
+    {
+      "id": "PKR-RECONCILE-SESSION-SPINE",
+      "contribution": "Reshape PR 346 activation ownership, explicit dependencies, cancellation, cleanup, and observation without discarding its proven domain contracts.",
+      "status": "candidate_blocked_pending_dkr_1_to_dkr_3"
+    },
+    {
+      "id": "PKR-ISSUE-TRIAGE-VERTICAL",
+      "contribution": "Add the bounded GitHub issue queue, code, PostgreSQL, Victoria, verifier, and publication proof after queue and evidence contracts are accepted.",
+      "status": "candidate_blocked_pending_dkr_4_and_dkr_5"
+    }
+  ]
+}

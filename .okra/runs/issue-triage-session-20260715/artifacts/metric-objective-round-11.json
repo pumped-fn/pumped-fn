@@ -1,0 +1,10 @@
+{
+  "type": "objective_metric_read",
+  "metric_kind": "objective",
+  "metric_id": "issue_triage_public_contract_pass_count",
+  "value": 0,
+  "target": 16,
+  "observed_at": "2026-07-15T06:16:01Z",
+  "source": "No product implementation or runnable issue-triage verifier exists at current PR head d8dc7e84. DKR-3 and DKR-5 are accepted as reducing discovery; DKR-4 v4 is under independent validation; all product work remains paused.",
+  "freshness": "observed_at=2026-07-15T06:16:01Z -> status=fresh against max_age=10m"
+}

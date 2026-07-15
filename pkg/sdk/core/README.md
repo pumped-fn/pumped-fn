@@ -1,18 +1,18 @@
 # @pumped-fn/sdk
 
-Pumped-fn SDK primitives for durable agent work. The SDK adds names and contracts. Lite still owns dependency resolution, execution, streaming, and the scope seam.
+Agent and session primitives built on Lite. Lite owns graph resolution, execution, streaming, lifetimes, and the `createScope` seam. The SDK supplies stable definitions and durable data contracts.
 
 ## Package structure
 
 | Import | Owns |
 |---|---|
-| `@pumped-fn/sdk` | Workflow, material, CLI, eval, and scalar `Model` primitives |
-| `@pumped-fn/sdk/agent` | Roles, tools, skills, subagents, turns, and provider attempts |
-| `@pumped-fn/sdk/session` | Durable records, live session runtime, work, branches, steering, storage, memory, and scheduling |
+| `@pumped-fn/sdk` | Workflow steps, scalar models, eval helpers, and `runCli` |
+| `@pumped-fn/sdk/agent` | Stable role, turn, provider, tool, skill, and subagent definitions |
+| `@pumped-fn/sdk/session` | Durable records, live session runtime, work, branches, steering, storage, memory, scheduling, and observation |
 | `@pumped-fn/sdk/validation` | Configurable Standard Schema validation |
 | `@pumped-fn/sdk/sandbox` | Session-mediated read, write, and command port flows |
 
-The root does not re-export the four subpaths. Import a namespace when several tags or flows share one meaning.
+Import related tags as a namespace:
 
 ```ts
 import * as agent from "@pumped-fn/sdk/agent"
@@ -24,159 +24,179 @@ import * as sandbox from "@pumped-fn/sdk/sandbox"
 ## Execution model
 
 ```text
-Host scope ──owns──> physical adapters
-    │
-    └──> Session resource ──admits──> Work attempt
-              │                         │
-              ├──authorizes──> Tool resource
-              └──binds───────> Role resource ──runs──> Turn flow
+createScope
+   |
+session context -> session.run -> agent.turn
+                              ├─ role + selected capability flows
+                              └─ provider + backend adapters
 ```
 
-The durable `SessionRecord` is data. The current-owned `SessionRuntime` coordinates live attempts. Physical model, database, sandbox, store, and scheduler adapters belong to a host context that encloses logical sessions.
+`session.run`, `agent.turn`, `agent.role`, and `agent.fromModel` are module-level definitions. Composition happens through namespaced tags:
 
-A session never retains an execution context and never closes its host. `session.finish` fences admission, joins owned attempts, commits through the declared store flow, and seals the runtime. Context cleanup only releases owned resources.
+| Namespace | Meaning |
+|---|---|
+| `agent.config.*` | Role, tool, skill, and subagent metadata |
+| `agent.impl.*` | Attempt, tool, skill, and subagent flow selection |
+| `session.execution.*` | Per-execution turn selection |
+| `session.current.*` | Work, attempt, branch, authority, and epoch bindings |
+| `session.store.*`, `session.memory.*`, `session.scheduler.*` | Effect implementors |
+| `session.observation.*` | Safe execution projection for extensions |
 
-Resolve `session.session` in the context that owns the logical session before any nested run. The resource uses `ownership: "current"`: if the first resolution happens inside `session.run`, that invocation owns a temporary runtime and its record changes disappear when the invocation closes.
+Executing the entry flow recursively activates its complete declared dependency tree before its factory starts. Required tags are checked at runtime during activation. Missing role config, validation, provider, session, tool backend, or store bindings fail at that boundary. Static missing-tag analysis is not part of this release.
+
+The full-tree activation is also the test model. A test supplies tags or presets at `createScope`, executes the public entry flow, and gets the same tree with selected edges replaced. It does not mock every descendant.
+
+## Database analysis
+
+The tool below can inspect a schema and explain a query. It cannot apply DDL. Both physical backend flows and their readiness fact are required dependencies of the tool flows.
 
 ```ts
-const sessionCtx = scope.createContext({ tags: [
-  session.authority(boundAuthority),
-  session.record(loadedRecord),
-  session.clock({ now: () => new Date().toISOString() }),
-] })
-
-await sessionCtx.resolve(session.session)
-await sessionCtx.exec({ flow: analyze, input })
-await sessionCtx.exec({ flow: session.finish })
-await sessionCtx.close()
-```
-
-## Primitive map
-
-| SDK primitive | Lite primitive | Reason |
-|---|---|---|
-| Role | current-owned `resource()` | Resolve declared tools and skills before the first model call |
-| Tool | current-owned `resource()` containing an inert `flow()` | Separate readiness from invocation |
-| Turn | streaming `flow()` | Own one model and dispatch loop |
-| Session runtime | current-owned `resource()` | Coordinate work without storing a context-bound handle |
-| Store, memory, scheduler, sandbox | namespaced tags carrying flows | Make effects explicit and replaceable |
-| Provider attempt | tagged streaming `flow()` | Share one neutral stream contract across providers |
-| Scalar model | root `model` tag plus `complete` flow | Preserve the small provider seam |
-
-## Validation
-
-The engine is configuration. Zod and Valibot stay at the application edge.
-
-```ts
-import * as z from "zod"
-import * as validation from "@pumped-fn/sdk/validation"
-
-export const validationBinding = validation.engine(validation.standard<z.ZodType>({
-  id: "zod@4",
-  toJsonSchema: (schema) => z.toJSONSchema(schema),
-}))
-```
-
-Every advertised tool is already resolved and has one identity:
-
-```text
-name + version + schema digest + validation engine + readiness + flow name
-```
-
-The model sees only tools that are declared by the role, resolved in the current session, and permitted by the bound authority. Dispatch validates through the same engine and rechecks the same identity and epoch.
-
-## Database-analysis example
-
-This tool can inspect a schema. It cannot apply DDL because its authority and output contract do not allow it.
-
-```ts
-import { flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
+import { createScope, flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
+import { model } from "@pumped-fn/sdk"
 import * as z from "zod"
 import * as agent from "@pumped-fn/sdk/agent"
 import * as session from "@pumped-fn/sdk/session"
+import * as validation from "@pumped-fn/sdk/validation"
 
-interface SchemaInput {
+interface InspectInput {
   readonly schema: string
 }
 
-interface SchemaResult {
-  readonly tables: readonly string[]
-}
-
-interface DatabaseReadiness {
-  readonly serverVersion: string
+interface ExplainInput {
+  readonly sql: string
 }
 
 const database = Object.freeze({
-  inspect: tag<Lite.Flow<SchemaResult, SchemaInput>>({ label: "database.inspect" }),
-  ready: tag<DatabaseReadiness>({ label: "database.ready" }),
+  ready: tag<{ readonly serverVersion: string }>({ label: "database.ready" }),
+  inspect: tag<Lite.Flow<{ readonly tables: readonly string[] }, InspectInput>>({ label: "database.impl.inspect" }),
+  explain: tag<Lite.Flow<{ readonly plan: string; readonly applied: false }, ExplainInput>>({ label: "database.impl.explain" }),
 })
 
-const inspectSchemaFlow = flow({
-  name: "database.inspect_schema",
-  parse: typed<SchemaInput>(),
-  deps: { impl: tags.required(database.inspect) },
-  factory: (ctx, { impl }) => impl.exec({ input: ctx.input }),
-})
-
-const inspectSchema = agent.tool({
+const inspectSchema = flow({
   name: "inspect_schema",
-  version: "1",
-  description: "Read the current database schema.",
-  input: z.object({ schema: z.string() }),
-  flow: inspectSchemaFlow,
-  deps: { ready: tags.required(database.ready) },
+  tags: [agent.config.tool({
+    version: "1",
+    description: "Read the current database schema.",
+    input: z.object({ schema: z.string() }),
+  })],
+  parse: typed<InspectInput>(),
+  deps: {
+    ready: tags.required(database.ready),
+    inspect: tags.required(database.inspect),
+  },
+  factory: (ctx, { inspect }) => inspect.exec({ input: ctx.input }),
 })
 
-const analyst = agent.role({
-  name: "database-analyst",
-  version: "1",
-  instructions: "Recommend query changes. Never apply schema changes.",
-  tools: { inspectSchema },
+const explainQuery = flow({
+  name: "explain_query",
+  tags: [agent.config.tool({
+    version: "1",
+    description: "Explain a query without executing it.",
+    input: z.object({ sql: z.string() }),
+  })],
+  parse: typed<ExplainInput>(),
+  deps: {
+    ready: tags.required(database.ready),
+    explain: tags.required(database.explain),
+  },
+  factory: (ctx, { explain }) => explain.exec({ input: ctx.input }),
 })
-
-const analyzeTurn = agent.turn({ name: "database.analyze", role: analyst })
-const analyze = session.run({ name: "database.analysis", turn: analyzeTurn })
-```
-
-The application supplies the session record, authority, validation engine, provider attempt, store, and database adapters through `createScope({ tags, presets, extensions })`. Tests replace the same edges. No module mock or shared scope factory is needed.
-
-Parallel analysis uses child `WorkRecord`s. `session.join` waits for attempts; it does not merge branch state. `session.merge` requires the expected target version and accepts only related branches whose work has settled.
-
-Waiting work persists both an admitted work record and a schedule intent before the owner closes. A later host loads and rebinds authority, then calls `session.wake` with the persisted intent id.
-
-Work and branch records store their full narrowed authority, not only its fingerprint. The same authority and attempt epoch are bound before role, tool, provider, database, or sandbox resolution. Tool permits are isolated by identity, narrowed authority, and epoch. Artifact and memory adapter results must match their bound branch before entering the record.
-
-Artifacts, memory decisions, invocation status, and provider continuation ids mutate the live `SessionRecord`; the owner chooses when to checkpoint it. Once finish begins, new semantic mutations are rejected. Only already-active attempt and invocation settlement may complete.
-
-Steering is attempt-and-epoch fenced. Stale events are ignored, queue/input events become messages at the next model-round boundary, and interrupt/cancel events abort the active attempt. `session.events` replays the runtime's monotonic, clock-stamped event stream.
-
-## Provider attempts
-
-`agent.attempt` is the rich provider port. Its neutral events are content deltas, reasoning deltas, and provider status. `agent.fromModel()` adapts an existing scalar model without inventing deltas.
-
-```ts
-import { createScope } from "@pumped-fn/lite"
-import { model } from "@pumped-fn/sdk"
-import * as agent from "@pumped-fn/sdk/agent"
 
 const scope = createScope({
   tags: [
+    session.authority(boundAuthority),
+    session.record(loadedRecord),
+    session.clock(clock),
+    session.store.commit(commitSession),
+    validation.engine(zodEngine),
+    agent.config.role({
+      name: "database-analyst",
+      version: "1",
+      instructions: "Recommend query changes. Never apply schema changes.",
+    }),
+    agent.impl.tool(inspectSchema),
+    agent.impl.tool(explainQuery),
+    agent.impl.attempt(agent.fromModel),
+    model(databaseModel),
+    session.execution.turn({ flow: agent.turn }),
+    database.ready({ serverVersion: "16" }),
+    database.inspect(inspectDatabase),
+    database.explain(explainDatabaseQuery),
+  ],
+})
+
+const ctx = scope.createContext()
+await ctx.resolve(session.session)
+await ctx.exec({
+  flow: session.run,
+  input: {
+    work: { id: "analysis-1", branchId: "main", role: "database-analyst", policy: "all" },
+    input: { prompt: "Find the slow query and recommend an index." },
+  },
+})
+await ctx.exec({ flow: session.finish })
+await ctx.close()
+await scope.dispose()
+```
+
+Activation reaches `inspectSchema` and `explainQuery`, then their readiness and backend tags, before `session.run` emits `work.started` or `agent.turn` calls the model. Tests prove that an absent readiness binding produces no model or database calls.
+
+## GitHub issue triage
+
+```text
+GitHub issue -> session.run -> agent.turn -> repo + Postgres + Victoria
+                                      |                    |
+                                      +-> hypothesis -> cited verdict
+```
+
+The queue consumer is an application flow. It composes `controller(session.run)` with explicit receive, acknowledge, reject, lease, and timer port flows. Awaited controller executions provide blocking. Multiple consumer flows provide bounded concurrency. There is no worker registry or pool surface in the SDK.
+
+The turn sees only tag-selected tools. A practical triage role can select:
+
+- a repository search flow for code evidence;
+- read-only Postgres schema, statistics, and `EXPLAIN` flows;
+- VictoriaMetrics or VictoriaLogs query flows;
+- a publication flow that accepts a validated verdict with citations and an idempotency key.
+
+Backend readiness belongs in each tool's declared tree. Input and output validation belongs at the tool boundary. The model proposes a hypothesis; application flows decide whether evidence is fresh and sufficient for publication.
+
+The runnable issue-triage verifier shipped with `@pumped-fn/sdk-test` proves all sixteen intake, containment, evidence, verdict, publication, retry, observation, and bounded-concurrency contracts with fake ports.
+
+## Session lifecycle
+
+The durable `SessionRecord` is data. The current-owned `SessionRuntime` coordinates attempts and registries for one activation. Resolve `session.session` in the context that owns the logical session before nested work.
+
+`session.finish` and context cleanup have different jobs:
+
+| Path | Admission | Active attempts | Commit | Durable status |
+|---|---|---|---|---|
+| `session.finish` | Fenced | Joined | Once through `session.store.commit` | `finished` |
+| `SessionRuntime.deactivate()` | Fenced | Aborted, then joined | Never | Unchanged |
+
+The session resource registers `deactivate()` as cleanup. Cleanup does not commit, schedule, write memory, or call a model. Finish-first makes deactivation wait for the existing finish. Deactivate-first makes later finish fail without a commit.
+
+`session.run` binds one `session.observation.current` projection for the activation. It contains `sessionId`, `activationId`, `workId`, optional `parentWorkId`, and `role`. Extensions can observe that stable projection without enumerating arbitrary execution tags or reading prompts, tool inputs, memory, or credentials.
+
+## Providers
+
+`agent.impl.attempt` selects the provider attempt flow. Its neutral stream contains content deltas, reasoning deltas, and provider status. `agent.fromModel` adapts the scalar root `model` tag without inventing deltas.
+
+```ts
+const scope = createScope({
+  tags: [
     model(myScalarModel),
-    agent.attempt(agent.fromModel(myScalarModel)),
+    agent.impl.attempt(agent.fromModel),
   ],
 })
 ```
 
-Claude, Codex, and Pi packages provide native attempt bindings. Their scalar exports drain the same provider execution path.
+Claude, Codex, and Pi export native attempt bindings for the same tag.
 
 ## Sandboxing
 
-Sandbox policy and implementors are separate namespaces.
+Sandbox policy and implementors are separate:
 
 ```ts
-import * as sandbox from "@pumped-fn/sdk/sandbox"
-
 const tags = [
   sandbox.policy({
     roots: ["/workspace"],
@@ -192,69 +212,14 @@ const tags = [
 ]
 ```
 
-The policy must be a subset of session authority. A missing implementor or wider policy fails before the effect. Validation hashing and POSIX sandbox containment use runtime-neutral implementations; the core subpaths do not require Node built-ins.
+The policy must fit the bound session authority. A missing implementation or wider policy fails before the effect.
 
-## Workflow and eval adapters
+## Deliberate absences
 
-Stable workflow primitives remain at the root: `step`, `workflowRun`, `workflowExtension`, materials, CLI workers, `inspect`, and scalar `Model`.
+The SDK has no `WorkerRegistry`, material factory, `cliWorker`, or `channel`/`schedule`/`http` handle factory. Use `controller(flow)` for queue and child-flow composition, `runCli` for a declared CLI adapter, plain records for durable state, and application-owned inbound adapters.
 
-Inbound adapters now receive a flow directly:
-
-```ts
-const inbound = channel({
-  name: "database-analysis-channel",
-  parse: typed<{ prompt: string }>(),
-  turn: analyze,
-  input: (ctx) => ({
-    work: {
-      id: "analysis-1",
-      branchId: "main",
-      role: "database-analyst",
-      policy: "all",
-    },
-    input: { prompt: ctx.input.prompt },
-  }),
-})
-```
-
-`schedule`, `http`, and `suite` use the same pattern. They do not own an agent runtime.
-
-## SDK 2 to SDK 3
-
-| SDK 2 | SDK 3 |
-|---|---|
-| root `agent()` and `Agent` | `agent.role()` plus `agent.turn()` |
-| `AgentOptions` | `agent.RoleOptions` plus `agent.TurnOptions` |
-| `agent.turn` property | exported turn flow |
-| root `tool()` | `agent.tool()` resource |
-| root `Tool` and `ToolOptions` | `agent.ResolvedTool`, `agent.ToolSnapshot`, and `agent.ToolOptions` |
-| root `skill()` | `agent.skill()` resource |
-| root `Skill` and `SkillOptions` | `agent.ResolvedSkill` and `agent.SkillOptions` |
-| root `sub()` | `agent.subagent()` and child work |
-| root `Sub`, `SubOptions`, and `SubResult` | `agent.SubagentDefinition`, `agent.SubagentOptions`, and `agent.SubagentResult` |
-| `TurnResult.agentName` | `agent.TurnResult.role` |
-| `ToolResult.id` and `SkillResult.id` | `callId` |
-| root `session()` material | `session.SessionRecord` plus `session.session` resource |
-| `SessionState` and `SessionOptions` | `session.SessionRecord`, `session.Authority`, and session configuration tags |
-| `send()` | `session.run()` plus explicit `session.finish` |
-| root `Event`, `EventType`, `EventBuffer`, and `events` | `session.SessionEvent` and `session.events` |
-| root `sandbox` method bag | `sandbox.read`, `sandbox.write`, `sandbox.exec`, and `sandbox.impl` tags |
-| root `Sandbox` and `SandboxExecResult` | `sandbox.Policy`, `sandbox.Read`, `sandbox.Write`, `sandbox.Run`, and `sandbox.ExecResult` |
-| `channel({ agent })`, `schedule({ agent })`, `http({ agent })` | the same adapters with `{ turn }` |
-| `suite({ agent })` | `suite({ turn })` |
-
-SDK 3 has no legacy execution loop. Existing scalar `Model`, `model`, and `complete` remain available.
-
-## Anti-goals
-
-- No built-in tools or automatic tool discovery.
-- No context-bound flow handle stored in a session or tool registry.
-- No model-authorized memory acceptance, permission expansion, or database apply.
-- No business effect in cleanup hooks.
-- No shared production scope factory.
-- No MCP or native-Claude tool surface in this migration.
-- No single model verdict as release evidence.
+It also has no built-in tools, automatic tool collection, context-bound handle registry, model-authorized permission expansion, cleanup-time business effects, or shared production scope factory.
 
 ## Testing
 
-The scope is the seam. Build each test with only public definitions and `createScope({ tags, presets, extensions })`. Resolve physical resources in a host context when two sessions must share them. Close logical sessions before the host, then dispose the scope.
+Every test builds its own `createScope({ tags, presets, extensions })`. Preset a direct dependency for a unit test. Bind only physical edge adapters for an outside-in test. Runtime missing-tag failures are accepted in this release; code analysis can report them later.

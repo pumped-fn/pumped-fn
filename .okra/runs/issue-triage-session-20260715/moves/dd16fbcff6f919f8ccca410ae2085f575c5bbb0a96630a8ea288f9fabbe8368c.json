@@ -1,0 +1,39 @@
+{
+  "committed_at": "2026-07-15T06:04:47Z",
+  "idempotency_key": "accept:DKR-3:v4",
+  "key_sha256": "dd16fbcff6f919f8ccca410ae2085f575c5bbb0a96630a8ea288f9fabbe8368c",
+  "payload": {
+    "checkpoint_ref": "workers/dkr-3-v4/checkpoint.v4.json",
+    "claim_id": "accept.DKR-3.safe-observation-v4",
+    "contract": {
+      "forbidden_export_count": 0,
+      "lite_projection_change_count": 0,
+      "projection_source_count": 1,
+      "public_arbitrary_tag_enumeration_count": 0,
+      "public_context_data_callback_count": 0,
+      "same_scope_cross_session_leak_count": 0,
+      "terminal_ordering": "2/2",
+      "trace_dimensions": "12/12"
+    },
+    "decided_at": "2026-07-15T06:03:46Z",
+    "decision": "accepted_as_reducing_discovery",
+    "evidence": [
+      "workers/dkr-3-v4/checkpoint.v4.json",
+      "workers/dkr-3-v4/replay.sh",
+      "workers/validator-dkr-3-v4/verification.json",
+      "workers/validator-dkr-3-v4/independent-v4-audit.mjs"
+    ],
+    "freshness": {
+      "checkpoint_age_seconds_at_validation": 286,
+      "frame_max_age_seconds": 600,
+      "wall_reads": "6/6 fresh"
+    },
+    "implementation_authorized": false,
+    "implementation_boundary": "Define one named safe SDK observation projection, compose it through declared execution tags, let the observable extension read only that projection, and emit activation close before sink flush and close. Do not add arbitrary tag enumeration, a public ContextData callback, or a Lite projection primitive.",
+    "observed_at": "2026-07-15T06:00:58Z",
+    "type": "claim_acceptance",
+    "unit_id": "DKR-3",
+    "verification_ref": "workers/validator-dkr-3-v4/verification.json"
+  },
+  "payload_sha256": "75ede6af39908a07e4fb626bd354fb404dedb933fd8734b785cb7c18bc7b164f"
+}

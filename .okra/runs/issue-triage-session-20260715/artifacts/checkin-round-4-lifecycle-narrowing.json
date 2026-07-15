@@ -1,0 +1,70 @@
+{
+  "type": "steering_checkin",
+  "checkin_id": "checkin.issue-triage.round-4.lifecycle-narrowing",
+  "round": 4,
+  "observed_at": "2026-07-15T04:42:18Z",
+  "next_check_at": "2026-07-15T04:52:18Z",
+  "inbound_signal": "Observation behavior and six walls replayed, but one stale hash blocked DKR-3; cleanup discovery selected an SDK deactivation contract with ten replayed cases; the generic descendant-cancellation question remains open.",
+  "decision_delta": "Kept DKR-3 mechanically blocked, sent DKR-1 cleanup to a new validator, and activated DKR-2 without adding any product primitive.",
+  "affected_units": ["DKR-1", "DKR-2", "DKR-3", "CKR-LITE-LIFECYCLE", "CKR-SESSION-ACTIVATION", "CKR-OBSERVATION"],
+  "expected_effect": "Separate SDK activation deactivation from generic ExecutionContext descendant cancellation, so each layer receives only behavior proven necessary.",
+  "evidence_delta": "DKR-3 reads 12 of 12 trace dimensions, zero cross-session leaks, zero sensitive exports, six of six held walls, and 11 of 12 resolvable hashes. DKR-1 cleanup candidate reads 10 of 10 cases and preserves 6 of 6 activation behavior while the current product wall remains 1 against 0.",
+  "problem_restatement": "Close an activation safely, observe it through one declared projection, and determine whether ExecutionContext itself must cancel and join descendants before resources clean up.",
+  "alternatives_considered": [
+    "Fold all cancellation into SessionRuntime",
+    "Add a Lite task or spawn abstraction now",
+    "Keep SDK deactivation and generic descendant cancellation as separate evidence questions"
+  ],
+  "assumptions_at_risk": [
+    "Runtime.deactivate can arbitrate finish without a hidden commit",
+    "Existing Lite cleanup timing is sufficient for SDK work owned directly by the session",
+    "A generic context signal or cancel operation is enough for nested scalar and stream descendants"
+  ],
+  "dkr_decision": "Validate DKR-1 cleanup, continue DKR-2 generic probes, mechanically repair DKR-3 evidence, and keep every CKR and PKR candidate.",
+  "hallucination_sweep": [
+    {
+      "claim": "Verified DKR-3 behavior makes its malformed checkpoint acceptable.",
+      "evidence_ref": "workers/validator-dkr-3/verification.json",
+      "verdict": "rejected; one unresolved evidence hash keeps the exact record blocked"
+    }
+  ],
+  "missing_context_sweep": [
+    {
+      "claim": "Session deactivation proves generic child-context cancellation semantics.",
+      "evidence_ref": "worker-packets/dkr-2.json",
+      "verdict": "rejected; scalar, stream, error, consumer-break, and nested-close probes remain separate"
+    }
+  ],
+  "unexpected_results": [
+    {
+      "claim": "Observation needs no Lite change, while lifecycle may still expose one generic Lite gap.",
+      "evidence_ref": "workers/validator-dkr-3/verification.json",
+      "verdict": "observation side verified; lifecycle side under DKR-2"
+    }
+  ],
+  "anti_goal_violation_review": [
+    {
+      "claim": "The current product cleanup wall remains breached despite a candidate replacement contract.",
+      "evidence_ref": "workers/dkr-1-cleanup/checkpoint.v2.json",
+      "verdict": "held as a blocking baseline; no product edit dispatched"
+    }
+  ],
+  "uncertainty_5why": {
+    "status": "open",
+    "terminal_metric_or_uncertainty_id": "uncertainty.structured_descendant_cancellation",
+    "reducing_dkr": "DKR-2"
+  },
+  "open_flags": [
+    "DKR-0 v2 disposition proof pending",
+    "DKR-1 cleanup independent validation pending",
+    "DKR-2 generic lifecycle probe active",
+    "DKR-3 corrected evidence checkpoint pending"
+  ],
+  "steering_value_score": 1,
+  "worker_progress_refs": [
+    "workers/validator-dkr-3/progress.jsonl#seq=1",
+    "workers/dkr-1-cleanup/progress.jsonl#seq=1",
+    "worker-packets/validator-dkr-1-cleanup.json",
+    "worker-packets/dkr-2.json"
+  ]
+}

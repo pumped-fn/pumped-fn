@@ -1,0 +1,15 @@
+{
+  "flag_id": "breaking.DKR-0.slop-violations",
+  "type": "breaking",
+  "status": "open",
+  "opened_at": "2026-07-15T05:20:26Z",
+  "owner": "Codex /root",
+  "severity": "blocking-commit",
+  "requires_human_by": null,
+  "affected": ["AG-STYLE", "DKR-0", "CKR-PUBLIC-TRUTH"],
+  "evidence": [
+    "artifacts/dkr-0-slop-gate.v3.json",
+    "workers/dkr-0-v3/progress.jsonl#seq=1"
+  ],
+  "blocking_effect": "Keep product-changing moves paused until a separate validator reproduces the 72 lint diagnostics and two graph-rule violations. Confirmed violations must be removed by the recorded PR reshape; the threshold remains zero."
+}

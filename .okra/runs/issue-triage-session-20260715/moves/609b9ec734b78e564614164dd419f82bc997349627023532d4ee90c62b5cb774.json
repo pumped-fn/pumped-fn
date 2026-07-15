@@ -1,0 +1,15 @@
+{
+  "committed_at": "2026-07-15T04:15:31Z",
+  "idempotency_key": "dispatch:DKR-0:v1",
+  "key_sha256": "609b9ec734b78e564614164dd419f82bc997349627023532d4ee90c62b5cb774",
+  "payload": {
+    "admissibility": "allowed: read-only product inspection with governed run writes; active walls fresh or funded",
+    "observed_at": "2026-07-15T04:08:44Z",
+    "packet": "worker-packets/dkr-0.json",
+    "status": "dispatched",
+    "target": "/root/dkr_0_pr_disposition",
+    "type": "dispatch_result",
+    "unit_id": "DKR-0"
+  },
+  "payload_sha256": "76688622ea2f97fe5dc94a72205c84dd318bfc12b95534d13cd33dd8e94ad317"
+}

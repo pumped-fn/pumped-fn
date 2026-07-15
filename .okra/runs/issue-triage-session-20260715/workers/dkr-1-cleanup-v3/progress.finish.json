@@ -1,0 +1,47 @@
+{
+  "type": "worker_finish",
+  "worker_id": "dkr-1-cleanup-v3",
+  "worker_kind": "discovery",
+  "unit_id": "DKR-1",
+  "status": "checkpoint_written_pending_independent_review",
+  "recorded_at": "2026-07-15T04:57:37Z",
+  "next_check_at": "2026-07-15T05:07:37Z",
+  "checkpoint_ref": "workers/dkr-1-cleanup-v3/checkpoint.v3.json",
+  "checkpoint_sha256": "909ba54fd7cc80fdf588e6bf7f2086fb23c4fcd7a23126f6dca674e03c796a6e",
+  "contract_ref": "workers/dkr-1-cleanup-v3/cleanup-contract.json",
+  "contract_sha256": "430cf9264c3f0df2b5110c1a14842d75f82a8e9f29ae4f18c0595e4a9d2867e6",
+  "probe_ref": "workers/dkr-1-cleanup-v3/cleanup-contract-probe.mjs",
+  "probe_sha256": "a2bb2b22a37a2d8a85575383042fa1af285b1f2145bfd53f4748532102adedce",
+  "replay_ref": "workers/dkr-1-cleanup-v3/replay.sh",
+  "replay_sha256": "d6027930abf8fd5f89ac4ff7829f63460f62ea316409cdac3ad448c3472ca930",
+  "replay_exit_code": 0,
+  "case_result": "11 of 11 candidate cleanup cases replayed, including two settlement failures aggregated after all three snapshotted attempts settle; inherited activation behavior replayed at 6 of 6.",
+  "product_files_changed": false,
+  "decision": "candidate only; never accepted by this worker",
+  "remaining_blockers": [
+    "checkpoint v3 requires a separate validator replay",
+    "current product cleanup_business_state_mutation_count remains 1 against threshold 0 and needs a recorded in-frame resolution before progression"
+  ],
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked"
+  },
+  "commanded_lines": [
+    "Model phrasing: GPT-5.x detected from the system harness; Phrasing profile id RTM-PH6OCQ6MX4.",
+    "Action envelope: read and replay prior cleanup evidence; write only workers/dkr-1-cleanup-v3 artifacts; no product, test, doc, manifest, git, PR, frame, tree, external, ownership, Lite primitive, lifecycle, or wall changes; permission owner is the user and runtime.",
+    "Anti-goal coverage: cleanup_business_state_mutation_count -> readable; cross_session_leak_count -> readable; primitive_proof_gap_count -> readable; single_llm_truth_acceptance_count -> reducing-DKR validator-dkr-1-cleanup-v3; ungoverned_write_or_read_count -> readable; anti_goal_bypass_or_dishonesty_count -> reducing-DKR validator-dkr-1-cleanup-v3; anti_goal_coverage_gap_count == 0.",
+    "CKR-level discovery/delivery balance: the added discovery closes deterministic multiple-error aggregation; delivery remains PKR-SESSION-DEACTIVATION-CLEANUP-V3 only after independent checkpoint acceptance and a recorded wall resolution.",
+    "progress signals: inherited cleanup cases 10 of 10, added error case 1 of 1, activation behaviors 6 of 6, evidence hashes 8 of 8, current cleanup wall 1 against 0, product files changed false.",
+    "active anti-goals: cleanup_business_state_mutation_count because ordinary close still changes runtime business state; cross_session_leak_count because current ownership stays isolated; primitive_proof_gap_count because placement remains SDK-native; single_llm_truth_acceptance_count because v3 validation is pending; ungoverned_write_or_read_count because all writes stay in the packet directory; anti_goal_bypass_or_dishonesty_count because the current breach remains blocking.",
+    "Storage integrity: append-only records are the source of truth, status and progress files are generated views, and claims are accepted only on independent deterministic evidence, not one LLM's say-so.",
+    "Worker progress: .okra/runs/issue-triage-session-20260715/workers/dkr-1-cleanup-v3/progress.jsonl, written at worker finish.",
+    "Heartbeat cadence and next_check_at: ten minutes; next check is 2026-07-15T05:07:37Z.",
+    "Introspection cadence: checkpoint acceptance, any flag, level descent before plan to task, terminalization, and every third check-in.",
+    "Standing walls: all six active walls remain standing and retire only through human context retirement."
+  ],
+  "role_grammar": [
+    "Candidate CKRs and candidate PKRs are not promoted until the orchestrator accepts the supporting DKR learning checkpoint.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+    "In-progress worker narrative is not evidence; only worker progress, check-ins, metric reads, flags, or accepted checkpoints can influence the next dispatch."
+  ]
+}

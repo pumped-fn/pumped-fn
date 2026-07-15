@@ -1,0 +1,46 @@
+{
+  "type": "worker_finish",
+  "unit_id": "DKR-2",
+  "worker_id": "dkr-2",
+  "status": "checkpoint_written_pending_independent_review",
+  "observed_at": "2026-07-15T04:43:59Z",
+  "checkpoint_ref": "workers/dkr-2/checkpoint.json",
+  "probe_ref": "workers/dkr-2/cancellation-probe.mjs",
+  "probe_result_ref": "workers/dkr-2/cancellation-probe.json",
+  "replay_ref": "workers/dkr-2/replay.sh",
+  "decision": "candidate_signal_only_structured_lifetime_without_public_cancel",
+  "questions_answered": [
+    "Current parent close leaks scalar, stream, and nested descendants past parent cleanup",
+    "Existing scalar error and stream completion, error, and consumer-break behavior is sound",
+    "Signal-only structured close can cancel and join cooperative scalar work, nested work, and streams before parent cleanup",
+    "Optional per-exec signals give invocation callers selective cancellation",
+    "A public cancel method adds no caller beyond close, supplied signals, and ctx.signal observation"
+  ],
+  "questions_unanswered": [
+    "Uncooperative scalar work must settle before structured close can return",
+    "Independent replay and challenge",
+    "Exact private descendant-settlement bookkeeping"
+  ],
+  "candidate_ckrs": [
+    "CKR-LITE-LIFECYCLE"
+  ],
+  "candidate_pkrs": [
+    "PKR-LITE-STRUCTURED-CLOSE",
+    "PKR-LITE-CANCELLATION-CONTRACTS"
+  ],
+  "active_anti_goals": [
+    "primitive_proof_gap_count",
+    "touched_surface_regression_count",
+    "single_llm_truth_acceptance_count",
+    "ungoverned_write_or_read_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "evidence_refs_or_hashes": [
+    "sha256:30858c146118a23be1e942cc5e4adba683a7f517c8daef02537b0d643146249f",
+    "sha256:267674e4a35a3164f3e2a686dce592de00234d1951bec04a6e7acff1e9c9f5d7",
+    "sha256:279bb23e659eda55548324addbf3243f759262607ffb865f749f21535b61e087",
+    "sha256:8aa3127afe09d23506868d906dd778dd6cc55ebc6ed129781504c9b7c08a408d"
+  ],
+  "downstream_advance": "blocked",
+  "reason": "Independent replay and active-wall verification are pending"
+}

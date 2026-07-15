@@ -1,5 +1,4 @@
 import { createScope } from "@pumped-fn/lite"
-import { abortSignal } from "@pumped-fn/sdk"
 import * as sandbox from "@pumped-fn/sdk/sandbox"
 import * as session from "@pumped-fn/sdk/session"
 import { expect, it } from "vitest"
@@ -137,7 +136,7 @@ it("settles cancellation in session A without closing session B", async () => {
       binding.run,
     ],
   })
-  const sessionA = context(scope, "session-a", authority, [abortSignal(controller.signal)])
+  const sessionA = context(scope, "session-a", authority)
   const sessionB = context(scope, "session-b", authority)
   await sessionA.resolve(session.session)
   await sessionB.resolve(session.session)
@@ -150,6 +149,7 @@ it("settles cancellation in session A without closing session B", async () => {
   const waiting = sessionA.exec({
     flow: sandbox.exec,
     input: { command: "sleep", args: ["1"] },
+    signal: controller.signal,
   })
   await Promise.resolve()
   controller.abort(new Error("steered"))
@@ -169,14 +169,12 @@ function context(
   scope: ReturnType<typeof createScope>,
   id: string,
   authority: session.Authority,
-  tags: ReturnType<typeof abortSignal>[] = [],
 ) {
   return scope.createContext({
     tags: [
       session.authority(authority),
       session.record(sessionRecord(id, authority)),
       session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
-      ...tags,
     ],
   })
 }

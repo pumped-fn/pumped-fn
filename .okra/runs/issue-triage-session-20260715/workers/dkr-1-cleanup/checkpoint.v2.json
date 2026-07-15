@@ -1,0 +1,199 @@
+{
+  "contract_version": "okra.executable-dkr-checkpoint.v1",
+  "type": "dkr_learning_checkpoint",
+  "unit_id": "DKR-1",
+  "checkpoint_id": "dkr-1-cleanup-contract-v2",
+  "conclusion_id": "current-owned-deactivation-contract",
+  "model_phrasing": "Model phrasing: GPT-5.x detected from the system harness; Phrasing profile id RTM-PH6OCQ6MX4.",
+  "decision_target": "Choose the exact session deactivation cleanup contract without changing current-owned activation or adding a Lite primitive.",
+  "source_of_truth": "workers/dkr-1-cleanup/cleanup-contract.json, its saved executable probe, current Lite and SDK source, and the independent 6-of-6 activation validator record",
+  "read_method": "Run workers/dkr-1-cleanup/replay.sh and compare the asserted case counts, commit counts, mutation counts, race outcomes, cleanup order, and source hashes with this checkpoint.",
+  "observed_at": "2026-07-15T04:36:37Z",
+  "recorded_at": "2026-07-15T04:36:37Z",
+  "max_age": "30m",
+  "freshness_status": "fresh",
+  "confidence": 0.92,
+  "evidence_refs_or_hashes": [
+    "sha256:912c3874fb823655abf4e69a6ed9db16573de8d3640638aa41a8b4dfabdb7603",
+    "sha256:0d6a86e5d40573ef827767ed44bbc10c39aaa26eda317e5202449eae6eda6b4d",
+    "sha256:cfa9a363c400e6637e8537ba0ac5053fa96f70cf8dfca85d43deccede705b500",
+    "sha256:78b6500dee31b501644f3a528149e2efb3cb8f684a59373071cf9fdc5f5cfe06",
+    "sha256:7fb45a842db6233d61ee7f2d81e886c4ac2c8b5fc77549ff4db8bc41df8a725f",
+    "sha256:549e6b4096698a433f5a843dc4851d2ab9743c7b5e77e7497e0205c7d9aa3b0b",
+    "sha256:b8810fd41440692eb6390cb6efb954dbfcbc8af188a2e370c30975eca9944001",
+    "sha256:b0d98497cdf17e6f3b2c6062344fca910aa310f99104c6276159657d2bec5129"
+  ],
+  "replay_command_or_checker": "workers/dkr-1-cleanup/replay.sh",
+  "questions_answered": [
+    "Ordinary deactivation must synchronously fence the activation, abort all live attempts, and join all snapshotted settlements without beginning durable finish or calling store.commit.",
+    "Cancellation may settle activation-local work and attempt records as cancelled. Those working-copy changes are disposable until an explicit checkpoint or finish commits a snapshot.",
+    "Ordinary deactivation leaves both the activation-local SessionRecord status/version and the durable store status/version unchanged.",
+    "The smallest placement is SessionRuntime.deactivate, replacing shutdown, invoked by the existing resource cleanup closure. Lite already supplies the needed cleanup timing and error policy.",
+    "Repeated deactivation returns one cached promise and repeats no effects.",
+    "Finish and deactivation use first-claimer ordering: finish-first commits once and deactivation awaits it; deactivate-first rejects later finish and commits zero times.",
+    "An explicit checkpoint before close remains the only checkpoint commit; an explicit finish before close remains the only finished commit.",
+    "Settlement rejection waits for all snapshotted attempts, then rejects cleanup without a commit. Ordinary cancelled settlement is a value, not an error.",
+    "Existing Lite order is execution onClose first, then resources in reverse resolution order, with each cleanup awaited.",
+    "The prior current-owned activation behavior remains independently verified at 6 of 6."
+  ],
+  "questions_unanswered": [
+    "Independent validation has not yet replayed the ten cleanup cases or challenged the proposed public method shape.",
+    "Parent-child structured cancellation and provider-specific descendant joining remain assigned to DKR-2, not this cleanup checkpoint.",
+    "The product still has shutdown calling beginFinish, so the cleanup wall remains breached until a separately authorized progression change is implemented and verified."
+  ],
+  "decision": "candidate only; never accepted by this worker",
+  "flag_if_missing_or_stale": "cannot",
+  "reviewer_audit_status": "pending_independent_replay",
+  "active_anti_goals": [
+    "cleanup_business_state_mutation_count",
+    "cross_session_leak_count",
+    "primitive_proof_gap_count",
+    "single_llm_truth_acceptance_count",
+    "ungoverned_write_or_read_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "anti_goal_id": "AG-CLEANUP-EFFECT",
+      "metric_id": "cleanup_business_state_mutation_count",
+      "source_of_truth": "Current SDK baseline close replay and the prior independent cleanup audit",
+      "read_method": "Close a current session resource without finish and count runtime SessionRecord status/version changes or store commits",
+      "observed_at": "2026-07-15T04:36:37Z",
+      "recorded_at": "2026-07-15T04:36:37Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 1,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "breached",
+      "evidence_ref": "workers/dkr-1-cleanup/cleanup-contract-probe.mjs#currentBaseline",
+      "replay_command_or_checker": "workers/dkr-1-cleanup/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-0-1/verification.json#DKR-1.cleanup-wall"
+    },
+    {
+      "anti_goal_id": "AG-SESSION-ISOLATION",
+      "metric_id": "cross_session_leak_count",
+      "source_of_truth": "Prior overlapping current-owned activation probe and independent validator replay",
+      "read_method": "Replay the inherited activation probe and compare sibling runtime identities and tags",
+      "observed_at": "2026-07-15T04:36:37Z",
+      "recorded_at": "2026-07-15T04:36:37Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held",
+      "evidence_ref": "workers/dkr-1/activation-probe.mjs",
+      "replay_command_or_checker": "workers/dkr-1-cleanup/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-0-1/verification.json#DKR-1.activation-behavior"
+    },
+    {
+      "anti_goal_id": "AG-PRIMITIVE-PROOF",
+      "metric_id": "primitive_proof_gap_count",
+      "source_of_truth": "Candidate cleanup contract, current Runtime ownership, and current Lite cleanup replay",
+      "read_method": "Confirm every case uses SessionRuntime.deactivate plus existing resource cleanup and no new Lite primitive",
+      "observed_at": "2026-07-15T04:36:37Z",
+      "recorded_at": "2026-07-15T04:36:37Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_verification",
+      "evidence_ref": "workers/dkr-1-cleanup/cleanup-contract.json#placement",
+      "replay_command_or_checker": "workers/dkr-1-cleanup/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-1-cleanup/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-INDEPENDENCE",
+      "metric_id": "single_llm_truth_acceptance_count",
+      "source_of_truth": "This writer checkpoint and the missing cleanup validator record",
+      "read_method": "Require a separate validator to replay all cleanup cases before checkpoint acceptance",
+      "observed_at": "2026-07-15T04:36:37Z",
+      "recorded_at": "2026-07-15T04:36:37Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 1,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "breached",
+      "evidence_ref": "workers/dkr-1-cleanup/checkpoint.v2.json#reviewer_audit_status",
+      "replay_command_or_checker": "workers/dkr-1-cleanup/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-1-cleanup/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-STORAGE",
+      "metric_id": "ungoverned_write_or_read_count",
+      "source_of_truth": "DKR-1 cleanup packet, scoped changed-path check, saved hashes, and governed worker report",
+      "read_method": "Compare all changed paths with authorized_writes and replay hashed artifacts",
+      "observed_at": "2026-07-15T04:36:37Z",
+      "recorded_at": "2026-07-15T04:36:37Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_verification",
+      "evidence_ref": "worker-packets/dkr-1-v2-cleanup.json#authorized_writes",
+      "replay_command_or_checker": "workers/dkr-1-cleanup/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-1-cleanup/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-INTEGRITY",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "source_of_truth": "Candidate checkpoint with the current breach and missing independent replay left blocking",
+      "read_method": "Inspect that the cleanup breach is not weakened and every unverified claim blocks downstream advance",
+      "observed_at": "2026-07-15T04:36:37Z",
+      "recorded_at": "2026-07-15T04:36:37Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_verification",
+      "evidence_ref": "workers/dkr-1-cleanup/checkpoint.v2.json#wall_gate",
+      "replay_command_or_checker": "workers/dkr-1-cleanup/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-1-cleanup/progress.jsonl#pending"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-15T04:36:37Z",
+    "reason": "Current product cleanup still changes the runtime SessionRecord status to finishing, and the new cleanup contract lacks independent replay."
+  },
+  "worked_checkpoint_trace": {
+    "metric_read": "cleanup_business_state_mutation_count",
+    "threshold": 0,
+    "value": 1,
+    "evidence_sha256": "sha256:0d6a86e5d40573ef827767ed44bbc10c39aaa26eda317e5202449eae6eda6b4d",
+    "confidence": 0.92,
+    "decision": "rejected for downstream advance because the current product wall is breached"
+  },
+  "confidence_probability_update": "0.55 before the cleanup cases; 0.92 after ten candidate cases, current baseline replay, Lite order replay, and preserved 6-of-6 activation replay",
+  "risk_or_anti_goal_implications": [
+    "The contract removes the hidden beginFinish effect from ordinary resource cleanup without weakening cancellation or join.",
+    "Separating activation lifecycle from SessionRecord status is required to fence late work while leaving durable business state unchanged.",
+    "First-claimer finish ordering prevents a deactivation race from creating an unrequested commit.",
+    "Current product state still breaches cleanup_business_state_mutation_count, so this learning cannot authorize progression by itself.",
+    "No Lite change is supported by the probe."
+  ],
+  "candidate_ckrs": [
+    {
+      "id": "CKR-SESSION-DEACTIVATION",
+      "metric": "session_deactivation_contract_pass_count",
+      "target": "10/10 cleanup cases while cleanup_business_state_mutation_count remains 0 after implementation"
+    }
+  ],
+  "candidate_pkrs": [
+    {
+      "id": "PKR-SESSION-DEACTIVATION-CLEANUP-V2",
+      "scope": "Replace shutdown with deactivation, add activation lifecycle arbitration, and enforce the ten scope-seam cases after checkpoint acceptance."
+    }
+  ],
+  "checkpoint_rejection_policy": "Superficial, tautological, false-positive, fabricated, unsupported, or single-LLM-truth checkpoints are rejected. Missing, stale, wrong-source, non-replayable, or contradicted evidence fails closed. An empty result remains valid only with a replayable probe trace.",
+  "role_grammar": [
+    "CKRs are measurable contribution context, not worker work.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  ]
+}

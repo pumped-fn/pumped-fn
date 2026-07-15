@@ -1,0 +1,37 @@
+{
+  "type": "worker_finish",
+  "worker_id": "dkr-3-v4",
+  "worker_kind": "discovery",
+  "unit_id": "DKR-3",
+  "status": "freshness_v4_checkpoint_pending_independent_replay",
+  "recorded_at": "2026-07-15T05:58:16Z",
+  "checkpoint_ref": "workers/dkr-3-v4/checkpoint.v4.json",
+  "checkpoint_sha256": "da6d4371869701885c28db301c2d2bd9caf24f32315ac47ed5e557177dbb78e3",
+  "replay_ref": "workers/dkr-3-v4/replay.sh",
+  "replay_sha256": "0a531875eaac84ec23a115dcc3808c737b6620eaf60fa28d796f7441eb9cb995",
+  "exact_replay_command": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-3-v4/replay.sh",
+  "result": "12 of 12 dimensions; same-Scope leaks 0; forbidden exports 0; terminal orders 2 of 2; hashes 11 of 11; max_age 10m on checkpoint and 6 of 6 walls; accepted wall references 6 of 6",
+  "decision": "candidate freshness repair only; v3 behavior acceptance and freshness rejection are preserved; never accepted by this worker",
+  "observation_decision": {
+    "projectionSourceCount": 1,
+    "arbitraryTagEnumerationPathCount": 0,
+    "publicContextDataCallbackCount": 0,
+    "liteProjectionChangeCount": 0
+  },
+  "active_wall_reads": {
+    "sensitive_context_export_count": 0,
+    "cross_session_leak_count": 0,
+    "primitive_proof_gap_count": 0,
+    "single_llm_truth_acceptance_count": 0,
+    "ungoverned_write_or_read_count": 0,
+    "anti_goal_bypass_or_dishonesty_count": 0
+  },
+  "wall_gate": {
+    "verdict": "held",
+    "downstream_advance": "blocked",
+    "reason": "Separate v4 acceptance is still missing."
+  },
+  "product_files_changed": false,
+  "plain_wording_violation_count": 0,
+  "next_check_at": "independent v4 validator dispatch within the 10-minute freshness window"
+}

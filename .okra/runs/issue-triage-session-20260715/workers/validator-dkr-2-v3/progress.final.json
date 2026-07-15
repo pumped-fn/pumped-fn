@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "worker_id": "validator-dkr-2-v3",
+  "status": "finalized",
+  "unit_id": "DKR-2",
+  "disposition": "accepted_as_reducing_discovery",
+  "verification_sha256": "fc37bc9522646041efd98b3cee01a1a2ee5b41fc5b99eda00ed4f158e30b88a0",
+  "replay_sha256": "7af3b570a0e517fb4240dce5529c515fabe49183113e5bcc9b76abbbb62249bc",
+  "independent_probe_sha256": "d1586101411c3397e729e7522dc8d99cf821ac33dfe41b65990f4aea20c4631d",
+  "accepted_claim_count": 9,
+  "rejected_claim_count": 0,
+  "next_authority": "orchestrator",
+  "observed_at": "2026-07-15T05:24:35Z"
+}

@@ -1,0 +1,69 @@
+{
+  "type": "steering_checkin",
+  "checkin_id": "checkin.issue-triage.round-3.validation-remediation",
+  "round": 3,
+  "observed_at": "2026-07-15T04:30:53Z",
+  "next_check_at": "2026-07-15T04:40:53Z",
+  "inbound_signal": "The independent validator accepted DKR-1's six activation behaviors but rejected DKR-0 disposition proof, DKR-0 walls, DKR-1 cleanup safety, and DKR-1 checkpoint completeness.",
+  "decision_delta": "Kept all downstream product work blocked and dispatched three read-only corrections: exhaustive PR disposition, exact session deactivation semantics, and same-Scope observation isolation.",
+  "affected_units": ["DKR-0", "DKR-1", "DKR-3", "CKR-SESSION-ACTIVATION", "CKR-OBSERVATION"],
+  "expected_effect": "Turn narrative architecture choices into replayable decisions and resolve the current cleanup breach before any committing move.",
+  "evidence_delta": "DKR-1 activation behavior reads 6 of 6; cleanup business-state mutation reads 1 against 0; DKR-0 inventory markers read 39 of 39 but disposition proof reads 0 against 1; objective remains 0 of 16.",
+  "problem_restatement": "Prove graph-native session activation and safe observation while ordinary context close remains a deactivation, never an implicit durable finish.",
+  "alternatives_considered": [
+    "Proceed directly to product remediation from verified learning",
+    "Weaken the cleanup wall for the current branch baseline",
+    "Keep product work blocked and resolve the exact cleanup contract as discovery"
+  ],
+  "assumptions_at_risk": [
+    "Deactivation can cancel and join active work without changing durable session status or version",
+    "Every PR concept can receive a complete keep, reshape, or remove disposition",
+    "One explicit safe observation tag remains isolated across overlapping same-Scope sessions"
+  ],
+  "dkr_decision": "Continue DKR-0, DKR-1, and DKR-3 discovery revisions; do not promote a CKR or create a progression worker until fresh independent wall gates hold.",
+  "hallucination_sweep": [
+    {
+      "claim": "A passing marker checker proves architectural disposition correctness.",
+      "evidence_ref": "workers/validator-dkr-0-1/verification.json",
+      "verdict": "rejected; it proves presence only"
+    }
+  ],
+  "missing_context_sweep": [
+    {
+      "claim": "The exact cleanup contract is already decided by naming a deactivation method.",
+      "evidence_ref": "worker-packets/dkr-1-v2-cleanup.json",
+      "verdict": "rejected; active, concurrent, checkpoint, finish, and idempotency cases still need replay"
+    }
+  ],
+  "unexpected_results": [
+    {
+      "claim": "The simplest activation ownership model passed while the inherited cleanup coupling failed.",
+      "evidence_ref": "workers/validator-dkr-0-1/verification.json",
+      "verdict": "verified learning; checkpoint acceptance remains blocked"
+    }
+  ],
+  "anti_goal_violation_review": [
+    {
+      "claim": "cleanup_business_state_mutation_count is above threshold in the current candidate.",
+      "evidence_ref": "workers/validator-dkr-0-1/verification.json",
+      "verdict": "breached; only read-only reducing discovery is active"
+    }
+  ],
+  "uncertainty_5why": {
+    "status": "open",
+    "terminal_metric_or_uncertainty_id": "uncertainty.cleanup_without_finish",
+    "reducing_dkr": "DKR-1"
+  },
+  "open_flags": [
+    "DKR-0 disposition proof and walls rejected",
+    "DKR-1 cleanup_business_state_mutation_count=1",
+    "DKR-3 same-Scope isolation and independent validation pending"
+  ],
+  "steering_value_score": 1,
+  "worker_progress_refs": [
+    "workers/validator-dkr-0-1/progress.jsonl#seq=1",
+    "worker-packets/dkr-0-v2.json",
+    "worker-packets/dkr-1-v2-cleanup.json",
+    "worker-packets/validator-dkr-3.json"
+  ]
+}

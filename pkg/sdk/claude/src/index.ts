@@ -3,7 +3,6 @@ import { createInterface } from "node:readline"
 import { spawn } from "node:child_process"
 import { atom, controller, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
 import {
-  abortSignal,
   formatModelPrompt,
   model,
   parseModelResponse,
@@ -282,14 +281,13 @@ export const claudeAttempt: agent.Attempt = flow({
     branch: tags.optional(session.current.branch),
     leases: claudeLeases,
     record: tags.optional(session.record),
-    signal: tags.optional(abortSignal),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async function* (ctx, { branch, leases, record, signal }) {
+  factory: async function* (ctx, { branch, leases, record }) {
     const sessionId = record
       ? branch ? `${record.id}:${branch.id}` : record.id
       : leases.transient()
-    const invocation = leases.prompt(sessionId, formatModelPrompt(ctx.input), signal)
+    const invocation = leases.prompt(sessionId, formatModelPrompt(ctx.input), ctx.signal)
     let completed = false
     try {
       for await (const event of invocation.events) yield event
@@ -302,17 +300,14 @@ export const claudeAttempt: agent.Attempt = flow({
   },
 })
 
-export const claudeAttemptBinding = agent.attempt(claudeAttempt)
+export const claudeAttemptBinding = agent.impl.attempt(claudeAttempt)
 
 export const claudeRun = flow({
   name: "claude.run",
   parse: typed<PromptInput>(),
-  deps: {
-    session: claudeSession,
-    signal: tags.optional(abortSignal),
-  },
+  deps: { session: claudeSession },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: (ctx, { session, signal }) => session.prompt(ctx.input.prompt, signal),
+  factory: (ctx, { session }) => session.prompt(ctx.input.prompt, ctx.signal),
 })
 
 export const claudeTurn = flow({

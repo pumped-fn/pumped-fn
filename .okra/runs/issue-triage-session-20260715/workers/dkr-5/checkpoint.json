@@ -1,0 +1,164 @@
+{
+  "contract_version": "okra.executable-dkr-checkpoint.v1",
+  "type": "dkr_learning_checkpoint",
+  "unit_id": "DKR-5",
+  "checkpoint_id": "dkr-5-evidence-publication-v1",
+  "conclusion_id": "scope-substitutable-evidence-publication-contract",
+  "model_phrasing": "Model phrasing: GPT-5.x detected from the system harness; Phrasing profile id RTM-PH6OCQ6MX4.",
+  "decision_target": "Define the evidence, independent verification, authority, idempotency, publication, and public scope-seam contract for the issue-triage example.",
+  "source_of_truth": "The deterministic fake-adapter probe, evidence-publication contract, named sixteen-contract set, frame v2, DKR-5 packet, and current public Lite and SDK validation source.",
+  "read_method": "Run bash .okra/runs/issue-triage-session-20260715/workers/dkr-5/replay.sh from the repository root and require 14 of 14 fixtures, six Standard Schema shapes, sixteen named objective contracts, eight hashes, seven wall entries, and blocked downstream advance.",
+  "observed_at": "2026-07-15T05:40:12Z",
+  "recorded_at": "2026-07-15T05:40:12Z",
+  "max_age": "30m",
+  "freshness_status": "fresh",
+  "confidence": 0.91,
+  "evidence_refs_or_hashes": [
+    "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+    "sha256:9d42d437e5454a8eb57531761d79d1503e3a1e1ab2bd3ef1d4ab699a4253def9",
+    "sha256:7f3717195985dc3265cc7fb5b4b746fe0ed2e93de9e86892c01b13d829620d63",
+    "sha256:65610763eec1514a3bd03816c660cfd28bbdc606f695b2747d2bc7edd634ac93",
+    "sha256:8a21f143c6d009d84632c360ec1a3073a26e2caef215886c8c3ac7a50f280cd0",
+    "sha256:28a698375b2fb46e536fbd986ba922cde9b576d8333a053193488cd2ab542a88",
+    "sha256:a208869ca9eeb3d8f2407d399d01394ed01c86dda46ee2df0b41899f72b86b34",
+    "sha256:0ed0e104938580c604afcc7c7c7a143c4bf353ac8424c847328a3de9d6aa091b"
+  ],
+  "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-5/replay.sh",
+  "questions_answered": [
+    "Six Standard Schema-compatible shapes cover intake, capabilities, evidence, hypotheses, verifier verdicts, and publication receipts.",
+    "Evidence carries source, citation, capture time, expiry or maximum age, query or revision identity, and capability scope.",
+    "Repository containment, read-only SQL, bounded Victoria windows, publication authority, and idempotency keys are checked before adapters.",
+    "Publication requires a supported fully cited hypothesis and a separate verified verdict covering every citation.",
+    "Fourteen fake-adapter fixtures cover success, unsupported, missing, stale, unsafe, unauthorized, duplicate, conflicting, failed, and retry paths.",
+    "Every effect is one of six required tag ports; all logic runs through createScope and the public flow API.",
+    "The proposed sixteen names instantiate the existing objective target without changing its denominator."
+  ],
+  "questions_unanswered": [
+    "The exact example package layout and adapter package ownership remain progression choices.",
+    "A separate validator has not replayed the schemas, fixtures, objective names, or active walls.",
+    "Real adapter integration remains forbidden and human-gated."
+  ],
+  "decision": "candidate only: use configurable Standard Schema validation, required capability and effect tag ports, pre-effect safety gates, fresh cited evidence, separate verifier verdicts, and idempotent authority-bound publication; never accepted by this worker",
+  "flag_if_missing_or_stale": "cannot: fail closed when any schema, fixture, hash, source, freshness read, objective contract, or independent review is missing or stale",
+  "reviewer_audit_status": "pending_independent_replay",
+  "active_anti_goals": [
+    "scope_seam_escape_count",
+    "undeclared_effect_edge_count",
+    "unapproved_external_write_count",
+    "unsupported_hypothesis_publish_count",
+    "single_llm_truth_acceptance_count",
+    "ungoverned_write_or_read_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "anti_goal_id": "AG-SCOPE-SEAM",
+      "metric_id": "scope_seam_escape_count",
+      "source_of_truth": "Fake-adapter createScope probe",
+      "read_method": "Count module mocks, internal reaches, global patches, and logic outside the public scope seam.",
+      "observed_at": "2026-07-15T05:40:12Z", "recorded_at": "2026-07-15T05:40:12Z", "max_age": "30m", "freshness_status": "fresh",
+      "value": 0, "threshold": 0, "comparator": "==", "verdict": "pending_independent_verification",
+      "evidence_ref": "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-5/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-5/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-HIDDEN-EDGE",
+      "metric_id": "undeclared_effect_edge_count",
+      "source_of_truth": "Triage flow declared dependency graph and fake call records",
+      "read_method": "Confirm every effect comes from one of six required tag dependencies.",
+      "observed_at": "2026-07-15T05:40:12Z", "recorded_at": "2026-07-15T05:40:12Z", "max_age": "30m", "freshness_status": "fresh",
+      "value": 0, "threshold": 0, "comparator": "==", "verdict": "pending_independent_verification",
+      "evidence_ref": "sha256:9d42d437e5454a8eb57531761d79d1503e3a1e1ab2bd3ef1d4ab699a4253def9",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-5/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-5/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-PRODUCTION-SAFETY",
+      "metric_id": "unapproved_external_write_count",
+      "source_of_truth": "Safety denial fixtures and fake backend write counters",
+      "read_method": "Replay containment, SQL, window, authority, duplicate, conflict, and retry cases and count extra writes.",
+      "observed_at": "2026-07-15T05:40:12Z", "recorded_at": "2026-07-15T05:40:12Z", "max_age": "30m", "freshness_status": "fresh",
+      "value": 0, "threshold": 0, "comparator": "==", "verdict": "pending_independent_verification",
+      "evidence_ref": "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-5/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-5/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-EVIDENCE",
+      "metric_id": "unsupported_hypothesis_publish_count",
+      "source_of_truth": "Unsupported, citation, freshness, and verifier denial fixtures",
+      "read_method": "Count publication writes after unsupported, missing, stale, failed, or writer-only verdict inputs.",
+      "observed_at": "2026-07-15T05:40:12Z", "recorded_at": "2026-07-15T05:40:12Z", "max_age": "30m", "freshness_status": "fresh",
+      "value": 0, "threshold": 0, "comparator": "==", "verdict": "pending_independent_verification",
+      "evidence_ref": "sha256:9d42d437e5454a8eb57531761d79d1503e3a1e1ab2bd3ef1d4ab699a4253def9",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-5/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-5/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-INDEPENDENCE",
+      "metric_id": "single_llm_truth_acceptance_count",
+      "source_of_truth": "Writer checkpoint without a separate validator record",
+      "read_method": "Keep the value at one until a separate validator replays every claim and wall.",
+      "observed_at": "2026-07-15T05:40:12Z", "recorded_at": "2026-07-15T05:40:12Z", "max_age": "30m", "freshness_status": "fresh",
+      "value": 1, "threshold": 0, "comparator": "==", "verdict": "breached",
+      "evidence_ref": "sha256:28a698375b2fb46e536fbd986ba922cde9b576d8333a053193488cd2ab542a88",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-5/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-5/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-STORAGE",
+      "metric_id": "ungoverned_write_or_read_count",
+      "source_of_truth": "DKR-5 packet, named hashes, governed progress, and store verification",
+      "read_method": "Compare writes with the packet allowlist, resolve eight hashes, and verify the run store.",
+      "observed_at": "2026-07-15T05:40:12Z", "recorded_at": "2026-07-15T05:40:12Z", "max_age": "30m", "freshness_status": "fresh",
+      "value": 0, "threshold": 0, "comparator": "==", "verdict": "pending_independent_verification",
+      "evidence_ref": "sha256:65610763eec1514a3bd03816c660cfd28bbdc606f695b2747d2bc7edd634ac93",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-5/replay.sh",
+      "verification_record_ref": "workers/dkr-5/progress.jsonl#pending"
+    },
+    {
+      "anti_goal_id": "AG-INTEGRITY",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "source_of_truth": "Candidate checkpoint with numeric walls and blocked independence gate",
+      "read_method": "Confirm fixture failures stay explicit, objective denominator is unchanged, and this writer makes no acceptance claim.",
+      "observed_at": "2026-07-15T05:40:12Z", "recorded_at": "2026-07-15T05:40:12Z", "max_age": "30m", "freshness_status": "fresh",
+      "value": 0, "threshold": 0, "comparator": "==", "verdict": "pending_independent_verification",
+      "evidence_ref": "sha256:7f3717195985dc3265cc7fb5b4b746fe0ed2e93de9e86892c01b13d829620d63",
+      "replay_command_or_checker": "bash .okra/runs/issue-triage-session-20260715/workers/dkr-5/replay.sh",
+      "verification_record_ref": "workers/validator-dkr-5/progress.jsonl#pending"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-15T05:40:12Z",
+    "reason": "The contract is writer-only evidence; independent replay is required before CKR or PKR promotion."
+  },
+  "worked_checkpoint_trace": {
+    "metric_read": "issue_triage_denial_fixture_pass_count",
+    "threshold": 13,
+    "value": 13,
+    "evidence_sha256": "sha256:36ae1ab823bd817b4cd36230eb25168ad991138dc8e72bbe2a792013e254b1cb",
+    "confidence": 0.91,
+    "decision": "candidate only pending independent replay"
+  },
+  "confidence_probability_update": "0.4 before DKR-5; 0.91 after six schemas, fourteen fixtures, eight explicit ports, and sixteen named contracts replayed",
+  "risk_or_anti_goal_implications": [
+    "All external capabilities remain fake, explicit, and scope-substitutable.",
+    "Unsafe input and missing authority stop before adapters; evidence and verdict failures stop before publication.",
+    "Idempotency reuses known receipts, rejects conflicts, and prevents duplicate writes.",
+    "The objective denominator remains sixteen; only candidate names are proposed."
+  ],
+  "candidate_ckrs": [
+    { "id": "CKR-ISSUE-TRIAGE", "metric_id": "issue_triage_public_contract_pass_count", "target": 16, "status": "candidate_blocked" }
+  ],
+  "candidate_pkrs": [
+    { "id": "PKR-ISSUE-TRIAGE-EXAMPLE", "scope": "Build the runnable example only after independent DKR-5 acceptance.", "status": "candidate_blocked" }
+  ],
+  "checkpoint_rejection_policy": "Superficial, tautological, false-positive, fabricated, unsupported, or single-LLM-truth checkpoints are rejected. Missing, stale, wrong-source, non-replayable, or contradicted evidence fails closed. An empty result remains valid only with a replayable probe trace.",
+  "role_grammar": [
+    "CKRs are measurable contribution context, not worker work.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  ]
+}

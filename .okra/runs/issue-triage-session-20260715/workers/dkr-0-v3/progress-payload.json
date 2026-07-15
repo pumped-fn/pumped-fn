@@ -1,0 +1,47 @@
+{
+  "type": "worker_finish",
+  "worker_id": "dkr-0-v3",
+  "worker_kind": "discovery",
+  "unit_id": "DKR-0",
+  "status": "candidate_blocked",
+  "recorded_at": "2026-07-15T05:18:37Z",
+  "next_check_at": "2026-07-15T05:28:37Z",
+  "candidate_checkpoint_ref": "artifacts/dkr-0-current-pr-checkpoint.v3.json",
+  "candidate_checkpoint_sha256": "5706cf7a54ff9282cec4697c54df19cd41d356be9a8ba5d72e0ddf9f196f9bd1",
+  "matrix_ref": "artifacts/dkr-0-disposition-matrix.v3.json",
+  "matrix_sha256": "422669bfa0769c52da1aa85c690dff3c92a0af944dd1413e1e613cf089b682b6",
+  "replay_ref": "replay/dkr-0-disposition-v3.sh",
+  "replay_sha256": "54cca4dca4c441f97206ec7cd2abcf32efcfd966f582271aa5cf39c98565b259",
+  "mechanical_result": {
+    "changed_path_count": 58,
+    "concept_disposition_count": 90,
+    "negative_rejection_pass_count": 12,
+    "negative_rejection_total": 12
+  },
+  "direct_wall_reads": {
+    "touched_surface_regression_count": {
+      "value": 2,
+      "threshold": 0,
+      "verdict": "breached",
+      "evidence_ref": "sha256:90ddad78e6793c7811152d084e95f62f8d3f02d3554f5754103bcc5ff0c473d7"
+    },
+    "slop_violation_count": {
+      "value": 74,
+      "threshold": 0,
+      "verdict": "breached",
+      "evidence_ref": "sha256:51dc235c8c65ff526a6ca90a8652f0542503218229b96aa2ad0e3673d5d7fc54"
+    }
+  },
+  "semantic_corrections": [
+    "Keep the current-owned session resource declaration and remove X-PRE-RESOLVE from that row.",
+    "Split ordinary workflow state from WorkerRegistry runtime delegation and assign the hidden dynamic edge to DKR-4 reshape work.",
+    "Split material state from direct CLI process execution and assign the physical effect boundary to DKR-4 reshape work."
+  ],
+  "wall_gate": {
+    "verdict": "blocked_by_direct_walls_and_pending_independent_judgement",
+    "downstream_advance": "blocked"
+  },
+  "product_files_changed": false,
+  "decision": "candidate evidence only; acceptance remains orchestrator-owned and requires a separate validator",
+  "worker_progress": ".okra/runs/issue-triage-session-20260715/workers/dkr-0-v3/progress.jsonl at finish, unknown, and ten-minute heartbeat"
+}

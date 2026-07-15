@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events"
 import { PassThrough } from "node:stream"
 import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "node:child_process"
 import { createScope, preset, type Lite } from "@pumped-fn/lite"
-import { abortSignal, type ModelRequest } from "@pumped-fn/sdk"
+import type { ModelRequest } from "@pumped-fn/sdk"
 import * as session from "@pumped-fn/sdk/session"
 import { expect, it } from "vitest"
 import {
@@ -29,6 +29,7 @@ const request: ModelRequest = {
 
 const agent = String.raw`
 import readline from "node:readline"
+setInterval(() => {}, 1_000)
 const lines = readline.createInterface({ input: process.stdin })
 let pending
 let active
@@ -59,6 +60,7 @@ lines.on("line", (line) => {
 
 const parallelAgent = String.raw`
 import readline from "node:readline"
+setInterval(() => {}, 1_000)
 const lines = readline.createInterface({ input: process.stdin })
 const pending = new Map()
 let next = 0
@@ -89,6 +91,7 @@ lines.on("line", (line) => {
 
 const continuationAgent = String.raw`
 import readline from "node:readline"
+setInterval(() => {}, 1_000)
 const lines = readline.createInterface({ input: process.stdin })
 let next = 0
 const send = (message) => process.stdout.write(JSON.stringify(message) + "\n")
@@ -107,6 +110,7 @@ lines.on("line", (line) => {
 
 const delayedContinuationAgent = String.raw`
 import readline from "node:readline"
+setInterval(() => {}, 1_000)
 const lines = readline.createInterface({ input: process.stdin })
 let next = 0
 const send = (message) => process.stdout.write(JSON.stringify(message) + "\n")
@@ -126,6 +130,7 @@ lines.on("line", (line) => {
 
 const lateContinuationAgent = String.raw`
 import readline from "node:readline"
+setInterval(() => {}, 1_000)
 const lines = readline.createInterface({ input: process.stdin })
 const send = (message) => process.stdout.write(JSON.stringify(message) + "\n")
 lines.on("line", (line) => {
@@ -140,6 +145,7 @@ lines.on("line", (line) => {
 
 const blockedSessionAgent = String.raw`
 import readline from "node:readline"
+setInterval(() => {}, 1_000)
 const lines = readline.createInterface({ input: process.stdin })
 const send = (message) => process.stdout.write(JSON.stringify(message) + "\n")
 lines.on("line", (line) => {
@@ -152,6 +158,7 @@ lines.on("line", (line) => {
 
 const uncooperativeAgent = String.raw`
 import readline from "node:readline"
+setInterval(() => {}, 1_000)
 const lines = readline.createInterface({ input: process.stdin })
 const send = (message) => process.stdout.write(JSON.stringify(message) + "\n")
 lines.on("line", (line) => {
@@ -177,7 +184,7 @@ function managedConfig(source = agent, shutdownTimeoutMs = 5_000) {
 }
 
 it("passes explicit roots with no MCP servers and leaves no live state after close", async () => {
-  const scope = createScope({ tags: [managedConfig()] })
+  const scope = createScope({ presets: [preset(spawnProcess, managedProcess(agent))], tags: [managedConfig()] })
   const ctx = scope.createContext()
   const boundary = await ctx.resolve(acp)
   const output = JSON.parse(await ctx.exec({ flow: codexAcpPrompt, input: request })) as {
@@ -204,12 +211,16 @@ it("passes explicit roots with no MCP servers and leaves no live state after clo
 
 it("cancels only the selected ACP attempt while an overlapping attempt completes", async () => {
   const controller = new AbortController()
-  const scope = createScope({ tags: [managedConfig(parallelAgent)] })
-  const cancelled = scope.createContext({ tags: [abortSignal(controller.signal)] })
+  const scope = createScope({
+    presets: [preset(spawnProcess, managedProcess(parallelAgent))],
+    tags: [managedConfig(parallelAgent)],
+  })
+  const cancelled = scope.createContext()
   const completed = scope.createContext()
   const first = cancelled.execStream({
     flow: codexAcpAttempt,
     input: { ...request, instructions: "wait for cancellation" },
+    signal: controller.signal,
   })
   const second = completed.execStream({ flow: codexAcpAttempt, input: request })
   const firstEvents = collect(first).catch((error: unknown) => error)
@@ -235,12 +246,15 @@ it("cancels only the selected ACP attempt while an overlapping attempt completes
 it("continues the same ACP session for the same SDK session and branch", async () => {
   const branch = branchRecord()
   const record = sessionRecord("sdk-session", branch)
-  const scope = createScope({ tags: [
+  const scope = createScope({
+    presets: [preset(spawnProcess, managedProcess(continuationAgent))],
+    tags: [
     managedConfig(continuationAgent),
     session.authority(branch.authority),
     session.record(record),
     session.clock({ now: () => new Date(0).toISOString() }),
-  ] })
+    ],
+  })
   const host = scope.createContext()
   const boundary = await host.resolve(acp)
   const runtime = await host.resolve(session.session)
@@ -267,7 +281,10 @@ it("continues the same ACP session for the same SDK session and branch", async (
 it("atomically reserves the first continuation for concurrent prompts", async () => {
   const branch = branchRecord()
   const record = sessionRecord("sdk-session", branch)
-  const scope = createScope({ tags: [managedConfig(delayedContinuationAgent)] })
+  const scope = createScope({
+    presets: [preset(spawnProcess, managedProcess(delayedContinuationAgent))],
+    tags: [managedConfig(delayedContinuationAgent)],
+  })
   const ctx = scope.createContext({ tags: [session.record(record), session.current.branch(branch)] })
   const boundary = await ctx.resolve(acp)
   const first = ctx.execStream({ flow: codexAcpAttempt, input: request })
@@ -293,24 +310,26 @@ it("does not publish a late continuation after the session starts finishing", as
   const controller = new AbortController()
   const branch = branchRecord()
   const record = sessionRecord("sdk-session", branch)
-  const scope = createScope({ tags: [
+  const scope = createScope({
+    presets: [preset(spawnProcess, managedProcess(lateContinuationAgent))],
+    tags: [
     managedConfig(lateContinuationAgent),
     session.authority(branch.authority),
     session.record(record),
     session.clock({ now: () => new Date(0).toISOString() }),
-  ] })
+    ],
+  })
   const host = scope.createContext()
   const boundary = await host.resolve(acp)
   const runtime = await host.resolve(session.session)
   const ctx = scope.createContext({
     parent: host,
     tags: [
-      abortSignal(controller.signal),
       session.current.branch(branch),
       session.current.session(runtime),
     ],
   })
-  const stream = ctx.execStream({ flow: codexAcpAttempt, input: request })
+  const stream = ctx.execStream({ flow: codexAcpAttempt, input: request, signal: controller.signal })
   const events = collect(stream).catch((error: unknown) => error)
 
   for (let attempt = 0; attempt < 100 && !boundary.continuations.has("codex-acp:sdk-session:main"); attempt++) {
@@ -334,10 +353,13 @@ it("does not publish a late continuation after the session starts finishing", as
 
 it("settles abort while session creation is blocked", async () => {
   const controller = new AbortController()
-  const scope = createScope({ tags: [managedConfig(blockedSessionAgent)] })
-  const ctx = scope.createContext({ tags: [abortSignal(controller.signal)] })
+  const scope = createScope({
+    presets: [preset(spawnProcess, managedProcess(blockedSessionAgent))],
+    tags: [managedConfig(blockedSessionAgent)],
+  })
+  const ctx = scope.createContext()
   await ctx.resolve(acp)
-  const stream = ctx.execStream({ flow: codexAcpAttempt, input: request })
+  const stream = ctx.execStream({ flow: codexAcpAttempt, input: request, signal: controller.signal })
   const events = collect(stream).catch((error: unknown) => error)
 
   await new Promise<void>((resolve) => setTimeout(resolve, 25))
@@ -350,7 +372,10 @@ it("settles abort while session creation is blocked", async () => {
 })
 
 it("bounds consumer-stop when the ACP agent ignores cancellation", async () => {
-  const scope = createScope({ tags: [managedConfig(uncooperativeAgent, 25)] })
+  const scope = createScope({
+    presets: [preset(spawnProcess, managedProcess(uncooperativeAgent))],
+    tags: [managedConfig(uncooperativeAgent, 25)],
+  })
   const ctx = scope.createContext()
   await ctx.resolve(acp)
   const stream = ctx.execStream({ flow: codexAcpAttempt, input: request })
@@ -372,7 +397,7 @@ it("quarantines a timed-out continuation until the active prompt settles", async
   const branch = branchRecord()
   const record = sessionRecord("sdk-session", branch)
   const scope = createScope({
-    presets: [preset(clock, lifecycle.value)],
+    presets: [preset(clock, lifecycle.value), preset(spawnProcess, managedProcess(uncooperativeAgent))],
     tags: [
       managedConfig(uncooperativeAgent, 25),
       session.authority(branch.authority),
@@ -422,7 +447,7 @@ it("quarantines a timed-out continuation until the active prompt settles", async
 })
 
 it("normalizes ACP chunks and keeps correlation state scoped to the attempt", async () => {
-  const scope = createScope({ tags: [managedConfig()] })
+  const scope = createScope({ presets: [preset(spawnProcess, managedProcess(agent))], tags: [managedConfig()] })
   const ctx = scope.createContext()
   const boundary = await ctx.resolve(acp)
   const stream = ctx.execStream({ flow: codexAcpAttempt, input: request })
@@ -447,12 +472,13 @@ it("normalizes ACP chunks and keeps correlation state scoped to the attempt", as
 
 it("sends ACP cancellation from AbortSignal and settles correlation state", async () => {
   const controller = new AbortController()
-  const scope = createScope({ tags: [managedConfig()] })
-  const ctx = scope.createContext({ tags: [abortSignal(controller.signal)] })
+  const scope = createScope({ presets: [preset(spawnProcess, managedProcess(agent))], tags: [managedConfig()] })
+  const ctx = scope.createContext()
   const boundary = await ctx.resolve(acp)
   const prompt = ctx.exec({
     flow: codexAcpPrompt,
     input: { ...request, instructions: "wait for cancellation" },
+    signal: controller.signal,
   })
   await new Promise<void>((resolve) => setTimeout(resolve, 25))
   controller.abort()
@@ -579,6 +605,158 @@ it("rejects with a typed error after both shutdown bounds", async () => {
   expect(boundary.metadata.size).toBe(0)
   await scope.dispose()
 })
+
+interface AcpMessage {
+  readonly id?: number
+  readonly method?: string
+  readonly params?: {
+    readonly sessionId?: string
+    readonly cwd?: string
+    readonly additionalDirectories?: string[]
+    readonly mcpServers?: unknown[]
+    readonly prompt?: Array<{ readonly text?: string }>
+  }
+  readonly result?: unknown
+}
+
+function managedProcess(source: string): Lite.Utils.AtomValue<typeof spawnProcess> {
+  return ((_command: string, _args: readonly string[], _options: SpawnOptionsWithoutStdio) => {
+    const input = new PassThrough()
+    const output = new PassThrough()
+    const error = new PassThrough()
+    const pending = new Map<string, number>()
+    let activePrompt: number | undefined
+    let created = 0
+    let buffered = ""
+    let exitCode: number | null = null
+    let sessionConfig: AcpMessage["params"]
+    const send = (message: unknown) => output.write(`${JSON.stringify(message)}\n`)
+    const kind = source === parallelAgent
+      ? "parallel"
+      : source === continuationAgent
+        ? "continuation"
+        : source === delayedContinuationAgent
+          ? "delayed"
+          : source === lateContinuationAgent
+            ? "late"
+            : source === blockedSessionAgent
+              ? "blocked"
+              : source === uncooperativeAgent
+                ? "uncooperative"
+                : "agent"
+    const sessionId = () => kind === "agent"
+      ? "probe-session"
+      : kind === "uncooperative"
+        ? "uncooperative-session"
+        : `session-${created++}`
+    const respondSession = (message: AcpMessage, id: string) => send({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: { sessionId: id },
+    })
+    input.setEncoding("utf8")
+    input.on("data", (chunk: string) => {
+      buffered += chunk
+      const lines = buffered.split("\n")
+      buffered = lines.pop() ?? ""
+      for (const line of lines) {
+        const message = JSON.parse(line) as AcpMessage
+        if (message.method === "initialize") {
+          send({
+            jsonrpc: "2.0",
+            id: message.id,
+            result: { protocolVersion: 1, agentCapabilities: {}, agentInfo: { name: kind, version: "1" } },
+          })
+        } else if (message.method === "session/new") {
+          sessionConfig = message.params
+          if (kind === "blocked") continue
+          const id = kind === "late" ? "late-session" : sessionId()
+          const delay = kind === "late" ? 250 : kind === "delayed" ? 25 : 0
+          if (delay) setTimeout(() => respondSession(message, id), delay)
+          else respondSession(message, id)
+        } else if (message.method === "session/prompt") {
+          const id = message.params?.sessionId ?? ""
+          const text = message.params?.prompt?.[0]?.text ?? ""
+          if (kind === "uncooperative") continue
+          if (text.includes("wait for cancellation")) {
+            if (message.id !== undefined) pending.set(id, message.id)
+          } else if (kind === "agent") {
+            activePrompt = message.id
+            send({
+              jsonrpc: "2.0",
+              id: 99,
+              method: "session/request_permission",
+              params: {
+                sessionId: id,
+                toolCall: { toolCallId: "tool-1", title: "write" },
+                options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }],
+              },
+            })
+          } else {
+            const content = kind === "parallel" ? "second" : id
+            send({
+              jsonrpc: "2.0",
+              method: "session/update",
+              params: {
+                sessionId: id,
+                update: {
+                  sessionUpdate: "agent_message_chunk",
+                  content: { type: "text", text: JSON.stringify({ content, stop: true }) },
+                },
+              },
+            })
+            send({ jsonrpc: "2.0", id: message.id, result: { stopReason: "end_turn" } })
+          }
+        } else if (message.method === "session/cancel") {
+          const id = message.params?.sessionId ?? ""
+          const requestId = pending.get(id)
+          if (requestId !== undefined) {
+            send({ jsonrpc: "2.0", id: requestId, result: { stopReason: "cancelled" } })
+            pending.delete(id)
+          }
+        } else if (message.id === 99 && activePrompt !== undefined) {
+          send({
+            jsonrpc: "2.0",
+            method: "session/update",
+            params: {
+              sessionId: "probe-session",
+              update: {
+                sessionUpdate: "agent_message_chunk",
+                content: {
+                  type: "text",
+                  text: JSON.stringify({
+                    cwd: sessionConfig?.cwd,
+                    additionalDirectories: sessionConfig?.additionalDirectories,
+                    mcpServers: sessionConfig?.mcpServers,
+                    permission: message.result,
+                    pid: 2_147_483_647,
+                  }),
+                },
+              },
+            },
+          })
+          send({ jsonrpc: "2.0", id: activePrompt, result: { stopReason: "end_turn" } })
+          activePrompt = undefined
+        }
+      }
+    })
+    const child = Object.assign(new EventEmitter(), {
+      stdin: input,
+      stdout: output,
+      stderr: error,
+      kill() {
+        if (exitCode !== null) return false
+        exitCode = 0
+        output.end()
+        error.end()
+        child.emit("close", 0, null)
+        return true
+      },
+    }) as unknown as ChildProcessWithoutNullStreams
+    Object.defineProperty(child, "exitCode", { get: () => exitCode })
+    return child
+  }) as Lite.Utils.AtomValue<typeof spawnProcess>
+}
 
 function createLifecycleHarness(options: { closeOnForce: boolean }) {
   const input = new PassThrough()

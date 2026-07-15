@@ -1,0 +1,37 @@
+{
+  "committed_at": "2026-07-15T06:12:13Z",
+  "idempotency_key": "accept:DKR-5:v2",
+  "key_sha256": "bf3131df10a286200871d5861e7f0f710fceebd66b039fdc1265c0b78019a129",
+  "payload": {
+    "checkpoint_ref": "workers/dkr-5-v2/checkpoint.v2.json",
+    "claim_id": "accept.DKR-5.evidence-publication-v2",
+    "contract": {
+      "denominator_change_count": 0,
+      "fixture_pass_count": "16/16",
+      "objective_contract_count": "16/16",
+      "real_external_access_count": 0,
+      "repository_traversal_adapter_calls": 0,
+      "repository_traversal_writes": 0,
+      "scope_seam_escape_count": 0,
+      "standard_schema_shape_count": "6/6",
+      "undeclared_effect_edge_count": 0,
+      "wrong_hypothesis_publisher_calls": 0,
+      "wrong_hypothesis_writes": 0
+    },
+    "decided_at": "2026-07-15T06:11:40Z",
+    "decision": "accepted_as_reducing_discovery",
+    "evidence": [
+      "workers/dkr-5-v2/checkpoint.v2.json",
+      "workers/dkr-5-v2/replay.sh",
+      "workers/validator-dkr-5-v2/verification.json",
+      "workers/validator-dkr-5-v2/semantic-audit.mjs"
+    ],
+    "implementation_authorized": false,
+    "implementation_boundary": "Use configurable Standard Schema validation, canonical repository containment before effects, read-only SQL and bounded Victoria preflight, fresh cited evidence, a separately identified verifier bound to the same hypothesis and citations, and authority-bound idempotent publication. Real external access remains forbidden.",
+    "observed_at": "2026-07-15T06:09:57Z",
+    "type": "claim_acceptance",
+    "unit_id": "DKR-5",
+    "verification_ref": "workers/validator-dkr-5-v2/verification.json"
+  },
+  "payload_sha256": "a44b95df59d2566154ab5898d742384f666a8214f76e2963ab7498acfda37f28"
+}

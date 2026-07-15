@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "worker_id": "validator-dkr-2-v3",
+  "status": "store_verified",
+  "unit_id": "DKR-2",
+  "store_verification_failure_count": 0,
+  "store_verification_exit_code": 0,
+  "store_verification_result": "OKRA store verified: .okra/runs/issue-triage-session-20260715",
+  "observed_at": "2026-07-15T05:23:38Z"
+}

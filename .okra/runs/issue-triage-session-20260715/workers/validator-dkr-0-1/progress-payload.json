@@ -1,0 +1,34 @@
+{
+  "type": "worker_finish",
+  "unit_id": "DKR-0,DKR-1",
+  "worker_id": "validator-dkr-0-1",
+  "status": "verification_complete_downstream_blocked",
+  "observed_at": "2026-07-15T04:25:52Z",
+  "verification_ref": "workers/validator-dkr-0-1/verification.json",
+  "replay_ref": "workers/validator-dkr-0-1/replay.sh",
+  "dispositions": {
+    "DKR-0": "rejected",
+    "DKR-1": "blocked"
+  },
+  "accepted_claims": [
+    "DKR-0 inventory checker passes 39 of 39 at the pinned head",
+    "All 9 DKR-0 and all 4 DKR-1 cited hashes match",
+    "DKR-1 activation tags, nested reuse, sibling isolation, extension visibility, checkpoint, and resume replay"
+  ],
+  "rejected_claims": [
+    "DKR-0 disposition completeness and correctness is non-replayable",
+    "DKR-0 active walls are pending rather than held",
+    "DKR-1 ordinary cleanup mutates business status",
+    "DKR-1 checkpoint omits contract_version, type, and unit_id"
+  ],
+  "active_anti_goals": [
+    "cleanup_business_state_mutation_count",
+    "cross_session_leak_count",
+    "primitive_proof_gap_count",
+    "single_llm_truth_acceptance_count",
+    "ungoverned_write_or_read_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "downstream_advance": "blocked",
+  "next_check_at": "orchestrator checkpoint"
+}

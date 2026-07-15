@@ -2,13 +2,14 @@ import {
   PROTOCOL_VERSION,
   client,
   ndJsonStream,
+  type ActiveSession,
+  type ClientContext,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionNotification,
 } from "@agentclientprotocol/sdk"
 import { atom, controller, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
 import {
-  abortSignal,
   formatModelPrompt,
   model,
   parseModelResponse,
@@ -66,10 +67,9 @@ export const codexRun = flow({
   deps: {
     config: tags.required(codexConfig),
     environment,
-    signal: tags.optional(abortSignal),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async (ctx, { config, environment, signal }) => {
+  factory: async (ctx, { config, environment }) => {
     if (config.extraArgs?.some((arg) => arg === "--")) throw new CodexConfigError("Codex extraArgs cannot include --")
     const env = config.auth.kind === "api-key"
       ? { CODEX_API_KEY: requiredEnvironment(environment, config.auth.env ?? "CODEX_API_KEY") }
@@ -89,7 +89,7 @@ export const codexRun = flow({
       env,
       isolate: config.isolate,
       timeoutMs: config.timeoutMs,
-      signal,
+      signal: ctx.signal,
     })).stdout.trim()
   },
 })
@@ -107,7 +107,7 @@ export const codexAttempt: agent.Attempt = flow({
   },
 })
 
-export const codexAttemptBinding = agent.attempt(codexAttempt)
+export const codexAttemptBinding = agent.impl.attempt(codexAttempt)
 
 export const codexTurn = flow({
   name: "codex.complete",
@@ -265,37 +265,33 @@ export const codexAcpPrompt = flow({
   deps: {
     acp,
     config: tags.required(codexAcpConfig),
-    signal: tags.optional(abortSignal),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async (ctx, { acp, config, signal }) => {
-    signal?.throwIfAborted()
-    const session = await abortable(acp.connection.agent.request("session/new", {
-      cwd: config.cwd,
-      additionalDirectories: [...config.additionalDirectories],
-      mcpServers: [],
-    }), signal)
+  factory: async (ctx, { acp, config }) => {
+    const signal = ctx.signal
+    signal.throwIfAborted()
+    const sessionId = await createAcpSession(acp.connection.agent, config, signal)
     const chunks: string[] = []
-    acp.sessions.set(session.sessionId, chunks)
-    acp.metadata.set(session.sessionId, { agentName: ctx.input.agentName, round: ctx.input.round })
+    acp.sessions.set(sessionId, chunks)
+    acp.metadata.set(sessionId, { agentName: ctx.input.agentName, round: ctx.input.round })
     let cancellation: Promise<void> | undefined
     const cancel = () => {
-      cancellation ??= acp.connection.agent.notify("session/cancel", { sessionId: session.sessionId })
+      cancellation ??= acp.connection.agent.notify("session/cancel", { sessionId })
     }
-    signal?.addEventListener("abort", cancel, { once: true })
-    if (signal?.aborted) cancel()
-    await (signal?.aborted
+    signal.addEventListener("abort", cancel, { once: true })
+    if (signal.aborted) cancel()
+    await (signal.aborted
       ? Promise.reject(signal.reason)
       : acp.connection.agent.request("session/prompt", {
-          sessionId: session.sessionId,
+          sessionId,
           prompt: [{ type: "text", text: formatModelPrompt(ctx.input) }],
         })).finally(async () => {
-      signal?.removeEventListener("abort", cancel)
+      signal.removeEventListener("abort", cancel)
       try {
         if (cancellation) await cancellation
       } finally {
-        acp.sessions.delete(session.sessionId)
-        acp.metadata.delete(session.sessionId)
+        acp.sessions.delete(sessionId)
+        acp.metadata.delete(sessionId)
       }
     })
     return chunks.join("")
@@ -309,20 +305,16 @@ export const codexAcpAttempt: agent.Attempt = flow({
     acp,
     clock,
     config: tags.required(codexAcpConfig),
-    signal: tags.optional(abortSignal),
     record: tags.optional(session.record),
     branch: tags.optional(session.current.branch),
     runtime: tags.optional(session.current.session),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async function* (ctx, { acp, branch, clock, config, record, runtime, signal }) {
-    signal?.throwIfAborted()
+  factory: async function* (ctx, { acp, branch, clock, config, record, runtime }) {
+    const signal = ctx.signal
+    signal.throwIfAborted()
     const continuationKey = record && branch ? `codex-acp:${record.id}:${branch.id}` : undefined
-    const createSession = () => acp.connection.agent.request("session/new", {
-      cwd: config.cwd,
-      additionalDirectories: [...config.additionalDirectories],
-      mcpServers: [],
-    }).then((created) => created.sessionId)
+    const createSession = () => createAcpSession(acp.connection.agent, config, signal)
     let sessionId: string
     if (continuationKey) {
       let continuation: string | Promise<string> | undefined = runtime?.continuations.get(continuationKey)
@@ -357,7 +349,7 @@ export const codexAcpAttempt: agent.Attempt = flow({
     } else {
       sessionId = await abortable(createSession(), signal)
     }
-    signal?.throwIfAborted()
+    signal.throwIfAborted()
     if (acp.sessions.has(sessionId)) {
       throw new CodexConcurrencyError(`ACP session ${sessionId} already has an active prompt`)
     }
@@ -370,10 +362,10 @@ export const codexAcpAttempt: agent.Attempt = flow({
     let settled = false
     const cancel = () => {
       cancellation ??= acp.connection.agent.notify("session/cancel", { sessionId })
-      stream.fail(signal?.reason ?? new DOMException("Codex ACP stream closed", "AbortError"))
+      stream.fail(signal.reason ?? new DOMException("Codex ACP stream closed", "AbortError"))
     }
-    signal?.addEventListener("abort", cancel, { once: true })
-    if (signal?.aborted) cancel()
+    signal.addEventListener("abort", cancel, { once: true })
+    if (signal.aborted) cancel()
     const prompt = acp.connection.agent.request("session/prompt", {
       sessionId,
       prompt: [{ type: "text", text: formatModelPrompt(ctx.input) }],
@@ -391,7 +383,7 @@ export const codexAcpAttempt: agent.Attempt = flow({
       await prompt
       return parseModelResponse(chunks.join(""))
     } finally {
-      signal?.removeEventListener("abort", cancel)
+      signal.removeEventListener("abort", cancel)
       if (!settled) cancel()
       const release = () => {
         acp.sessions.delete(sessionId)
@@ -419,7 +411,7 @@ export const codexAcpAttempt: agent.Attempt = flow({
   },
 })
 
-export const codexAcpAttemptBinding = agent.attempt(codexAcpAttempt)
+export const codexAcpAttemptBinding = agent.impl.attempt(codexAcpAttempt)
 
 export const codexAcpTurn = flow({
   name: "codex.acp.complete",
@@ -442,6 +434,28 @@ function requiredEnvironment(environment: NodeJS.ProcessEnv, name: string): stri
   const value = environment[name]
   if (!value) throw new CodexConfigError(`Codex API key environment variable "${name}" is not set`)
   return value
+}
+
+async function createAcpSession(
+  agent: ClientContext,
+  config: CodexAcpConfig,
+  signal?: AbortSignal,
+): Promise<string> {
+  const pending = agent.buildSession({
+    cwd: config.cwd,
+    additionalDirectories: [...config.additionalDirectories],
+    mcpServers: [],
+  }).start()
+  let active: ActiveSession
+  try {
+    active = await abortable(pending, signal)
+  } catch (error) {
+    void pending.then((session) => session.dispose(), () => undefined)
+    throw error
+  }
+  const sessionId = active.sessionId
+  active.dispose()
+  return sessionId
 }
 
 function abortable<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {

@@ -2,7 +2,7 @@ import { PassThrough } from "node:stream"
 import { EventEmitter } from "node:events"
 import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "node:child_process"
 import { createScope, flow, preset, typed, type Lite } from "@pumped-fn/lite"
-import { abortSignal, complete, model, type Model, type ModelRequest } from "@pumped-fn/sdk"
+import { complete, model, type Model, type ModelRequest } from "@pumped-fn/sdk"
 import * as session from "@pumped-fn/sdk/session"
 import { expect, expectTypeOf, it } from "vitest"
 import * as claudeModule from "../src/index"
@@ -202,10 +202,10 @@ it("releases only the aborted logical session lease", async () => {
   }
   const scope = createScope({ presets: [preset(claudeLeases, leases)] })
   const blocked = scope.createContext({
-    tags: [session.record(sessionRecord("blocked")), abortSignal(controller.signal)],
+    tags: [session.record(sessionRecord("blocked"))],
   })
   const completed = scope.createContext({ tags: [session.record(sessionRecord("completed"))] })
-  const first = blocked.execStream({ flow: claudeAttempt, input: request })
+  const first = blocked.execStream({ flow: claudeAttempt, input: request, signal: controller.signal })
   const second = completed.execStream({ flow: claudeAttempt, input: request })
   const firstEvents = collect(first).catch((error: unknown) => error)
   const secondEvents = collect(second)
@@ -272,12 +272,16 @@ it("isolates managed leases by branch within one logical session", async () => {
   const shared = { ...record, branches: [left, right], currentBranchId: left.id }
   const scope = createScope({ presets: [preset(claudeLeases, leases)] })
   const leftContext = scope.createContext({
-    tags: [session.record(shared), session.current.branch(left), abortSignal(controller.signal)],
+    tags: [session.record(shared), session.current.branch(left)],
   })
   const rightContext = scope.createContext({
     tags: [session.record(shared), session.current.branch(right)],
   })
-  const leftStream = leftContext.execStream({ flow: claudeAttempt, input: { ...request, agentName: "left" } })
+  const leftStream = leftContext.execStream({
+    flow: claudeAttempt,
+    input: { ...request, agentName: "left" },
+    signal: controller.signal,
+  })
   const rightStream = rightContext.execStream({ flow: claudeAttempt, input: { ...request, agentName: "right" } })
   const leftEvents = collect(leftStream).catch((error: unknown) => error)
   const rightEvents = collect(rightStream)
@@ -348,9 +352,9 @@ it("interrupts an active prompt and awaits child close", async () => {
     presets: [preset(engine, harness.engine)],
     tags: [claudeConfig(managedConfig())],
   })
-  const ctx = scope.createContext({ tags: [abortSignal(controller.signal)] })
-  const prompt = ctx.exec({ flow: claudeRun, input: { prompt: "wait" } })
-  const queued = ctx.exec({ flow: claudeRun, input: { prompt: "must-not-start" } })
+  const ctx = scope.createContext()
+  const prompt = ctx.exec({ flow: claudeRun, input: { prompt: "wait" }, signal: controller.signal })
+  const queued = ctx.exec({ flow: claudeRun, input: { prompt: "must-not-start" }, signal: controller.signal })
   await harness.writes(1)
 
   controller.abort()

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "worker_id": "validator-dkr-3-v3",
+  "status": "finalized",
+  "unit_id": "DKR-3",
+  "behavior_disposition": "accepted",
+  "checkpoint_disposition": "rejected_stale_against_frame_v2",
+  "downstream_advance": "blocked",
+  "verification_sha256": "83a921288e7c9fe4b27f7904304f289b7b789343fe5fe778fa0f19038bf035a9",
+  "replay_sha256": "dcd55adfa32265de0ba2a97326d2f4a99d9398e8a9a8e211afa6b9d63a19609e",
+  "independent_probe_sha256": "0cc8c4c6a776aa73a79f974a8a22455988769a1321d8cecdea43939db5635002",
+  "accepted_claim_count": 11,
+  "rejected_claim_count": 2,
+  "store_verification_exit_code": 0,
+  "store_verification_failure_count": 0,
+  "store_verification_result": "OKRA store verified: .okra/runs/issue-triage-session-20260715",
+  "next_authority": "orchestrator",
+  "observed_at": "2026-07-15T05:47:10Z"
+}
