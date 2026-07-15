@@ -88,6 +88,7 @@ describe("session review regressions", () => {
     const started = await iterator.next()
     const result = stream.result.catch((error: unknown) => error)
     const attempt = runtime.record.attempts.find((value) => value.workId === "cancelled")!
+    const cancellation = { reason: "stop" }
 
     expect(started).toMatchObject({ done: false, value: { type: "work.started" } })
     runtime.controls.enqueue({
@@ -98,11 +99,11 @@ describe("session review regressions", () => {
       sequence: 1,
       mode: "cancel",
       source: "human",
-      payload: { reason: "stop" },
+      payload: cancellation,
     })
 
-    await expect(iterator.next()).rejects.toMatchObject({ name: "AbortError" })
-    await expect(result).resolves.toMatchObject({ name: "AbortError" })
+    await expect(iterator.next()).rejects.toBe(cancellation)
+    await expect(result).resolves.toBe(cancellation)
     expect(effects).toBe(0)
     expect(runtime.record.work.find((value) => value.id === "cancelled")?.status).toBe("cancelled")
 

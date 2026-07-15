@@ -1,0 +1,38 @@
+{
+  "name": "@pumped-fn/issue-triage",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "start": "node --import tsx bin/daemon.ts",
+    "verify": "node --import tsx bin/verify.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsgo --noEmit",
+    "lint": "node ../../pkg/tool/lint/dist/cli.mjs src tests bin"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "catalog:",
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-extension-logging": "workspace:*",
+    "@pumped-fn/lite-extension-observable": "workspace:*",
+    "@pumped-fn/lite-extension-observable-otel": "workspace:*",
+    "@pumped-fn/sdk": "workspace:*",
+    "@pumped-fn/sdk-pi": "workspace:*",
+    "pg": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "catalog:",
+    "@pumped-fn/sdk-test": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

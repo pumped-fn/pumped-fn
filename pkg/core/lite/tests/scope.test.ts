@@ -1664,6 +1664,22 @@ describe("ExecutionContext", () => {
       expect(closed).toEqual(["second"])
       await scope.dispose()
     })
+
+    it("passes inferred close dependencies with the execution context", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const events: string[] = []
+
+      ctx.onClose((result, closeCtx, target, value) => {
+        expect(result).toEqual({ ok: true })
+        expect(closeCtx).toBe(ctx)
+        target.push(value)
+      }, events, "closed")
+
+      await ctx.close()
+      expect(events).toEqual(["closed"])
+      await scope.dispose()
+    })
   })
 
   describe("closed context", () => {
@@ -2023,9 +2039,23 @@ describe("ExecutionContext", () => {
       expect(ctrl.get()).toBe(2)
       expect(notifications).toEqual(["resolved", "resolved"])
     })
+
   })
 
   describe("controller.on()", () => {
+    it("infers declared listener parameters", async () => {
+      const scope = createScope()
+      const value = atom({ factory: () => 1 })
+      const ctrl = scope.controller(value)
+      const events: string[] = []
+
+      ctrl.on("resolved", (target, event) => target.push(event), events, "resolved")
+      await ctrl.resolve()
+
+      expect(events).toEqual(["resolved"])
+      await scope.dispose()
+    })
+
     it("notifies on state change, invalidation, and exactly twice per invalidation cycle", async () => {
       const scope = createScope()
 
@@ -2108,6 +2138,18 @@ describe("ExecutionContext", () => {
   })
 
   describe("scope.on()", () => {
+    it("infers declared listener parameters", async () => {
+      const scope = createScope()
+      const value = atom({ factory: () => 1 })
+      const events: string[] = []
+
+      scope.on("resolved", value, (target, event) => target.push(event), events, "resolved")
+      await scope.resolve(value)
+
+      expect(events).toEqual(["resolved"])
+      await scope.dispose()
+    })
+
     it("fires state transitions, failed events, and supports unsubscribe", async () => {
       const scope = createScope()
       const events: string[] = []
@@ -3343,6 +3385,20 @@ describe("scope.select()", () => {
       expect(() => {
         scope.select(todosAtom, (todos) => todos[0])
       }).toThrow("Cannot select from unresolved atom")
+    })
+
+    it("infers declared subscriber parameters", async () => {
+      const scope = createScope()
+      const value = atom({ factory: () => 1 })
+      await scope.resolve(value)
+      const handle = scope.select(value, (current) => current)
+      const events: string[] = []
+
+      handle.subscribe((target, event) => target.push(event), events, "changed")
+      scope.controller(value).set(2)
+
+      expect(events).toEqual(["changed"])
+      await scope.dispose()
     })
   })
 

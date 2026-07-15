@@ -485,6 +485,23 @@ describe("session runtime", () => {
     await scope.dispose()
   })
 
+  it("preserves the supplied work cancellation reason", async () => {
+    const bound = authorityValue()
+    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+    const active = runtime.work.admit({ id: "cancelled", branchId: "main", role: "test", policy: "all" })
+    const reason = new Error("operator stopped work")
+
+    runtime.work.cancel("cancelled", reason)
+
+    expect(active.signal.aborted).toBe(true)
+    expect(active.signal.reason).toBe(reason)
+    runtime.work.settle("cancelled", active.record.attempt, { status: "cancelled" })
+    await ctx.close()
+    await scope.dispose()
+  })
+
   it("fences admission, aborts the active snapshot, joins all settlements, and caches deactivation", async () => {
     const bound = authorityValue()
     const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })

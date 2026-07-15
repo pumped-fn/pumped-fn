@@ -16,17 +16,17 @@ This is the intended composition and testing model. Tests replace edges at `crea
 Use namespaces for configuration, implementations, and execution facts.
 
 ```ts
-export const database = Object.freeze({
-  config: Object.freeze({
+export const database = {
+  config: {
     connection: tag<ConnectionConfig>({ label: "database.config.connection" }),
-  }),
-  impl: Object.freeze({
+  },
+  impl: {
     inspect: tag<Inspect>({ label: "database.impl.inspect" }),
-  }),
-  execution: Object.freeze({
+  },
+  execution: {
     tenant: tag<string>({ label: "database.execution.tenant" }),
-  }),
-})
+  },
+}
 ```
 
 The SDK follows the same split with `agent.config.*`, `agent.impl.*`, `session.execution.*`, `session.current.*`, and `session.observation.*`.

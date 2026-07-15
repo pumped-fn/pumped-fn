@@ -1,0 +1,10 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "undeclared_effect_edge_count",
+  "value": 0,
+  "target": 0,
+  "observed_at": "2026-07-15T10:45:38Z",
+  "source": "Root lint scanned 112 files with zero diagnostics; publication reservation is a required ordinary tag and every effectful child is a declared controller, resource, or tag dependency.",
+  "freshness": "observed_at=2026-07-15T10:45:38Z -> status=fresh against max_age=10m"
+}

@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec"
 import { controller, flow, isStreamingExec, resource, tag, tags, typed, type Lite } from "@pumped-fn/lite"
-import { model, type Capability, type LoadedSkill, type Message, type ModelRequest, type ModelResponse } from "./index.js"
+import type { Capability, LoadedSkill, Message, ModelRequest, ModelResponse } from "./index.js"
+import { model } from "./model.js"
 import * as session from "./session.js"
 import * as validation from "./validation.js"
 

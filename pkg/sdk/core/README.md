@@ -66,11 +66,11 @@ interface ExplainInput {
   readonly sql: string
 }
 
-const database = Object.freeze({
+const database = {
   ready: tag<{ readonly serverVersion: string }>({ label: "database.ready" }),
   inspect: tag<Lite.Flow<{ readonly tables: readonly string[] }, InspectInput>>({ label: "database.impl.inspect" }),
   explain: tag<Lite.Flow<{ readonly plan: string; readonly applied: false }, ExplainInput>>({ label: "database.impl.explain" }),
-})
+}
 
 const inspectSchema = flow({
   name: "inspect_schema",

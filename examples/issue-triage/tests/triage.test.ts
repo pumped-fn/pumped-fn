@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { objectiveIds, runVerifier } from "../examples/issue-triage/verify.js"
+import { objectiveIds, runVerifier } from "./support/verifier.js"
 
 describe("issue triage vertical", () => {
   it("proves all sixteen fixed objective contracts", async () => {

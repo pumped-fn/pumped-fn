@@ -62,7 +62,7 @@ export function schedule<Input>(opts: Scheduler.Options<Input>): Lite.Atom<Sched
           }
         }
       )
-      ctx.cleanup(() => registration.stop())
+      ctx.cleanup((target) => target.stop(), registration)
       return registration
     },
   })

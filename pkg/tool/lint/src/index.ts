@@ -11,6 +11,7 @@ export type RuleId =
   | "pumped/no-explicit-atom-type-argument"
   | "pumped/no-handle-spread"
   | "pumped/no-handle-factory"
+  | "pumped/no-hidden-exec-dependencies"
   | "pumped/no-implicit-tag-read"
   | "pumped/no-internal-example-label"
   | "pumped/no-immediate-return-binding"
@@ -144,8 +145,10 @@ type Imports = {
   liteNamespaces: Set<string>
   liteNamespaceImportEnds: Map<string, number>
   liteReactNamespaces: Set<string>
+  localImports: Set<string>
   mockFns: Set<string>
   nodeBuiltins: Map<string, string>
+  pumpedNamespaces: Set<string>
   reactNamespaces: Set<string>
   render: Set<string>
   stepLocals: Set<string>
@@ -333,8 +336,10 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     liteNamespaces: new Set(),
     liteNamespaceImportEnds: new Map(),
     liteReactNamespaces: new Set(),
+    localImports: new Set(),
     mockFns: new Set(),
     nodeBuiltins: new Map(),
+    pumpedNamespaces: new Set(),
     reactNamespaces: new Set(),
     render: new Set(),
     stepLocals: new Set(),
@@ -369,6 +374,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     if (!clause.namedBindings) continue
 
     if (ts.isNamespaceImport(clause.namedBindings)) {
+      if (moduleName.startsWith("@pumped-fn/")) imports.pumpedNamespaces.add(clause.namedBindings.name.text)
       if (moduleName === "@pumped-fn/lite") {
         imports.liteNamespaces.add(clause.namedBindings.name.text)
         imports.liteNamespaceImportEnds.set(clause.namedBindings.name.text, clause.namedBindings.name.getEnd())
@@ -383,6 +389,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     for (const specifier of clause.namedBindings.elements) {
       const imported = (specifier.propertyName ?? specifier.name).text
       const local = specifier.name.text
+      if (moduleName.startsWith(".")) imports.localImports.add(local)
       if (moduleName === "@pumped-fn/lite" && imported === "createScope") {
         imports.createScope.add(local)
       }
@@ -952,6 +959,166 @@ function collectIdentifierReferences(root: ts.Node): Set<string> {
   return names
 }
 
+function collectBindingNames(name: ts.BindingName, names: Set<string>): void {
+  if (ts.isIdentifier(name)) {
+    names.add(name.text)
+    return
+  }
+  for (const element of name.elements) {
+    if (ts.isBindingElement(element)) collectBindingNames(element.name, names)
+  }
+}
+
+function bindingHasName(binding: ts.BindingName, name: string): boolean {
+  if (ts.isIdentifier(binding)) return binding.text === name
+  return binding.elements.some((element) => ts.isBindingElement(element) && bindingHasName(element.name, name))
+}
+
+function declarationListHasName(list: ts.VariableDeclarationList, name: string): boolean {
+  return list.declarations.some((declaration) => bindingHasName(declaration.name, name))
+}
+
+function statementDeclaresValue(statement: ts.Statement, name: string): boolean {
+  if (ts.isVariableStatement(statement)) return declarationListHasName(statement.declarationList, name)
+  if (
+    ts.isFunctionDeclaration(statement)
+    || ts.isClassDeclaration(statement)
+    || ts.isEnumDeclaration(statement)
+  ) return statement.name?.text === name
+  if (ts.isImportEqualsDeclaration(statement)) return !statement.isTypeOnly && statement.name.text === name
+  if (!ts.isImportDeclaration(statement) || statement.importClause?.isTypeOnly) return false
+  const clause = statement.importClause
+  if (!clause) return false
+  if (clause.name?.text === name) return true
+  const bindings = clause.namedBindings
+  if (!bindings) return false
+  if (ts.isNamespaceImport(bindings)) return bindings.name.text === name
+  return bindings.elements.some((element) => !element.isTypeOnly && element.name.text === name)
+}
+
+function scopeStatementsDeclareValue(statements: ts.NodeArray<ts.Statement>, name: string): boolean {
+  return statements.some((statement) => statementDeclaresValue(statement, name))
+}
+
+function isRuntimeFunction(node: ts.Node): node is ts.FunctionLikeDeclaration {
+  return ts.isArrowFunction(node)
+    || ts.isFunctionDeclaration(node)
+    || ts.isFunctionExpression(node)
+    || ts.isMethodDeclaration(node)
+    || ts.isGetAccessorDeclaration(node)
+    || ts.isSetAccessorDeclaration(node)
+    || ts.isConstructorDeclaration(node)
+}
+
+function functionVarDeclaresValue(node: ts.FunctionLikeDeclaration, name: string): boolean {
+  let found = false
+  function visit(child: ts.Node): void {
+    if (found || child !== node && (isRuntimeFunction(child) || ts.isClassLike(child))) return
+    if (
+      ts.isVariableDeclarationList(child)
+      && !(child.flags & ts.NodeFlags.BlockScoped)
+      && declarationListHasName(child, name)
+    ) {
+      found = true
+      return
+    }
+    ts.forEachChild(child, visit)
+  }
+  if (node.body) visit(node.body)
+  return found
+}
+
+function hasVisibleValueBinding(node: ts.Node, name: string): boolean {
+  let current = node.parent
+  while (current) {
+    if (isRuntimeFunction(current)) {
+      if (current.parameters.some((parameter) => bindingHasName(parameter.name, name))) return true
+      if (
+        (ts.isFunctionDeclaration(current) || ts.isFunctionExpression(current))
+        && current.name?.text === name
+      ) return true
+      if (functionVarDeclaresValue(current, name)) return true
+    } else if (ts.isBlock(current) || ts.isSourceFile(current)) {
+      if (scopeStatementsDeclareValue(current.statements, name)) return true
+    } else if (ts.isCaseBlock(current)) {
+      if (current.clauses.some((clause) => scopeStatementsDeclareValue(clause.statements, name))) return true
+    } else if (ts.isCatchClause(current) && current.variableDeclaration) {
+      if (bindingHasName(current.variableDeclaration.name, name)) return true
+    } else if (
+      (ts.isForStatement(current) || ts.isForInStatement(current) || ts.isForOfStatement(current))
+      && current.initializer
+      && ts.isVariableDeclarationList(current.initializer)
+      && declarationListHasName(current.initializer, name)
+    ) {
+      return true
+    } else if (ts.isClassExpression(current) && current.name?.text === name) return true
+    current = current.parent
+  }
+  return false
+}
+
+function callbackCaptures(callback: ts.ArrowFunction | ts.FunctionExpression): string[] {
+  const declared = new Set<string>()
+  for (const parameter of callback.parameters) collectBindingNames(parameter.name, declared)
+  if (callback.name) declared.add(callback.name.text)
+
+  function collectDeclarations(node: ts.Node): void {
+    if (ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isBindingElement(node)) {
+      collectBindingNames(node.name, declared)
+    } else if (
+      (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isFunctionExpression(node))
+      && node.name
+    ) {
+      declared.add(node.name.text)
+    } else if (ts.isCatchClause(node) && node.variableDeclaration) {
+      collectBindingNames(node.variableDeclaration.name, declared)
+    }
+    ts.forEachChild(node, collectDeclarations)
+  }
+  collectDeclarations(callback.body)
+
+  const references = new Set<string>()
+  function collectReferences(node: ts.Node): void {
+    if (ts.isTypeNode(node)) return
+    if (ts.isPropertyAccessExpression(node)) {
+      collectReferences(node.expression)
+      return
+    }
+    if (ts.isElementAccessExpression(node)) {
+      collectReferences(node.expression)
+      collectReferences(node.argumentExpression)
+      return
+    }
+    if (ts.isPropertyAssignment(node)) {
+      if (ts.isComputedPropertyName(node.name)) collectReferences(node.name.expression)
+      collectReferences(node.initializer)
+      return
+    }
+    if (ts.isShorthandPropertyAssignment(node)) {
+      references.add(node.name.text)
+      return
+    }
+    if (
+      ts.isVariableDeclaration(node)
+      || ts.isParameter(node)
+      || ts.isBindingElement(node)
+      || ts.isFunctionDeclaration(node)
+      || ts.isFunctionExpression(node)
+      || ts.isClassDeclaration(node)
+    ) {
+      if ("initializer" in node && node.initializer) collectReferences(node.initializer)
+      if ("body" in node && node.body) collectReferences(node.body)
+      return
+    }
+    if (ts.isIdentifier(node)) references.add(node.text)
+    else ts.forEachChild(node, collectReferences)
+  }
+  collectReferences(callback.body)
+  return [...references]
+    .filter((name) => !declared.has(name) && (name !== "Promise" || hasVisibleValueBinding(callback, name)))
+    .sort()
+}
+
 function isClosedOverByFactory(name: string, factoryNodes: Array<ts.ArrowFunction | ts.FunctionExpression>): boolean {
   return factoryNodes.some((factory) => collectIdentifierReferences(factory).has(name))
 }
@@ -1188,6 +1355,68 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const unitFactoryNodes = collectUnitFactoryNodes(sourceFile, imports)
   const hasGraphNodes = unitFactoryNodes.length > 0
   const creatorHandleNames = collectCreatorHandleNames(sourceFile, imports)
+  const moduleValues = new Map<string, ts.Expression>()
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.initializer) {
+        moduleValues.set(declaration.name.text, declaration.initializer)
+      }
+    }
+  }
+
+  function graphExpression(expression: ts.Expression, seen = new Set<string>()): boolean {
+    if (
+      ts.isAsExpression(expression)
+      || ts.isTypeAssertionExpression(expression)
+      || ts.isParenthesizedExpression(expression)
+      || ts.isNonNullExpression(expression)
+      || ts.isSatisfiesExpression(expression)
+    ) return graphExpression(expression.expression, seen)
+
+    if (ts.isIdentifier(expression)) {
+      if (seen.has(expression.text)) return false
+      const initializer = moduleValues.get(expression.text)
+      if (!initializer) return false
+      const nextSeen = new Set(seen)
+      nextSeen.add(expression.text)
+      return graphExpression(initializer, nextSeen)
+    }
+
+    if (ts.isPropertyAccessExpression(expression)) {
+      return graphExpression(expression.expression, seen)
+    }
+
+    if (ts.isObjectLiteralExpression(expression)) {
+      return expression.properties.length > 0 && expression.properties.every((property) => {
+        if (ts.isPropertyAssignment(property) && !ts.isComputedPropertyName(property.name)) {
+          return graphExpression(property.initializer, new Set(seen))
+        }
+        if (ts.isShorthandPropertyAssignment(property)) {
+          return graphExpression(property.name, new Set(seen))
+        }
+        return false
+      })
+    }
+
+    if (ts.isArrayLiteralExpression(expression)) {
+      return expression.elements.length > 0 && expression.elements.every((element) =>
+        !ts.isSpreadElement(element) && graphExpression(element, new Set(seen)),
+      )
+    }
+
+    if (!ts.isCallExpression(expression)) return false
+    if (unshadowedCreatorKind(expression.expression, sourceFile, imports)) return true
+    if (expression.arguments.length === 0) return false
+    const root = rootIdentifier(expression.expression)
+    const pumpedBinding = root && imports.pumpedNamespaces.has(root.text)
+    const localImportedBinding = root && imports.localImports.has(root.text)
+    const localBinding = ts.isPropertyAccessExpression(expression.expression)
+      ? graphExpression(expression.expression.expression, new Set(seen))
+      : graphExpression(expression.expression, new Set(seen))
+    return (pumpedBinding || localImportedBinding || localBinding)
+      && expression.arguments.every((argument) => graphExpression(argument, new Set(seen)))
+  }
 
   function factoryCtxAt(node: ts.Node): { factory: ts.ArrowFunction | ts.FunctionExpression; name: string } | null {
     const factory = enclosingUnitFactory(node, imports)
@@ -1545,6 +1774,31 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           node.expression,
           "Raw ambient IO belongs in transport atoms or composition-root adapters.",
         )
+      }
+
+      const execFactory = factoryCtxAt(node)
+      if (
+        execFactory
+        && ts.isPropertyAccessExpression(node.expression)
+        && node.expression.name.text === "exec"
+        && isDirectCtxExpression(node.expression.expression, execFactory.name)
+        && node.arguments[0]
+        && ts.isObjectLiteralExpression(node.arguments[0])
+      ) {
+        const fn = objectProperty(node.arguments[0], "fn")?.initializer
+        if (fn && (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))) {
+          const captures = callbackCaptures(fn)
+          if (captures.length > 0) {
+            pushNodeDiagnostic(
+              diagnostics,
+              sourceFile,
+              filePath,
+              "pumped/no-hidden-exec-dependencies",
+              fn,
+              `ctx.exec callback captures "${captures.join(", ")}"; receive execution values after ctx and provide them through params.`,
+            )
+          }
+        }
       }
 
       if (
@@ -1962,6 +2216,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
         const isExported = exported(node)
         const closedOver = isClosedOverByFactory(declaration.name.text, unitFactoryNodes)
         if (!isExported && !closedOver) continue
+        if (isExported && graphExpression(initializer)) continue
 
         pushNodeDiagnostic(
           diagnostics,

@@ -22,11 +22,11 @@ export const database = resource({
   deps: { caseFixture: tags.required(caseFixture) },
   factory: async (ctx, { caseFixture }): Promise<Database> => {
     const connection = await ctx.exec({
-      fn: () => caseFixture.openDatabase(),
-      params: [],
+      fn: (_ctx, target) => target.openDatabase(),
+      params: [caseFixture],
       name: "database.open",
     })
-    ctx.cleanup(() => connection.close())
+    ctx.cleanup((_ctx, target) => target.close(), connection)
     return connection
   },
 })
@@ -51,8 +51,8 @@ export const provision = flow({
       createdAt: clock.now(),
     }
     const result = await ctx.exec({
-      fn: () => database.insertUser(user),
-      params: [],
+      fn: (_ctx, target, value) => target.insertUser(value),
+      params: [database, user],
       name: "database.insertUser",
     })
     if (result === "duplicate") ctx.fail({ kind: "duplicate-email", email: ctx.input.email })

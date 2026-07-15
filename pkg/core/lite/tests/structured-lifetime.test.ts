@@ -34,6 +34,32 @@ function abortable<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
 }
 
 describe("ExecutionContext structured lifetime", () => {
+  it("passes inferred resource cleanup dependencies with the resource context", async () => {
+    const events: string[] = []
+    const backend = resource({
+      ownership: "current",
+      factory: (ctx) => {
+        ctx.cleanup((cleanupCtx, target, value) => {
+          expect(cleanupCtx.scope).toBe(ctx.scope)
+          target.push(value)
+        }, events, "released")
+        return "ready"
+      },
+    })
+    const run = flow({
+      deps: { backend },
+      factory: (_ctx, { backend }) => backend,
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({ flow: run })).resolves.toBe("ready")
+    expect(events).toEqual(["released"])
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
   it("exposes the effective signal and isolates targeted caller cancellation", async () => {
     const startedA = deferred()
     const startedB = deferred()
@@ -225,6 +251,73 @@ describe("ExecutionContext structured lifetime", () => {
     release.resolve()
     await Promise.all([pending, closing])
     expect(events).toEqual(["child-aborted", "child-finished", "parent-resource-cleanup"])
+    await scope.dispose()
+  })
+
+  it("owns default resources at the nearest execution boundary", async () => {
+    const events: string[] = []
+    const backend = resource({
+      factory: (ctx) => {
+        events.push("resolve")
+        ctx.cleanup(() => {
+          events.push("cleanup")
+        })
+        return "ready"
+      },
+    })
+    const inner = flow({
+      deps: { backend },
+      factory: (_ctx, { backend }) => backend,
+    })
+    const middle = flow({
+      factory: (ctx) => ctx.exec({ flow: inner }),
+    })
+    const outer = flow({
+      factory: async (ctx) => [
+        await ctx.exec({ flow: middle }),
+        await ctx.exec({ flow: middle }),
+      ],
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({ flow: outer })).resolves.toEqual(["ready", "ready"])
+    expect(events).toEqual(["resolve"])
+
+    await ctx.close()
+    expect(events).toEqual(["resolve", "cleanup"])
+    await scope.dispose()
+  })
+
+  it("waits for direct resource resolution before cleanup", async () => {
+    const events: string[] = []
+    const started = deferred()
+    const release = deferred()
+    const backend = resource({
+      factory: async (ctx) => {
+        started.resolve()
+        await release.promise
+        ctx.cleanup(() => {
+          events.push("cleanup")
+        })
+        return "ready"
+      },
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const resolving = ctx.resolve(backend)
+    await started.promise
+    let closed = false
+    const closing = ctx.close().then(() => {
+      closed = true
+    })
+
+    await Promise.resolve()
+    expect(closed).toBe(false)
+    release.resolve()
+    await expect(resolving).resolves.toBe("ready")
+    await closing
+    expect(events).toEqual(["cleanup"])
     await scope.dispose()
   })
 

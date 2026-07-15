@@ -18,64 +18,13 @@ export interface StandardSchema<T> {
   }
 }
 
-export interface IssueIntake {
-  issueId: string
-  repository: string
-  title: string
-  body: string
-  revision: string
-  path: string
-  sql: string
-  victoriaQuery: string
-  windowStart: string
-  windowEnd: string
-  idempotencyKey: string
-}
-
-export interface Capability {
-  repositoryRoot: string
-  databaseMode: "read-only"
-  victoriaMaxWindowMs: number
-  publication: boolean
-  scopes: string[]
-}
-
-export interface Evidence {
-  id: string
-  source: "repository" | "postgresql" | "victoria"
-  citation: string
-  capturedAt: string
-  expiresAt?: string
-  maxAgeMs?: number
-  queryIdentity: string
-  revisionIdentity?: string
-  capabilityScope: string
-  summary: string
-}
-
-export interface Hypothesis {
-  id: string
-  statement: string
-  writerId: string
-  evidenceIds: string[]
-  supported: boolean
-}
-
-export interface VerifierVerdict {
-  hypothesisId: string
-  verifierId: string
-  verdict: "verified" | "rejected" | "failed"
-  checkedEvidenceIds: string[]
-}
-
-export interface PublicationReceipt {
-  publicationId: string
-  issueId: string
-  idempotencyKey: string
-  payloadDigest: string
-  publishedAt: string
-  known: boolean
-}
+export type IssueIntake = z.infer<typeof issueIntakeShape>
+export type Capability = z.infer<typeof capabilityShape>
+export type WatchConfig = z.infer<typeof watchShape>
+export type Evidence = z.infer<typeof evidenceShape>
+export type Hypothesis = z.infer<typeof hypothesisShape>
+export type VerifierVerdict = z.infer<typeof verifierVerdictShape>
+export type PublicationReceipt = z.infer<typeof publicationReceiptShape>
 
 export interface ValidationEngine {
   issueIntake: StandardSchema<IssueIntake>
@@ -89,6 +38,11 @@ export interface ValidationEngine {
 export interface IssueLease {
   leaseId: string
   issue: unknown
+}
+
+export interface DeliveryLease extends IssueLease {
+  authority: session.Authority
+  record: session.SessionRecord
 }
 
 export interface RepositoryRead {
@@ -113,6 +67,7 @@ export interface VerificationInput {
 
 export interface PublicationInput {
   authorityFingerprint: string
+  leaseId: string
   issueId: string
   idempotencyKey: string
   payload: {
@@ -148,74 +103,81 @@ export class TriageError extends Error {
 }
 
 const iso = z.string().datetime()
-const shapes = Object.freeze({
-  issueIntake: z.object({
-    issueId: z.string().min(1),
-    repository: z.string().min(1),
-    title: z.string().min(1),
-    body: z.string(),
-    revision: z.string().min(1),
-    path: z.string().min(1),
-    sql: z.string().min(1),
-    victoriaQuery: z.string().min(1),
-    windowStart: iso,
-    windowEnd: iso,
-    idempotencyKey: z.string().min(1),
-  }).strict(),
-  capability: z.object({
-    repositoryRoot: z.string().min(1),
-    databaseMode: z.literal("read-only"),
-    victoriaMaxWindowMs: z.number().int().positive(),
-    publication: z.boolean(),
-    scopes: z.array(z.string()).min(1),
-  }).strict(),
-  evidence: z.object({
-    id: z.string().min(1),
-    source: z.enum(["repository", "postgresql", "victoria"]),
-    citation: z.string().min(1),
-    capturedAt: iso,
-    expiresAt: iso.optional(),
-    maxAgeMs: z.number().int().positive().optional(),
-    queryIdentity: z.string().min(1),
-    revisionIdentity: z.string().min(1).optional(),
-    capabilityScope: z.string().min(1),
-    summary: z.string().min(1),
-  }).strict().refine((value) => value.expiresAt !== undefined || value.maxAgeMs !== undefined),
-  hypothesis: z.object({
-    id: z.string().min(1),
-    statement: z.string().min(1),
-    writerId: z.string().min(1),
-    evidenceIds: z.array(z.string()).min(1),
-    supported: z.boolean(),
-  }).strict(),
-  verifierVerdict: z.object({
-    hypothesisId: z.string().min(1),
-    verifierId: z.string().min(1),
-    verdict: z.enum(["verified", "rejected", "failed"]),
-    checkedEvidenceIds: z.array(z.string()),
-  }).strict(),
-  publicationReceipt: z.object({
-    publicationId: z.string().min(1),
-    issueId: z.string().min(1),
-    idempotencyKey: z.string().min(1),
-    payloadDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
-    publishedAt: iso,
-    known: z.boolean(),
-  }).strict(),
-})
+const issueIntakeShape = z.object({
+  issueId: z.string().min(1),
+  repository: z.string().min(1),
+  title: z.string().min(1),
+  body: z.string(),
+  revision: z.string().min(1),
+  path: z.string().min(1),
+  sql: z.string().min(1),
+  victoriaQuery: z.string().min(1),
+  windowStart: iso,
+  windowEnd: iso,
+  idempotencyKey: z.string().min(1),
+}).strict()
+const capabilityShape = z.object({
+  repositoryRoot: z.string().min(1),
+  databaseMode: z.literal("read-only"),
+  victoriaMaxWindowMs: z.number().int().positive(),
+  publication: z.boolean(),
+  scopes: z.array(z.string()).min(1),
+}).strict()
+const evidenceShape = z.object({
+  id: z.string().min(1),
+  source: z.enum(["repository", "postgresql", "victoria"]),
+  citation: z.string().min(1),
+  capturedAt: iso,
+  expiresAt: iso.optional(),
+  maxAgeMs: z.number().int().positive().optional(),
+  queryIdentity: z.string().min(1),
+  revisionIdentity: z.string().min(1).optional(),
+  capabilityScope: z.string().min(1),
+  summary: z.string().min(1),
+}).strict().refine((value) => value.expiresAt !== undefined || value.maxAgeMs !== undefined)
+const hypothesisShape = z.object({
+  id: z.string().min(1),
+  statement: z.string().min(1),
+  writerId: z.string().min(1),
+  evidenceIds: z.array(z.string()).min(1).refine((value) => new Set(value).size === value.length),
+  supported: z.boolean(),
+}).strict()
+const verifierVerdictShape = z.object({
+  hypothesisId: z.string().min(1),
+  verifierId: z.string().min(1),
+  verdict: z.enum(["verified", "rejected", "failed"]),
+  checkedEvidenceIds: z.array(z.string()).refine((value) => new Set(value).size === value.length),
+}).strict()
+const publicationReceiptShape = z.object({
+  publicationId: z.string().min(1),
+  issueId: z.string().min(1),
+  idempotencyKey: z.string().min(1),
+  payloadDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+  publishedAt: iso,
+  known: z.boolean(),
+}).strict()
+const watchShape = z.object({
+  concurrency: z.number().int().positive(),
+  continuous: z.boolean(),
+  idleWaitMs: z.number().int().nonnegative(),
+}).strict()
+const turnResultShape = z.object({
+  content: z.string(),
+  toolResults: z.array(z.object({ output: z.unknown() }).passthrough()),
+}).passthrough()
 
 function standard<T>(schema: z.ZodType<T>): StandardSchema<T> {
-  return schema as unknown as StandardSchema<T>
+  return schema
 }
 
 export function createZodValidationEngine(): ValidationEngine {
   return {
-    issueIntake: standard(shapes.issueIntake),
-    capability: standard(shapes.capability),
-    evidence: standard(shapes.evidence),
-    hypothesis: standard(shapes.hypothesis),
-    verifierVerdict: standard(shapes.verifierVerdict),
-    publicationReceipt: standard(shapes.publicationReceipt),
+    issueIntake: standard(issueIntakeShape),
+    capability: standard(capabilityShape),
+    evidence: standard(evidenceShape),
+    hypothesis: standard(hypothesisShape),
+    verifierVerdict: standard(verifierVerdictShape),
+    publicationReceipt: standard(publicationReceiptShape),
   }
 }
 
@@ -226,14 +188,15 @@ export function createZodSdkEngine(): sdkValidation.Engine {
   })
 }
 
-export const config = Object.freeze({
+export const config = {
   validation: tag<ValidationEngine>({ label: "example.issue-triage.validation" }),
   capability: tag<unknown>({ label: "example.issue-triage.capability" }),
   clock: tag<() => number>({ label: "example.issue-triage.clock" }),
-})
+  watch: tag<WatchConfig>({ label: "example.issue-triage.watch" }),
+}
 
-export const ports = Object.freeze({
-  issueIntake: tag<Lite.Flow<IssueLease | undefined, void>>({ label: "example.issue-triage.issue-intake" }),
+export const ports = {
+  issueIntake: tag<Lite.Flow<DeliveryLease | undefined, void>>({ label: "example.issue-triage.issue-intake" }),
   acknowledge: tag<Lite.Flow<void, { leaseId: string; receipt: PublicationReceipt }>>({ label: "example.issue-triage.acknowledge" }),
   reject: tag<Lite.Flow<void, { leaseId: string; error: unknown }>>({ label: "example.issue-triage.reject" }),
   leaseValid: tag<Lite.Flow<boolean, { leaseId: string }>>({ label: "example.issue-triage.lease-valid" }),
@@ -243,7 +206,7 @@ export const ports = Object.freeze({
   victoria: tag<Lite.Flow<unknown, VictoriaRead>>({ label: "example.issue-triage.victoria-read" }),
   verifier: tag<Lite.Flow<unknown, VerificationInput>>({ label: "example.issue-triage.independent-verifier" }),
   publisher: tag<Lite.Flow<unknown, PublicationInput>>({ label: "example.issue-triage.github-publisher" }),
-})
+}
 
 async function validate<T>(schema: StandardSchema<T>, value: unknown): Promise<T> {
   const result = await schema["~standard"].validate(value)
@@ -370,7 +333,7 @@ export const collectEvidence = flow({
   tags: [agent.config.tool({
     version: "1",
     description: "Collect cited repository, PostgreSQL, and Victoria evidence under the session authority.",
-    input: shapes.issueIntake,
+    input: issueIntakeShape,
   })],
   parse: typed<IssueIntake>(),
   deps: {
@@ -396,14 +359,15 @@ export const triageIssue = flow({
     run: controller(session.run),
     verifier: tags.required(ports.verifier),
     publisher: tags.required(ports.publisher),
+    leaseValid: tags.required(ports.leaseValid),
   },
-  factory: async (ctx, { runtime, validation, capability: rawCapability, clock, run, verifier, publisher }): Promise<TriageResult> => {
+  factory: async (ctx, { runtime, validation, capability: rawCapability, clock, run, verifier, publisher, leaseValid }): Promise<TriageResult> => {
     const issue = authorize(
       await validate(validation.issueIntake, ctx.input.issue),
       await validate(validation.capability, rawCapability),
       runtime.authority,
     )
-    const result = await run.exec({
+    const result = turnResultShape.parse(await run.exec({
       tags: [
         agent.config.role({
           name: "issue-triage",
@@ -425,7 +389,7 @@ export const triageIssue = flow({
           metadata: { issueId: issue.issueId },
         },
       },
-    }) as agent.TurnResult
+    }))
     const outputs = result.toolResults.flatMap((tool) => Array.isArray(tool.output) ? tool.output : [tool.output])
     const evidence = await Promise.all(outputs.map((output) => validate(validation.evidence, output)))
     if (evidence.length !== 3 || evidence.some((item) => !isFresh(item, clock()))) {
@@ -448,11 +412,17 @@ export const triageIssue = flow({
     if (verdict.verifierId === hypothesis.writerId || verdict.verdict !== "verified") {
       throw new TriageError("verify", hypothesis.id, "Independent verification is required")
     }
-    if (hypothesis.evidenceIds.some((id) => !verdict.checkedEvidenceIds.includes(id))) {
+    const checkedEvidenceIds = new Set(verdict.checkedEvidenceIds)
+    if (checkedEvidenceIds.size !== evidenceIds.size
+      || [...evidenceIds].some((id) => !checkedEvidenceIds.has(id))) {
       throw new TriageError("verify", hypothesis.id, "Verdict does not cover every citation")
+    }
+    if (!await leaseValid.exec({ input: { leaseId: ctx.input.leaseId } })) {
+      throw new TriageError("lease", ctx.input.leaseId, "Issue lease expired before publication")
     }
     const publication = {
       authorityFingerprint: runtime.authority.fingerprint,
+      leaseId: ctx.input.leaseId,
       issueId: issue.issueId,
       idempotencyKey: issue.idempotencyKey,
       payload: { hypothesis, verdict, evidence },
@@ -472,20 +442,25 @@ export const triageIssue = flow({
 
 export const runDelivery = flow({
   name: "example.issue-triage.run-delivery",
-  parse: typed<IssueLease>(),
+  parse: typed<DeliveryLease>(),
   deps: {
     triage: controller(triageIssue),
+    finish: controller(session.finish),
     acknowledge: tags.required(ports.acknowledge),
     reject: tags.required(ports.reject),
     leaseValid: tags.required(ports.leaseValid),
     wait: tags.required(ports.wait),
   },
-  factory: async (ctx, { triage, acknowledge, reject, leaseValid, wait }): Promise<DeliveryResult> => {
+  factory: async (ctx, { triage, finish, acknowledge, reject, leaseValid, wait }): Promise<DeliveryResult> => {
     try {
       if (!await leaseValid.exec({ input: { leaseId: ctx.input.leaseId } })) {
         throw new TriageError("lease", ctx.input.leaseId, "Issue lease expired")
       }
       const result = await triage.exec({ input: ctx.input })
+      if (!await leaseValid.exec({ input: { leaseId: ctx.input.leaseId } })) {
+        throw new TriageError("lease", ctx.input.leaseId, "Issue lease expired before acknowledgement")
+      }
+      await finish.exec()
       await acknowledge.exec({ input: { leaseId: ctx.input.leaseId, receipt: result.receipt } })
       return { leaseId: ctx.input.leaseId, status: "acknowledged", result }
     } catch (error) {
@@ -501,19 +476,35 @@ export const watchIssues = flow({
   deps: {
     receive: tags.required(ports.issueIntake),
     delivery: controller(runDelivery),
+    wait: tags.required(ports.wait),
+    watch: tags.required(config.watch),
   },
-  factory: async (_ctx, { receive, delivery }): Promise<DeliveryResult[]> => {
+  factory: async (ctx, { receive, delivery, wait, watch }): Promise<DeliveryResult[]> => {
+    if (!Number.isSafeInteger(watch.concurrency) || watch.concurrency < 1) {
+      throw new TriageError("lease", "watcher", "Watcher concurrency must be a positive safe integer")
+    }
     const active = new Set<Promise<void>>()
     const results: DeliveryResult[] = []
     for (;;) {
+      ctx.signal.throwIfAborted()
       const lease = await receive.exec()
-      if (!lease) break
-      const running = delivery.exec({ input: lease }).then((result) => {
+      if (!lease) {
+        if (!watch.continuous) break
+        await wait.exec({ input: { milliseconds: watch.idleWaitMs } })
+        continue
+      }
+      const running = delivery.exec({
+        input: lease,
+        tags: [
+          session.authority(lease.authority),
+          session.record(lease.record),
+        ],
+      }).then((result) => {
         results.push(result)
       })
       active.add(running)
       void running.then(() => active.delete(running))
-      if (active.size >= 2) await Promise.race(active)
+      if (active.size >= watch.concurrency) await Promise.race(active)
     }
     await Promise.all(active)
     return results

@@ -1,0 +1,10 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "scope_seam_escape_count",
+  "value": 0,
+  "target": 0,
+  "observed_at": "2026-07-15T10:45:38Z",
+  "source": "Issue-triage tests pass 11 of 11 using createScope tags, presets, and extensions; no module mocks, global patches, or internal reaches are present.",
+  "freshness": "observed_at=2026-07-15T10:45:38Z -> status=fresh against max_age=10m"
+}

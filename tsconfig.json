@@ -15,6 +15,7 @@
     "baseUrl": ".",
     "paths": {
       "@pumped-fn/sdk": ["pkg/sdk/core/src/index.ts"],
+      "@pumped-fn/sdk/*": ["pkg/sdk/core/src/*"],
       "@pumped-fn/sdk-test": ["pkg/sdk/test/src/index.ts"],
       "@pumped-fn/lite": ["pkg/core/lite/src/index.ts"],
       "@pumped-fn/lite/*": ["pkg/core/lite/src/*"]

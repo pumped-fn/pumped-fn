@@ -793,6 +793,34 @@ describe("lite lint scanner", () => {
     `)).toEqual([])
   })
 
+  it("allows exported graph namespaces and binding tuples without Object.freeze", () => {
+    expect(ids(`
+      import { flow, resource, tag } from "@pumped-fn/lite"
+      import * as session from "@pumped-fn/sdk/session"
+
+      const port = tag<unknown>({ label: "port" })
+      const run = flow({ name: "run", factory: () => "ok" })
+      const tx = resource({ name: "tx", ownership: "current", factory: () => ({}) })
+      export const graph = { port, nested: { run, tx } }
+      export const bindings = [port(run), session.store.load(run)] as const
+    `)).toEqual([])
+
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const run = flow({ name: "run", factory: () => "ok" })
+      export const mixed = { run, cache: new Map() }
+      export const data = { retries: 3 }
+      export const empty = {}
+      export const spread = { ...mixed }
+    `)).toEqual([
+      "pumped/no-module-state",
+      "pumped/no-module-state",
+      "pumped/no-module-state",
+      "pumped/no-module-state",
+    ])
+  })
+
   it("finds resource/flow factories reading deps via an identifier instead of destructuring", () => {
     expect(ids(`
       import { resource } from "@pumped-fn/lite"
@@ -1515,14 +1543,102 @@ describe("lite lint scanner", () => {
     `, "tests/example.test.ts")).toBe(0)
   })
 
-  it("does not flag the sanctioned ctx.exec({ fn }) form", () => {
-    expect(ids(`
+  it("requires ctx.exec callbacks to receive every execution dependency through params", () => {
+    const hidden = (source: string) => diagnostics(source)
+      .filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
+
+    expect(hidden(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
       const send = flow({
         deps: { client },
         factory: (ctx, { client }) => ctx.exec({ fn: () => client.send(msg), name: "client.send", params: [] }),
+      })
+    `).map((diagnostic) => diagnostic.message)).toEqual([
+      'ctx.exec callback captures "client, msg"; receive execution values after ctx and provide them through params.',
+    ])
+
+    expect(hidden(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx) => {
+          const client = { send: (message: string) => message }
+          return ctx.exec({ fn: () => client.send("hello"), params: [client] })
+        },
+      })
+    `)).toHaveLength(1)
+
+    expect(hidden(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx) => ctx.exec({
+          fn: (_ctx, target, content) => {
+            const relay = ({ value }: { value: string }) => target.send(value)
+            return relay({ value: content })
+          },
+          params: [{ send: (value: string) => value }, "hello"],
+        }),
+      })
+    `)).toEqual([])
+
+    expect(hidden(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx) => ctx.exec({ fn: () => Promise.resolve("ok"), params: [] }),
+      })
+    `)).toEqual([])
+
+    expect(hidden(`
+      import { flow } from "@pumped-fn/lite"
+
+      const unrelated = (Promise: { resolve: (value: string) => string }) => Promise.resolve("elsewhere")
+      const send = flow({
+        factory: (ctx) => ctx.exec({ fn: () => Promise.resolve("ok"), params: [] }),
+      })
+    `)).toEqual([])
+
+    expect(hidden(`
+      import { flow } from "@pumped-fn/lite"
+
+      const Promise = { resolve: (value: string) => value }
+      const send = flow({
+        factory: (ctx) => ctx.exec({ fn: () => Promise.resolve("ok"), params: [] }),
+      })
+    `).map((diagnostic) => diagnostic.message)).toEqual([
+      'ctx.exec callback captures "Promise"; receive execution values after ctx and provide them through params.',
+    ])
+
+    expect(hidden(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx, { Promise }: { Promise: { resolve: (value: string) => string } }) =>
+          ctx.exec({ fn: () => Promise.resolve("ok"), params: [] }),
+      })
+    `).map((diagnostic) => diagnostic.message)).toEqual([
+      'ctx.exec callback captures "Promise"; receive execution values after ctx and provide them through params.',
+    ])
+
+    expect(hidden(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx) => ctx.exec({ fn: () => crypto.randomUUID(), params: [] }),
+      })
+    `).map((diagnostic) => diagnostic.message)).toEqual([
+      'ctx.exec callback captures "crypto"; receive execution values after ctx and provide them through params.',
+    ])
+
+    expect(hidden(`
+      import { flow } from "@pumped-fn/lite"
+
+      const worker = { exec: (_options: unknown) => undefined }
+      const send = flow({
+        factory: () => worker.exec({ fn: () => Promise.resolve("ok"), params: [] }),
       })
     `)).toEqual([])
   })

@@ -10,6 +10,9 @@ import {
   type SuspenseStepKey,
 } from "@pumped-fn/lite-extension-suspense"
 import type { TurnInput, TurnResult } from "./agent.js"
+import { model } from "./model.js"
+
+export { model }
 
 export type WorkerKind = "code" | "llm" | "cli" | string
 
@@ -695,8 +698,6 @@ export interface LoadedSkill {
   readonly description?: string
   readonly content: string
 }
-
-export const model = tag<Model>({ label: "agent.model" })
 
 export const complete = flow({
   name: "model.complete",

@@ -175,8 +175,8 @@ interface CollectingNotifier extends Notifier {
   record(message: ReminderMessage): Promise<ReminderResult>
 }
 
-function collecting(messages: ReminderMessage[]): Notifier {
-  const client: CollectingNotifier = {
+function collecting(messages: ReminderMessage[]): CollectingNotifier {
+  return {
     async send(message: ReminderMessage): Promise<ReminderResult> {
       return this.record(message)
     },
@@ -184,8 +184,7 @@ function collecting(messages: ReminderMessage[]): Notifier {
       messages.push(message)
       return { invoiceId: message.invoiceId, sent: true }
     },
-  }
-  return client
+  } satisfies CollectingNotifier
 }
 
 interface Feed<T> extends AsyncIterable<T>, AsyncIterator<T, undefined> {

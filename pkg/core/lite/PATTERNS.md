@@ -204,8 +204,8 @@ const tx = resource({
       },
     }
 
-    ctx.onClose((result) => result.ok ? tx.commit() : tx.rollback())
-    ctx.cleanup(() => tx.release())
+    ctx.onClose((result, _ctx, target) => result.ok ? target.commit() : target.rollback(), tx)
+    ctx.cleanup((_ctx, target) => target.release(), tx)
     return tx
   },
 })
@@ -287,7 +287,7 @@ sequenceDiagram
     Note right of Ctrl: apply value, skip factory, cleanups NOT run
     Ctrl->>Ctrl: emit 'resolved'
 
-    App->>Ctrl: ctrl.update(v => v + 1)
+    App->>Ctrl: ctrl.update((v) => v + 1)
     Note right of Ctrl: apply fn(prev), skip factory, cleanups NOT run
     Ctrl->>Ctrl: emit 'resolved'
 

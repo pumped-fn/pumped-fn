@@ -261,11 +261,11 @@ export const claudeLeases = resource({
       leases.delete(sessionId)
       await current.close()
     }
-    ctx.cleanup(async () => {
-      const current = [...leases.entries()]
-      leases.clear()
+    ctx.cleanup(async (_ctx, active) => {
+      const current = [...active.entries()]
+      active.clear()
       await Promise.all(current.map(([, value]) => value.close()))
-    })
+    }, leases)
     return {
       prompt: (sessionId, prompt, signal) => lease(sessionId).prompt(prompt, signal),
       release,

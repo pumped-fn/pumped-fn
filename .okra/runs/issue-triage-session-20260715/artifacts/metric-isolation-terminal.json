@@ -1,0 +1,10 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "cross_session_leak_count",
+  "value": 0,
+  "target": 0,
+  "observed_at": "2026-07-15T10:45:38Z",
+  "source": "SDK core overlapping-session, cancellation, continuation, and observation tests pass within the 54-case source suite.",
+  "freshness": "observed_at=2026-07-15T10:45:38Z -> status=fresh against max_age=10m"
+}

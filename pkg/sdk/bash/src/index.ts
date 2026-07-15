@@ -165,7 +165,9 @@ export const run: sandbox.Run = flow({
     const controller = new AbortController()
     const abort = () => controller.abort(signal.reason)
     signal.addEventListener("abort", abort, { once: true })
-    const unregister = ctx.onClose(() => controller.abort(new DOMException("Sandbox stream closed", "AbortError")))
+    const unregister = ctx.onClose((_result, _ctx, target) => {
+      target.abort(new DOMException("Sandbox stream closed", "AbortError"))
+    }, controller)
     let timedOut = false
     const timer = clock.set(() => {
       timedOut = true

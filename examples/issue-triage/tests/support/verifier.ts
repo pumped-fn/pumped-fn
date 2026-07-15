@@ -16,12 +16,12 @@ import {
   type Capability,
   type Evidence,
   type IssueIntake,
-  type IssueLease,
+  type DeliveryLease,
   type PublicationInput,
   type PublicationReceipt,
   type TriageResult,
   type VerificationInput,
-} from "./index.js"
+} from "../../src/triage.js"
 
 export const objectiveIds = [
   "issue-intake-valid",
@@ -47,6 +47,7 @@ type Mode =
   | "stale"
   | "unsupported"
   | "missing-citation"
+  | "duplicate-citation"
   | "writer-verdict"
   | "partial-verdict"
   | "wrong-hypothesis"
@@ -60,7 +61,7 @@ interface PublicationStore {
 
 interface EnvironmentOptions {
   mode?: Mode
-  queue?: IssueLease[]
+  queue?: DeliveryLease[]
   authority?: session.Authority
   capability?: Capability
   publicationStore?: PublicationStore
@@ -119,7 +120,7 @@ function authority(tenant = "acme-triage", publication = true): session.Authorit
 }
 
 function initial(bound: session.Authority): session.SessionRecord {
-  return Object.freeze({
+  return {
     id: `session:${bound.tenant}`,
     version: 0,
     schemaVersion: 1,
@@ -127,23 +128,23 @@ function initial(bound: session.Authority): session.SessionRecord {
     authorityFingerprint: bound.fingerprint,
     authorityConstraints: bound,
     currentBranchId: "main",
-    branches: Object.freeze([{
+    branches: [{
       id: "main",
       version: 0,
       createdBy: "bootstrap",
       authorityFingerprint: bound.fingerprint,
       authority: bound,
-      evidence: Object.freeze([]),
-    }]),
-    work: Object.freeze([]),
-    attempts: Object.freeze([]),
-    invocations: Object.freeze([]),
-    artifacts: Object.freeze([]),
-    memory: Object.freeze([]),
-    schedules: Object.freeze([]),
-    providerContinuations: Object.freeze({}),
+      evidence: [],
+    }],
+    work: [],
+    attempts: [],
+    invocations: [],
+    artifacts: [],
+    memory: [],
+    schedules: [],
+    providerContinuations: {},
     nextEventSequence: 1,
-  })
+  }
 }
 
 function publicationStore(): PublicationStore {
@@ -283,7 +284,9 @@ function createEnvironment(options: EnvironmentOptions = {}) {
           writerId: "writer:luna",
           evidenceIds: mode === "missing-citation"
             ? evidence.slice(0, 2).map((item) => item.id)
-            : evidence.map((item) => item.id),
+            : mode === "duplicate-citation"
+              ? [evidence[0]!.id, evidence[0]!.id, evidence[1]!.id]
+              : evidence.map((item) => item.id),
           supported: mode !== "unsupported",
         }),
         stop: true,
@@ -339,7 +342,7 @@ function createEnvironment(options: EnvironmentOptions = {}) {
   })
   const issueIntake = flow({
     name: "example.issue-triage.fake.issue-intake",
-    factory: (): IssueLease | undefined => queue.shift(),
+    factory: (): DeliveryLease | undefined => queue.shift(),
   })
   const acknowledge = flow({
     name: "example.issue-triage.fake.acknowledge",
@@ -367,6 +370,11 @@ function createEnvironment(options: EnvironmentOptions = {}) {
       calls.waited += 1
     },
   })
+  const commit: session.Commit = flow({
+    name: "example.issue-triage.fake.session-commit",
+    parse: typed<{ record: session.SessionRecord; expectedVersion: number }>(),
+    factory: (ctx) => ({ version: ctx.input.expectedVersion + 1 }),
+  })
   const observation: Lite.Extension = {
     name: "example.issue-triage.fake.observation",
     wrapExec: (next, target, ctx) => {
@@ -391,6 +399,7 @@ function createEnvironment(options: EnvironmentOptions = {}) {
       config.validation(createZodValidationEngine()),
       config.capability(options.capability ?? capability()),
       config.clock(() => Date.parse("2026-07-15T05:45:00.000Z")),
+      config.watch({ concurrency: 2, continuous: false, idleWaitMs: 0 }),
       ports.repository(repository),
       ports.postgresql(postgresql),
       ports.victoria(victoria),
@@ -401,12 +410,30 @@ function createEnvironment(options: EnvironmentOptions = {}) {
       ports.reject(reject),
       ports.leaseValid(leaseValid),
       ports.wait(wait),
+      session.store.commit(commit),
     ],
   }
 }
 
 async function useEnvironment<T>(environment: ReturnType<typeof createEnvironment>, run: (ctx: Context) => Promise<T>): Promise<T> {
   const scope = createScope({ tags: environment.tags, extensions: environment.extensions })
+  const ctx = scope.createContext()
+  try {
+    return await run(ctx)
+  } finally {
+    await ctx.close()
+    await scope.dispose()
+  }
+}
+
+async function useDeliveryEnvironment<T>(
+  environment: ReturnType<typeof createEnvironment>,
+  run: (ctx: Context) => Promise<T>,
+): Promise<T> {
+  const scope = createScope({
+    tags: environment.tags.filter((value) => value.tag !== session.authority && value.tag !== session.record),
+    extensions: environment.extensions,
+  })
   const ctx = scope.createContext()
   try {
     return await run(ctx)
@@ -484,7 +511,12 @@ export async function runVerifier(): Promise<{
 
   const missingCitation = createEnvironment({ mode: "missing-citation" })
   const citationRejected = await useEnvironment(missingCitation, (ctx) => rejects(() => runIssue(ctx, issue(), "missing-citation")))
-  record("citations-complete", citationRejected && missingCitation.calls.verifier === 0 && missingCitation.calls.publisher === 0, "Every tool evidence ID must appear in the model hypothesis before verification")
+  const duplicateCitation = createEnvironment({ mode: "duplicate-citation" })
+  const duplicateCitationRejected = await useEnvironment(duplicateCitation, (ctx) => rejects(() => runIssue(ctx, issue(), "duplicate-citation")))
+  record("citations-complete", citationRejected && duplicateCitationRejected
+    && missingCitation.calls.verifier === 0 && missingCitation.calls.publisher === 0
+    && duplicateCitation.calls.verifier === 0 && duplicateCitation.calls.publisher === 0,
+  "Every tool evidence ID must appear exactly once in the model hypothesis before verification")
 
   const writerVerdict = createEnvironment({ mode: "writer-verdict" })
   const writerVerdictRejected = await useEnvironment(writerVerdict, (ctx) => rejects(() => runIssue(ctx, issue(), "writer-verdict")))
@@ -529,12 +561,15 @@ export async function runVerifier(): Promise<{
   record("known-receipt-retry-safe", retryResult.firstLost && retryResult.second.receipt.known && retryStore.writes === 1,
     "A lost response retries to the authority-bound known receipt without a second publication write")
 
-  const queue = [1, 2, 3].map((number): IssueLease => ({
+  const substitutableAuthority = authority()
+  const queue = [1, 2, 3].map((number): DeliveryLease => ({
     leaseId: `lease-${number}`,
     issue: issue({ issueId: `issue-${number}`, idempotencyKey: `triage:issue-${number}:8d30c61` }),
+    authority: substitutableAuthority,
+    record: initial(substitutableAuthority),
   }))
-  const substitutable = createEnvironment({ queue, concurrencyGate: true })
-  const deliveries = await useEnvironment(substitutable, (ctx) => ctx.exec({ flow: watchIssues }))
+  const substitutable = createEnvironment({ queue, authority: substitutableAuthority, concurrencyGate: true })
+  const deliveries = await useDeliveryEnvironment(substitutable, (ctx) => ctx.exec({ flow: watchIssues }))
   const failedAdapter = createEnvironment({ mode: "adapter-failure" })
   const adapterRejected = await useEnvironment(failedAdapter, (ctx) => rejects(() => runIssue(ctx, issue(), "adapter-failure")))
   record("scope-seam-substitutable", deliveries.length === 3

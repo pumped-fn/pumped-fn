@@ -205,8 +205,8 @@ const tx = resource({
         events.push("release")
       },
     }
-    ctx.onClose((result) => result.ok ? tx.commit() : tx.rollback())
-    ctx.cleanup(() => tx.release())
+    ctx.onClose((result, _ctx, target) => result.ok ? target.commit() : target.rollback(), tx)
+    ctx.cleanup((_ctx, target) => target.release(), tx)
     return tx
   },
 })
@@ -351,7 +351,7 @@ async function handle(_order: Order): Promise<void> {}
 const orders = atom({
   factory: async function* (ctx) {
     const sub = await connect("orders")
-    ctx.cleanup(() => sub.close())
+    ctx.cleanup((target) => target.close(), sub)
     yield* sub
   },
 })

@@ -258,7 +258,12 @@ export const sendReminder = flow({
       body: `${invoice.classification.vendor} invoice ${invoice.id} for ${invoice.classification.amount} is due ${invoice.classification.dueDate}.`,
     }
     try {
-      return await ctx.exec({ fn: () => notifier.send(message), params: [], name: "notifier.send", tags: [step({ workflow: true, kind: "email" })] })
+      return await ctx.exec({
+        fn: (_ctx, target, content) => target.send(content),
+        params: [notifier, message],
+        name: "notifier.send",
+        tags: [step({ workflow: true, kind: "email" })],
+      })
     } catch (error) {
       const failedAt = clock.now()
       await db.transaction(async (tx) => {

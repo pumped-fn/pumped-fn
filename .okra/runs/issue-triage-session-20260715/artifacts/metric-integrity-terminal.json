@@ -1,0 +1,10 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "anti_goal_bypass_or_dishonesty_count",
+  "value": 0,
+  "target": 0,
+  "observed_at": "2026-07-15T10:45:38Z",
+  "source": "The contradicted completion claim is preserved as history, a late-discovery event records the direct verifier failure, all review findings were remediated, and performance remains labeled inconclusive.",
+  "freshness": "observed_at=2026-07-15T10:45:38Z -> status=fresh against max_age=10m"
+}

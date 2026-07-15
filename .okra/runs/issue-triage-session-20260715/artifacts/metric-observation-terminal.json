@@ -1,0 +1,10 @@
+{
+  "type": "anti_goal_metric_read",
+  "metric_kind": "anti_goal",
+  "metric_id": "sensitive_context_export_count",
+  "value": 0,
+  "target": 0,
+  "observed_at": "2026-07-15T10:45:38Z",
+  "source": "SDK observation projections remain explicit named tags and the core observation tests pass without exporting config, credentials, prompts, authority handles, or runtime objects.",
+  "freshness": "observed_at=2026-07-15T10:45:38Z -> status=fresh against max_age=10m"
+}

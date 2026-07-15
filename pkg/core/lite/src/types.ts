@@ -57,7 +57,12 @@ export namespace Lite {
     dispose(): Promise<void>
     flush(): Promise<void>
     createContext(options?: CreateContextOptions): ExecutionContext
-    on(event: AtomState, atom: Atom<unknown>, listener: () => void): () => void
+    on<Args extends unknown[]>(
+      event: AtomState,
+      atom: Atom<unknown>,
+      listener: (...args: Args) => void,
+      ...params: Args
+    ): () => void
     changes<T>(atom: Atom<T>): AsyncIterable<T>
     changes<T>(atom: Atom<T>, options: ChangesOptions): AsyncIterable<AtomChange<T>>
     changes<T>(handle: SelectHandle<T>): AsyncIterable<T>
@@ -220,7 +225,7 @@ export namespace Lite {
   }
 
   export interface ResolveContext {
-    cleanup(fn: () => MaybePromise<void>): void
+    cleanup<Args extends unknown[]>(fn: (...args: Args) => MaybePromise<void>, ...params: Args): void
     invalidate(): void
     readonly scope: Scope
     readonly data: ContextData
@@ -244,20 +249,26 @@ export namespace Lite {
     release<T>(resource: Resource<T>): Promise<void>
     controller<T>(resource: Resource<T>): ResourceController<T>
     exec<Output, Input, Yield = never>(options: ExecFlowOptions<Output, Input, Yield>): Promise<Output>
-    exec<Output, Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
+    exec<Output, const Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
     execStream<Output, Yield, Input>(options: ExecFlowOptions<Output, Input, Yield>): FlowStream<Yield, Output>
     changes<T>(atom: Atom<T>): AsyncIterable<T>
     changes<T>(atom: Atom<T>, options: ChangesOptions): AsyncIterable<AtomChange<T>>
     changes<T>(handle: SelectHandle<T>): AsyncIterable<T>
     resolveStream<T>(atom: Atom<AsyncIterable<T> | AsyncIterator<T>>): AsyncIterable<T>
-    onClose(fn: (result: CloseResult) => MaybePromise<void>): () => void
+    onClose<Args extends unknown[]>(
+      fn: (result: CloseResult, ctx: ExecutionContext, ...args: Args) => MaybePromise<void>,
+      ...params: Args
+    ): () => void
     close(result?: CloseResult): Promise<void>
     /** Throws a `FlowFault` carrying `fault`, tagged with the executing flow's name. */
     fail(fault: Fault): never
   }
 
   export interface ResourceContext extends ExecutionContext {
-    cleanup(fn: () => MaybePromise<void>): void
+    cleanup<Args extends unknown[]>(
+      fn: (ctx: ResourceContext, ...args: Args) => MaybePromise<void>,
+      ...params: Args
+    ): void
   }
 
   export type ExecFlowOptions<Output, Input, Yield = never> = {
@@ -320,7 +331,7 @@ export namespace Lite {
      */
     update(fn: (prev: T) => T): void
     /** Subscribe to state changes */
-    on(event: ControllerEvent, listener: () => void): () => void
+    on<Args extends unknown[]>(event: ControllerEvent, listener: (...args: Args) => void, ...params: Args): () => void
   }
 
   /**
@@ -339,7 +350,11 @@ export namespace Lite {
     /** Owner-local release/reset */
     release(): Promise<void>
     /** Subscribe to resource state changes visible from this execution context */
-    on(event: ResourceControllerEvent, listener: () => void): () => void
+    on<Args extends unknown[]>(
+      event: ResourceControllerEvent,
+      listener: (...args: Args) => void,
+      ...params: Args
+    ): () => void
   }
 
   export interface SelectOptions<S> {
@@ -348,7 +363,7 @@ export namespace Lite {
 
   export interface SelectHandle<S> {
     get(): S
-    subscribe(listener: () => void): () => void
+    subscribe<Args extends unknown[]>(listener: (...args: Args) => void, ...params: Args): () => void
     dispose(): void
   }
 

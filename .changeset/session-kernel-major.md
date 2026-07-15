@@ -6,6 +6,7 @@
 "@pumped-fn/sdk-just-bash": major
 "@pumped-fn/sdk-test": major
 "@pumped-fn/lite": major
+"@pumped-fn/lite-lint": minor
 ---
 
-Replace the Agent facade and material session with stable resource-backed role, tool, session, work, and attempt primitives. Lite entry execution now activates declared dependency trees, exposes structured cancellation through `ExecutionContext.signal`, and supports tagged controller readiness through `FlowInvocation`. Existing Model providers remain usable. Migrate `agent()`, `agent.turn`, `session()`, `send()`, and `Sandbox` imports using the package migration table. This release intentionally has no legacy execution loop.
+Replace the Agent facade and material session with stable resource-backed role, tool, session, work, and attempt primitives. Lite entry execution now activates declared dependency trees, exposes structured cancellation through `ExecutionContext.signal`, and supports tagged controller readiness through `FlowInvocation`. Callback registration and `ctx.exec` function calls accept inferred parameter tuples, keeping captured inputs explicit while preserving direct zero-parameter callback paths. Lite lint rejects hidden `ctx.exec` captures and recognizes exported graph namespaces without requiring `Object.freeze`. Existing Model providers remain usable. Migrate `agent()`, `agent.turn`, `session()`, `send()`, and `Sandbox` imports using the package migration table. This release intentionally has no legacy execution loop.

@@ -161,6 +161,7 @@ Read the checklist: [How to review pumped-fn code](docs/code-review-guide.md).
 | Path | What it shows |
 | --- | --- |
 | `examples` | [Examples index](examples/README.md). |
+| `examples/issue-triage` | [GitHub issue triage with durable leases, per-delivery SDK sessions, repository/PostgreSQL/Victoria evidence, deterministic review, and idempotent publication.](examples/issue-triage/README.md) |
 | `examples/invoice-triage` | [Canonical Postgres-backed invoice import and triage with traced store, model, review, and reminder edges.](examples/invoice-triage/README.md) |
 
 ## Package inventory

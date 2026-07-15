@@ -16,7 +16,7 @@ import { resourceSymbol, type Lite, type MaybePromise } from "./types"
  *   deps: { requestId: tags.required(requestId), logService },
  *   factory: (ctx, { requestId, logService }) => {
  *     const logger = logService.child({ requestId })
- *     ctx.cleanup(() => logger.flush())
+ *     ctx.cleanup((_ctx, logger) => logger.flush(), logger)
  *     return logger
  *   }
  * })

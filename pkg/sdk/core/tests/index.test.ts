@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest"
-import { formatModelPrompt } from "../src/index"
+import * as agent from "../src/agent"
+import { formatModelPrompt, model } from "../src/index"
 
 describe("sdk public surface", () => {
+  it("shares the model tag with the agent subpath", () => {
+    expect(agent.fromModel.deps.provider.tag.key).toBe(model.key)
+  })
+
   it("includes a canonically ordered tool schema in model prompts", () => {
     const prompt = formatModelPrompt({
       agentName: "analyst",

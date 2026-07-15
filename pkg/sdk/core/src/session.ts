@@ -686,9 +686,9 @@ class Runtime implements SessionRuntime {
       settle: (workId: WorkId, attempt: number, settlement: AttemptSettlement) => this.settle(workId, attempt, settlement),
       children: (workId: WorkId) => this.#record.work.filter((item) => item.parentId === workId),
       active: () => [...this.#active.values()].map((entry) => entry.value),
-      cancel: (workId: WorkId) => {
+      cancel: (workId: WorkId, reason: unknown) => {
         for (const entry of this.#active.values()) {
-          if (entry.value.record.workId === workId) entry.controller.abort()
+          if (entry.value.record.workId === workId) entry.controller.abort(reason)
         }
       },
     })
@@ -1236,7 +1236,7 @@ export const session = resource({
   },
   factory: (ctx, { record, authority, clock }) => {
     const runtime = new Runtime(record, authority, clock)
-    ctx.cleanup(() => runtime.deactivate())
+    ctx.cleanup((_ctx, target) => target.deactivate(), runtime)
     return runtime
   },
 })
