@@ -10,6 +10,7 @@ Put your app behind a scope, and it becomes fully testable, fully traceable, wit
 ```text
 createScope({ presets, tags, extensions })
   ├─ run / runStream -> owned execution context ─┐
+  │    └─ flow or named inline { deps, fn, params }  │
   └─ createContext -> exec / execStream ─────────┴─ session.run -> agent.turn
                                                                ├─ role + selected capability flows
                                                                └─ provider + backend adapters
@@ -98,7 +99,7 @@ The core package has zero runtime dependencies and ~12 kB min+gzip.
 
 ## Mental model
 
-A `scope` is the composition and test boundary. `scope.run` and `scope.runStream` own one temporary execution context. Use `createContext` with `exec` or `execStream` when several turns or flows share one lifetime. `atom` values live in the scope. `resource` values are owned by an execution context. `tag` values carry request facts and role choices. `preset` replaces an edge for tests or alternate roots. `extension` wraps resolution and execution.
+A `scope` is the composition and test boundary. `scope.run` and `scope.runStream` own one temporary execution context. `scope.run({ name, deps, fn, params })` declares a named one-off operation without a reusable flow handle. Use `createContext` with `exec` or `execStream` when several turns or flows share one lifetime. `atom` values live in the scope. `resource` values are owned by an execution context. `tag` values carry request facts and role choices. `preset` replaces an edge for tests or alternate roots. `extension` wraps resolution and execution.
 
 SDK applications use stable `session.run`, `agent.turn`, `agent.role`, and `agent.fromModel` definitions. Composition selects configuration and implementations through namespaced tags such as `agent.config.*`, `agent.impl.*`, and `session.execution.*`. Tool, skill, and subagent flows remain ordinary declared graph edges.
 

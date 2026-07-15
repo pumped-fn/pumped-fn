@@ -127,10 +127,15 @@ resources, tags, or cancellation must span several executions.
 | One owned execution | Managed execution lifetime |
 | --- | --- |
 | `scope.run({ flow, input, tags })` | `scope.createContext({ tags })`, then `ctx.exec({ flow, input })` |
+| `scope.run({ name, deps, fn, params, tags })` for a named one-off operation | Define a flow when the operation is reused inside a managed lifetime |
 | `scope.runStream({ flow, input, tags })` | `scope.createContext({ tags })`, then `ctx.execStream({ flow, input })` |
 | Scope closes the temporary context after success, failure, or stream cancellation | The caller closes `ctx` after the last related execution |
 
 ```ts
+const users = atom({
+  factory: () => ({ byId: (id: string) => ({ id }) }),
+})
+
 const loadUser = flow({
   parse: typed<{ id: string }>(),
   factory: (ctx) => ctx.input,
@@ -138,11 +143,18 @@ const loadUser = flow({
 
 const result = await scope.run({ flow: loadUser, input: { id: "u1" } })
 
+const inline = await scope.run({
+  name: "load-user-once",
+  deps: { users },
+  params: ["u2"],
+  fn: ({ users }, id) => users.byId(id),
+})
+
 const ctx = scope.createContext()
 try {
   const first = await ctx.exec({ flow: loadUser, input: { id: "u1" } })
   const second = await ctx.exec({ flow: loadUser, input: { id: "u2" } })
-  console.log(first, second)
+  console.log(result, inline, first, second)
 } finally {
   await ctx.close()
 }
@@ -152,6 +164,11 @@ Both paths use the same parsing, presets, extensions, tag precedence, dependency
 rules. `scope.run*` seeds its tags on the temporary owner boundary. For a managed lifetime, put shared tags
 on `createContext`; `ctx.exec({ tags })` remains an invocation-local override. `scope.run*` is lifecycle
 ownership, not a second execution model.
+
+The inline form is for a named composition-root operation that is used once. Dependency values are inferred
+from `deps`; execution inputs must be listed in `params`; the callback receives neither `ctx` nor `scope`.
+Define a flow instead when the operation needs reuse, parsing, typed faults, flow tags, presets, a handle in
+another dependency graph, or streaming yields.
 
 Flows compose through dependencies. The dependency value is a context-bound handle, so nested execution
 keeps the `ctx.exec` options shape, parsing, presets, extensions, tags, and resource cleanup while making
@@ -506,7 +523,7 @@ composition roots. See [Observability](../../../docs/observability.md).
 | `scope.changes(target, options?)` / `ctx.changes(...)` | Async-iterate atom values, select slices, or state transitions, conflated to latest |
 | `scope.resolveStream(atom)` / `ctx.resolveStream(atom)` | Consume an async-iterable atom through a scope-driven fan-out view |
 | `scope.drain(atom, options?)` | Collect an async-iterable atom into an array, optionally `take`-bounded |
-| `scope.run(options)` | Execute one flow or traced function in a temporary context and close it with the outcome |
+| `scope.run(options)` | Execute one flow, traced function, or named inline dependency operation in a temporary context and close it with the outcome |
 | `scope.runStream(options)` | Stream one generator flow from a temporary context; completion or cancellation closes it |
 | `ctx.execStream(options)` | Consume a generator flow's yields; `result` carries the final output, break cancels |
 | `ctx.exec(options)` | Execute a child flow or function; optional `signal` joins caller cancellation with context lifetime |

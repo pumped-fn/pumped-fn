@@ -65,6 +65,139 @@ describe("ExecutionContext structured lifetime", () => {
     await scope.dispose()
   })
 
+  it("runs one named operation with declared deps and explicit params", async () => {
+    const factor = tag<number>({ label: "factor" })
+    const events: string[] = []
+    const targets: Array<string | undefined> = []
+    const inputs: unknown[] = []
+    const lease = resource({
+      factory: (ctx) => {
+        events.push("open")
+        ctx.cleanup((target) => { target.push("close") }, events)
+        return 2
+      },
+    })
+    const scope = createScope({
+      extensions: [{
+        name: "operation-target",
+        wrapExec: async (next, target, ctx) => {
+          targets.push(target.name)
+          inputs.push(ctx.input)
+          return next()
+        },
+      }],
+    })
+
+    const output = scope.run({
+      name: "multiply-once",
+      deps: { lease, factor: tags.required(factor) },
+      params: [4],
+      tags: [factor(3)],
+      fn: ({ lease, factor }, value) => lease * factor * value,
+    })
+
+    expectTypeOf(output).toEqualTypeOf<Promise<number>>()
+    await expect(output).resolves.toBe(24)
+    expect(targets).toEqual(["multiply-once"])
+    expect(inputs).toEqual([[4]])
+    expect(events).toEqual(["open", "close"])
+    await scope.dispose()
+  })
+
+  it("rejects streaming results from an inline scalar operation", async () => {
+    expectTypeOf<Lite.RunDepsOptions<
+      Record<string, never>,
+      [boolean],
+      string | AsyncIterable<string>
+    >>().toEqualTypeOf<never>()
+    expectTypeOf<Lite.RunDepsOptions<
+      Record<string, never>,
+      [],
+      AsyncIterator<string>
+    >>().toEqualTypeOf<never>()
+    expectTypeOf<Lite.RunFnOptions<
+      [],
+      AsyncGenerator<string, string>
+    >>().toEqualTypeOf<never>()
+    expectTypeOf<Lite.RunDepsOptions<
+      Record<string, never>,
+      [],
+      Generator<string>
+    >>().toEqualTypeOf<never>()
+    expectTypeOf<Lite.RunFnOptions<
+      [],
+      { next: () => number }
+    >>().toEqualTypeOf<never>()
+    const scope = createScope()
+
+    await expect(Reflect.apply(scope.run, scope, [{
+      name: "stream-once",
+      deps: {},
+      params: [],
+      fn: () => ({
+        async *[Symbol.asyncIterator]() {
+          yield "value"
+        },
+      }),
+    }])).rejects.toThrow("Flow returned an async iterable or iterator from a non-generator factory")
+    await expect(Reflect.apply(scope.run, scope, [{
+      name: "iterator-once",
+      deps: {},
+      params: [],
+      fn: () => ({
+        next: async () => ({ done: true, value: undefined }),
+      }),
+    }])).rejects.toThrow("Flow returned an async iterable or iterator from a non-generator factory")
+    await expect(Reflect.apply(scope.run, scope, [{
+      name: "function-stream-once",
+      params: [],
+      fn: async function* () {
+        yield "value"
+        return "done"
+      },
+    }])).rejects.toThrow("Flow returned an async iterable or iterator from a non-generator factory")
+    await expect(Reflect.apply(scope.run, scope, [{
+      name: "sync-generator-once",
+      deps: {},
+      params: [],
+      fn: function* () {
+        yield "value"
+      },
+    }])).rejects.toThrow("Flow returned an async iterable or iterator from a non-generator factory")
+    await expect(Reflect.apply(scope.run, scope, [{
+      name: "function-sync-generator-once",
+      params: [],
+      fn: function* () {
+        yield "value"
+      },
+    }])).rejects.toThrow("Flow returned an async iterable or iterator from a non-generator factory")
+    await expect(Reflect.apply(scope.run, scope, [{
+      name: "next-bearing-once",
+      deps: {},
+      params: [],
+      fn: () => ({ next: () => 1 }),
+    }])).rejects.toThrow("Flow returned an async iterable or iterator from a non-generator factory")
+    await scope.dispose()
+  })
+
+  it("fails inline operation activation before calling the function", async () => {
+    const required = tag<string>({ label: "operation-required" })
+    let called = false
+    const scope = createScope()
+
+    await expect(scope.run({
+      name: "requires-binding",
+      deps: { required: tags.required(required) },
+      params: [],
+      fn: () => {
+        called = true
+        return "unreachable"
+      },
+    })).rejects.toThrow('Tag "operation-required" not found while activating "requires-binding"')
+    expect(called).toBe(false)
+    await scope.dispose()
+  })
+
   it("closes scope.run failures with the failed result", async () => {
     const closes: Lite.CloseResult[] = []
     const lease = resource({

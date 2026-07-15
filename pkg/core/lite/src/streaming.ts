@@ -19,12 +19,16 @@ export function isAsyncGenerator(value: unknown): value is AsyncGenerator<unknow
 
 function isAsyncStream(value: unknown): boolean {
   if (!isObjectKey(value)) return false
-  return typeof (value as { readonly [Symbol.asyncIterator]?: unknown })[Symbol.asyncIterator] === "function"
+  const source = value as {
+    readonly [Symbol.asyncIterator]?: unknown
+    readonly next?: unknown
+  }
+  return typeof source[Symbol.asyncIterator] === "function" || typeof source.next === "function"
 }
 
-function assertNoReturnedStream(value: unknown): unknown {
+export function assertNoReturnedStream(value: unknown): unknown {
   if (isAsyncStream(value)) {
-    throw new Error("Flow returned an async iterable from a non-generator factory; use an async generator flow for yields or an iterable atom with resolveStream().")
+    throw new Error("Flow returned an async iterable or iterator from a non-generator factory; use an async generator flow for yields or an iterable atom with resolveStream().")
   }
   return value
 }

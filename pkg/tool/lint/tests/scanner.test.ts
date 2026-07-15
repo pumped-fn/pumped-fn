@@ -1643,4 +1643,181 @@ describe("lite lint scanner", () => {
     `)).toEqual([])
   })
 
+  it("requires inline scope operations to declare graph deps and runtime params", () => {
+    const hidden = (source: string) => diagnostics(source)
+      .filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
+
+    expect(hidden(`
+      import { createScope, resource } from "@pumped-fn/lite"
+
+      const client = resource({ factory: () => ({ send: (value: string) => value }) })
+      const message = "hello"
+      const scope = createScope()
+      scope.run({
+        name: "send-once",
+        deps: { client },
+        params: [],
+        fn: ({ client }) => client.send(message),
+      })
+    `).map((diagnostic) => diagnostic.message)).toEqual([
+      'scope.run callback captures "message"; declare graph values in deps and provide runtime values through params.',
+    ])
+
+    expect(hidden(`
+      import { createScope, resource } from "@pumped-fn/lite"
+
+      const client = resource({ factory: () => ({ send: (value: string) => value }) })
+      const message = "hello"
+      const scope = createScope()
+      scope.run({
+        name: "send-once",
+        deps: { client },
+        params: [message],
+        fn: ({ client }, message) => client.send(message),
+      })
+    `)).toEqual([])
+
+    expect(hidden(`
+      const message = "hello"
+      const runner = { run: (_options: unknown) => undefined }
+      runner.run({
+        name: "unrelated",
+        deps: {},
+        params: [],
+        fn: () => message,
+      })
+    `)).toEqual([])
+
+    expect(hidden(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const scope = createScope()
+      const message = "hello"
+      const unrelated = (scope: { run: (options: unknown) => void }) => scope.run({
+        name: "unrelated",
+        deps: {},
+        params: [],
+        fn: () => message,
+      })
+      unrelated({ run: () => undefined })
+    `)).toEqual([])
+
+    expect(diagnostics(`
+      import { atom, createScope } from "@pumped-fn/lite"
+
+      const value = atom({ factory: () => "value" })
+      const scope = createScope()
+      scope.run({
+        name: "scope-reach",
+        deps: {},
+        params: [{ scope }],
+        fn: (_deps, { scope }) => scope.resolve(value),
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-argument")
+      .map((diagnostic) => diagnostic.message)).toEqual([
+      "Do not pass scope through scope.run params; declare the operation dependencies in deps.",
+    ])
+
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const scope = createScope()
+      scope.run({
+        name: "transform",
+        deps: {},
+        params: [(scope: string) => scope.toUpperCase()],
+        fn: (_deps, transform) => transform("value"),
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-argument"))
+      .toEqual([])
+
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+      scope.run({
+        name: "context-reach",
+        deps: {},
+        params: [{ ctx }],
+        fn: (_deps, { ctx }) => ctx.close(),
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-ctx-argument")
+      .map((diagnostic) => diagnostic.message)).toEqual([
+      "ctx is a receiver, never an argument; reify the contract as a flow reached via deps.",
+    ])
+
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const scope = createScope()
+      scope.run({
+        name: "transform-context",
+        deps: {},
+        params: [(ctx: string) => ctx.toUpperCase()],
+        fn: (_deps, transform) => transform("value"),
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-ctx-argument"))
+      .toEqual([])
+
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+      scope.run({
+        name: "property-names",
+        deps: {},
+        params: [{ scope: "request", ctx: "request" }, { scope: "request" }.scope],
+        fn: (_deps, request, scopeName) => request.scope + request.ctx + scopeName,
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-argument" || diagnostic.ruleId === "pumped/no-ctx-argument"))
+      .toEqual([])
+
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const scope = createScope()
+      const unrelated = (scope: string) => scope.toUpperCase()
+      scope.run({
+        name: "scope-reach-with-unrelated-binding",
+        deps: {},
+        params: [scope],
+        fn: (_deps, scope) => scope.dispose(),
+      })
+      unrelated("value")
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-argument")
+      .map((diagnostic) => diagnostic.message)).toEqual([
+      "Do not pass scope through scope.run params; declare the operation dependencies in deps.",
+    ])
+
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const first = () => {
+        const scope = createScope()
+        const ctx = scope.createContext()
+        return scope.run({
+          name: "first-context",
+          deps: {},
+          params: [{ ctx }],
+          fn: (_deps, { ctx }) => ctx.close(),
+        })
+      }
+      const second = () => {
+        const scope = createScope()
+        const ctx = scope.createContext()
+        return scope.run({
+          name: "second-context",
+          deps: {},
+          params: [{ ctx }],
+          fn: (_deps, { ctx }) => ctx.close(),
+        })
+      }
+      void first
+      void second
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-ctx-argument"))
+      .toHaveLength(2)
+  })
+
 })

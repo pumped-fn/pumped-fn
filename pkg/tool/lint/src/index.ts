@@ -522,6 +522,161 @@ function isCreateScopeCall(expression: ts.Expression, imports: Imports): boolean
   return isNamespaceCall(expression, imports.liteNamespaces, "createScope")
 }
 
+function visibleBinding(
+  expression: ts.Identifier,
+  sourceFile: ts.SourceFile,
+  candidates: ts.VariableDeclaration[],
+): ts.VariableDeclaration | undefined {
+  const name = expression.text
+  const position = expression.getStart(sourceFile)
+  return candidates
+    .filter((candidate) => {
+      let scope: ts.Node | undefined = candidate.parent
+      while (scope && !ts.isBlock(scope) && !ts.isSourceFile(scope) && !ts.isModuleBlock(scope)) {
+        scope = scope.parent
+      }
+      return scope !== undefined
+        && candidate.getEnd() <= position
+        && scope.getStart(sourceFile) <= position
+        && position < scope.getEnd()
+        && !shadowsName(expression, sourceFile, name, candidate.getEnd())
+    })
+    .sort((a, b) => b.getStart(sourceFile) - a.getStart(sourceFile))[0]
+}
+
+function createScopeBinding(
+  expression: ts.Expression,
+  sourceFile: ts.SourceFile,
+  imports: Imports,
+): ts.VariableDeclaration | undefined {
+  if (!ts.isIdentifier(expression)) return undefined
+  const name = expression.text
+  const candidates: ts.VariableDeclaration[] = []
+  function visit(node: ts.Node): void {
+    if (
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === name
+      && node.initializer
+      && ts.isCallExpression(node.initializer)
+      && isCreateScopeCall(node.initializer.expression, imports)
+    ) candidates.push(node)
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return visibleBinding(expression, sourceFile, candidates)
+}
+
+function isCreateScopeValue(expression: ts.Expression, sourceFile: ts.SourceFile, imports: Imports): boolean {
+  if (ts.isCallExpression(expression)) return isCreateScopeCall(expression.expression, imports)
+  return createScopeBinding(expression, sourceFile, imports) !== undefined
+}
+
+function createContextBinding(
+  expression: ts.Expression,
+  sourceFile: ts.SourceFile,
+  imports: Imports,
+): ts.VariableDeclaration | undefined {
+  if (!ts.isIdentifier(expression)) return undefined
+  const name = expression.text
+  const candidates: ts.VariableDeclaration[] = []
+  function visit(node: ts.Node): void {
+    if (
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === name
+      && node.initializer
+      && ts.isCallExpression(node.initializer)
+      && ts.isPropertyAccessExpression(node.initializer.expression)
+      && node.initializer.expression.name.text === "createContext"
+      && isCreateScopeValue(node.initializer.expression.expression, sourceFile, imports)
+    ) candidates.push(node)
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return visibleBinding(expression, sourceFile, candidates)
+}
+
+function isCreateContextValue(expression: ts.Expression, sourceFile: ts.SourceFile, imports: Imports): boolean {
+  if (
+    ts.isCallExpression(expression)
+    && ts.isPropertyAccessExpression(expression.expression)
+    && expression.expression.name.text === "createContext"
+  ) return isCreateScopeValue(expression.expression.expression, sourceFile, imports)
+  return createContextBinding(expression, sourceFile, imports) !== undefined
+}
+
+function containsRuntimeValue(node: ts.Node, matches: (expression: ts.Expression) => boolean): boolean {
+  if (ts.isExpression(node) && matches(node)) return true
+  let found = false
+  function visit(child: ts.Node): void {
+    if (found || ts.isTypeNode(child)) return
+    if (ts.isPropertyAccessExpression(child)) {
+      found = containsRuntimeValue(child.expression, matches)
+      return
+    }
+    if (ts.isPropertyAssignment(child)) {
+      if (ts.isComputedPropertyName(child.name)) visit(child.name.expression)
+      if (!found) visit(child.initializer)
+      return
+    }
+    if (ts.isShorthandPropertyAssignment(child)) {
+      found = containsRuntimeValue(child.name, matches)
+      return
+    }
+    if (ts.isVariableDeclaration(child) || ts.isParameter(child) || ts.isBindingElement(child)) {
+      if (child.initializer) visit(child.initializer)
+      return
+    }
+    if (ts.isExpression(child) && matches(child)) {
+      found = true
+      return
+    }
+    ts.forEachChild(child, visit)
+  }
+  ts.forEachChild(node, visit)
+  return found
+}
+
+function containsCreateScopeValue(node: ts.Node, sourceFile: ts.SourceFile, imports: Imports): boolean {
+  return containsRuntimeValue(node, (expression) => isCreateScopeValue(expression, sourceFile, imports))
+}
+
+function containsCreateContextValue(node: ts.Node, sourceFile: ts.SourceFile, imports: Imports): boolean {
+  return containsRuntimeValue(node, (expression) => isCreateContextValue(expression, sourceFile, imports))
+}
+
+function containsUnshadowedReference(root: ts.Node, name: string, boundary: ts.Node, afterPosition: number): boolean {
+  let found = false
+  function visit(node: ts.Node): void {
+    if (found || ts.isTypeNode(node)) return
+    if (ts.isPropertyAccessExpression(node)) {
+      visit(node.expression)
+      return
+    }
+    if (ts.isPropertyAssignment(node)) {
+      if (ts.isComputedPropertyName(node.name)) visit(node.name.expression)
+      visit(node.initializer)
+      return
+    }
+    if (ts.isShorthandPropertyAssignment(node)) {
+      if (node.name.text === name && !shadowsName(node.name, boundary, name, afterPosition)) found = true
+      return
+    }
+    if (ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isBindingElement(node)) {
+      if (node.initializer) visit(node.initializer)
+      return
+    }
+    if (ts.isIdentifier(node)) {
+      if (node.text === name && !shadowsName(node, boundary, name, afterPosition)) found = true
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(root)
+  return found
+}
+
 function returnsCreateScope(node: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression, imports: Imports): boolean {
   if (!node.body) return false
   if (ts.isCallExpression(node.body)) return isCreateScopeCall(node.body.expression, imports)
@@ -1364,7 +1519,6 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       }
     }
   }
-
   function graphExpression(expression: ts.Expression, seen = new Set<string>()): boolean {
     if (
       ts.isAsExpression(expression)
@@ -1777,15 +1931,28 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       }
 
       const execFactory = factoryCtxAt(node)
-      if (
+      const executionOptions = node.arguments[0] && ts.isObjectLiteralExpression(node.arguments[0])
+        ? node.arguments[0]
+        : undefined
+      const directCtxExec = Boolean(
         execFactory
         && ts.isPropertyAccessExpression(node.expression)
         && node.expression.name.text === "exec"
         && isDirectCtxExpression(node.expression.expression, execFactory.name)
-        && node.arguments[0]
-        && ts.isObjectLiteralExpression(node.arguments[0])
+      )
+      const inlineDepsRun = Boolean(
+        ts.isPropertyAccessExpression(node.expression)
+        && node.expression.name.text === "run"
+        && isCreateScopeValue(node.expression.expression, sourceFile, imports)
+        && executionOptions
+        && objectProperty(executionOptions, "deps")
+        && objectProperty(executionOptions, "params")
+      )
+      if (
+        executionOptions
+        && (directCtxExec || inlineDepsRun)
       ) {
-        const fn = objectProperty(node.arguments[0], "fn")?.initializer
+        const fn = objectProperty(executionOptions, "fn")?.initializer
         if (fn && (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))) {
           const captures = callbackCaptures(fn)
           if (captures.length > 0) {
@@ -1795,9 +1962,41 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
               filePath,
               "pumped/no-hidden-exec-dependencies",
               fn,
-              `ctx.exec callback captures "${captures.join(", ")}"; receive execution values after ctx and provide them through params.`,
+              inlineDepsRun
+                ? `scope.run callback captures "${captures.join(", ")}"; declare graph values in deps and provide runtime values through params.`
+                : `ctx.exec callback captures "${captures.join(", ")}"; receive execution values after ctx and provide them through params.`,
             )
           }
+        }
+      }
+
+      if (inlineDepsRun && executionOptions) {
+        const params = objectProperty(executionOptions, "params")?.initializer
+        const receiver = ts.isPropertyAccessExpression(node.expression)
+          ? node.expression.expression
+          : undefined
+        const scopeBinding = receiver && createScopeBinding(receiver, sourceFile, imports)
+        const passesReceiver = Boolean(params && scopeBinding && ts.isIdentifier(receiver)
+          && containsUnshadowedReference(params, receiver.text, sourceFile, scopeBinding.getEnd()))
+        if (params && (passesReceiver || containsCreateScopeValue(params, sourceFile, imports))) {
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/no-scope-argument",
+            params,
+            "Do not pass scope through scope.run params; declare the operation dependencies in deps.",
+          )
+        }
+        if (params && containsCreateContextValue(params, sourceFile, imports)) {
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/no-ctx-argument",
+            params,
+            ctxArgumentMessage,
+          )
         }
       }
 

@@ -56,8 +56,17 @@ export namespace Lite {
     release<T>(atom: Atom<T>): Promise<void>
     dispose(): Promise<void>
     flush(): Promise<void>
-    run<Output, Input, Yield = never>(options: ExecFlowOptions<Output, Input, Yield>): Promise<Output>
-    run<Output, const Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
+    run<Output, Input, Yield = never>(options: ExecFlowOptions<Output, Input, Yield> & {
+      deps?: never
+      fn?: never
+      params?: never
+    }): Promise<Output>
+    run<
+      const D extends Record<string, ExecutionDependency>,
+      const Args extends unknown[],
+      Result,
+    >(options: RunDepsOptions<D, Args, Result>): Promise<Awaited<Result>>
+    run<const Args extends unknown[], Result>(options: RunFnOptions<Args, Result>): Promise<Awaited<Result>>
     runStream<Output, Yield, Input>(options: ExecFlowOptions<Output, Input, Yield>): FlowStream<Yield, Output>
     createContext(options?: CreateContextOptions): ExecutionContext
     on<Args extends unknown[]>(
@@ -291,6 +300,36 @@ export namespace Lite {
     tags?: Tagged<any>[]
     signal?: AbortSignal
   }
+
+  export type RunDepsOptions<
+    D extends Record<string, ExecutionDependency>,
+    Args extends unknown[],
+    Result,
+  > = {
+    name: string
+    deps: D
+    fn: (deps: InferDeps<D>, ...args: Args) => Result
+    params: Args
+    tags?: Tagged<any>[]
+    signal?: AbortSignal
+    flow?: never
+  } & (Extract<
+    Awaited<Result>,
+    AsyncIterable<unknown> | { next: (...args: never[]) => unknown }
+  > extends never ? unknown : never)
+
+  export type RunFnOptions<Args extends unknown[], Result> = {
+    fn: (ctx: ExecutionContext, ...args: Args) => Result
+    params: Args
+    name?: string
+    tags?: Tagged<any>[]
+    signal?: AbortSignal
+    deps?: never
+    flow?: never
+  } & (Extract<
+    Awaited<Result>,
+    AsyncIterable<unknown> | { next: (...args: never[]) => unknown }
+  > extends never ? unknown : never)
 
   export type ControllerEvent = 'resolving' | 'resolved' | '*'
   export type ResourceControllerEvent = AtomState | '*'

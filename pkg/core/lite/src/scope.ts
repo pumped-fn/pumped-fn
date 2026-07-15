@@ -1,10 +1,10 @@
 import { controllerSymbol, ParseError, FlowFault, type Lite, type MaybePromise, type AtomState } from "./types"
 import { isAtom, isControllerDep } from "./atom"
 import { classifyDeps, type DepsGraph } from "./deps-graph"
-import { isFlow } from "./flow"
+import { flow, isFlow, typed } from "./flow"
 import { isResource } from "./resource"
 import { latest, type Latest } from "./latest"
-import { consumeScalarResult, isAsyncGenerator, isAsyncGeneratorFunction, isPromiseLike, markStreamingExec, registerStreamingExec, requireAsyncGenerator, streamResultBeforeStartError } from "./streaming"
+import { assertNoReturnedStream, consumeScalarResult, isAsyncGenerator, isAsyncGeneratorFunction, isPromiseLike, markStreamingExec, registerStreamingExec, requireAsyncGenerator, streamResultBeforeStartError } from "./streaming"
 export { isStreamingExec } from "./streaming"
 
 function isPlainObject(value: object): value is Record<PropertyKey, unknown> {
@@ -218,13 +218,22 @@ type StreamHub<T> = {
 }
 
 type ExecFlowRuntimeOptions = {
-  flow: Lite.Flow<unknown, unknown, any, unknown>
+  flow: Lite.Flow<unknown, any, any, unknown>
   input?: unknown
   rawInput?: unknown
   name?: string
   tags?: Lite.Tagged<any>[]
   signal?: AbortSignal
   blockedTags?: Lite.Tagged<any>[]
+}
+
+type RunDepsRuntimeOptions = {
+  name: string
+  deps: Record<string, Lite.ExecutionDependency>
+  fn: (deps: Record<string, unknown>, ...params: any[]) => unknown
+  params: unknown[]
+  tags?: Lite.Tagged<any>[]
+  signal?: AbortSignal
 }
 
 function assertExecutionContextImpl(ctx: Lite.ExecutionContext): asserts ctx is ExecutionContextImpl {
@@ -2084,16 +2093,42 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
-  run<Output, Input, Yield = never>(options: Lite.ExecFlowOptions<Output, Input, Yield>): Promise<Output>
-  run<Output, const Args extends unknown[]>(options: Lite.ExecFnOptions<Output, Args>): Promise<Output>
-  async run(options: ExecFlowRuntimeOptions | Lite.ExecFnOptions<unknown>): Promise<unknown> {
+  run<Output, Input, Yield = never>(options: Lite.ExecFlowOptions<Output, Input, Yield> & {
+    deps?: never
+    fn?: never
+    params?: never
+  }): Promise<Output>
+  run<
+    const D extends Record<string, Lite.ExecutionDependency>,
+    const Args extends unknown[],
+    Result,
+  >(options: Lite.RunDepsOptions<D, Args, Result>): Promise<Awaited<Result>>
+  run<const Args extends unknown[], Result>(options: Lite.RunFnOptions<Args, Result>): Promise<Awaited<Result>>
+  async run(options: ExecFlowRuntimeOptions | RunDepsRuntimeOptions | Lite.ExecFnOptions<unknown>): Promise<unknown> {
     const ctx = this.createContext(options.tags || options.signal
       ? { tags: options.tags, signal: options.signal }
       : undefined) as ExecutionContextImpl
     try {
-      const output = await ctx.exec("flow" in options
-        ? { ...options, tags: undefined, signal: undefined, blockedTags: options.tags }
-        : { ...options, tags: undefined, signal: undefined })
+      let execution: ExecFlowRuntimeOptions | Lite.ExecFnOptions<unknown>
+      if ("flow" in options && options.flow !== undefined) {
+        execution = { ...options, tags: undefined, signal: undefined, blockedTags: options.tags }
+      } else if ("deps" in options && options.deps !== undefined) {
+        execution = {
+          flow: flow({
+            name: options.name,
+            parse: typed<unknown[]>(),
+            deps: options.deps,
+            factory: async (ctx, deps) => assertNoReturnedStream(await options.fn(deps, ...ctx.input)),
+          }),
+          input: options.params,
+          name: options.name,
+          blockedTags: options.tags,
+        }
+      } else {
+        const fnOptions = options as Lite.ExecFnOptions<unknown>
+        execution = { ...fnOptions, tags: undefined, signal: undefined }
+      }
+      const output = assertNoReturnedStream(await ctx.exec(execution))
       await ctx.close({ ok: true })
       return output
     } catch (error) {
