@@ -3,8 +3,8 @@ import { logging, type Logging } from "@pumped-fn/lite-extension-logging"
 import { observable } from "@pumped-fn/lite-extension-observable"
 import { otel, type Otel } from "@pumped-fn/lite-extension-observable-otel"
 import { scheduler, type Scheduler } from "@pumped-fn/lite-extension-scheduler"
-import { inspect, model as provider, workflowRun, type Model } from "@pumped-fn/sdk"
-import { kit, modelStub } from "@pumped-fn/sdk-test"
+import { inspect, model as provider, workflowRun } from "@pumped-fn/sdk"
+import { config as testConfig, kit, modelStub } from "@pumped-fn/sdk-test"
 import { describe, expect, expectTypeOf, it } from "vitest"
 import { database } from "../src/database"
 import {
@@ -80,12 +80,15 @@ function json(options: Partial<Classification> = {}): string {
   return JSON.stringify(classification(options))
 }
 
-function scripted(outputs: readonly string[]): Model {
+function scripted(outputs: readonly string[]) {
   let index = 0
-  return modelStub(() => ({
-    content: outputs[index++] ?? outputs.at(-1) ?? json(),
-    stop: true,
-  }))
+  return [
+    provider(modelStub),
+    testConfig.model(() => ({
+      content: outputs[index++] ?? outputs.at(-1) ?? json(),
+      stop: true,
+    })),
+  ] as const
 }
 
 function gated(outputs: readonly string[]) {
@@ -99,18 +102,21 @@ function gated(outputs: readonly string[]) {
     releaseFirst = resolve
   })
   return {
-    model: modelStub(async () => {
-      const index = calls
-      calls += 1
-      if (index === 0) {
-        startFirst()
-        await firstReleased
-      }
-      return {
-        content: outputs[index] ?? outputs.at(-1) ?? json(),
-        stop: true,
-      }
-    }),
+    tags: [
+      provider(modelStub),
+      testConfig.model(async () => {
+        const index = calls
+        calls += 1
+        if (index === 0) {
+          startFirst()
+          await firstReleased
+        }
+        return {
+          content: outputs[index] ?? outputs.at(-1) ?? json(),
+          stop: true,
+        }
+      }),
+    ],
     firstStarted,
     releaseFirst,
     calls: () => calls,
@@ -343,7 +349,7 @@ describe("invoice triage patterns", () => {
       extensions: runtime.extensions,
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        provider(scripted([
+        ...scripted([
           json({ vendor: first.vendor, amount: first.amount, dueDate: first.dueDate }),
           json({
             vendor: second.vendor,
@@ -353,7 +359,7 @@ describe("invoice triage patterns", () => {
             risk: "review",
             reason: "hardware purchase",
           }),
-        ])),
+        ]),
         clock({ now: () => now }),
       ],
     })
@@ -392,10 +398,10 @@ describe("invoice triage patterns", () => {
       extensions: runtime.extensions,
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        provider(scripted([
+        ...scripted([
           json({ risk: "review", reason: "manual approval" }),
           json(),
-        ])),
+        ]),
         clock({ now: () => now }),
       ],
     })
@@ -432,10 +438,10 @@ describe("invoice triage patterns", () => {
         },
       ],
       tags: [
-        provider(scripted([
+        ...scripted([
           json({ vendor: first.vendor, amount: first.amount, dueDate: first.dueDate }),
           json({ vendor: second.vendor, amount: second.amount, dueDate: second.dueDate }),
-        ])),
+        ]),
         clock({ now: () => now }),
       ],
     })
@@ -464,7 +470,7 @@ describe("invoice triage patterns", () => {
       extensions: runtime.extensions,
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        provider(scripted(["not json"])),
+        ...scripted(["not json"]),
         clock({ now: () => now }),
       ],
     })
@@ -530,7 +536,7 @@ describe("invoice triage patterns", () => {
     const scope = createScope({
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        provider(gate.model),
+        ...gate.tags,
         clock({ now: () => now }),
       ],
     })
@@ -569,7 +575,7 @@ describe("invoice triage patterns", () => {
     const scope = createScope({
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        provider(gate.model),
+        ...gate.tags,
         clock({ now: () => now }),
       ],
     })
@@ -614,7 +620,7 @@ describe("invoice triage patterns", () => {
     const scope = createScope({
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        provider(gate.model),
+        ...gate.tags,
         clock({ now: () => now }),
       ],
     })
@@ -646,9 +652,10 @@ describe("invoice triage patterns", () => {
     const scope = createScope({
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        provider(modelStub(() => {
+        provider(modelStub),
+        testConfig.model(() => {
           throw new Error("provider down")
-        })),
+        }),
         clock({ now: () => now }),
       ],
     })
@@ -677,7 +684,8 @@ describe("invoice triage patterns", () => {
     const failing = createScope({
       presets: [preset(database, db)],
       tags: [
-        provider(modelStub(() => {
+        provider(modelStub),
+        testConfig.model(() => {
           calls += 1
           if (calls === 1) {
             return {
@@ -686,7 +694,7 @@ describe("invoice triage patterns", () => {
             }
           }
           throw new Error("provider down")
-        })),
+        }),
         clock({ now: () => now }),
       ],
     })
@@ -716,7 +724,7 @@ describe("invoice triage patterns", () => {
     const recovered = createScope({
       presets: [preset(database, db)],
       tags: [
-        provider(gate.model),
+        ...gate.tags,
         clock({ now: () => now }),
       ],
     })
@@ -758,7 +766,7 @@ describe("invoice triage patterns", () => {
     const second = createScope({
       presets: [preset(database, db)],
       tags: [
-        provider(gate.model),
+        ...gate.tags,
         clock({ now: () => now }),
       ],
     })
@@ -835,7 +843,7 @@ describe("invoice triage patterns", () => {
     }) as typeof db
     const scope = createScope({
       presets: [preset(database, failing)],
-      tags: [provider(scripted([json()])), clock({ now: () => now })],
+      tags: [...scripted([json()]), clock({ now: () => now })],
     })
     const ctx = scope.createContext()
 
@@ -890,11 +898,11 @@ describe("invoice triage patterns", () => {
           level: "info",
           flow: "errors",
         }),
-        provider(scripted([
+        ...scripted([
           json({ risk: "review", reason: "needs approval" }),
           json({ risk: "review", reason: "needs approval" }),
           json({ risk: "review", reason: "needs approval" }),
-        ])),
+        ]),
         clock({ now: () => now }),
       ],
     })
@@ -1124,12 +1132,12 @@ describe("invoice triage patterns", () => {
       presets: [preset(database, await pgliteDatabase())],
       tags: [
         observable.runtime({ sinks: [otel.sink({ tracer: recorded.tracer })] }),
-        provider(scripted([json({
+        ...scripted([json({
           vendor: source.vendor,
           amount: source.amount,
           dueDate: source.dueDate,
           category: "utilities",
-        })])),
+        })]),
         notifier(collecting(messages)),
         clock({ now: () => now }),
         reminderRecipient("ap-test@company.local"),
@@ -1176,12 +1184,12 @@ describe("invoice triage patterns", () => {
       presets: [preset(database, await pgliteDatabase())],
       tags: [
         observable.runtime({ sinks: [otel.sink()] }),
-        provider(scripted([json({
+        ...scripted([json({
           vendor: source.vendor,
           amount: source.amount,
           dueDate: source.dueDate,
           category: "utilities",
-        })])),
+        })]),
         clock({ now: () => now }),
       ],
     })
