@@ -258,12 +258,9 @@ it("continues the same ACP session for the same SDK session and branch", async (
   const host = scope.createContext()
   const boundary = await host.resolve(acp)
   const runtime = await host.resolve(session.session)
-  const ctx = scope.createContext({
-    parent: host,
-    tags: [session.current.branch(branch), session.current.session(runtime)],
-  })
+  const executionTags = [session.current.branch(branch), session.current.session(runtime)]
   const invoke = async () => {
-    const stream = ctx.execStream({ flow: codexAcpAttempt, input: request })
+    const stream = host.execStream({ flow: codexAcpAttempt, input: request, tags: executionTags })
     await collect(stream)
     return stream.result
   }
@@ -273,7 +270,6 @@ it("continues the same ACP session for the same SDK session and branch", async (
   expect(boundary.continuations).toEqual(new Map([["codex-acp:sdk-session:main", "session-0"]]))
   expect(runtime.record.providerContinuations).toEqual({ "codex-acp:sdk-session:main": "session-0" })
 
-  await ctx.close()
   await host.close()
   await scope.dispose()
 })
@@ -322,14 +318,12 @@ it("does not publish a late continuation after the session starts finishing", as
   const host = scope.createContext()
   const boundary = await host.resolve(acp)
   const runtime = await host.resolve(session.session)
-  const ctx = scope.createContext({
-    parent: host,
-    tags: [
-      session.current.branch(branch),
-      session.current.session(runtime),
-    ],
+  const stream = host.execStream({
+    flow: codexAcpAttempt,
+    input: request,
+    signal: controller.signal,
+    tags: [session.current.branch(branch), session.current.session(runtime)],
   })
-  const stream = ctx.execStream({ flow: codexAcpAttempt, input: request, signal: controller.signal })
   const events = collect(stream).catch((error: unknown) => error)
 
   for (let attempt = 0; attempt < 100 && !boundary.continuations.has("codex-acp:sdk-session:main"); attempt++) {
@@ -346,7 +340,6 @@ it("does not publish a late continuation after the session starts finishing", as
   expect(boundary.continuations).toEqual(new Map())
   expect(runtime.record.providerContinuations).toEqual({})
 
-  await ctx.close()
   await host.close()
   await scope.dispose()
 })
@@ -408,11 +401,8 @@ it("quarantines a timed-out continuation until the active prompt settles", async
   const host = scope.createContext()
   const boundary = await host.resolve(acp)
   const runtime = await host.resolve(session.session)
-  const ctx = scope.createContext({
-    parent: host,
-    tags: [session.current.branch(branch), session.current.session(runtime)],
-  })
-  const stream = ctx.execStream({ flow: codexAcpAttempt, input: request })
+  const executionTags = [session.current.branch(branch), session.current.session(runtime)]
+  const stream = host.execStream({ flow: codexAcpAttempt, input: request, tags: executionTags })
   const iterator = stream[Symbol.asyncIterator]()
 
   await expect(iterator.next()).resolves.toMatchObject({
@@ -435,13 +425,12 @@ it("quarantines a timed-out continuation until the active prompt settles", async
   ]))
   expect(boundary.sessions.has("uncooperative-session")).toBe(true)
 
-  const replacement = ctx.execStream({ flow: codexAcpAttempt, input: request })
+  const replacement = host.execStream({ flow: codexAcpAttempt, input: request, tags: executionTags })
   const replacementEvents = collect(replacement).catch((error: unknown) => error)
   await expect(replacement.result).rejects.toMatchObject({ name: "CodexConcurrencyError" })
   await expect(replacementEvents).resolves.toMatchObject({ name: "CodexConcurrencyError" })
   expect(boundary.sessions.has("uncooperative-session")).toBe(true)
 
-  await ctx.close()
   await host.close()
   await scope.dispose()
 })

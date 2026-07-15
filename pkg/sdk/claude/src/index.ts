@@ -108,7 +108,6 @@ export const claudeSession = resource({
     } | undefined
     let closed = false
     let closing = false
-    let shutdown: Promise<void> | undefined
     let shutdownPhase: "open" | "graceful" | "force" = "open"
     let stderr = ""
     let tail = Promise.resolve()
@@ -219,7 +218,8 @@ export const claudeSession = resource({
       return transaction
     }
 
-    ctx.cleanup(() => shutdown ??= close())
+    const lifetime = { close, shutdown: undefined as Promise<void> | undefined }
+    ctx.cleanup((target) => target.shutdown ??= target.close(), lifetime)
 
     return { prompt }
   },
@@ -261,7 +261,7 @@ export const claudeLeases = resource({
       leases.delete(sessionId)
       await current.close()
     }
-    ctx.cleanup(async (_ctx, active) => {
+    ctx.cleanup(async (active) => {
       const current = [...active.entries()]
       active.clear()
       await Promise.all(current.map(([, value]) => value.close()))

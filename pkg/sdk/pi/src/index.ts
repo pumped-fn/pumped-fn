@@ -59,7 +59,7 @@ export const models = resource({
   ownership: "boundary",
   factory: (ctx) => {
     const collection = builtinModels()
-    ctx.cleanup((_ctx, target) => target.clearProviders(), collection)
+    ctx.cleanup((target) => target.clearProviders(), collection)
     return collection
   },
 })

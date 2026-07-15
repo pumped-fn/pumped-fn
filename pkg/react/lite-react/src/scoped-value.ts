@@ -114,11 +114,11 @@ function scopedValue<
       }
     }
 
-    const offClose = ctx.onClose(closeAccess)
-    ctx.cleanup(() => {
-      offClose()
-      return closeAccess({ ok: true })
-    })
+    const offClose = ctx.onClose((result, close) => close(result), closeAccess)
+    ctx.cleanup(async (unregister, close) => {
+      unregister()
+      await close({ ok: true })
+    }, offClose, closeAccess)
 
     return access
   }

@@ -1236,7 +1236,7 @@ export const session = resource({
   },
   factory: (ctx, { record, authority, clock }) => {
     const runtime = new Runtime(record, authority, clock)
-    ctx.cleanup((_ctx, target) => target.deactivate(), runtime)
+    ctx.cleanup((target) => target.deactivate(), runtime)
     return runtime
   },
 })

@@ -183,6 +183,9 @@ Choose ownership by use case:
 | `boundary` | One request, job, or UI boundary shares the value and closes it together. | request loggers, trace data, per-request clients, UI sessions |
 | `current` | One action or editor gets a private pocket. Nested `ctx.exec()` children can use it; sibling actions and nested explicit boundaries reset. | transactions, action audit buffers, form drafts, modal/editor state |
 
+Boundary lookup stops at the nearest explicit context. Nested flow executions share that context's value;
+`createContext({ parent })` starts another boundary even if the parent resolved the same resource first.
+
 ```ts
 import { createScope, resource } from "@pumped-fn/lite"
 
@@ -204,8 +207,8 @@ const tx = resource({
       },
     }
 
-    ctx.onClose((result, _ctx, target) => result.ok ? target.commit() : target.rollback(), tx)
-    ctx.cleanup((_ctx, target) => target.release(), tx)
+    ctx.onClose((result, target) => result.ok ? target.commit() : target.rollback(), tx)
+    ctx.cleanup((target) => target.release(), tx)
     return tx
   },
 })

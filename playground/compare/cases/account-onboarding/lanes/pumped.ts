@@ -26,7 +26,7 @@ export const database = resource({
       params: [caseFixture],
       name: "database.open",
     })
-    ctx.cleanup((_ctx, target) => target.close(), connection)
+    ctx.cleanup((target = connection) => target.close(), connection)
     return connection
   },
 })
@@ -74,17 +74,18 @@ export async function startPumped(fixture: Fixture, trace?: Trace): Promise<Awai
 
   return {
     async provision(input: ProvisionInput, facts: RequestFacts): Promise<Outcome> {
-      const ctx = scope.createContext({
-        parent: root,
-        tags: [actorId(facts.actorId), requestId(facts.requestId)],
-      })
       try {
-        return { ok: true, user: await ctx.exec({ flow: provision, input }) }
+        return {
+          ok: true,
+          user: await root.exec({
+            flow: provision,
+            input,
+            tags: [actorId(facts.actorId), requestId(facts.requestId)],
+          }),
+        }
       } catch (error) {
         if (isFault(provision, error)) return { ok: false, error: error.fault }
         throw error
-      } finally {
-        await ctx.close()
       }
     },
     async close() {

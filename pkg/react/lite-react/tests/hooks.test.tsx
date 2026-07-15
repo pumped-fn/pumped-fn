@@ -799,15 +799,17 @@ describe('ExecutionContextProvider + useResource', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText(/workspace:w1;board:b1;\s*resource:1;draft:ready/)).toBeInTheDocument()
+      expect(screen.getByText(/workspace:w1;board:b1;\s*resource:\d+;draft:ready/)).toBeInTheDocument()
+      expect(innerValue).toBeDefined()
+      expect(outerValue).toBeDefined()
     })
 
     const capturedOuter = outerCtx as unknown as Lite.ExecutionContext
     const capturedInner = innerCtx as unknown as Lite.ExecutionContext
     expect(capturedInner.parent).toBe(capturedOuter)
     expect(capturedOuter.data.seekTag(board)).toBeUndefined()
-    expect(innerValue).toBe(outerValue)
-    expect(creates).toBe(1)
+    expect(innerValue).not.toBe(outerValue)
+    expect(creates).toBe(2)
     expect(innerDraft).not.toBe(outerDraft)
 
     await act(async () => {
@@ -821,13 +823,18 @@ describe('ExecutionContextProvider + useResource', () => {
       await Promise.resolve()
     })
 
-    expect(closes).toEqual(['draft:b1:true'])
+    expect(closes).toEqual(['draft:b1:true', `workspace:w1:${innerValue!.id}`])
 
     await act(async () => {
       view.unmount()
       await Promise.resolve()
     })
-    expect(closes).toEqual(['draft:b1:true', 'draft:outer:true', 'workspace:w1:1'])
+    expect(closes).toEqual([
+      'draft:b1:true',
+      `workspace:w1:${innerValue!.id}`,
+      'draft:outer:true',
+      `workspace:w1:${outerValue!.id}`,
+    ])
 
     await scope.dispose()
   })

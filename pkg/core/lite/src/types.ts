@@ -256,7 +256,7 @@ export namespace Lite {
     changes<T>(handle: SelectHandle<T>): AsyncIterable<T>
     resolveStream<T>(atom: Atom<AsyncIterable<T> | AsyncIterator<T>>): AsyncIterable<T>
     onClose<Args extends unknown[]>(
-      fn: (result: CloseResult, ctx: ExecutionContext, ...args: Args) => MaybePromise<void>,
+      fn: (result: CloseResult, ...args: Args) => MaybePromise<void>,
       ...params: Args
     ): () => void
     close(result?: CloseResult): Promise<void>
@@ -265,10 +265,7 @@ export namespace Lite {
   }
 
   export interface ResourceContext extends ExecutionContext {
-    cleanup<Args extends unknown[]>(
-      fn: (ctx: ResourceContext, ...args: Args) => MaybePromise<void>,
-      ...params: Args
-    ): void
+    cleanup<Args extends unknown[]>(fn: (...args: Args) => MaybePromise<void>, ...params: Args): void
   }
 
   export type ExecFlowOptions<Output, Input, Yield = never> = {

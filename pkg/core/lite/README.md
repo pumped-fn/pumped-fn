@@ -178,6 +178,10 @@ Direct and tag-selected child flows activate their declared dependency trees bef
 Use `resource()` for values below the scope. Resources are not stored in `ctx.data` and are not owned by
 controllers. The resolved value lives on the owning execution context.
 
+Default resources stay inside the nearest explicit execution boundary. Nested `ctx.exec()` work shares
+that boundary's value; a nested `createContext({ parent })` starts a separate boundary even when the parent
+already resolved the same resource.
+
 Choose ownership by user expectation:
 
 | Ownership | User expectation | Examples |
@@ -205,8 +209,8 @@ const tx = resource({
         events.push("release")
       },
     }
-    ctx.onClose((result, _ctx, target) => result.ok ? target.commit() : target.rollback(), tx)
-    ctx.cleanup((_ctx, target) => target.release(), tx)
+    ctx.onClose((result, target) => result.ok ? target.commit() : target.rollback(), tx)
+    ctx.cleanup((target) => target.release(), tx)
     return tx
   },
 })

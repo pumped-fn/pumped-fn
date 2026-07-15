@@ -1118,6 +1118,35 @@ describe("ExecutionContext", () => {
       await scope.dispose()
     })
 
+    it("isolates boundary-owned resources across explicit contexts regardless of resolution order", async () => {
+      let creates = 0
+      const sharedResource = resource({
+        name: "explicit-boundary-resource",
+        factory: () => ({ id: ++creates }),
+      })
+      const readResource = flow({
+        name: "read-explicit-boundary-resource",
+        deps: { sharedResource },
+        factory: (_ctx, { sharedResource }) => sharedResource,
+      })
+
+      const scope = createScope()
+      const parent = scope.createContext()
+      const child = scope.createContext({ parent })
+
+      const parentValue = await parent.resolve(sharedResource)
+      const childValue = await child.resolve(sharedResource)
+
+      expect(childValue).not.toBe(parentValue)
+      expect(await child.exec({ flow: readResource })).toBe(childValue)
+      expect(await parent.exec({ flow: readResource })).toBe(parentValue)
+      expect(creates).toBe(2)
+
+      await child.close()
+      await parent.close()
+      await scope.dispose()
+    })
+
     it("resolves boundary-owned resource deps from the owner context tags", async () => {
       const requestTag = tag<string>({ label: "boundary-request" })
       const taggedResource = resource({
@@ -1665,14 +1694,13 @@ describe("ExecutionContext", () => {
       await scope.dispose()
     })
 
-    it("passes inferred close dependencies with the execution context", async () => {
+    it("passes inferred close dependencies", async () => {
       const scope = createScope()
       const ctx = scope.createContext()
       const events: string[] = []
 
-      ctx.onClose((result, closeCtx, target, value) => {
+      ctx.onClose((result, target, value) => {
         expect(result).toEqual({ ok: true })
-        expect(closeCtx).toBe(ctx)
         target.push(value)
       }, events, "closed")
 

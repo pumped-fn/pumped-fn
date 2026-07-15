@@ -204,7 +204,7 @@ export const acp = resource({
         streams.readable(child.stdout) as ReadableStream<Uint8Array>,
       ),
     )
-    ctx.cleanup(async () => {
+    const close = async () => {
       sessions.clear()
       eventStreams.clear()
       continuations.clear()
@@ -250,7 +250,8 @@ export const acp = resource({
       if (connectionFailure || childFailure) {
         throw new CodexShutdownError("Codex ACP closed with a lifecycle failure", { cause: connectionFailure ?? childFailure })
       }
-    })
+    }
+    ctx.cleanup((target) => target(), close)
     await connection.agent.request("initialize", {
       protocolVersion: PROTOCOL_VERSION,
       clientCapabilities: {},

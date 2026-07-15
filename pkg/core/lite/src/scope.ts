@@ -34,7 +34,7 @@ interface Cleanup {
 }
 
 interface CloseCleanup {
-  fn: (result: Lite.CloseResult, ctx: Lite.ExecutionContext, ...args: any[]) => MaybePromise<void>
+  fn: (result: Lite.CloseResult, ...args: any[]) => MaybePromise<void>
   params: unknown[]
 }
 
@@ -1284,7 +1284,7 @@ class ScopeImpl implements Lite.Scope {
           execName: ctx.name,
           signal: preparedOptions.signal,
         })
-        const unregister = ctx.onClose((result, _ctx, prepared) => prepared.close(result), preparedCtx)
+        const unregister = ctx.onClose((result, prepared) => prepared.close(result), preparedCtx)
         if (preparedOptions.tags) {
           for (let i = 0; i < preparedOptions.tags.length; i++) {
             preparedCtx.appendTagValue(preparedOptions.tags[i]!.key, preparedOptions.tags[i]!.value)
@@ -2223,7 +2223,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     while (current) {
       const entry = current.resources.get(resource as Lite.Resource<unknown>) as ResourceEntry<T> | undefined
       if (entry) return { owner: current, entry }
-      if (resource.ownership === "current" && current.boundary) return undefined
+      if (current.boundary) return undefined
       if (!current.parent) return undefined
       assertExecutionContextImpl(current.parent)
       current = current.parent
@@ -2255,7 +2255,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 
   private bindLatestToContextClose<T>(stream: Latest<T>): Latest<T> {
-    stream.onClose(this.onClose((_result, _ctx, target) => target.close(), stream))
+    stream.onClose(this.onClose((_result, target) => target.close(), stream))
     return stream
   }
 
@@ -2348,13 +2348,13 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       close: owner.close.bind(owner),
       fail: owner.fail.bind(owner),
       cleanup<Args extends unknown[]>(
-        fn: (ctx: Lite.ResourceContext, ...args: Args) => MaybePromise<void>,
+        fn: (...args: Args) => MaybePromise<void>,
         ...params: Args
       ) {
         if (owner.getLocalResourceEntry(resource) !== entry) {
           throw new Error("Resource is released")
         }
-        entry.cleanups.push({ fn, params: [resourceCtx as Lite.ResourceContext, ...params] })
+        entry.cleanups.push({ fn, params })
       },
     }
     return resourceCtx as Lite.ResourceContext
@@ -2728,7 +2728,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 
   onClose<Args extends unknown[]>(
-    fn: (result: Lite.CloseResult, ctx: Lite.ExecutionContext, ...args: Args) => MaybePromise<void>,
+    fn: (result: Lite.CloseResult, ...args: Args) => MaybePromise<void>,
     ...params: Args
   ): () => void {
     const cleanup = { fn, params }
@@ -2803,7 +2803,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     for (let i = this.cleanups.length - 1; i >= 0; i--) {
       try {
         const cleanup = this.cleanups[i]
-        if (cleanup) await cleanup.fn(result, this, ...cleanup.params)
+        if (cleanup) await cleanup.fn(result, ...cleanup.params)
       } catch (error) {
         if (result.ok) failures.push(error)
       }

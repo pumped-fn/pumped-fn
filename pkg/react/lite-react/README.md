@@ -333,9 +333,11 @@ fields into local component state. Do not use controllers as the form/resource s
 
 ## Nested Boundaries
 
-Nested `ExecutionContextProvider` instances are useful for modals, editors, side panels, and per-card
-forms. Current-owned scoped values reset with the nested boundary. Boundary-owned resources can be shared
-across the broader provider when that is the user expectation.
+Nested managed `ExecutionContextProvider` instances are useful for modals, editors, side panels, and
+per-card forms. Every managed provider creates an explicit execution boundary, so both boundary-owned
+and current-owned resources reset with the nested provider. Work started through `ctx.exec()` inside one
+provider still shares that provider's boundary-owned resources. A provider given an explicit `ctx` uses
+that context as-is and does not create another boundary.
 
 Use boundary tags to describe the nested owner:
 

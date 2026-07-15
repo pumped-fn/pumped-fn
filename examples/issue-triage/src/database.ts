@@ -52,7 +52,7 @@ export const database = {
     deps: { url: tags.required(config.controlDatabaseUrl) },
     factory: async (ctx, { url }): Promise<Pool> => {
       const pool = new Pool({ connectionString: url, max: 10 })
-      ctx.cleanup((_ctx, target) => target.end(), pool)
+      ctx.cleanup((target) => target.end(), pool)
       for (const statement of migrations) {
         await ctx.exec({
           fn: (_ctx, target, sql) => target.query(sql),
@@ -70,7 +70,7 @@ export const database = {
     deps: { url: tags.required(config.targetDatabaseUrl) },
     factory: (ctx, { url }): Pool => {
       const pool = new Pool({ connectionString: url, max: 4 })
-      ctx.cleanup((_ctx, target) => target.end(), pool)
+      ctx.cleanup((target) => target.end(), pool)
       return pool
     },
   }),

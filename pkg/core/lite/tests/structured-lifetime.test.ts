@@ -34,15 +34,12 @@ function abortable<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
 }
 
 describe("ExecutionContext structured lifetime", () => {
-  it("passes inferred resource cleanup dependencies with the resource context", async () => {
+  it("passes inferred resource cleanup dependencies", async () => {
     const events: string[] = []
     const backend = resource({
       ownership: "current",
       factory: (ctx) => {
-        ctx.cleanup((cleanupCtx, target, value) => {
-          expect(cleanupCtx.scope).toBe(ctx.scope)
-          target.push(value)
-        }, events, "released")
+        ctx.cleanup((target, value) => { target.push(value) }, events, "released")
         return "ready"
       },
     })
@@ -57,6 +54,35 @@ describe("ExecutionContext structured lifetime", () => {
     expect(events).toEqual(["released"])
 
     await ctx.close()
+    await scope.dispose()
+  })
+
+  it("passes only explicit parameters to lifecycle callbacks", async () => {
+    const cleanupArgs: unknown[][] = []
+    const closeArgs: unknown[][] = []
+    const token = { id: "lease" }
+    const backend = resource({
+      ownership: "current",
+      factory: (ctx) => {
+        ctx.cleanup((...args) => { cleanupArgs.push(args) }, token)
+        return "ready"
+      },
+    })
+    const run = flow({
+      deps: { backend },
+      factory: (ctx, { backend }) => {
+        ctx.onClose((...args) => { closeArgs.push(args) }, token)
+        return backend
+      },
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({ flow: run })).resolves.toBe("ready")
+    await ctx.close()
+
+    expect(cleanupArgs).toEqual([[token]])
+    expect(closeArgs).toEqual([[{ ok: true }, token]])
     await scope.dispose()
   })
 

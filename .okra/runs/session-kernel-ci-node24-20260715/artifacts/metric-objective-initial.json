@@ -1,0 +1,10 @@
+{
+  "type": "objective_metric_read",
+  "metric_kind": "objective",
+  "metric_id": "required_pr_check_success_count",
+  "value": 3,
+  "target": 6,
+  "observed_at": "2026-07-15T10:58:00Z",
+  "source": "PR 346 at eb32e9b5 had Changeset, Lint, and Changed Packages successful; Node 24 failed and Node 22 plus Pages were pending.",
+  "freshness": "observed_at=2026-07-15T10:58:00Z -> historical baseline from GitHub statusCheckRollup"
+}
