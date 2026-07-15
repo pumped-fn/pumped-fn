@@ -1,0 +1,5 @@
+{"trace_id":"objective","record_ref":"ledger.jsonl#seq=5","record_hash":"08bf11cd3f9f9182f2a2a1cb62c6c31e1a9dcac593a5d5351be2a1f58be3789f","purpose":"Exact-head six-of-six objective read"}
+{"trace_id":"regression","record_ref":"ledger.jsonl#seq=2","record_hash":"98df3a6813976265287883a402a1da96f3fcf51a561df322cb193224b91ff911","purpose":"Original Node 24 contradiction retained"}
+{"trace_id":"context-argument-antigoal","record_ref":"ledger.jsonl#seq=21","record_hash":"1e63638ee1307c5ba0ccd4330e93fc0254bbbd1c1d96714ea7f6910f03a3a984","purpose":"Human-added no-context-argument wall"}
+{"trace_id":"discovery","record_ref":"workers/dkr-boundary/progress.jsonl#seq=1","record_hash":"42f279566bc9bd9c87f180b171124bbb5421d41218cba089418615f25c945c4d","purpose":"Accepted executable DKR checkpoint"}
+{"trace_id":"independent-review","record_ref":"workers/validator-boundary/progress.jsonl#seq=1","record_hash":"b74091e282747f48dc6324fb510fd85cab8f2a5e005f26a58c936e573ae9a61d","purpose":"Independent GO after defect repair"}

@@ -1,0 +1,30 @@
+{
+  "source_run_id": "session-kernel-ci-node24-20260715",
+  "source_head": "71066c9a61c5f117a757aff384b2276d254637f1",
+  "terminal_record_hash": "65ab2e0bec6b5f2232f2a7ceaa8f420f97a9e1a540c68e70024eaba8f34ef912",
+  "terminal_state": "target_reached",
+  "extracted_traps": [
+    {"trap":"Boundary-owned lookup depended on whether a parent resolved first.","avoidance":"Stop resource lookup at every explicit execution boundary and prove both resolution orders.","trace_refs":["ledger.jsonl#seq=2","workers/dkr-boundary/progress.jsonl#seq=1"]},
+    {"trap":"Lifecycle convenience injected ctx into callbacks, violating graph discipline.","avoidance":"Pass only explicit rest parameters; onClose additionally receives CloseResult. Keep an exact-argument regression test and no-ctx-argument lint.","trace_refs":["ledger.jsonl#seq=20","ledger.jsonl#seq=21"]},
+    {"trap":"Runtime tests did not catch a callback returning number where the full type contract required void.","avoidance":"Run Lite typecheck:full, not only package source typecheck and runtime tests.","trace_refs":["workers/validator-boundary/progress.jsonl#seq=1"]}
+  ],
+  "misconceptions": [
+    "A parent-resolved boundary resource can safely leak into an explicit child.",
+    "Callback convenience justifies passing execution context as an argument.",
+    "Runtime green implies test-source type contracts are green."
+  ],
+  "optimizations": ["Use typed rest parameters to bind cleanup dependencies without closures or context transport."],
+  "candidate_anti_goals": [],
+  "standing_anti_goals_ref": "memory/continuation-packet.v1.json#standing_anti_goals",
+  "trace_manifest_refs": ["memory/trace-manifest.v1.jsonl"],
+  "redaction_decisions": [{"scope":"retained terminal traces","decision":"not_redacted","reason":"Records contain repository evidence and no credentials, production data, or private prompts."}],
+  "no_regression_evidence": [
+    "PR 346 exact head 71066c9a passes all six required checks.",
+    "Lite 225/225 with full test-source typecheck; React 68/68.",
+    "Root lint scans 112 files with zero diagnostics and alignment has zero gaps.",
+    "Independent read-only review returned GO after its identified defect was repaired."
+  ],
+  "review_set_refs": ["workers/dkr-boundary/progress.jsonl#seq=1","workers/validator-boundary/progress.jsonl#seq=1"],
+  "explicitly_rejected_or_deferred": ["No merge, release, publish, deployment, or performance claim was performed."],
+  "continuation_packet_ref": "memory/continuation-packet.v1.json"
+}

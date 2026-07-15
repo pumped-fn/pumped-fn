@@ -1,0 +1,55 @@
+{
+  "ckrs": [
+    {
+      "id": "CKR-PR-RECOVERY",
+      "metric_id": "required_pr_check_success_count",
+      "source_dkrs": [
+        "DKR-BOUNDARY"
+      ],
+      "status": "done",
+      "target": 6
+    }
+  ],
+  "dkrs": [
+    {
+      "budget": {
+        "time_min": 90,
+        "turns": 1
+      },
+      "decision_target": "Determine the smallest correction for resolution-order-independent explicit boundaries and context-free lifecycle callbacks.",
+      "id": "DKR-BOUNDARY",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-SESSION-ISOLATION",
+        "AG-PRIMITIVE-PROOF",
+        "AG-REGRESSION",
+        "AG-INDEPENDENCE",
+        "AG-CONTEXT-ARGUMENT"
+      ],
+      "status": "accepted",
+      "stop_rule": "Stop when focused replay, exact-head CI, and independent review agree, or return a blocking checkpoint."
+    }
+  ],
+  "frame_version": 1,
+  "orchestrator": {
+    "owner": "Codex /root",
+    "responsibilities": [
+      "objective checks",
+      "wall reads",
+      "independent review",
+      "PR verification",
+      "subagent steering",
+      "terminalization"
+    ],
+    "terminal_condition": "Continue until required_pr_check_success_count equals 6 with every active anti-goal held, or stop on human direction or a blocking flag."
+  },
+  "pkrs": [
+    {
+      "id": "PKR-BOUNDARY-CORRECTION",
+      "source_ckrs": [
+        "CKR-PR-RECOVERY"
+      ],
+      "status": "done"
+    }
+  ],
+  "tree_version": 1
+}
