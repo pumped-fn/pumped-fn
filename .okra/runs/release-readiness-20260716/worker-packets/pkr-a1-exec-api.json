@@ -1,0 +1,47 @@
+{
+  "packet_version": 1,
+  "worker_id": "pkr-a1-exec-api",
+  "unit_id": "PKR-A1",
+  "worker_kind": "progression",
+  "frame": {
+    "objective": { "metric_id": "release_readiness_gap_count", "target": 0, "comparator": "==" },
+    "frame_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json",
+    "tree_ref": ".okra/runs/release-readiness-20260716/tree/tree.v3.json",
+    "source_dkr_ref": ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-a.v1.json",
+    "exact_start_head": "8af92a49d8e5a94d5d275093887487d6d67448f4"
+  },
+  "active_anti_goals": [
+    "context_argument_pass_count",
+    "implicit_required_dependency_count",
+    "hidden_execution_edge_count",
+    "redundant_graph_ceremony_count",
+    "scope_seam_escape_count",
+    "slop_violation_count",
+    "touched_surface_regression_count",
+    "single_llm_truth_acceptance_count"
+  ],
+  "assignment": "Implement the human-fixed execution contract. Add one shared inferred ExecDepsOptions used by Scope.run and ExecutionContext.exec. Require name, deps, and params. fn receives inferred deps then params and never ctx or scope. deps {} and params [] are the only empty form. Remove public RunFnOptions and ExecFnOptions context-taking forms. Lower scope.run and ctx.exec through one internal deps executor while preserving owned versus managed lifecycle, tag precedence, signal combination, extension tracing, target identity, input observation, cleanup, cancellation, failure, and streaming rejection. Keep context access inside atom, flow, resource, preset factories and Extension.wrapExec only. Define the extension target type so inline callback identity remains observable without claiming a context-taking callback signature. Migrate every product/test callsite. Strengthen Lite lint for both receivers and add a deterministic scripts/check-inline-exec-contract.mjs plus fixtures/tests that count missing name/deps/params, context callback arguments, captures, and ctx/scope passed in params. Do not edit public docs or changesets in this slice.",
+  "allowed_paths": [
+    "pkg/core/lite/src/**",
+    "pkg/core/lite/tests/**",
+    "pkg/tool/lint/src/**",
+    "pkg/tool/lint/tests/**",
+    "pkg/ext/**/src/**",
+    "pkg/react/lite-react/src/**",
+    "pkg/react/lite-react/tests/**",
+    "pkg/framework/pumped/tests/**",
+    "pkg/sdk/**/src/**",
+    "pkg/sdk/**/tests/**",
+    "examples/**/src/**",
+    "examples/**/tests/**",
+    "playground/compare/**",
+    "scripts/check-inline-exec-contract.mjs",
+    "scripts/check-inline-exec-contract.test.mjs",
+    "scripts/fixtures/inline-exec-contract/**",
+    "package.json"
+  ],
+  "forbidden_paths": ["**/*.md", ".changeset/**", ".okra/**", "pnpm-lock.yaml", "benchmarks/**"],
+  "budget_and_stop_rule": { "time_min": 100, "turns": 2, "stop": "Stop on an extension identity or compatibility unknown that cannot be proven by existing extension tests; never retain a public ctx callback as fallback." },
+  "hand_back_rule": "Do not weaken lifecycle semantics, add implicit deps, pass ctx/scope, edit docs, or change benchmark code. Return raw focused gate evidence for independent validation.",
+  "output_schema": "Changed files and intent, exact public signatures, callsite migration counts, commands and key outputs, checker metrics, unresolved items, hashes, and active-wall observations. Worker evidence is not acceptance."
+}

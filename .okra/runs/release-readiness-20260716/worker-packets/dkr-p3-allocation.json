@@ -1,0 +1,23 @@
+{
+  "packet_version": 1,
+  "worker_id": "dkr-p3-allocation",
+  "unit_id": "DKR-P3",
+  "worker_kind": "discovery",
+  "frame": {
+    "objective": { "metric_id": "release_readiness_gap_count", "target": 0, "comparator": "==" },
+    "frame_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json",
+    "tree_ref": ".okra/runs/release-readiness-20260716/tree/tree.v3.json",
+    "source_dkr_ref": ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-p2.v1.json"
+  },
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "allocation_regression_case_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "assignment": "Discovery only. Predeclare and run exactly one Node 26 allocation observation using in-heap controls rather than TypedArray backing stores: known-zero, one retained approximately 1 KiB JavaScript heap object per iteration, and two retained approximately 1 KiB objects. Pin sampler settings and batch size before execution. Accept only if zero noise, signal-to-noise, and two-to-one proportionality thresholds declared in the checkpoint are met and the saved replay is deterministic. Otherwise reject and name the next narrower method. Do not run product workloads, implement harness code, optimize, or edit product/.okra files.",
+  "budget_and_stop_rule": { "time_min": 35, "turns": 1, "stop": "One observation per control; never repeat until favorable." },
+  "hand_back_rule": "Preserve rejected results and block measurement implementation if calibration is weak.",
+  "output_schema": "Executable checkpoint with predeclared thresholds, exact script/command/hash, raw controls, acceptance arithmetic, questions, confidence, walls, and downstream decision. Worker evidence is not acceptance."
+}
