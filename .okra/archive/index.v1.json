@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "format": "tar.zst",
+  "archives": [
+    {
+      "run_id": "issue-triage-session-20260715",
+      "file": "issue-triage-session-20260715.tar.zst",
+      "terminal_state": "target_reached",
+      "terminal_record_sha256": "d741f1f7fffd744fb8187ba9e506e882f8bae5b33d5053c2446c3db0daacc682",
+      "source_file_count": 409,
+      "source_bytes": 2070163,
+      "archive_bytes": 285766,
+      "sha256": "32b64c7acfae154ad41871f2d943b893a9d435feec3865741c5c1ca8e54ab0a6"
+    },
+    {
+      "run_id": "session-kernel-ci-node24-20260715",
+      "file": "session-kernel-ci-node24-20260715.tar.zst",
+      "terminal_state": "target_reached",
+      "terminal_record_sha256": "65ab2e0bec6b5f2232f2a7ceaa8f420f97a9e1a540c68e70024eaba8f34ef912",
+      "source_file_count": 35,
+      "source_bytes": 180338,
+      "archive_bytes": 25016,
+      "sha256": "d53f925f37bced9ba100f0f00bbe1bb9dfe4f21ff2bc01d4c4c3fdec9f75e05c"
+    }
+  ]
+}

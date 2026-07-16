@@ -1,1 +1,0 @@
-{"type":"anti_goal_metric_read","metric_kind":"anti_goal","metric_id":"undeclared_effect_edge_count","value":0,"target":0,"observed_at":"2026-07-15T11:47:01Z","source":"Root pumped-lite-lint scanned 112 files with zero diagnostics; changed lifecycle dependencies are explicit rest parameters.","freshness":"fresh; local replay and exact-head Lint CI; max_age=10m"}

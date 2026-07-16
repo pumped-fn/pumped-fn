@@ -1,1 +1,0 @@
-{"type":"anti_goal_metric_read","metric_kind":"anti_goal","metric_id":"touched_surface_regression_count","value":0,"target":0,"observed_at":"2026-07-15T11:47:01Z","source":"All six required checks pass at exact head 71066c9a; all focused local suites pass.","freshness":"fresh; GitHub statusCheckRollup at 2026-07-15T11:47:01Z; max_age=10m"}

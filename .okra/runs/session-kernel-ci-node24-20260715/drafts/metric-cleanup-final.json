@@ -1,1 +1,0 @@
-{"type":"anti_goal_metric_read","metric_kind":"anti_goal","metric_id":"cleanup_business_state_mutation_count","value":0,"target":0,"observed_at":"2026-07-15T11:47:01Z","source":"Structured lifetime and React provider cleanup suites pass; cleanup remains resource release only.","freshness":"fresh; local replay plus exact-head Test 22 and Test 24; max_age=10m"}

@@ -1,1 +1,0 @@
-{"type":"anti_goal_metric_read","metric_kind":"anti_goal","metric_id":"anti_goal_bypass_or_dishonesty_count","value":0,"target":0,"observed_at":"2026-07-15T11:47:01Z","source":"The Node 24 contradiction was recorded, fixed, independently reviewed, and replayed before the target was accepted.","freshness":"fresh; successor ledger, review, and exact-head CI; max_age=10m"}

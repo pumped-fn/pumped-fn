@@ -1,1 +1,0 @@
-{"type":"anti_goal_metric_read","metric_kind":"anti_goal","metric_id":"slop_violation_count","value":0,"target":0,"observed_at":"2026-07-15T11:47:01Z","source":"Root lint scanned 112 files with zero diagnostics, alignment has zero gaps, full Lite test-source typecheck passes, and git diff check is clean.","freshness":"fresh; local replay plus exact-head Lint CI; max_age=10m"}
