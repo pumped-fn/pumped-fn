@@ -12,6 +12,8 @@ pnpm --dir benchmarks/lite-perf perf:test
 
 The harness test uses only Node built-ins. It proves exact 39/8 counts and rejects empty, missing, duplicate, non-finite, wrong-lane, wrong-order, environment-drifted, artifact-drifted, source-tree, and mixed false-green evidence.
 
+Environment identity uses semantic bytes, not installation locations. Package name, version, and manifest bytes; Node version and binary bytes; browser provider version and manifest bytes; Chromium bytes; lockfile, config, harness, writer, rows, platform, kernel, architecture, and CPU remain fingerprinted. Dependency, Node, and browser installation paths are excluded. Checkout, command, working-directory, and raw-output paths remain observation provenance only. Baseline and candidate roots must use byte-identical benchmark-control files while keeping their product sources and built artifacts separate.
+
 ## Capture one independent process
 
 Each command launches exactly one Vitest process. `variant`, `pair`, and `position` are evidence labels; capture derives artifact identity from the current built dist.
