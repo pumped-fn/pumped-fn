@@ -46,19 +46,19 @@ type Tool = Lite.AnyFlow
 type Skill = Lite.Flow<string, void>
 type Subagent = Lite.Flow<TurnResult, session.RunInput<TurnInput>, never, session.SessionEvent>
 
-export const config = Object.freeze({
+export const config = {
   role: tag<RoleConfig>({ label: "agent.config.role" }),
   tool: tag<ToolConfig>({ label: "agent.config.tool" }),
   skill: tag<SkillConfig>({ label: "agent.config.skill" }),
   subagent: tag<SubagentConfig>({ label: "agent.config.subagent" }),
-})
+}
 
-export const impl = Object.freeze({
+export const impl = {
   attempt: tag<Attempt>({ label: "agent.impl.attempt" }),
   tool: tag<Tool>({ label: "agent.impl.tool" }),
   skill: tag<Skill>({ label: "agent.impl.skill" }),
   subagent: tag<Subagent>({ label: "agent.impl.subagent" }),
-})
+}
 
 export const invoke = flow({
   name: "agent.invoke",
@@ -687,10 +687,10 @@ function json(value: unknown, seen = new WeakSet<object>()): Lite.JsonValue {
   if (value === null) return null
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value
   if (value === undefined || typeof value === "bigint" || typeof value === "symbol" || typeof value === "function") return String(value)
-  if (Array.isArray(value)) return value.map((item) => json(item, seen))
   if (typeof value === "object") {
     if (seen.has(value)) return "[Circular]"
     seen.add(value)
+    if (Array.isArray(value)) return value.map((item) => json(item, seen))
     return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, json(item, seen)]))
   }
   return String(value)

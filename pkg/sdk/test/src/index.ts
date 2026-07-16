@@ -25,13 +25,13 @@ import { flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 
 type MaybePromise<T> = T | Promise<T>
 
-export const config = Object.freeze({
+export const config = {
   model: tag<(request: ModelRequest) => MaybePromise<ModelResponse>>({ label: "sdk.test.config.model" }),
   attempt: tag<AttemptStubResult | ((request: ModelRequest) => MaybePromise<AttemptStubResult>)>({
     label: "sdk.test.config.attempt",
   }),
   sessionStore: tag<Map<session.SessionId, session.SessionRecord>>({ label: "sdk.test.config.session-store" }),
-})
+}
 
 export const modelStub: Model = flow({
   name: "model.stub",
@@ -158,9 +158,9 @@ export class MemorySuspenseLog implements SuspenseEventLog {
 
 export class MemoryWorkflowLog extends MemorySuspenseLog implements WorkflowEventLog, RunLog {}
 
-export const localRemoteRunner = Object.freeze({
+export const localRemoteRunner = {
   run: (_event, next) => next(),
-} satisfies RemoteRunner)
+} satisfies RemoteRunner
 
 export function suspense(
   options: Omit<SuspenseExtensionOptions, "log"> & { log?: SuspenseEventLog } = {}

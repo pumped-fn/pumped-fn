@@ -330,8 +330,14 @@ export interface SessionRuntime {
   deactivate(): Promise<void>
   beginFinish(): Promise<void>
   completeFinish(version: number): void
+  finishWith(commit: (record: SessionRecord, expectedVersion: number) => Promise<number>): Promise<SessionRecord>
   eventsFor(workId: WorkId): readonly SessionEvent[]
   emit(input: SessionEventInput): SessionEvent
+  park(input: WaitWorkInput): WorkRecord
+  previewWake(id: string): WorkRecord
+  wake(id: string, authoritative: WorkRecord): WorkRecord
+  merge(input: MergeBranchesInput): BranchRecord
+  settlement(workId: WorkId): AttemptSettlement
 }
 
 /** Supplies timestamps for deterministic session operations. */
@@ -844,6 +850,7 @@ class Runtime implements SessionRuntime {
       ) => {
         const existing = this.#record.invocations.find((item) => item.id === id)
         if (!existing) throw new Error(`Invocation ${id} does not exist`)
+        if (existing.status !== "working") throw new Error(`Invocation ${id} is already ${existing.status}`)
         const settled = Object.freeze({ ...existing, status })
         this.#record = Object.freeze({
           ...this.#record,
@@ -1232,44 +1239,44 @@ export const authority = tag<Authority>({ label: "sdk.session.authority" })
 export const record = tag<SessionRecord>({ label: "sdk.session.record" })
 export const clock = tag<Clock>({ label: "sdk.session.clock" })
 
-export const current = Object.freeze({
+export const current = {
   session: tag<SessionRuntime>({ label: "sdk.session.current.session" }),
   work: tag<WorkRecord>({ label: "sdk.session.current.work" }),
   attempt: tag<AttemptRecord>({ label: "sdk.session.current.attempt" }),
   branch: tag<BranchRecord>({ label: "sdk.session.current.branch" }),
   authority: tag<Authority>({ label: "sdk.session.current.authority" }),
   epoch: tag<number>({ label: "sdk.session.current.epoch" }),
-})
+}
 
-export const observation = Object.freeze({
+export const observation = {
   current: tag<ObservationProjection>({ label: "sdk.session.observation.current" }),
   channel: tag<string>({ label: "sdk.session.observation.channel" }),
-})
+}
 
-export const execution = Object.freeze({
+export const execution = {
   turn: tag<TurnSelection>({ label: "sdk.session.execution.turn" }),
-})
+}
 
 const selectedTurn = tag<Lite.AnyFlow>({ label: "sdk.session.execution.selectedTurn" })
 
-export const store = Object.freeze({
+export const store = {
   load: tag<Load>({ label: "sdk.session.store.load" }),
   commit: tag<Commit>({ label: "sdk.session.store.commit" }),
-})
+}
 
-export const artifacts = Object.freeze({
+export const artifacts = {
   publish: tag<PublishArtifact>({ label: "sdk.session.artifacts.publish" }),
-})
+}
 
-export const memory = Object.freeze({
+export const memory = {
   recall: tag<RecallMemory>({ label: "sdk.session.memory.recall" }),
   commit: tag<CommitMemory>({ label: "sdk.session.memory.commit" }),
   accept: tag<AcceptMemory>({ label: "sdk.session.memory.accept" }),
-})
+}
 
-export const scheduler = Object.freeze({
+export const scheduler = {
   wake: tag<Wake>({ label: "sdk.session.scheduler.wake" }),
-})
+}
 
 export const session = resource({
   name: "sdk.session",
@@ -1473,7 +1480,7 @@ export const wait = flow({
   name: "sdk.session.wait",
   parse: typed<WaitWorkInput>(),
   deps: { session },
-  factory: (ctx, { session }) => (session as Runtime).park(ctx.input),
+  factory: (ctx, { session }) => session.park(ctx.input),
 })
 
 export const wake = flow({
@@ -1481,10 +1488,10 @@ export const wake = flow({
   parse: typed<WakeInput>(),
   deps: { session, impl: tags.required(scheduler.wake) },
   factory: async (ctx, { session, impl }) => {
-    const expected = (session as Runtime).previewWake(ctx.input.id)
+    const expected = session.previewWake(ctx.input.id)
     const authoritative = await impl.exec({ input: ctx.input })
     if (!sameWakeRecord(expected, authoritative)) throw new BoundaryMismatchError("scheduler.wake", ctx.input.id)
-    return (session as Runtime).wake(ctx.input.id, authoritative)
+    return session.wake(ctx.input.id, authoritative)
   },
 })
 
@@ -1503,7 +1510,7 @@ export const join = flow({
     const active = new Map(session.work.active().map((attempt) => [attempt.record.workId, attempt]))
     const pending = new Map(ctx.input.workIds.map((workId) => [
       workId,
-      (active.get(workId)?.settled ?? Promise.resolve((session as Runtime).settlement(workId))).then(
+      (active.get(workId)?.settled ?? Promise.resolve(session.settlement(workId))).then(
         (settlement) => ({ workId, settlement }),
       ),
     ]))
@@ -1529,7 +1536,7 @@ export const merge = flow({
   name: "sdk.session.merge",
   parse: typed<MergeBranchesInput>(),
   deps: { session },
-  factory: (ctx, { session }) => (session as Runtime).merge(ctx.input),
+  factory: (ctx, { session }) => session.merge(ctx.input),
 })
 
 export const events = flow({
@@ -1544,7 +1551,7 @@ export const events = flow({
 export const finish = flow({
   name: "sdk.session.finish",
   deps: { session, commit: controller(commit) },
-  factory: (_ctx, { session, commit }) => (session as Runtime).finishWith(
+  factory: (_ctx, { session, commit }) => session.finishWith(
     async (record, expectedVersion) => (await commit.exec({ input: { record, expectedVersion } })).version,
   ),
 })

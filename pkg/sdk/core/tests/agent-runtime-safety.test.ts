@@ -183,6 +183,52 @@ describe("agent runtime safety", () => {
     await scope.dispose()
   })
 
+  it("serializes cyclic arrays returned by tools", async () => {
+    const output: unknown[] = []
+    output.push(output)
+    let calls = 0
+    let toolMessage: string | undefined
+    const inspect = flow({
+      name: "cyclic-array",
+      tags: [agent.config.tool({ version: "1", description: "Return a cyclic array.", input: z.object({}) })],
+      factory: () => output,
+    })
+    const model = flow({
+      name: "safety.cyclic-array-model",
+      parse: typed<ModelRequest>(),
+      factory: (ctx): ModelResponse => {
+        if (calls++ === 0) return { content: "", toolCalls: [{ name: "cyclic-array", input: {} }] }
+        toolMessage = ctx.input.messages.find((message) => message.role === "tool")?.content
+        return { content: "done", stop: true }
+      },
+    })
+    const granted = authority(["cyclic-array"])
+    const scope = createScope({ tags: [
+      session.authority(granted),
+      session.record(initial(granted)),
+      session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
+      validation.engine(engine),
+      agent.config.role({ name: "cyclic-array", version: "1" }),
+      agent.impl.tool(inspect),
+      agent.impl.attempt(agent.fromModel),
+      modelImpl(model),
+      session.execution.turn({ flow: agent.turn }),
+    ] })
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({
+      flow: session.run,
+      input: {
+        work: { id: "cyclic-array", branchId: "main", role: "cyclic-array", policy: "all" },
+        input: { prompt: "Inspect." },
+      },
+    })).resolves.toMatchObject({ content: "done" })
+    expect(toolMessage).toBe('["[Circular]"]')
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
   it("settles a direct turn invocation when its stream consumer returns", async () => {
     let modelCalls = 0
     const model = flow({

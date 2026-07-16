@@ -212,4 +212,27 @@ describe("session review regressions", () => {
     await ctx.close()
     await scope.dispose()
   })
+
+  it("keeps invocation settlement terminal", async () => {
+    const bound = authorityValue()
+    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+    runtime.invocations.start({
+      id: "terminal",
+      workId: "work",
+      attempt: 1,
+      kind: "model",
+      idempotencyKey: "terminal",
+    })
+
+    runtime.invocations.settle("terminal", "completed")
+    expect(() => runtime.invocations.settle("terminal", "failed")).toThrow(
+      "Invocation terminal is already completed",
+    )
+    expect(runtime.record.invocations).toMatchObject([{ id: "terminal", status: "completed" }])
+
+    await ctx.close()
+    await scope.dispose()
+  })
 })

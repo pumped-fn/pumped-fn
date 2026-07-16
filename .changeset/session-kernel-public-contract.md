@@ -3,8 +3,10 @@
 "@pumped-fn/lite-extension-logging": patch
 "@pumped-fn/lite-extension-observable": patch
 "@pumped-fn/lite-extension-scheduler": patch
+"@pumped-fn/lite-extension-scheduler-nats": patch
 "@pumped-fn/lite-extension-suspense": patch
 "@pumped-fn/lite-extension-sync": patch
+"@pumped-fn/lite-extension-sync-nats": patch
 "@pumped-fn/lite-react": patch
 "@pumped-fn/lite-react-json-render": patch
 "@pumped-fn/lite-render-core": patch

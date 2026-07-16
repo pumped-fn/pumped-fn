@@ -52,11 +52,11 @@ export class PolicyError extends Error {
 
 export const policy = tag<Policy>({ label: "sandbox.policy" })
 
-export const impl = Object.freeze({
+export const impl = {
   read: tag<Read>({ label: "sandbox.impl.read" }),
   write: tag<Write>({ label: "sandbox.impl.write" }),
   run: tag<Run>({ label: "sandbox.impl.run" }),
-})
+}
 
 export const read: Read = flow({
   name: "sandbox.read",

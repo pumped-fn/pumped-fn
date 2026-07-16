@@ -51,10 +51,10 @@ export class WorkspaceError extends Error {
   }
 }
 
-export const config = Object.freeze({
+export const config = {
   engine: tag<EngineConfig>({ label: "just-bash.config.engine" }),
   workspace: tag<WorkspaceConfig>({ label: "just-bash.config.workspace" }),
-})
+}
 
 export const clock = atom({
   factory: () => ({
@@ -200,11 +200,11 @@ export const run: sandbox.Run = flow({
   },
 })
 
-export const binding = Object.freeze({
+export const binding = {
   read: sandbox.impl.read(read),
   write: sandbox.impl.write(write),
   run: sandbox.impl.run(run),
-})
+}
 
 function assertAuthority(value: session.Authority, policy: sandbox.Policy): void {
   if (policy.write && !value.sandbox.write) throw new sandbox.PolicyError("write exceeds session authority")
