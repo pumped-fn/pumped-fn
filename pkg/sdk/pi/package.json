@@ -30,7 +30,7 @@
   },
   "peerDependencies": {
     "@pumped-fn/sdk": "^3.0.0",
-    "@pumped-fn/lite": "^5.0.0"
+    "@pumped-fn/lite": "^6.0.0"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "catalog:"

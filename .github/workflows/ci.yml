@@ -125,6 +125,8 @@ jobs:
             exit 0
           fi
 
+          pnpm release-policy:test
+          pnpm release-policy:check -- --base origin/main
           pnpm changeset status --since=origin/main
 
   changed-packages:

@@ -34,7 +34,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite-extension-logging": "^0.3.0",
+    "@pumped-fn/lite-extension-logging": "^0.3.0 || ^1.0.0",
     "pino": "^10.0.0"
   },
   "devDependencies": {

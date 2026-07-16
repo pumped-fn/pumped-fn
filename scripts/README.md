@@ -14,6 +14,8 @@
 | `check-inline-exec-contract.mjs` | Check inline `scope.run` and `ctx.exec` call sites for explicit names, parameters, inspectable callbacks, and graph dependencies when used. |
 | `check-inline-exec-contract.test.mjs` | Deterministic positive and negative fixtures for the inline execution contract checker. |
 | `check-public-contract.mjs` | Check package metadata, migration evidence, public interface TSDoc, README fences, changesets, and PR provenance. |
+| `check-release-policy.mjs` | Check Changeset bump size, internal peer alignment, and the repository release policy. |
+| `check-release-policy.test.mjs` | Deterministic release-policy fixtures for core majors, pre-1 graduation, stable minors, widening, and stale peers. |
 | `check-public-contract.test.mjs` | Deterministic positive and negative fixtures for the public contract checker. |
 | `get-release-title.sh` | Release workflow helper for Changesets PR titles. |
 

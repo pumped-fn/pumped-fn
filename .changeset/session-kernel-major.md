@@ -7,8 +7,15 @@
 "@pumped-fn/sdk-test": major
 "@pumped-fn/lite": major
 "@pumped-fn/lite-lint": minor
+"@pumped-fn/lite-extension-logging": major
+"@pumped-fn/lite-extension-observable": major
+"@pumped-fn/lite-extension-scheduler": major
+"@pumped-fn/lite-extension-sync": major
+"@pumped-fn/lite-react": minor
 ---
 
 Replace the Agent facade and material session with stable resource-backed role, tool, session, work, and attempt primitives. Lite entry execution now activates declared dependency trees, exposes structured cancellation through `ExecutionContext.signal`, and supports tagged controller readiness through `FlowInvocation`. `scope.run` and `scope.runStream` own one temporary execution boundary beside managed `ctx.exec` and `ctx.execStream` lifetimes. Named `scope.run({ name, params, fn })` operations provide a graph-visible one-off entry without a reusable flow handle or injected context parameter; add `deps` only for graph dependencies. Operations without `deps` receive `params` directly. Callback registration and inline execution accept inferred parameter tuples, keeping captured inputs explicit while preserving direct zero-parameter callback paths. Lite lint rejects hidden `ctx.exec` and inline `scope.run` captures and recognizes exported graph namespaces without requiring `Object.freeze`. Existing Model providers remain usable. Migrate `agent()`, `agent.turn`, `session()`, `send()`, and `Sandbox` imports using the package migration table. This release intentionally has no legacy execution loop.
 
 `SessionRuntime` now declares the full session contract used by public flows: `finishWith`, `park`, `previewWake`, `wake`, `merge`, and `settlement`. Effect edges are unchanged: `finishWith` receives the commit callback from `sdk.session.finish`, and `wake` validates the scheduler boundary inside the runtime. `invocations.settle` is terminal and throws on an already-settled invocation instead of overwriting its status.
+
+Packages using inferred callback parameters now require Lite 6. The pre-1.0 logging, observable, scheduler, and sync packages graduate to 1.0. Lite React moves to 2.4. Compatible adapters widen their peer ranges through Lite 6 without dropping supported older majors.

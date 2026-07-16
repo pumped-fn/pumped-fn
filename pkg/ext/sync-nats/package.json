@@ -35,7 +35,7 @@
   },
   "peerDependencies": {
     "@nats-io/kv": "^3.4.0",
-    "@pumped-fn/lite-extension-sync": "^0.2.0"
+    "@pumped-fn/lite-extension-sync": "^0.2.0 || ^1.0.0"
   },
   "devDependencies": {
     "@nats-io/kv": "catalog:",

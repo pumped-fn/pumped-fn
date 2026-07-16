@@ -19,6 +19,8 @@
     "changeset:version": "changeset version",
     "changeset:publish": "pnpm build && changeset publish",
     "changeset:status": "changeset status --verbose",
+    "release-policy:check": "node scripts/check-release-policy.mjs",
+    "release-policy:test": "node --test scripts/check-release-policy.test.mjs",
     "release": "pnpm verify && pnpm changeset:publish",
     "ci:changed-packages": "node scripts/check-changed-packages.mjs",
     "contract:check": "node scripts/check-public-contract.mjs",

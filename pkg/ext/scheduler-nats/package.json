@@ -35,7 +35,7 @@
   },
   "peerDependencies": {
     "@nats-io/kv": "^3.4.0",
-    "@pumped-fn/lite-extension-scheduler": "^0.2.0"
+    "@pumped-fn/lite-extension-scheduler": "^0.2.0 || ^1.0.0"
   },
   "dependencies": {
     "croner": "catalog:"

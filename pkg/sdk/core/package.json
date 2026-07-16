@@ -76,7 +76,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^5.0.0"
+    "@pumped-fn/lite": "^6.0.0"
   },
   "dependencies": {
     "@standard-schema/spec": "catalog:",
