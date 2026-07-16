@@ -1,0 +1,12 @@
+{
+  "type": "worker_finish",
+  "worker_id": "pkr-a1-exec-api",
+  "worker_kind": "progression",
+  "unit_id": "PKR-A1",
+  "status": "accepted_after_two_remediations",
+  "recorded_at": "2026-07-16T05:19:00Z",
+  "acceptance_ref": "artifacts/accept-pkr-a1.v3.json",
+  "verification_ref": "workers/validator-pkr-a1/verification.v3.json",
+  "product_files_changed": true,
+  "downstream_advance": "docs_migration_and_contract_content_allowed"
+}

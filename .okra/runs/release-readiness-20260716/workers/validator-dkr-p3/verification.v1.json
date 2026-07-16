@@ -1,0 +1,209 @@
+{
+  "schema_version": 1,
+  "verification_type": "dkr_validator_audit",
+  "verification_id": "validator-dkr-p3.2026-07-16T05:06:53Z",
+  "validator_id": "validator-dkr-p3",
+  "worker_kind": "verification",
+  "unit_id": "DKR-P3",
+  "checkpoint_ref": "workers/dkr-p3-allocation/checkpoint.v1.json",
+  "checkpoint_sha256": "9e600a66656ce1bb546102296f28564d11f5a5bb99613c4be654653bc3769b5e",
+  "observed_at": "2026-07-16T05:06:53Z",
+  "decision": "accepted_reducing_discovery_only",
+  "fail_closed": true,
+  "product_files_changed": false,
+  "one_shot_replay_count": 1,
+  "claims": [
+    {
+      "claim_id": "DKR-P3-CHECKPOINT-INTEGRITY",
+      "check": "The checkpoint hash matches its worker finish record",
+      "threshold": "9e600a66656ce1bb546102296f28564d11f5a5bb99613c4be654653bc3769b5e",
+      "value": "9e600a66656ce1bb546102296f28564d11f5a5bb99613c4be654653bc3769b5e",
+      "source_of_truth": "workers/dkr-p3-allocation/checkpoint.v1.json and progress.finish.json",
+      "replay": "sha256sum .okra/runs/release-readiness-20260716/workers/dkr-p3-allocation/checkpoint.v1.json",
+      "exit_code": 0,
+      "sha256": [
+        "9e600a66656ce1bb546102296f28564d11f5a5bb99613c4be654653bc3769b5e"
+      ],
+      "observed_at": "2026-07-16T05:06:53Z",
+      "decision": "accepted",
+      "evidence": [
+        "Checkpoint bytes match the hash recorded by dkr-p3-allocation."
+      ]
+    },
+    {
+      "claim_id": "DKR-P3-PREDECLARATION",
+      "check": "Runtime, sampler, workload, observation count, scripts, and acceptance gates were frozen before observation",
+      "threshold": "predeclared.json and both script hashes exist before raw.json; zero maximum=0; one observation per 0x, 1x, and 2x control",
+      "value": "predeclared mtime=2026-07-16T05:00:35Z; raw mtime=2026-07-16T05:00:49Z; declaredAt=2026-07-16T05:00:00Z; thresholds and script hashes matched",
+      "source_of_truth": "/tmp/dkr-p3-allocation/predeclared.json, observe.mjs, check-replay.mjs, and raw.json",
+      "replay": "Read predeclared.json and compare its timestamp, thresholds, observationCountPerControl, and scriptSha256 values with file metadata and sha256sum output",
+      "exit_code": 0,
+      "sha256": [
+        "e0f244126ba1e04afe85d753f650b1575ff2900e827ae34fb61064e7bdf5ed6d",
+        "18183d8eff6af055dde6a22cbcc425603e5f5f80ef1bff9bdd1cb4607dab9ce4",
+        "f59e8aed8030068ce490d826c6b3393935bf4e164867d28383005b58b8f2e003",
+        "73a837b771dfd7c572c3ac6f8d015051ec463a60c0149606dbdb6962c08154e6"
+      ],
+      "observed_at": "2026-07-16T05:06:53Z",
+      "decision": "accepted",
+      "evidence": [
+        "Node v26.4.0; sampling interval=1; iterations=256; units=[0,1,2].",
+        "zeroAttributedBytesMax=0; oneBytesPerIteration=768..1408; signalToNoiseMin=64; twoToOneRatio=1.8..2.2.",
+        "observationCountPerControl=1; observe.mjs and check-replay.mjs hashes equal the predeclared hashes.",
+        "The predeclaration and scripts predate raw.json."
+      ]
+    },
+    {
+      "claim_id": "DKR-P3-ONE-SHOT-RAW-EVIDENCE",
+      "check": "The preserved observation has one result for each frozen control and is not replaced by a favorable repeat",
+      "threshold": "Exactly one 0x, one 1x, and one 2x result; one raw artifact; failed result preserved",
+      "value": "controls=[0x,1x,2x] exactly once; raw hash=73a837b771dfd7c572c3ac6f8d015051ec463a60c0149606dbdb6962c08154e6; failed result preserved",
+      "source_of_truth": "/tmp/dkr-p3-allocation/observe.mjs, raw.json, and replay.json",
+      "replay": "Read observe.mjs control loop and raw.json controls; compare raw.json hash with replay.json observationSha256",
+      "exit_code": 0,
+      "sha256": [
+        "18183d8eff6af055dde6a22cbcc425603e5f5f80ef1bff9bdd1cb4607dab9ce4",
+        "73a837b771dfd7c572c3ac6f8d015051ec463a60c0149606dbdb6962c08154e6",
+        "25a6532abf7d58825ea23f1dccf0c7dc6e806b13f7f06b3e6db6d62d018a1cb9"
+      ],
+      "observed_at": "2026-07-16T05:06:53Z",
+      "decision": "accepted",
+      "evidence": [
+        "observe.mjs invokes observe once for each unit in config.control.units.",
+        "raw.json contains exactly three controls: 0x=168, 1x=278632, 2x=557160.",
+        "replay.json pins the preserved raw artifact hash and records accepted=false."
+      ]
+    },
+    {
+      "claim_id": "DKR-P3-RAW-ARITHMETIC",
+      "check": "The saved checker reproduces the raw 168, 278632, and 557160 byte arithmetic",
+      "threshold": "Subtract zero, divide by 256, and compare the 2x/1x signal without post-observation threshold changes",
+      "value": "oneSignal=278464; twoSignal=556992; onePerIteration=1087.75; twoPerIteration=2175.75; signalToNoise=1087.75; ratio=2.0002298322224776",
+      "source_of_truth": "/tmp/dkr-p3-allocation/predeclared.json, raw.json, and check-replay.mjs",
+      "replay": "node /tmp/dkr-p3-allocation/check-replay.mjs /tmp/dkr-p3-allocation/predeclared.json /tmp/dkr-p3-allocation/raw.json",
+      "exit_code": 1,
+      "sha256": [
+        "e0f244126ba1e04afe85d753f650b1575ff2900e827ae34fb61064e7bdf5ed6d",
+        "73a837b771dfd7c572c3ac6f8d015051ec463a60c0149606dbdb6962c08154e6",
+        "f59e8aed8030068ce490d826c6b3393935bf4e164867d28383005b58b8f2e003"
+      ],
+      "observed_at": "2026-07-16T05:06:53Z",
+      "decision": "accepted",
+      "evidence": [
+        "zeroAttributedBytes=168; oneAttributedBytes=278632; twoAttributedBytes=557160.",
+        "oneSignalBytes=278464; twoSignalBytes=556992.",
+        "oneBytesPerIteration=1087.75; twoBytesPerIteration=2175.75; signalToNoise=1087.75; twoToOneRatio=2.0002298322224776."
+      ]
+    },
+    {
+      "claim_id": "DKR-P3-EXACT-ZERO-GATE",
+      "check": "The frozen exact-zero noise gate rejects the allocation method",
+      "threshold": "zeroAttributedBytes <= 0 and every checker gate true",
+      "value": "zeroAttributedBytes=168; zeroNoise=false; accepted=false",
+      "source_of_truth": "/tmp/dkr-p3-allocation/predeclared.json, raw.json, check-replay.mjs, and the one-shot validator replay",
+      "replay": "node /tmp/dkr-p3-allocation/check-replay.mjs /tmp/dkr-p3-allocation/predeclared.json /tmp/dkr-p3-allocation/raw.json",
+      "exit_code": 1,
+      "sha256": [
+        "e0f244126ba1e04afe85d753f650b1575ff2900e827ae34fb61064e7bdf5ed6d",
+        "73a837b771dfd7c572c3ac6f8d015051ec463a60c0149606dbdb6962c08154e6",
+        "f59e8aed8030068ce490d826c6b3393935bf4e164867d28383005b58b8f2e003"
+      ],
+      "observed_at": "2026-07-16T05:06:53Z",
+      "decision": "accepted",
+      "evidence": [
+        "The deterministic replay emitted accepted=false and zeroNoise=false.",
+        "All other replay gates emitted true.",
+        "The checker sets exit code 1 when accepted is false; the replay exited 1."
+      ]
+    },
+    {
+      "claim_id": "DKR-P3-FRESHNESS",
+      "check": "The checkpoint remains within its 30 minute freshness window",
+      "threshold": "age_seconds <= 1800",
+      "value": "age_seconds=364",
+      "source_of_truth": "workers/dkr-p3-allocation/checkpoint.v1.json observed_at and max_age",
+      "replay": "Read observed_at and max_age and compare with date -u +%Y-%m-%dT%H:%M:%SZ",
+      "exit_code": 0,
+      "sha256": [
+        "9e600a66656ce1bb546102296f28564d11f5a5bb99613c4be654653bc3769b5e"
+      ],
+      "observed_at": "2026-07-16T05:06:53Z",
+      "decision": "accepted",
+      "evidence": [
+        "checkpoint observed_at=2026-07-16T05:00:49.828Z",
+        "validator observed_at=2026-07-16T05:06:53Z",
+        "max_age=30m"
+      ]
+    },
+    {
+      "claim_id": "DKR-P3-DOWNSTREAM-BOUNDARY",
+      "check": "Only reducing discovery may advance; allocation measurement implementation and optimization remain blocked",
+      "threshold": "Rejected method retained; no allocation regression claim; implementation and optimization blocked",
+      "value": "Rejected method independently reproduced; reducing discovery accepted; allocation regression case remains unreadable; implementation and optimization blocked",
+      "source_of_truth": "The one-shot replay and checkpoint wall_gate",
+      "replay": "Compare the replay rejection with checkpoint questions_unanswered, active_wall_readings, and wall_gate",
+      "exit_code": 0,
+      "sha256": [
+        "9e600a66656ce1bb546102296f28564d11f5a5bb99613c4be654653bc3769b5e"
+      ],
+      "observed_at": "2026-07-16T05:06:53Z",
+      "decision": "accepted",
+      "evidence": [
+        "The exact-zero gate failed at 168 > 0.",
+        "No product allocation regression value can be derived from the rejected calibration.",
+        "Only a separately funded narrower leaf-attribution DKR can proceed."
+      ]
+    }
+  ],
+  "active_wall_verification": [
+    {
+      "metric_id": "invalid_performance_comparison_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_by_rejecting_failed_calibration",
+      "evidence_claim_id": "DKR-P3-EXACT-ZERO-GATE"
+    },
+    {
+      "metric_id": "unsupported_performance_claim_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_for_reducing_discovery",
+      "evidence_claim_id": "DKR-P3-DOWNSTREAM-BOUNDARY"
+    },
+    {
+      "metric_id": "allocation_regression_case_count",
+      "value": null,
+      "threshold": 0,
+      "verdict": "blocked_rejected_calibration",
+      "evidence_claim_id": "DKR-P3-EXACT-ZERO-GATE"
+    },
+    {
+      "metric_id": "single_llm_truth_acceptance_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_by_independent_replay",
+      "evidence_claim_id": "DKR-P3-EXACT-ZERO-GATE"
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_by_preserving_failed_gate",
+      "evidence_claim_id": "DKR-P3-DOWNSTREAM-BOUNDARY"
+    }
+  ],
+  "summary": {
+    "accepted": 7,
+    "rejected": 0,
+    "rejected_claim_ids": [],
+    "decision": "accepted_reducing_discovery_only"
+  },
+  "wall_gate": {
+    "verdict": "blocked",
+    "dkr_learning_advance": "allowed_reducing_discovery_only",
+    "ckr_performance_advance": "blocked",
+    "measurement_implementation": "blocked",
+    "optimization": "blocked",
+    "reason": "The predeclared exact-zero gate rejected the method at 168 attributed bytes; no allocation regression value exists."
+  }
+}

@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "verification_id": "validator-pkr-a1.v1.2026-07-16T05:18:20Z",
+  "worker_id": "validator-pkr-a1",
+  "worker_kind": "verification",
+  "unit_id": "PKR-A1",
+  "packet_ref": "worker-packets/pkr-a1-exec-api.json",
+  "observed_at": "2026-07-16T05:18:20Z",
+  "decision": "rejected",
+  "fail_closed": true,
+  "product_files_changed": false,
+  "audit_traces": [
+    {
+      "claim_id": "pkr-a1-root-typecheck",
+      "check": "The migrated public API and all workspace call sites typecheck",
+      "threshold": "31 of 31 selected workspace projects pass once",
+      "value": "31 projects passed",
+      "source_of_truth": "Root pnpm workspace typecheck",
+      "replay": "pnpm typecheck",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "Scope: 31 of 32 workspace projects",
+        "pkg/core/lite typecheck: Done",
+        "pkg/tool/lint typecheck: Done",
+        "examples/invoice-triage typecheck: Done",
+        "examples/issue-triage typecheck: Done",
+        "pkg/framework/pumped typecheck: Done"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-public-runtime-contract",
+      "check": "Scope.run and ExecutionContext.exec share required inferred ExecDepsOptions and one context-free dependency executor",
+      "threshold": "One public option type; required name, deps, params; inferred deps and params; zero public context callback types; callback receives no ctx or scope",
+      "value": "ExecDepsOptions is the only inline overload on both receivers; execDepsInternal resolves options.deps then invokes options.fn(resolved, ...options.params)",
+      "source_of_truth": "pkg/core/lite/src/types.ts and pkg/core/lite/src/scope.ts",
+      "replay": "pnpm typecheck",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "Scope.run and ExecutionContext.exec both accept Lite.ExecDepsOptions<D, Args, Result>",
+        "name, deps, fn, and params are required fields",
+        "fn: (deps: InferDeps<D>, ...args: Args) => Result",
+        "execDepsInternal resolves declared deps and invokes the callback without ctx or scope",
+        "RunDepsOptions, RunFnOptions, and ExecFnOptions declarations are absent"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-lite-lifecycle",
+      "check": "Inline dependency execution preserves inference, activation, tags, signal, owned and managed cleanup, extension identity/input/failure, and stream rejection",
+      "threshold": "8 Lite files and all Lite tests pass once",
+      "value": "8 files and 236 tests passed",
+      "source_of_truth": "pkg/core/lite tests",
+      "replay": "pnpm -F @pumped-fn/lite test",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "Test Files 8 passed (8)",
+        "Tests 236 passed (236)",
+        "structured lifetime tests cover inferred Promise results, activation before callback, tag resolution, caller cancellation, callback target identity, params input observation, owned versus managed cleanup, failure close results, and scalar stream rejection"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-lint-contract",
+      "check": "Lite lint handles both inline receivers and rejects missing fields plus direct ctx or scope transport",
+      "threshold": "2 lint files and all lint tests pass once",
+      "value": "2 files and 81 tests passed",
+      "source_of_truth": "pkg/tool/lint tests",
+      "replay": "pnpm -F @pumped-fn/lite-lint test",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "Test Files 2 passed (2)",
+        "Tests 81 passed (81)",
+        "fixtures assert name, deps, and params on ctx.exec and scope.run",
+        "fixtures assert diagnostics for context callback parameters and ctx or scope in params"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-checker-fixtures",
+      "check": "The saved inline checker is deterministic for its declared fixtures and rejects a stale expected head",
+      "threshold": "3 tests pass once",
+      "value": "3 passed and 0 failed",
+      "source_of_truth": "scripts/check-inline-exec-contract.test.mjs",
+      "replay": "pnpm inline-exec:test",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "accepts explicit deps and params on both receivers",
+        "reports every fixture metric deterministically",
+        "rejects a stale expected head",
+        "tests 3, pass 3, fail 0"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-focused-regressions",
+      "check": "Touched observable, OTel, logging, compare, invoice-triage, and issue-triage behavior remains green",
+      "threshold": "All six focused suites pass once",
+      "value": "79 tests passed across six suites",
+      "source_of_truth": "Focused package test commands",
+      "replay": "pnpm -F @pumped-fn/lite-extension-observable test; pnpm -F @pumped-fn/lite-extension-observable-otel test; pnpm -F @pumped-fn/lite-extension-logging test; pnpm -F @pumped-fn/compare test; pnpm -F @pumped-fn/invoice-triage test; pnpm -F @pumped-fn/issue-triage test",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "observable 13 passed",
+        "observable-otel 5 passed",
+        "logging 12 passed",
+        "compare 15 passed",
+        "invoice-triage 23 passed",
+        "issue-triage 11 passed"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-path-and-slop-boundary",
+      "check": "The slice stays in allowed product paths with no docs, changeset, benchmark, lockfile, whitespace, or forbidden-comment edits",
+      "threshold": "Zero forbidden product paths and zero diff whitespace errors",
+      "value": "Zero forbidden product paths; git diff --check exited 0; only two new public TSDoc lines were added",
+      "source_of_truth": "Git diff from packet exact_start_head and current worktree status",
+      "replay": "git diff --check",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "No *.md, .changeset, pnpm-lock.yaml, or benchmarks path appears in the product diff",
+        "No output from git diff --check",
+        "New comments are TSDoc on exported ExecTarget and ExecTargetFn only"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-exact-head-check",
+      "check": "The inline checker replay is pinned to the packet exact_start_head",
+      "threshold": "actual HEAD equals 8af92a49d8e5a94d5d275093887487d6d67448f4",
+      "value": "actual HEAD is 8504cafb29148346089bb06abb00a9374fc3a961",
+      "source_of_truth": "worker-packets/pkr-a1-exec-api.json exact_start_head and git rev-parse HEAD",
+      "replay": "pnpm inline-exec:check -- --expect-head 8504cafb29148346089bb06abb00a9374fc3a961",
+      "exit_code": 0,
+      "decision": "rejected",
+      "failure_mode": "wrong-source",
+      "evidence": [
+        "packet exact_start_head=8af92a49d8e5a94d5d275093887487d6d67448f4",
+        "observed HEAD=8504cafb29148346089bb06abb00a9374fc3a961",
+        "The replay used the observed head rather than the packet head and therefore does not prove the packet's exact-head claim"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-zero-capture-proof",
+      "check": "The deterministic checker proves zero callback captures across every current inline call site",
+      "threshold": "captured_dependency_count equals 0 with identifier callbacks included",
+      "value": "checker reports 0 but skips identifier callbacks; current fn: wait closes over abortable",
+      "source_of_truth": "scripts/check-inline-exec-contract.mjs:115-153 and pkg/core/lite/tests/structured-lifetime.test.ts:15-34,265-271",
+      "replay": "pnpm inline-exec:check -- --expect-head 8504cafb29148346089bb06abb00a9374fc3a961",
+      "exit_code": 0,
+      "decision": "rejected",
+      "failure_mode": "false-positive",
+      "evidence": [
+        "checker output captured_dependency_count=0 and inline_exec_contract_gap_count=0",
+        "capture analysis runs only when fn is an ArrowFunction or FunctionExpression",
+        "structured-lifetime passes the identifier wait as fn",
+        "wait references the outer abortable function",
+        "The saved checker therefore emits a zero count while a current identifier callback has a lexical capture"
+      ]
+    }
+  ],
+  "artifact_hashes": {
+    "pkg/core/lite/src/types.ts": "03545f324721e87752c2d7748a6c4fac7d07a0165539ad81767d19744e3182b3",
+    "pkg/core/lite/src/scope.ts": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "pkg/core/lite/tests/structured-lifetime.test.ts": "cc23330075ed19edf4adb71a10cd6fa18646aae29fc8f4bc13bbe7e945e3f4ca",
+    "pkg/core/lite/tests/scope.test.ts": "0fd5e4a215b037cd81198199125880c884a9ffd8b8a63dd77e400e7bfc46c89c",
+    "pkg/tool/lint/src/index.ts": "642d2e419b556039f395cd5a05cd317690fec7eaa753a84252bf46e456bcfabd",
+    "pkg/tool/lint/tests/scanner.test.ts": "2ff31966a5dd0720491cd531480053959fabc2ad722fd24cf82638611f899ab0",
+    "scripts/check-inline-exec-contract.mjs": "4ab1015005a39d020c5b4d2104bf0b45990315bfb4b25fa75e170f6ae8371cfb",
+    "scripts/check-inline-exec-contract.test.mjs": "2be4ebd6f8e6490e9a73b5e879ae888a20aea0ec6ac5c7c1493125b987b6eb38",
+    "package.json": "d01d6911abf560cd32dc1d39d84b7a5617f037bffffbd7e94aa987dcd490cdcb"
+  },
+  "summary": {
+    "accepted": 7,
+    "rejected": 2,
+    "rejected_claim_ids": [
+      "pkr-a1-exact-head-check",
+      "pkr-a1-zero-capture-proof"
+    ],
+    "decision": "rejected"
+  },
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "context_argument_pass_count": 0,
+    "touched_surface_regression_count": 0,
+    "single_llm_truth_acceptance_count": 0,
+    "unsupported_claim_acceptance_count": 0,
+    "reason": "Functional and regression gates pass, but exact-head provenance is not the packet head and the saved checker emits a false zero for captures by skipping identifier callbacks."
+  }
+}

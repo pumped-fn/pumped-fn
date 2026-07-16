@@ -22,7 +22,8 @@ export const database = resource({
   deps: { caseFixture: tags.required(caseFixture) },
   factory: async (ctx, { caseFixture }): Promise<Database> => {
     const connection = await ctx.exec({
-      fn: (_ctx, target) => target.openDatabase(),
+      deps: {},
+      fn: (_deps, target) => target.openDatabase(),
       params: [caseFixture],
       name: "database.open",
     })
@@ -51,7 +52,8 @@ export const provision = flow({
       createdAt: clock.now(),
     }
     const result = await ctx.exec({
-      fn: (_ctx, target, value) => target.insertUser(value),
+      deps: {},
+      fn: (_deps, target, value) => target.insertUser(value),
       params: [database, user],
       name: "database.insertUser",
     })

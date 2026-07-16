@@ -1,0 +1,25 @@
+{
+  "type": "worker_finish",
+  "schema_version": 1,
+  "worker_id": "validator-dkr-p3",
+  "worker_kind": "verification",
+  "unit_id": "DKR-P3",
+  "status": "accepted_reducing_discovery",
+  "recorded_at": "2026-07-16T05:06:53Z",
+  "verification_ref": "workers/validator-dkr-p3/verification.v1.json",
+  "accepted": 7,
+  "rejected": 0,
+  "rejected_claim_ids": [],
+  "decision": "accepted_reducing_discovery_only",
+  "downstream_advance": "blocked",
+  "ckr_performance_advance": "blocked",
+  "measurement_implementation": "blocked",
+  "optimization": "blocked",
+  "product_files_changed": false,
+  "commanded_lines": [
+    "Action envelope: read-only validation; write only workers/validator-dkr-p3/verification.v1.json and progress.finish.json; no product, git, frame, tree, ledger, release, or external-state changes.",
+    "Validation decision: the frozen hashes, one result per control, raw arithmetic, and deterministic exit-1 rejection are accepted as reducing discovery only.",
+    "Downstream decision: the method remains rejected; CKR performance, measurement implementation, and optimization remain blocked.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  ]
+}

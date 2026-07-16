@@ -1,7 +1,7 @@
 import { controllerSymbol, ParseError, FlowFault, type Lite, type MaybePromise, type AtomState } from "./types"
 import { isAtom, isControllerDep } from "./atom"
 import { classifyDeps, type DepsGraph } from "./deps-graph"
-import { flow, isFlow, typed } from "./flow"
+import { isFlow } from "./flow"
 import { isResource } from "./resource"
 import { latest, type Latest } from "./latest"
 import { assertNoReturnedStream, consumeScalarResult, isAsyncGenerator, isAsyncGeneratorFunction, isPromiseLike, markStreamingExec, registerStreamingExec, requireAsyncGenerator, streamResultBeforeStartError } from "./streaming"
@@ -227,7 +227,7 @@ type ExecFlowRuntimeOptions = {
   blockedTags?: Lite.Tagged<any>[]
 }
 
-type RunDepsRuntimeOptions = {
+type ExecDepsRuntimeOptions = {
   name: string
   deps: Record<string, Lite.ExecutionDependency>
   fn: (deps: Record<string, unknown>, ...params: any[]) => unknown
@@ -2102,31 +2102,17 @@ class ScopeImpl implements Lite.Scope {
     const D extends Record<string, Lite.ExecutionDependency>,
     const Args extends unknown[],
     Result,
-  >(options: Lite.RunDepsOptions<D, Args, Result>): Promise<Awaited<Result>>
-  run<const Args extends unknown[], Result>(options: Lite.RunFnOptions<Args, Result>): Promise<Awaited<Result>>
-  async run(options: ExecFlowRuntimeOptions | RunDepsRuntimeOptions | Lite.ExecFnOptions<unknown>): Promise<unknown> {
+  >(options: Lite.ExecDepsOptions<D, Args, Result>): Promise<Awaited<Result>>
+  async run(options: ExecFlowRuntimeOptions | ExecDepsRuntimeOptions): Promise<unknown> {
     const ctx = this.createContext(options.tags || options.signal
       ? { tags: options.tags, signal: options.signal }
       : undefined) as ExecutionContextImpl
     try {
-      let execution: ExecFlowRuntimeOptions | Lite.ExecFnOptions<unknown>
+      let execution: ExecFlowRuntimeOptions | ExecDepsRuntimeOptions
       if ("flow" in options && options.flow !== undefined) {
         execution = { ...options, tags: undefined, signal: undefined, blockedTags: options.tags }
-      } else if ("deps" in options && options.deps !== undefined) {
-        execution = {
-          flow: flow({
-            name: options.name,
-            parse: typed<unknown[]>(),
-            deps: options.deps,
-            factory: async (ctx, deps) => assertNoReturnedStream(await options.fn(deps, ...ctx.input)),
-          }),
-          input: options.params,
-          name: options.name,
-          blockedTags: options.tags,
-        }
       } else {
-        const fnOptions = options as Lite.ExecFnOptions<unknown>
-        execution = { ...fnOptions, tags: undefined, signal: undefined }
+        execution = { ...options, tags: undefined, signal: undefined }
       }
       const output = assertNoReturnedStream(await ctx.exec(execution))
       await ctx.close({ ok: true })
@@ -2505,7 +2491,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     this.emitResourceState(resource, "idle")
   }
 
-  exec(options: ExecFlowRuntimeOptions | Lite.ExecFnOptions<unknown>): Promise<unknown> {
+  exec(options: ExecFlowRuntimeOptions | ExecDepsRuntimeOptions): Promise<unknown> {
     try {
       this.assertOpen()
     } catch (error) {
@@ -2514,7 +2500,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return this.trackDescendant(this.runExec(options))
   }
 
-  private async runExec(options: ExecFlowRuntimeOptions | Lite.ExecFnOptions<unknown>): Promise<unknown> {
+  private async runExec(options: ExecFlowRuntimeOptions | ExecDepsRuntimeOptions): Promise<unknown> {
     if ("flow" in options) {
       const invocation = this.createChildInvocation(options)
       const { flow, presetValue, childCtx, streaming } = isPromiseLike(invocation)
@@ -2549,7 +2535,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       this.seedTags(childCtx, options.tags)
 
       try {
-        const runFn = async () => await childCtx.execFnInternal(options)
+        const runFn = async () => await childCtx.execDepsInternal(options)
         const result = await (this.scope.execExts.length === 0
           ? runFn()
           : childCtx.applyExecPipeline(options.fn, runFn))
@@ -2819,9 +2805,9 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return this.execFlowFactoryResult(flow, (value) => requireAsyncGenerator(value))
   }
 
-  private async execFnInternal(options: Lite.ExecFnOptions<unknown>): Promise<unknown> {
-    const { fn, params } = options
-    return fn(this, ...params)
+  private async execDepsInternal(options: ExecDepsRuntimeOptions): Promise<unknown> {
+    const resolved = await this.scope.resolveDepsOptimistic(options.deps, this, undefined)
+    return assertNoReturnedStream(await options.fn(resolved, ...options.params))
   }
 
   private async execPresetFn(

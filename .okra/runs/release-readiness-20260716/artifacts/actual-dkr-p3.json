@@ -1,0 +1,8 @@
+{
+  "type": "estimation_record",
+  "phase": "actual",
+  "unit_id": "DKR-P3",
+  "actual": { "time_min": 8, "turns": 1, "tokens": null },
+  "observed_at": "2026-07-16T04:57:00Z",
+  "result_ref": "workers/dkr-p3-allocation/checkpoint.v1.json"
+}

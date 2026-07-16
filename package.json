@@ -23,6 +23,8 @@
     "ci:changed-packages": "node scripts/check-changed-packages.mjs",
     "contract:check": "node scripts/check-public-contract.mjs",
     "contract:test": "node --test scripts/check-public-contract.test.mjs",
+    "inline-exec:check": "node scripts/check-inline-exec-contract.mjs",
+    "inline-exec:test": "node --test scripts/check-inline-exec-contract.test.mjs",
     "test:ci": "pnpm act -W .github/workflows/ci.yml -j test",
     "test:release": "pnpm act -W .github/workflows/release.yml -j release --secret-file .secrets",
     "compare:verify": "pnpm -F @pumped-fn/compare verify",

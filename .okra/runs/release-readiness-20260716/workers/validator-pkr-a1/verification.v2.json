@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "verification_id": "validator-pkr-a1.v2.2026-07-16T05:28:46Z",
+  "worker_id": "validator-pkr-a1",
+  "worker_kind": "verification",
+  "unit_id": "PKR-A1",
+  "prior_verification_ref": "workers/validator-pkr-a1/verification.v1.json",
+  "packet_ref": "worker-packets/pkr-a1-exec-api.v2.json",
+  "correction_ref": "artifacts/event-pkr-a1-start-head-correction.json",
+  "observed_at": "2026-07-16T05:28:46Z",
+  "decision": "rejected",
+  "fail_closed": true,
+  "product_files_changed": false,
+  "broader_suites_rerun": false,
+  "audit_traces": [
+    {
+      "claim_id": "pkr-a1-v2-head-correction",
+      "check": "The governed correction supersedes only the stale dispatch head and the v2 exact head matches the replayed repository head",
+      "threshold": "v2 exact_start_head and checker actual head both equal 8504cafb29148346089bb06abb00a9374fc3a961 with denominator_change_count 0",
+      "value": "v2 packet, correction event, current HEAD, and checker head all identify 8504cafb29148346089bb06abb00a9374fc3a961",
+      "source_of_truth": "worker-packets/pkr-a1-exec-api.v2.json, artifacts/event-pkr-a1-start-head-correction.json, ledger seq 20, and exact-head checker",
+      "replay": "pnpm inline-exec:check -- --expect-head 8504cafb29148346089bb06abb00a9374fc3a961",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "head_mismatch_count=0",
+        "v2 exact_start_head=8504cafb29148346089bb06abb00a9374fc3a961",
+        "correction event records denominator_change_count=0 and supersedes dispatch provenance only"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-v2-checker-negative-paths",
+      "check": "The saved checker resolves local arrow identifiers, detects their captures, fails closed on unresolved identifiers, and remains deterministic",
+      "threshold": "3 checker tests pass; invalid fixture reports captured_dependency_count 4 and uninspectable_callback_count 1; repeated invalid output is byte-identical",
+      "value": "3 tests passed and 0 failed with the asserted negative metrics",
+      "source_of_truth": "scripts/check-inline-exec-contract.test.mjs and scripts/fixtures/inline-exec-contract",
+      "replay": "pnpm inline-exec:test",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "accepts explicit deps and params on both receivers",
+        "reports every negative metric deterministically",
+        "rejects a stale expected head",
+        "invalid fixture includes capturedCallback and importedCallback identifiers",
+        "tests 3, pass 3, fail 0"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-v2-lint-identifier-paths",
+      "check": "Lite lint resolves local arrow and function-declaration identifiers and fails closed on imported identifiers",
+      "threshold": "The dedicated positive and negative lint cases pass within the complete lint suite",
+      "value": "2 files and 82 tests passed",
+      "source_of_truth": "pkg/tool/lint/tests/scanner.test.ts",
+      "replay": "pnpm -F @pumped-fn/lite-lint test",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "Test Files 2 passed (2)",
+        "Tests 82 passed (82)",
+        "positive case passes local const transform and function finish identifiers",
+        "negative case reports captured client and message plus uninspectable importedCallback"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-v2-declared-abort-and-identity",
+      "check": "The wait operation declares abortable through deps and preserves the callback target identity and cancellation cleanup",
+      "threshold": "Lite suite passes with wait deps { signal, abort }, callback target equal to wait, and failed close result equal to caller abort",
+      "value": "8 files and 236 tests passed",
+      "source_of_truth": "pkg/core/lite/tests/structured-lifetime.test.ts and Lite tests",
+      "replay": "pnpm -F @pumped-fn/lite test",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "Test Files 8 passed (8)",
+        "Tests 236 passed (236)",
+        "abort is an atom whose factory returns abortable",
+        "wait receives signal and abort from declared deps",
+        "targets equals [wait]",
+        "close result preserves the caller abort reason"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-v2-exact-contract-read",
+      "check": "The exact-head source tree has no inline execution contract gaps, captures, or uninspectable callbacks",
+      "threshold": "All gap metrics equal 0 and inline_exec_callsite_count equals 51",
+      "value": "51 call sites; every gap metric equals 0",
+      "source_of_truth": "scripts/check-inline-exec-contract.mjs on the v2 exact head working tree",
+      "replay": "pnpm inline-exec:check -- --expect-head 8504cafb29148346089bb06abb00a9374fc3a961",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "captured_dependency_count=0",
+        "uninspectable_callback_count=0",
+        "context_callback_argument_count=0",
+        "ctx_scope_param_argument_count=0",
+        "missing_name_count=0",
+        "missing_deps_count=0",
+        "missing_params_count=0",
+        "inline_exec_contract_gap_count=0"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-v2-path-and-whitespace-boundary",
+      "check": "The full PKR product diff stays within the original allowed paths and has no whitespace errors",
+      "threshold": "Zero forbidden product paths and git diff --check exit 0",
+      "value": "All listed product and untracked paths match the v1 allowed paths; diff check returned empty output",
+      "source_of_truth": "Git diff from v2 exact_start_head and current untracked inventory",
+      "replay": "git diff --check",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "No docs, changeset, benchmark, or pnpm-lock path appears",
+        "Remediation product changes are limited to Lite tests, Lite lint source/tests, and inline checker source/tests/fixtures",
+        "git diff --check returned no output"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-v2-checker-function-declaration-replay",
+      "check": "The saved inline checker replay proves local function-declaration identifier resolution",
+      "threshold": "At least one checker fixture invokes ctx.exec or scope.run with fn set to a local function declaration and asserts zero uninspectable callbacks",
+      "value": "No checker fixture invokes a local function declaration identifier; only the separate lint suite executes function finish",
+      "source_of_truth": "scripts/fixtures/inline-exec-contract/valid/valid.ts, invalid/invalid.ts, and scripts/check-inline-exec-contract.test.mjs",
+      "replay": "pnpm inline-exec:test",
+      "exit_code": 0,
+      "decision": "rejected",
+      "failure_mode": "unsupported",
+      "evidence": [
+        "valid checker fixture declares const operation as an arrow and uses fn: operation",
+        "invalid checker fixture uses capturedCallback and importedCallback identifiers",
+        "No checker fixture contains a function declaration used as fn",
+        "The checker source contains a function-declaration branch, but source inspection is not an executed replay"
+      ]
+    }
+  ],
+  "artifact_hashes": {
+    "scripts/check-inline-exec-contract.mjs": "1d80090bc7ce240f515bd53333d055ce73dc299047e37d160a21676fd0dbf881",
+    "scripts/check-inline-exec-contract.test.mjs": "5c0aa93e4dd52c65c451eb4fe70fd1c2e8c0b5e49711a8132419663e2f2dcb86",
+    "scripts/fixtures/inline-exec-contract/valid/valid.ts": "7770c8659bfecb3df761fd316618c6a5dab32037bd38dbac7dec64a35b75677d",
+    "scripts/fixtures/inline-exec-contract/invalid/invalid.ts": "eaf2332cbbaf18d0fe413b2084139d791d3135785984af993376fd3900cc077a",
+    "pkg/tool/lint/src/index.ts": "87d4bc032ee85684de2ee4d879ba56bd2470c4e84c566d54933cd5df41d01d28",
+    "pkg/tool/lint/tests/scanner.test.ts": "a0df5c69762a231f2a6b7f470f12f44520a8d62a466b99a09af7a7751b97d444",
+    "pkg/core/lite/tests/structured-lifetime.test.ts": "4ea00bb3b7294e2407cdd547c1352ed98d5daf24cb1825fdfd8f9bdf8dbc5a55",
+    "worker-packets/pkr-a1-exec-api.v2.json": "a75c536a24224248c6da3feb7fd8869f1f783207be1cb17ad535a733c2d8e98d",
+    "artifacts/event-pkr-a1-start-head-correction.json": "4d9ebab99c7727abcce8a8befe2f91b67f4839c8d4fce70b2e7cac1f43f987a1"
+  },
+  "summary": {
+    "accepted": 6,
+    "rejected": 1,
+    "rejected_claim_ids": [
+      "pkr-a1-v2-checker-function-declaration-replay"
+    ],
+    "decision": "rejected"
+  },
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "context_argument_pass_count": 0,
+    "touched_surface_regression_count": 0,
+    "single_llm_truth_acceptance_count": 0,
+    "unsupported_claim_acceptance_count": 0,
+    "reason": "The original head and capture defects are corrected and every requested gate is green, but the saved checker suite does not execute the requested local function-declaration identifier path."
+  }
+}

@@ -25,23 +25,27 @@ export const postgresql = flow({
       throw new TriageError("authorize", ctx.input.sql, "Database request does not match the configured read-only query")
     }
     const client = await ctx.exec({
-      fn: (_ctx, target) => target.connect(),
+      deps: {},
+      fn: (_deps, target) => target.connect(),
       params: [pool],
       name: "postgres.target.connect",
     })
     await ctx.exec({
-      fn: (_ctx, target, sql) => target.query(sql),
+      deps: {},
+      fn: (_deps, target, sql) => target.query(sql),
       params: [client, "BEGIN READ ONLY"],
       name: "postgres.target.begin-read-only",
     })
     try {
       await ctx.exec({
-        fn: (_ctx, target, sql) => target.query(sql),
+        deps: {},
+        fn: (_deps, target, sql) => target.query(sql),
         params: [client, `SET LOCAL statement_timeout = '${plan.statementTimeoutMs}ms'`],
         name: "postgres.target.statement-timeout",
       })
       const schema = await ctx.exec({
-        fn: (_ctx, target, sql) => target.query<{
+        deps: {},
+        fn: (_deps, target, sql) => target.query<{
           table_schema: string
           table_name: string
           column_name: string
@@ -59,13 +63,15 @@ export const postgresql = flow({
       })
       ctx.signal.throwIfAborted()
       const explanation = await ctx.exec({
-        fn: (_ctx, target, sql) => target.query<{ "QUERY PLAN": unknown }>(sql),
+        deps: {},
+        fn: (_deps, target, sql) => target.query<{ "QUERY PLAN": unknown }>(sql),
         params: [client, `EXPLAIN (FORMAT JSON, ANALYZE FALSE, BUFFERS FALSE) ${ctx.input.sql}`],
         name: "postgres.target.explain-query",
       })
       ctx.signal.throwIfAborted()
       await ctx.exec({
-        fn: (_ctx, target, sql) => target.query(sql),
+        deps: {},
+        fn: (_deps, target, sql) => target.query(sql),
         params: [client, "ROLLBACK"],
         name: "postgres.target.rollback-read-only",
       })
@@ -81,14 +87,16 @@ export const postgresql = flow({
       }
     } catch (error) {
       await ctx.exec({
-        fn: (_ctx, target, sql) => target.query(sql),
+        deps: {},
+        fn: (_deps, target, sql) => target.query(sql),
         params: [client, "ROLLBACK"],
         name: "postgres.target.rollback-error",
       })
       throw error
     } finally {
       await ctx.exec({
-        fn: (_ctx, target) => target.release(),
+        deps: {},
+        fn: (_deps, target) => target.release(),
         params: [client],
         name: "postgres.target.release",
       })

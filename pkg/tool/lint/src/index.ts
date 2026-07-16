@@ -1212,7 +1212,51 @@ function hasVisibleValueBinding(node: ts.Node, name: string): boolean {
   return false
 }
 
-function callbackCaptures(callback: ts.ArrowFunction | ts.FunctionExpression): string[] {
+type InlineCallback = ts.ArrowFunction | ts.FunctionExpression | ts.FunctionDeclaration
+
+function unwrapCallback(expression: ts.Expression): ts.Expression {
+  let current = expression
+  while (
+    ts.isParenthesizedExpression(current)
+    || ts.isAsExpression(current)
+    || ts.isTypeAssertionExpression(current)
+    || ts.isSatisfiesExpression(current)
+    || ts.isNonNullExpression(current)
+  ) current = current.expression
+  return current
+}
+
+function resolveLocalCallback(expression: ts.Expression, sourceFile: ts.SourceFile): InlineCallback | null {
+  const direct = unwrapCallback(expression)
+  if (ts.isArrowFunction(direct) || ts.isFunctionExpression(direct)) return direct
+  if (!ts.isIdentifier(direct)) return null
+  const variables: ts.VariableDeclaration[] = []
+  const declarations: ts.FunctionDeclaration[] = []
+  function collect(node: ts.Node): void {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === direct.text) variables.push(node)
+    if (ts.isFunctionDeclaration(node) && node.name?.text === direct.text && node.body) declarations.push(node)
+    ts.forEachChild(node, collect)
+  }
+  collect(sourceFile)
+  const variable = visibleBinding(direct, sourceFile, variables)
+  if (variable?.initializer) {
+    const initializer = unwrapCallback(variable.initializer)
+    if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) return initializer
+  }
+  const position = direct.getStart(sourceFile)
+  return declarations
+    .filter((declaration) => {
+      let scope: ts.Node | undefined = declaration.parent
+      while (scope && !ts.isBlock(scope) && !ts.isSourceFile(scope) && !ts.isModuleBlock(scope)) scope = scope.parent
+      return scope
+        && scope.getStart(sourceFile) <= position
+        && position < scope.getEnd()
+    })
+    .sort((left, right) => right.getStart(sourceFile) - left.getStart(sourceFile))[0] ?? null
+}
+
+function callbackCaptures(callback: InlineCallback): string[] {
+  if (!callback.body) return []
   const declared = new Set<string>()
   for (const parameter of callback.parameters) collectBindingNames(parameter.name, declared)
   if (callback.name) declared.add(callback.name.text)
@@ -1940,20 +1984,39 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
         && node.expression.name.text === "exec"
         && isDirectCtxExpression(node.expression.expression, execFactory.name)
       )
-      const inlineDepsRun = Boolean(
+      const inlineScopeRun = Boolean(
         ts.isPropertyAccessExpression(node.expression)
         && node.expression.name.text === "run"
         && isCreateScopeValue(node.expression.expression, sourceFile, imports)
         && executionOptions
-        && objectProperty(executionOptions, "deps")
-        && objectProperty(executionOptions, "params")
+        && objectProperty(executionOptions, "fn")
       )
+      const inlineCtxExec = Boolean(directCtxExec && executionOptions && objectProperty(executionOptions, "fn"))
       if (
         executionOptions
-        && (directCtxExec || inlineDepsRun)
+        && (inlineCtxExec || inlineScopeRun)
       ) {
-        const fn = objectProperty(executionOptions, "fn")?.initializer
-        if (fn && (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))) {
+        const receiver = inlineScopeRun ? "scope.run" : "ctx.exec"
+        const missing = ["name", "deps", "params"].filter((property) => !objectProperty(executionOptions, property))
+        if (missing.length > 0) {
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/no-hidden-exec-dependencies",
+            executionOptions,
+            `${receiver} inline options require name, deps, and params; missing "${missing.join(", ")}".`,
+          )
+        }
+        const fnExpression = objectProperty(executionOptions, "fn")?.initializer
+        const fn = fnExpression ? resolveLocalCallback(fnExpression, sourceFile) : null
+        if (fn) {
+          const first = fn.parameters[0]
+          if (
+            first
+            && ts.isIdentifier(first.name)
+            && /^(?:_*ctx|_*context|_*executionContext|_*scope)$/i.test(first.name.text)
+          ) pushCtxDiagnostic(first)
           const captures = callbackCaptures(fn)
           if (captures.length > 0) {
             pushNodeDiagnostic(
@@ -1962,21 +2025,32 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
               filePath,
               "pumped/no-hidden-exec-dependencies",
               fn,
-              inlineDepsRun
+              inlineScopeRun
                 ? `scope.run callback captures "${captures.join(", ")}"; declare graph values in deps and provide runtime values through params.`
-                : `ctx.exec callback captures "${captures.join(", ")}"; receive execution values after ctx and provide them through params.`,
+                : `ctx.exec callback captures "${captures.join(", ")}"; declare graph values in deps and provide runtime values through params.`,
             )
           }
+        } else if (fnExpression) {
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/no-hidden-exec-dependencies",
+            fnExpression,
+            `${receiver} callback "${fnExpression.getText(sourceFile)}" cannot be inspected; use a local function or inline callback.`,
+          )
         }
       }
 
-      if (inlineDepsRun && executionOptions) {
+      if ((inlineCtxExec || inlineScopeRun) && executionOptions) {
         const params = objectProperty(executionOptions, "params")?.initializer
         const receiver = ts.isPropertyAccessExpression(node.expression)
           ? node.expression.expression
           : undefined
-        const scopeBinding = receiver && createScopeBinding(receiver, sourceFile, imports)
-        const passesReceiver = Boolean(params && scopeBinding && ts.isIdentifier(receiver)
+        const scopeBinding = inlineScopeRun && receiver
+          ? createScopeBinding(receiver, sourceFile, imports)
+          : undefined
+        const passesReceiver = Boolean(params && scopeBinding && receiver && ts.isIdentifier(receiver)
           && containsUnshadowedReference(params, receiver.text, sourceFile, scopeBinding.getEnd()))
         if (params && (passesReceiver || containsCreateScopeValue(params, sourceFile, imports))) {
           pushNodeDiagnostic(
@@ -1985,7 +2059,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
             filePath,
             "pumped/no-scope-argument",
             params,
-            "Do not pass scope through scope.run params; declare the operation dependencies in deps.",
+            "Do not pass scope through inline execution params; declare the operation dependencies in deps.",
           )
         }
         if (params && containsCreateContextValue(params, sourceFile, imports)) {

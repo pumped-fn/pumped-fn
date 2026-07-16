@@ -1,0 +1,17 @@
+{
+  "type": "event",
+  "event_type": "late_discovery_event",
+  "unit_id": "PKR-A1",
+  "observed_at": "2026-07-16T05:14:00Z",
+  "finding": "The v1 packet recorded the pre-governance commit 8af92a49 as exact_start_head, but PKR-A1 began after the governed tree and packet commit 8504cafb.",
+  "cause": "The v1 packet was drafted before its own governance commit and did not refresh exact_start_head after that commit.",
+  "evidence_refs_or_hashes": [
+    "worker-packets/pkr-a1-exec-api.json#exact_start_head",
+    "workers/validator-pkr-a1/verification.v1.json",
+    "git:8504cafb29148346089bb06abb00a9374fc3a961"
+  ],
+  "impact": "Validator rejected exact-head provenance while accepting functional gates.",
+  "correction": "Supersede only dispatch provenance with worker-packets/pkr-a1-exec-api.v2.json; product scope, target contract, thresholds, and authority are unchanged.",
+  "denominator_change_count": 0,
+  "anti_goal_bypass_or_dishonesty_count": 0
+}

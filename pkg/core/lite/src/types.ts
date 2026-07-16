@@ -65,8 +65,7 @@ export namespace Lite {
       const D extends Record<string, ExecutionDependency>,
       const Args extends unknown[],
       Result,
-    >(options: RunDepsOptions<D, Args, Result>): Promise<Awaited<Result>>
-    run<const Args extends unknown[], Result>(options: RunFnOptions<Args, Result>): Promise<Awaited<Result>>
+    >(options: ExecDepsOptions<D, Args, Result>): Promise<Awaited<Result>>
     runStream<Output, Yield, Input>(options: ExecFlowOptions<Output, Input, Yield>): FlowStream<Yield, Output>
     createContext(options?: CreateContextOptions): ExecutionContext
     on<Args extends unknown[]>(
@@ -262,7 +261,11 @@ export namespace Lite {
     release<T>(resource: Resource<T>): Promise<void>
     controller<T>(resource: Resource<T>): ResourceController<T>
     exec<Output, Input, Yield = never>(options: ExecFlowOptions<Output, Input, Yield>): Promise<Output>
-    exec<Output, const Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
+    exec<
+      const D extends Record<string, ExecutionDependency>,
+      const Args extends unknown[],
+      Result,
+    >(options: ExecDepsOptions<D, Args, Result>): Promise<Awaited<Result>>
     execStream<Output, Yield, Input>(options: ExecFlowOptions<Output, Input, Yield>): FlowStream<Yield, Output>
     changes<T>(atom: Atom<T>): AsyncIterable<T>
     changes<T>(atom: Atom<T>, options: ChangesOptions): AsyncIterable<AtomChange<T>>
@@ -293,15 +296,7 @@ export namespace Lite {
     | { rawInput: unknown; input?: never }
   )
 
-  export interface ExecFnOptions<Output, Args extends unknown[] = unknown[]> {
-    fn: (ctx: ExecutionContext, ...args: Args) => MaybePromise<Output>
-    params: Args
-    name?: string
-    tags?: Tagged<any>[]
-    signal?: AbortSignal
-  }
-
-  export type RunDepsOptions<
+  export type ExecDepsOptions<
     D extends Record<string, ExecutionDependency>,
     Args extends unknown[],
     Result,
@@ -312,19 +307,6 @@ export namespace Lite {
     params: Args
     tags?: Tagged<any>[]
     signal?: AbortSignal
-    flow?: never
-  } & (Extract<
-    Awaited<Result>,
-    AsyncIterable<unknown> | { next: (...args: never[]) => unknown }
-  > extends never ? unknown : never)
-
-  export type RunFnOptions<Args extends unknown[], Result> = {
-    fn: (ctx: ExecutionContext, ...args: Args) => Result
-    params: Args
-    name?: string
-    tags?: Tagged<any>[]
-    signal?: AbortSignal
-    deps?: never
     flow?: never
   } & (Extract<
     Awaited<Result>,
@@ -680,16 +662,11 @@ export namespace Lite {
    */
   export type AnyResource = Resource<any>
 
-  /**
-   * Target type for wrapExec extension hook.
-   * Either a Flow or an inline function.
-   */
+  /** Target observed by the execution extension pipeline. */
   export type ExecTarget = Flow<unknown, unknown, any, unknown> | ExecTargetFn
 
-  /**
-   * Inline function that can be executed via ctx.exec.
-   */
-  export type ExecTargetFn = (ctx: ExecutionContext, ...args: any[]) => MaybePromise<unknown>
+  /** Inline operation identity observed by the execution extension pipeline. */
+  export type ExecTargetFn = (...args: any[]) => unknown
 
   /**
    * Utility types for type extraction and manipulation.

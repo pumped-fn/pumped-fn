@@ -1,0 +1,45 @@
+{
+  "type": "pkr_acceptance",
+  "unit_id": "PKR-A1",
+  "accepted_at": "2026-07-16T05:19:00Z",
+  "source_dkr_ref": "artifacts/accept-dkr-a.v1.json",
+  "packet_ref": "worker-packets/pkr-a1-exec-api.v2.json",
+  "late_discovery_ref": "artifacts/event-pkr-a1-start-head-correction.json",
+  "verification_refs": [
+    "workers/validator-pkr-a1/verification.v1.json",
+    "workers/validator-pkr-a1/verification.v2.json",
+    "workers/validator-pkr-a1/verification.v3.json"
+  ],
+  "final_verification_sha256": "0235dde33395f94fd1b697b5b3fc4382c2f4a96e629359475f20992f7ea006df",
+  "public_contract": {
+    "name_required": true,
+    "deps_required": true,
+    "params_required": true,
+    "callback": "fn receives inferred deps then explicit params; never ctx or scope",
+    "scope_and_context_parity": true
+  },
+  "metrics": {
+    "inline_exec_callsite_count": 51,
+    "inline_exec_contract_gap_count": 0,
+    "captured_dependency_count": 0,
+    "context_callback_argument_count": 0,
+    "ctx_scope_param_argument_count": 0,
+    "uninspectable_callback_count": 0,
+    "legacy_inline_option_type_count": 0,
+    "public_context_callback_type_count": 0
+  },
+  "gates": {
+    "root_typecheck_project_count": 31,
+    "lite_test_count": 236,
+    "lint_test_count": 82,
+    "focused_test_count": 79,
+    "checker_test_count": 3
+  },
+  "rework_preserved": [
+    "v1 rejected wrong start-head provenance and identifier-callback capture false-zero",
+    "v2 rejected missing function-declaration checker fixture",
+    "v3 accepted final fixture-only remediation"
+  ],
+  "single_llm_truth_acceptance_count": 0,
+  "context_argument_pass_count": 0
+}

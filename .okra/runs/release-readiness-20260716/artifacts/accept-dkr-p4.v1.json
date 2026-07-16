@@ -1,0 +1,18 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P4",
+  "accepted_at": "2026-07-16T05:14:00Z",
+  "accepted_scope": "Reducing discovery: Node 26 dedicated-leaf allocation calibration passed all frozen control gates.",
+  "checkpoint_ref": "workers/dkr-p4-allocation-leaf/checkpoint.v1.json",
+  "checkpoint_sha256": "6a2c98b6f5b6a0a9ac66efc718dc64186062f3f0fb0a97fc75205d520b13774e",
+  "verification_ref": "workers/validator-dkr-p4/verification.v1.json",
+  "verification_sha256": "db039b0f3fc7bf2fbb2610174662efe44326c11dd6f9e37560f94df944e425ef",
+  "calibration": {
+    "zero_attributed_bytes": 0,
+    "one_attributed_bytes": 12882032,
+    "two_attributed_bytes": 25534256,
+    "two_to_one_ratio": 1.9821605783932223,
+    "signal_to_noise": 12882032
+  },
+  "downstream_authority": "Fund corrected representative lifecycle row replay; no product allocation, retained-memory, throughput, or optimization claim."
+}

@@ -34,7 +34,8 @@ describe("observable and logging integration", () => {
         })
         const doubled = await ctx.exec({
           name: "double",
-          fn: function double(_ctx, value: number) {
+          deps: {},
+          fn: function double(_deps, value: number) {
             return value * 2
           },
           params: [ctx.input.id],

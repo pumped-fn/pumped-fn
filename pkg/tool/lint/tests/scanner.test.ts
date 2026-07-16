@@ -1553,10 +1553,10 @@ describe("lite lint scanner", () => {
 
       const send = flow({
         deps: { client },
-        factory: (ctx, { client }) => ctx.exec({ fn: () => client.send(msg), name: "client.send", params: [] }),
+        factory: (ctx, { client }) => ctx.exec({ fn: () => client.send(msg), name: "client.send", deps: {}, params: [] }),
       })
     `).map((diagnostic) => diagnostic.message)).toEqual([
-      'ctx.exec callback captures "client, msg"; receive execution values after ctx and provide them through params.',
+      'ctx.exec callback captures "client, msg"; declare graph values in deps and provide runtime values through params.',
     ])
 
     expect(hidden(`
@@ -1565,7 +1565,7 @@ describe("lite lint scanner", () => {
       const send = flow({
         factory: (ctx) => {
           const client = { send: (message: string) => message }
-          return ctx.exec({ fn: () => client.send("hello"), params: [client] })
+          return ctx.exec({ name: "client.send", deps: {}, fn: () => client.send("hello"), params: [client] })
         },
       })
     `)).toHaveLength(1)
@@ -1575,7 +1575,9 @@ describe("lite lint scanner", () => {
 
       const send = flow({
         factory: (ctx) => ctx.exec({
-          fn: (_ctx, target, content) => {
+          name: "target.send",
+          deps: {},
+          fn: (_deps, target, content) => {
             const relay = ({ value }: { value: string }) => target.send(value)
             return relay({ value: content })
           },
@@ -1588,7 +1590,7 @@ describe("lite lint scanner", () => {
       import { flow } from "@pumped-fn/lite"
 
       const send = flow({
-        factory: (ctx) => ctx.exec({ fn: () => Promise.resolve("ok"), params: [] }),
+        factory: (ctx) => ctx.exec({ name: "promise.resolve", deps: {}, fn: () => Promise.resolve("ok"), params: [] }),
       })
     `)).toEqual([])
 
@@ -1597,7 +1599,7 @@ describe("lite lint scanner", () => {
 
       const unrelated = (Promise: { resolve: (value: string) => string }) => Promise.resolve("elsewhere")
       const send = flow({
-        factory: (ctx) => ctx.exec({ fn: () => Promise.resolve("ok"), params: [] }),
+        factory: (ctx) => ctx.exec({ name: "promise.resolve", deps: {}, fn: () => Promise.resolve("ok"), params: [] }),
       })
     `)).toEqual([])
 
@@ -1606,10 +1608,10 @@ describe("lite lint scanner", () => {
 
       const Promise = { resolve: (value: string) => value }
       const send = flow({
-        factory: (ctx) => ctx.exec({ fn: () => Promise.resolve("ok"), params: [] }),
+        factory: (ctx) => ctx.exec({ name: "promise.resolve", deps: {}, fn: () => Promise.resolve("ok"), params: [] }),
       })
     `).map((diagnostic) => diagnostic.message)).toEqual([
-      'ctx.exec callback captures "Promise"; receive execution values after ctx and provide them through params.',
+      'ctx.exec callback captures "Promise"; declare graph values in deps and provide runtime values through params.',
     ])
 
     expect(hidden(`
@@ -1617,20 +1619,20 @@ describe("lite lint scanner", () => {
 
       const send = flow({
         factory: (ctx, { Promise }: { Promise: { resolve: (value: string) => string } }) =>
-          ctx.exec({ fn: () => Promise.resolve("ok"), params: [] }),
+          ctx.exec({ name: "promise.resolve", deps: {}, fn: () => Promise.resolve("ok"), params: [] }),
       })
     `).map((diagnostic) => diagnostic.message)).toEqual([
-      'ctx.exec callback captures "Promise"; receive execution values after ctx and provide them through params.',
+      'ctx.exec callback captures "Promise"; declare graph values in deps and provide runtime values through params.',
     ])
 
     expect(hidden(`
       import { flow } from "@pumped-fn/lite"
 
       const send = flow({
-        factory: (ctx) => ctx.exec({ fn: () => crypto.randomUUID(), params: [] }),
+        factory: (ctx) => ctx.exec({ name: "crypto.randomUUID", deps: {}, fn: () => crypto.randomUUID(), params: [] }),
       })
     `).map((diagnostic) => diagnostic.message)).toEqual([
-      'ctx.exec callback captures "crypto"; receive execution values after ctx and provide them through params.',
+      'ctx.exec callback captures "crypto"; declare graph values in deps and provide runtime values through params.',
     ])
 
     expect(hidden(`
@@ -1641,6 +1643,87 @@ describe("lite lint scanner", () => {
         factory: () => worker.exec({ fn: () => Promise.resolve("ok"), params: [] }),
       })
     `)).toEqual([])
+  })
+
+  it("requires the shared inline execution contract on both receivers", () => {
+    const missing = diagnostics(`
+      import { createScope, flow } from "@pumped-fn/lite"
+
+      const operation = flow({
+        factory: (ctx) => ctx.exec({ fn: () => "ctx" }),
+      })
+      const scope = createScope()
+      scope.run({ fn: () => "scope" })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
+      .map((diagnostic) => diagnostic.message)
+
+    expect(missing).toEqual([
+      'ctx.exec inline options require name, deps, and params; missing "name, deps, params".',
+      'scope.run inline options require name, deps, and params; missing "name, deps, params".',
+    ])
+
+    expect(diagnostics(`
+      import { createScope, flow } from "@pumped-fn/lite"
+
+      const operation = flow({
+        factory: (ctx) => ctx.exec({
+          name: "ctx-argument",
+          deps: {},
+          params: [ctx],
+          fn: (_ctx) => "invalid",
+        }),
+      })
+      const scope = createScope()
+      scope.run({
+        name: "scope-argument",
+        deps: {},
+        params: [scope],
+        fn: () => "invalid",
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-ctx-argument" || diagnostic.ruleId === "pumped/no-scope-argument")
+      .map((diagnostic) => diagnostic.message)).toEqual([
+      "ctx is a receiver, never an argument; reify the contract as a flow reached via deps.",
+      "ctx is a receiver, never an argument; reify the contract as a flow reached via deps.",
+      "Do not pass scope through inline execution params; declare the operation dependencies in deps.",
+    ])
+  })
+
+  it("audits local identifier callbacks and fails closed on unresolved identifiers", () => {
+    expect(diagnostics(`
+      import { createScope, flow } from "@pumped-fn/lite"
+
+      const transform = (_deps: {}, value: string) => value.toUpperCase()
+      function finish() { return "done" }
+      const operation = flow({
+        factory: (ctx) => ctx.exec({
+          name: "transform",
+          deps: {},
+          params: ["value"],
+          fn: transform,
+        }),
+      })
+      const scope = createScope()
+      scope.run({ name: "finish", deps: {}, params: [], fn: finish })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")).toEqual([])
+
+    expect(diagnostics(`
+      import { flow } from "@pumped-fn/lite"
+      import { importedCallback } from "./callback"
+
+      const client = { send: (value: string) => value }
+      const message = "hello"
+      const captured = () => client.send(message)
+      const operation = flow({
+        factory: (ctx) => {
+          void ctx.exec({ name: "captured", deps: {}, params: [], fn: captured })
+          return ctx.exec({ name: "imported", deps: {}, params: [], fn: importedCallback })
+        },
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
+      .map((diagnostic) => diagnostic.message)).toEqual([
+      'ctx.exec callback captures "client, message"; declare graph values in deps and provide runtime values through params.',
+      'ctx.exec callback "importedCallback" cannot be inspected; use a local function or inline callback.',
+    ])
   })
 
   it("requires inline scope operations to declare graph deps and runtime params", () => {
@@ -1715,7 +1798,7 @@ describe("lite lint scanner", () => {
       })
     `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-argument")
       .map((diagnostic) => diagnostic.message)).toEqual([
-      "Do not pass scope through scope.run params; declare the operation dependencies in deps.",
+      "Do not pass scope through inline execution params; declare the operation dependencies in deps.",
     ])
 
     expect(diagnostics(`
@@ -1788,7 +1871,7 @@ describe("lite lint scanner", () => {
       unrelated("value")
     `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-argument")
       .map((diagnostic) => diagnostic.message)).toEqual([
-      "Do not pass scope through scope.run params; declare the operation dependencies in deps.",
+      "Do not pass scope through inline execution params; declare the operation dependencies in deps.",
     ])
 
     expect(diagnostics(`

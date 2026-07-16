@@ -1,0 +1,13 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P3",
+  "accepted_at": "2026-07-16T05:07:00Z",
+  "accepted_scope": "Reducing discovery only: the in-heap allocation control has strong signal and proportionality but fails the frozen exact-zero attribution gate.",
+  "checkpoint_ref": "workers/dkr-p3-allocation/checkpoint.v1.json",
+  "checkpoint_sha256": "9e600a66656ce1bb546102296f28564d11f5a5bb99613c4be654653bc3769b5e",
+  "verification_ref": "workers/validator-dkr-p3/verification.v1.json",
+  "verification_sha256": "d6bb12123a6285f7c038d1558b87924531bf44334e43123085cd0faf2633144c",
+  "raw": { "zero": 168, "one": 278632, "two": 557160, "bytes_per_iteration": 1087.75, "ratio": 2.0002298322224776 },
+  "failure": "zero attribution 168 exceeded the frozen maximum 0",
+  "downstream_authority": "Fund one dedicated allocateOne-leaf attribution DKR only; measurement implementation and optimization remain blocked."
+}

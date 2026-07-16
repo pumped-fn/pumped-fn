@@ -1,0 +1,14 @@
+{
+  "packet_version": 2,
+  "supersedes": "worker-packets/pkr-a1-exec-api.json",
+  "worker_id": "pkr-a1-exec-api",
+  "unit_id": "PKR-A1",
+  "worker_kind": "progression",
+  "exact_start_head": "8504cafb29148346089bb06abb00a9374fc3a961",
+  "scope_and_authority": "Unchanged from v1 packet.",
+  "validator_v1_ref": "workers/validator-pkr-a1/verification.v1.json",
+  "remediation": "Resolve and audit identifier callbacks, fail closed on uninspectable callback identifiers, add positive and negative fixtures, and migrate the wait callback so abortable is declared rather than captured.",
+  "allowed_paths_ref": "worker-packets/pkr-a1-exec-api.json#allowed_paths",
+  "forbidden_paths_ref": "worker-packets/pkr-a1-exec-api.json#forbidden_paths",
+  "stop_rule": "Stop after one focused checker, lint, and Lite replay; do not rerun the already accepted broader suites."
+}

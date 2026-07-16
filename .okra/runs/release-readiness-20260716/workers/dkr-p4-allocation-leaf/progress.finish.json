@@ -1,0 +1,58 @@
+{
+  "progress_version": 1,
+  "worker_id": "dkr-p4-allocation-leaf",
+  "unit_id": "DKR-P4",
+  "worker_kind": "discovery",
+  "status": "finished",
+  "observed_at": "2026-07-16T05:12:03Z",
+  "recorded_at": "2026-07-16T05:16:04Z",
+  "assignment_result": "A single frozen Node 26 allocation-sampling observation produced an exact-zero leaf control, a positive one-batch signal, a 1.9821605783932223 two-to-one ratio, and signal-to-noise 12882032.",
+  "observation_count": {
+    "zero": 1,
+    "one": 1,
+    "two": 1,
+    "repeats_after_result": 0
+  },
+  "frozen_environment": {
+    "node": "v26.4.0",
+    "v8": "14.6.202.34-node.21",
+    "batch_objects": 200000,
+    "sampling_interval_bytes": 32768,
+    "stack_depth": 64,
+    "include_objects_collected_by_major_gc": false,
+    "attribution_leaf": "allocateOne"
+  },
+  "frozen_thresholds": {
+    "zero_attributed_bytes_max": 0,
+    "one_attributed_bytes_min_exclusive": 0,
+    "two_to_one_ratio_min": 1.8,
+    "two_to_one_ratio_max": 2.2,
+    "signal_to_noise_min": 10
+  },
+  "raw_results": {
+    "zero_attributed_bytes": 0,
+    "one_attributed_bytes": 12882032,
+    "two_attributed_bytes": 25534256,
+    "two_to_one_ratio": 1.9821605783932223,
+    "signal_to_noise": 12882032
+  },
+  "evidence_refs_or_hashes": [
+    "sha256:8b09f1c204301c6d9f10dcafe596648dd13641650d5b12834921640401e74377",
+    "sha256:f16e2ffd7aafd18dc8068d299dfc0228f04b0df4719f295a61f887f54a727c54",
+    "sha256:11fced10e13681bbd79609cdfa36815f926fc6ad0301fabb85528e0c748b5452",
+    "sha256:da2925784dec352af6d5d3c48339a55de031f1592c125b14e35a82afa98764c1",
+    "sha256:9c8935009aa29969fa57816cbe4e196c52c20718cca882e39f47d962b215a448",
+    "sha256:a227b63c87ae6628c874671195aa16694c1be926c03a1c33cbe55144e24844d6",
+    "sha256:bd9b590d5bf137d89fa6b0a3f637c385b735473e792db0635b9db0f12864874e"
+  ],
+  "no_repeat_evidence": "The observer refuses an existing output path; the frozen one-shot command exited 0 once and produced exactly one raw profile per control.",
+  "calibration_boundary": "Supported only for the exact dedicated-leaf calibration environment recorded above; independent acceptance remains pending.",
+  "product_claims": "blocked",
+  "checkpoint_ref": "workers/dkr-p4-allocation-leaf/checkpoint.v1.json",
+  "wall_gate": {
+    "verdict": "unknown",
+    "downstream_advance": "blocked",
+    "reason": "Worker evidence is not acceptance; independent verification is pending."
+  },
+  "worker_boundary": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

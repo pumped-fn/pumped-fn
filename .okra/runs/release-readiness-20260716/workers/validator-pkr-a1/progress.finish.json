@@ -1,0 +1,18 @@
+{
+  "type": "worker_finish",
+  "worker_id": "validator-pkr-a1",
+  "worker_kind": "verification",
+  "unit_id": "PKR-A1",
+  "status": "complete",
+  "recorded_at": "2026-07-16T05:18:20Z",
+  "verification_ref": "workers/validator-pkr-a1/verification.v1.json",
+  "accepted": 7,
+  "rejected": 2,
+  "rejected_claim_ids": [
+    "pkr-a1-exact-head-check",
+    "pkr-a1-zero-capture-proof"
+  ],
+  "decision": "rejected",
+  "downstream_advance": "blocked",
+  "product_files_changed": false
+}

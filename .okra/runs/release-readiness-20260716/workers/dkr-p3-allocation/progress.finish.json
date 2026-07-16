@@ -1,0 +1,49 @@
+{
+  "type": "worker-report",
+  "schema_version": 1,
+  "worker_id": "dkr-p3-allocation",
+  "worker_kind": "discovery",
+  "unit_id": "DKR-P3",
+  "status": "checkpoint_written_pending_independent_validation",
+  "recorded_at": "2026-07-16T05:01:26Z",
+  "checkpoint_ref": "workers/dkr-p3-allocation/checkpoint.v1.json",
+  "checkpoint_sha256": "9e600a66656ce1bb546102296f28564d11f5a5bb99613c4be654653bc3769b5e",
+  "result": "The one-shot in-heap allocation controls passed signal size, signal-to-noise, and 2:1 proportionality but failed the frozen zero-noise gate at 168 attributed bytes. The method is rejected without repetition; measurement implementation and optimization stay blocked.",
+  "metrics": {
+    "observation_count_per_control": 1,
+    "zero_attributed_bytes": 168,
+    "one_bytes_per_iteration": 1087.75,
+    "signal_to_noise": 1087.75,
+    "two_to_one_ratio": 2.0002298322224776,
+    "failed_predeclared_gate_count": 1,
+    "unsupported_performance_claim_count": 0,
+    "allocation_regression_case_count": null,
+    "single_llm_truth_acceptance_count": null
+  },
+  "product_files_changed": false,
+  "acceptance_claimed": false,
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "allocation_regression_case_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "wall_gate": {
+    "verdict": "blocked_rejected_allocation_calibration_and_pending_independent_validation",
+    "downstream_advance": "blocked",
+    "reason": "The zero control attributed 168 bytes against a frozen maximum of 0, and independent validation is absent."
+  },
+  "next_check_at": "Independent validator dispatch within the frame freshness window.",
+  "commanded_lines": [
+    "Action envelope: create scratch evidence only under /tmp/dkr-p3-allocation; write only the authorized checkpoint.v1.json and progress.finish.json records; no product, frame, tree, ledger, release, or external-state changes.",
+    "Frozen method: Node v26.4.0, 1-byte sampling interval, 256 iterations, retained in-heap Array(128) controls, and exactly one observation for each 0x, 1x, and 2x control.",
+    "Frozen gates: zero attributed bytes <= 0, 1x signal 768 to 1408 bytes per iteration, signal-to-noise >= 64, and 2:1 ratio from 1.8 to 2.2.",
+    "Raw result: 0x=168, 1x=278632, and 2x=557160 attributed bytes; zero-noise failed while all other arithmetic gates passed.",
+    "No-repeat proof: observation_command_count=1; the only later execution used check-replay.mjs against saved raw.json and returned exit 1.",
+    "Evidence hashes: predeclared=e0f244126ba1e04afe85d753f650b1575ff2900e827ae34fb61064e7bdf5ed6d; observe=18183d8eff6af055dde6a22cbcc425603e5f5f80ef1bff9bdd1cb4607dab9ce4; raw=73a837b771dfd7c572c3ac6f8d015051ec463a60c0149606dbdb6962c08154e6; replay-checker=f59e8aed8030068ce490d826c6b3393935bf4e164867d28383005b58b8f2e003; replay=25a6532abf7d58825ea23f1dccf0c7dc6e806b13f7f06b3e6db6d62d018a1cb9.",
+    "Next narrower method: attribute only a named allocateOne leaf that the 0x control never calls; do not subtract or relax zero noise after observation.",
+    "Downstream decision: reject this method; keep measurement implementation and optimization blocked pending independent validation and any separately funded narrower DKR.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  ]
+}

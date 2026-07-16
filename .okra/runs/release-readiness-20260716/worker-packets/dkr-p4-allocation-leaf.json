@@ -1,0 +1,14 @@
+{
+  "packet_version": 1,
+  "worker_id": "dkr-p4-allocation-leaf",
+  "unit_id": "DKR-P4",
+  "worker_kind": "discovery",
+  "frame": {
+    "objective": { "metric_id": "release_readiness_gap_count", "target": 0, "comparator": "==" },
+    "source_dkr_ref": ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-p3.v1.json"
+  },
+  "active_anti_goals": ["invalid_performance_comparison_count", "unsupported_performance_claim_count", "allocation_regression_case_count", "single_llm_truth_acceptance_count", "anti_goal_bypass_or_dishonesty_count"],
+  "assignment": "Discovery only. Run exactly one Node 26 allocation-sampling observation whose accepted bytes are attributed only to a dedicated named allocateOne leaf that the zero control never calls. Predeclare exact-zero attributed bytes <= 0, positive one-control signal, two-to-one ratio [1.8,2.2], and minimum signal-to-noise 10 before execution. Use in-heap JavaScript objects, fixed batch and sampler settings. Save raw profile and deterministic replay. Never repeat until favorable. No product, benchmark, or .okra edits.",
+  "budget_and_stop_rule": { "time_min": 30, "turns": 1, "stop": "One observation per control; accept or reject the method and stop." },
+  "output_schema": "Executable checkpoint with frozen thresholds, exact script/command/hash, raw attributed bytes, arithmetic, controls, replay, walls, and downstream decision. Worker evidence is not acceptance."
+}

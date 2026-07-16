@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "verification_id": "validator-pkr-a1.v3.2026-07-16T05:32:17Z",
+  "worker_id": "validator-pkr-a1",
+  "worker_kind": "verification",
+  "unit_id": "PKR-A1",
+  "prior_verification_ref": "workers/validator-pkr-a1/verification.v2.json",
+  "packet_ref": "worker-packets/pkr-a1-exec-api.v2.json",
+  "observed_at": "2026-07-16T05:32:17Z",
+  "decision": "accepted",
+  "fail_closed": true,
+  "product_files_changed": false,
+  "audit_traces": [
+    {
+      "claim_id": "pkr-a1-v3-function-declaration-fixtures",
+      "check": "The saved checker executes both valid and capturing local function-declaration identifier branches",
+      "threshold": "Valid fixture accepts one local function declaration; invalid fixture counts both of its captures; all checker tests pass",
+      "value": "Valid callsite count increased to 3 with zero gaps; invalid callsite count increased to 5 and captured dependency count increased from 4 to 6; 3 tests passed",
+      "source_of_truth": "scripts/fixtures/inline-exec-contract/valid/valid.ts, invalid/invalid.ts, and scripts/check-inline-exec-contract.test.mjs",
+      "replay": "pnpm inline-exec:test",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "valid fixture uses fn: declaredOperation before the local function declaration",
+        "invalid fixture uses fn: capturedDeclaration before a declaration that references client and message",
+        "valid inline_exec_callsite_count=3 and inline_exec_contract_gap_count=0",
+        "invalid inline_exec_callsite_count=5, captured_dependency_count=6, uninspectable_callback_count=1, and inline_exec_contract_gap_count=17",
+        "tests 3, pass 3, fail 0"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-v3-deterministic-negative-metrics",
+      "check": "The capturing function-declaration result is deterministic",
+      "threshold": "Two invalid-fixture executions are byte-identical and match the expanded expected metric object",
+      "value": "The saved test compares first.stdout with second.stdout and passed once",
+      "source_of_truth": "scripts/check-inline-exec-contract.test.mjs",
+      "replay": "pnpm inline-exec:test",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "reports every negative metric deterministically passed",
+        "captured_dependency_count=6",
+        "inline_exec_contract_gap_count=17"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-v3-semantic-continuity",
+      "check": "No production, lint, or checker implementation semantic file changed after v2",
+      "threshold": "Current hashes equal the hashes pinned by verification.v2.json",
+      "value": "Checker implementation, lint source/tests, Lite structured lifetime test, and Lite runtime/type hashes are unchanged from v2",
+      "source_of_truth": "verification.v2.json artifact_hashes and current sha256 reads",
+      "replay": "pnpm inline-exec:test",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "scripts/check-inline-exec-contract.mjs=1d80090bc7ce240f515bd53333d055ce73dc299047e37d160a21676fd0dbf881",
+        "pkg/tool/lint/src/index.ts=87d4bc032ee85684de2ee4d879ba56bd2470c4e84c566d54933cd5df41d01d28",
+        "pkg/tool/lint/tests/scanner.test.ts=a0df5c69762a231f2a6b7f470f12f44520a8d62a466b99a09af7a7751b97d444",
+        "pkg/core/lite/tests/structured-lifetime.test.ts=4ea00bb3b7294e2407cdd547c1352ed98d5daf24cb1825fdfd8f9bdf8dbc5a55",
+        "pkg/core/lite/src/types.ts=03545f324721e87752c2d7748a6c4fac7d07a0165539ad81767d19744e3182b3",
+        "pkg/core/lite/src/scope.ts=0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e"
+      ]
+    },
+    {
+      "claim_id": "pkr-a1-v3-whitespace",
+      "check": "The fixture-only remediation adds no whitespace errors",
+      "threshold": "git diff --check exits 0 once",
+      "value": "Exit 0 with empty output",
+      "source_of_truth": "Git diff parser",
+      "replay": "git diff --check",
+      "exit_code": 0,
+      "decision": "accepted"
+    }
+  ],
+  "artifact_hashes": {
+    "scripts/check-inline-exec-contract.mjs": "1d80090bc7ce240f515bd53333d055ce73dc299047e37d160a21676fd0dbf881",
+    "scripts/check-inline-exec-contract.test.mjs": "a3e2f90956294a0c31800a2b6e6a72f0c25e731ef6430fe914e8fe494e6b1a79",
+    "scripts/fixtures/inline-exec-contract/valid/valid.ts": "c0801c4b6000cdeb1a4e518b508af0f9733b5085df7c5c88784b4d0ca56cf2c3",
+    "scripts/fixtures/inline-exec-contract/invalid/invalid.ts": "ae76c079a8528251bfa6bc6249519f71cb261371c373a707fedaf29928be4b87",
+    "pkg/tool/lint/src/index.ts": "87d4bc032ee85684de2ee4d879ba56bd2470c4e84c566d54933cd5df41d01d28",
+    "pkg/tool/lint/tests/scanner.test.ts": "a0df5c69762a231f2a6b7f470f12f44520a8d62a466b99a09af7a7751b97d444",
+    "pkg/core/lite/tests/structured-lifetime.test.ts": "4ea00bb3b7294e2407cdd547c1352ed98d5daf24cb1825fdfd8f9bdf8dbc5a55",
+    "pkg/core/lite/src/types.ts": "03545f324721e87752c2d7748a6c4fac7d07a0165539ad81767d19744e3182b3",
+    "pkg/core/lite/src/scope.ts": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e"
+  },
+  "summary": {
+    "accepted": 4,
+    "rejected": 0,
+    "rejected_claim_ids": [],
+    "decision": "accepted"
+  },
+  "wall_gate": {
+    "verdict": "held",
+    "downstream_advance": "allowed",
+    "context_argument_pass_count": 0,
+    "touched_surface_regression_count": 0,
+    "single_llm_truth_acceptance_count": 0,
+    "unsupported_claim_acceptance_count": 0,
+    "reason": "The final saved fixtures execute valid and capturing local function declarations deterministically, while every v2 production, lint, and checker implementation hash remains unchanged."
+  }
+}

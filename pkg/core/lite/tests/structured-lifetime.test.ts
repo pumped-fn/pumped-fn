@@ -68,7 +68,7 @@ describe("ExecutionContext structured lifetime", () => {
   it("runs one named operation with declared deps and explicit params", async () => {
     const factor = tag<number>({ label: "factor" })
     const events: string[] = []
-    const targets: Array<string | undefined> = []
+    const targets: Lite.ExecTarget[] = []
     const inputs: unknown[] = []
     const lease = resource({
       factory: (ctx) => {
@@ -81,50 +81,92 @@ describe("ExecutionContext structured lifetime", () => {
       extensions: [{
         name: "operation-target",
         wrapExec: async (next, target, ctx) => {
-          targets.push(target.name)
+          targets.push(target)
           inputs.push(ctx.input)
           return next()
         },
       }],
     })
 
+    const multiply = ({ lease, factor }: { lease: number; factor: number }, value: number) => lease * factor * value
     const output = scope.run({
       name: "multiply-once",
       deps: { lease, factor: tags.required(factor) },
       params: [4],
       tags: [factor(3)],
-      fn: ({ lease, factor }, value) => lease * factor * value,
+      fn: multiply,
     })
 
     expectTypeOf(output).toEqualTypeOf<Promise<number>>()
     await expect(output).resolves.toBe(24)
-    expect(targets).toEqual(["multiply-once"])
+    expect(targets).toEqual([multiply])
     expect(inputs).toEqual([[4]])
     expect(events).toEqual(["open", "close"])
     await scope.dispose()
   })
 
+  it("shares inline dependency execution across owned and managed boundaries", async () => {
+    const tenant = tag<string>({ label: "inline-tenant" })
+    const closes: string[] = []
+    const lease = resource({
+      deps: { tenant: tags.required(tenant) },
+      factory: (ctx, { tenant }) => {
+        ctx.cleanup((target, value) => { target.push(value) }, closes, tenant)
+        return tenant
+      },
+    })
+    const scope = createScope()
+
+    const owned = scope.run({
+      name: "owned-inline",
+      deps: { lease },
+      params: ["owned"],
+      tags: [tenant("owned")],
+      fn: ({ lease }, value) => `${lease}:${value}`,
+    })
+    expectTypeOf(owned).toEqualTypeOf<Promise<string>>()
+    await expect(owned).resolves.toBe("owned:owned")
+    expect(closes).toEqual(["owned"])
+
+    const ctx = scope.createContext({ tags: [tenant("managed")] })
+    const managed = ctx.exec({
+      name: "managed-inline",
+      deps: { lease },
+      params: [2],
+      fn: ({ lease }, value) => `${lease}:${value}`,
+    })
+    expectTypeOf(managed).toEqualTypeOf<Promise<string>>()
+    await expect(managed).resolves.toBe("managed:2")
+    expect(closes).toEqual(["owned"])
+
+    await ctx.close()
+    expect(closes).toEqual(["owned", "managed"])
+    await scope.dispose()
+  })
+
   it("rejects streaming results from an inline scalar operation", async () => {
-    expectTypeOf<Lite.RunDepsOptions<
+    expectTypeOf<Lite.ExecDepsOptions<
       Record<string, never>,
       [boolean],
       string | AsyncIterable<string>
     >>().toEqualTypeOf<never>()
-    expectTypeOf<Lite.RunDepsOptions<
+    expectTypeOf<Lite.ExecDepsOptions<
       Record<string, never>,
       [],
       AsyncIterator<string>
     >>().toEqualTypeOf<never>()
-    expectTypeOf<Lite.RunFnOptions<
+    expectTypeOf<Lite.ExecDepsOptions<
+      Record<string, never>,
       [],
       AsyncGenerator<string, string>
     >>().toEqualTypeOf<never>()
-    expectTypeOf<Lite.RunDepsOptions<
+    expectTypeOf<Lite.ExecDepsOptions<
       Record<string, never>,
       [],
       Generator<string>
     >>().toEqualTypeOf<never>()
-    expectTypeOf<Lite.RunFnOptions<
+    expectTypeOf<Lite.ExecDepsOptions<
+      Record<string, never>,
       [],
       { next: () => number }
     >>().toEqualTypeOf<never>()
@@ -188,13 +230,58 @@ describe("ExecutionContext structured lifetime", () => {
     await expect(scope.run({
       name: "requires-binding",
       deps: { required: tags.required(required) },
-      params: [],
-      fn: () => {
-        called = true
+      params: [{ mark: () => { called = true } }],
+      fn: (_deps, state) => {
+        state.mark()
         return "unreachable"
       },
     })).rejects.toThrow('Tag "operation-required" not found while activating "requires-binding"')
     expect(called).toBe(false)
+    await scope.dispose()
+  })
+
+  it("keeps inline activation and caller cancellation inside the extension pipeline", async () => {
+    const closes: Lite.CloseResult[] = []
+    const never = deferred<string>()
+    const signal = resource({
+      ownership: "current",
+      factory: (ctx) => {
+        ctx.onClose((result, target) => { target.push(result) }, closes)
+        return ctx.signal
+      },
+    })
+    const abort = atom({ factory: () => abortable })
+    const targets: Lite.ExecTarget[] = []
+    const scope = createScope({
+      extensions: [{
+        name: "inline-observer",
+        wrapExec: async (next, target) => {
+          targets.push(target)
+          return next()
+        },
+      }],
+    })
+    const ctx = scope.createContext()
+    const caller = new AbortController()
+    const wait = (
+      { signal, abort }: { signal: AbortSignal; abort: typeof abortable },
+      pending: Promise<string>
+    ) => abort(signal, pending)
+    const running = ctx.exec({
+      name: "inline-wait",
+      deps: { signal, abort },
+      params: [never.promise],
+      signal: caller.signal,
+      fn: wait,
+    })
+    const reason = new Error("caller stopped")
+
+    caller.abort(reason)
+    await expect(running).rejects.toBe(reason)
+    expect(targets).toEqual([wait])
+    expect(closes).toEqual([{ ok: false, error: reason, aborted: true }])
+
+    await ctx.close()
     await scope.dispose()
   })
 

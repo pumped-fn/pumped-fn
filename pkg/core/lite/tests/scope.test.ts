@@ -1626,13 +1626,15 @@ describe("ExecutionContext", () => {
     })
   })
 
-  describe("ctx.exec() with fn", () => {
-    it("executes plain function with auto-injected ctx", async () => {
+  describe("ctx.exec() with deps", () => {
+    it("executes an inline operation with explicit deps and params", async () => {
       const scope = createScope()
       const ctx = scope.createContext()
 
       const result = await ctx.exec({
-        fn: (_ctx: Lite.ExecutionContext, a: number, b: number) => a + b,
+        name: "add",
+        deps: {},
+        fn: (_deps, a: number, b: number) => a + b,
         params: [1, 2],
       })
 
@@ -1640,13 +1642,15 @@ describe("ExecutionContext", () => {
       await ctx.close()
     })
 
-    it("applies exec tags to function child context", async () => {
+    it("resolves exec tags through declared deps", async () => {
       const marker = tag<string>({ label: "fn-exec-marker" })
       const scope = createScope()
       const ctx = scope.createContext()
 
       const result = await ctx.exec({
-        fn: (childCtx: Lite.ExecutionContext) => childCtx.data.seekTag(marker),
+        name: "read-marker",
+        deps: { marker: tags.required(marker) },
+        fn: ({ marker }) => marker,
         params: [],
         tags: [marker("fn")],
       })
@@ -2758,7 +2762,7 @@ describe("Coverage: edge cases and error paths", () => {
 
     const ctx = scope.createContext()
     await expect(
-      ctx.exec({ fn: () => { throw new Error("fn-error") }, params: [] })
+      ctx.exec({ name: "fail", deps: {}, fn: () => { throw new Error("fn-error") }, params: [] })
     ).rejects.toThrow("fn-error")
 
     let callCount = 0
@@ -3981,7 +3985,7 @@ describe("public helper coverage", () => {
       },
       wrapExec: async (
         next: () => Promise<unknown>,
-        _target: Lite.Flow<unknown, unknown> | ((ctx: Lite.ExecutionContext, ...args: unknown[]) => unknown),
+        _target: Lite.ExecTarget,
         ctx: Lite.ExecutionContext
       ) => {
         extensionEvents.push(`exec:${ctx.name ?? "anonymous"}`)
@@ -4015,10 +4019,11 @@ describe("public helper coverage", () => {
     })
     expect(await ctx.exec({ flow: namedFlow })).toBe("named-flow:1")
     expect(await ctx.exec({
-      fn: (childCtx: Lite.ExecutionContext, value: number) => `${childCtx.name}:${value}`,
       name: "inline-exec",
+      deps: {},
+      fn: (_deps, value: number) => value,
       params: [7],
-    })).toBe("inline-exec:7")
+    })).toBe(7)
 
     const replacementFlow = flow({
       name: "replacement-flow",
@@ -4153,7 +4158,7 @@ describe("public helper coverage", () => {
       },
       wrapExec: async (
         next: () => Promise<unknown>,
-        _target: Lite.Flow<unknown, unknown> | ((ctx: Lite.ExecutionContext, ...args: unknown[]) => unknown),
+        _target: Lite.ExecTarget,
         ctx: Lite.ExecutionContext
       ) => {
         resourceEvents.push(`exec:${ctx.name ?? "anonymous"}`)
@@ -4265,12 +4270,9 @@ describe("public helper coverage", () => {
     expect(await ctx.exec({ flow: lazyCtrlFlow })).toBe(5)
     expect(await ctx.exec({ flow: resourceFlow })).toBe(5)
 
-    const anonymousFn = ((_ctx: Lite.ExecutionContext) => "anon") as (
-      ctx: Lite.ExecutionContext,
-      ...args: unknown[]
-    ) => string
+    const anonymousFn = (() => "anon") as (...args: unknown[]) => string
     Object.defineProperty(anonymousFn, "name", { value: "" })
-    expect(await ctx.exec({ fn: anonymousFn, params: [] })).toBe("anon")
+    expect(await ctx.exec({ name: "anonymous", deps: {}, fn: anonymousFn, params: [] })).toBe("anon")
 
     const presetAtom = atom({ factory: () => 1 })
     const presetScope = createScope({

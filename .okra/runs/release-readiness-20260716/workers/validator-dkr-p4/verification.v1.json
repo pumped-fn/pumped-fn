@@ -1,0 +1,242 @@
+{
+  "schema_version": 1,
+  "verification_type": "dkr_validator_audit",
+  "verification_id": "validator-dkr-p4.2026-07-16T05:19:16Z",
+  "validator_id": "validator-dkr-p4",
+  "worker_kind": "verification",
+  "unit_id": "DKR-P4",
+  "checkpoint_ref": "workers/dkr-p4-allocation-leaf/checkpoint.v1.json",
+  "checkpoint_sha256": "6a2c98b6f5b6a0a9ac66efc718dc64186062f3f0fb0a97fc75205d520b13774e",
+  "observed_at": "2026-07-16T05:19:16Z",
+  "decision": "accepted_reducing_discovery_only",
+  "fail_closed": true,
+  "product_files_changed": false,
+  "one_shot_replay_count": 1,
+  "claims": [
+    {
+      "claim_id": "DKR-P4-CHECKPOINT-INTEGRITY",
+      "check": "The saved checkpoint is readable, scoped to dedicated-leaf method calibration, and pinned for this verification",
+      "threshold": "checkpoint exists with calibration-only decision boundary and a recorded sha256",
+      "value": "checkpoint sha256=6a2c98b6f5b6a0a9ac66efc718dc64186062f3f0fb0a97fc75205d520b13774e; product claims blocked",
+      "source_of_truth": "workers/dkr-p4-allocation-leaf/checkpoint.v1.json",
+      "replay": "sha256sum .okra/runs/release-readiness-20260716/workers/dkr-p4-allocation-leaf/checkpoint.v1.json",
+      "exit_code": 0,
+      "sha256": [
+        "6a2c98b6f5b6a0a9ac66efc718dc64186062f3f0fb0a97fc75205d520b13774e"
+      ],
+      "observed_at": "2026-07-16T05:19:16Z",
+      "decision": "accepted",
+      "evidence": [
+        "The checkpoint limits its decision to a Node 26 dedicated-leaf allocation-sampling method.",
+        "The checkpoint blocks pumped-fn allocation, retained-memory, regression, and optimization claims."
+      ]
+    },
+    {
+      "claim_id": "DKR-P4-PREDECLARATION",
+      "check": "Runtime, leaf, workload, sampler, observation count, and acceptance gates were frozen before observation",
+      "threshold": "predeclare and scripts predate all raw profiles; one observation per control; zero maximum=0; ratio=1.8..2.2; signal-to-noise minimum=10",
+      "value": "predeclare/scripts mtime=2026-07-16T05:11:50Z; raw mtimes=2026-07-16T05:12:03Z; all declared controls and thresholds matched",
+      "source_of_truth": "/tmp/dkr-p4-allocation-leaf/predeclare.json, observe.mjs, replay.mjs, and raw profiles",
+      "replay": "Read predeclare.json and compare its controls, thresholds, and file timestamps with observe.mjs, replay.mjs, and the raw profiles",
+      "exit_code": 0,
+      "sha256": [
+        "8b09f1c204301c6d9f10dcafe596648dd13641650d5b12834921640401e74377",
+        "f16e2ffd7aafd18dc8068d299dfc0228f04b0df4719f295a61f887f54a727c54",
+        "11fced10e13681bbd79609cdfa36815f926fc6ad0301fabb85528e0c748b5452"
+      ],
+      "observed_at": "2026-07-16T05:19:16Z",
+      "decision": "accepted",
+      "evidence": [
+        "Node.js 26.4.0; V8 14.6.202.34-node.21; allocation leaf=allocateOne.",
+        "batchObjects=200000; samplingIntervalBytes=32768; stackDepth=64; includeObjectsCollectedByMajorGC=false.",
+        "observationsPerControl=1 for zero, one, and two.",
+        "zeroAttributedBytesMax=0; oneAttributedBytesMinExclusive=0; twoToOneRatio=1.8..2.2; signalToNoiseMin=10."
+      ]
+    },
+    {
+      "claim_id": "DKR-P4-EVIDENCE-HASHES",
+      "check": "Every evidence hash cited by the checkpoint matches the saved artifact bytes",
+      "threshold": "7 of 7 cited sha256 hashes match",
+      "value": "7 of 7 matched",
+      "source_of_truth": "/tmp/dkr-p4-allocation-leaf/{predeclare.json,observe.mjs,replay.mjs,raw-zero.json,raw-one.json,raw-two.json,replay-output.json}",
+      "replay": "sha256sum the seven cited allocation-leaf artifacts and compare with checkpoint evidence_refs_or_hashes",
+      "exit_code": 0,
+      "sha256": [
+        "8b09f1c204301c6d9f10dcafe596648dd13641650d5b12834921640401e74377",
+        "f16e2ffd7aafd18dc8068d299dfc0228f04b0df4719f295a61f887f54a727c54",
+        "11fced10e13681bbd79609cdfa36815f926fc6ad0301fabb85528e0c748b5452",
+        "da2925784dec352af6d5d3c48339a55de031f1592c125b14e35a82afa98764c1",
+        "9c8935009aa29969fa57816cbe4e196c52c20718cca882e39f47d962b215a448",
+        "a227b63c87ae6628c874671195aa16694c1be926c03a1c33cbe55144e24844d6",
+        "bd9b590d5bf137d89fa6b0a3f637c385b735473e792db0635b9db0f12864874e"
+      ],
+      "observed_at": "2026-07-16T05:19:16Z",
+      "decision": "accepted",
+      "evidence": [
+        "All seven checkpoint evidence references matched their saved files exactly."
+      ]
+    },
+    {
+      "claim_id": "DKR-P4-ONE-SHOT-REPLAY",
+      "check": "The saved checker reproduces the exact zero, one, two, ratio, and signal-to-noise values",
+      "threshold": "zero=0; one=12882032; two=25534256; ratio=1.9821605783932223 within 1.8..2.2; signal-to-noise=12882032 >=10; methodAccepted=true",
+      "value": "zero=0; one=12882032; two=25534256; ratio=1.9821605783932223; signal-to-noise=12882032; methodAccepted=true",
+      "source_of_truth": "/tmp/dkr-p4-allocation-leaf/replay.mjs and the three raw profiles",
+      "replay": "cd /tmp/dkr-p4-allocation-leaf && node replay.mjs raw-zero.json raw-one.json raw-two.json",
+      "exit_code": 0,
+      "sha256": [
+        "11fced10e13681bbd79609cdfa36815f926fc6ad0301fabb85528e0c748b5452",
+        "da2925784dec352af6d5d3c48339a55de031f1592c125b14e35a82afa98764c1",
+        "9c8935009aa29969fa57816cbe4e196c52c20718cca882e39f47d962b215a448",
+        "a227b63c87ae6628c874671195aa16694c1be926c03a1c33cbe55144e24844d6"
+      ],
+      "observed_at": "2026-07-16T05:19:16Z",
+      "decision": "accepted",
+      "evidence": [
+        "observations=[zero:0, one:12882032, two:25534256]",
+        "twoToOneRatio=1.9821605783932223",
+        "signalToNoise=12882032",
+        "checks={zeroExact:true,onePositive:true,ratio:true,signalToNoise:true}",
+        "methodAccepted=true"
+      ]
+    },
+    {
+      "claim_id": "DKR-P4-SAMPLER-AND-BATCH-CONTROLS",
+      "check": "Each profile uses the frozen runtime, sampler settings, batch count, and retained in-heap control",
+      "threshold": "metadata exactly matches Node 26.4.0, V8 14.6.202.34-node.21, 200000 objects per batch, interval 32768, depth 64, major-GC collection false, and retainedBatchCount equal to 0, 1, and 2",
+      "value": "all three profile metadata records matched; retainedBatchCount=[0,1,2]",
+      "source_of_truth": "/tmp/dkr-p4-allocation-leaf/observe.mjs and raw-zero.json, raw-one.json, raw-two.json",
+      "replay": "Read the observer retention path and compare all raw metadata through replay.mjs metadata guards",
+      "exit_code": 0,
+      "sha256": [
+        "f16e2ffd7aafd18dc8068d299dfc0228f04b0df4719f295a61f887f54a727c54",
+        "11fced10e13681bbd79609cdfa36815f926fc6ad0301fabb85528e0c748b5452",
+        "da2925784dec352af6d5d3c48339a55de031f1592c125b14e35a82afa98764c1",
+        "9c8935009aa29969fa57816cbe4e196c52c20718cca882e39f47d962b215a448",
+        "a227b63c87ae6628c874671195aa16694c1be926c03a1c33cbe55144e24844d6"
+      ],
+      "observed_at": "2026-07-16T05:19:16Z",
+      "decision": "accepted",
+      "evidence": [
+        "observe.mjs pushes each 200000-object batch into the process-local retained array before profiling stops.",
+        "Raw metadata reports batches and retainedBatchCount as zero=0, one=1, two=2.",
+        "The one-shot replay rejects any runtime, V8, sampler, batch, or retention metadata drift."
+      ]
+    },
+    {
+      "claim_id": "DKR-P4-NO-FAVORABLE-REPEAT",
+      "check": "The saved study evidence contains one frozen output per control and the observer prevents overwriting those outputs",
+      "threshold": "exactly one named raw profile for each control; output-exists guard; repeats_after_result=0",
+      "value": "raw-zero.json, raw-one.json, and raw-two.json exist once; observe.mjs exits 2 when the requested output exists; finish record reports repeats_after_result=0",
+      "source_of_truth": "/tmp/dkr-p4-allocation-leaf/observe.mjs, the three raw profiles, and workers/dkr-p4-allocation-leaf/progress.finish.json",
+      "replay": "Read observe.mjs output-exists guard, enumerate the frozen raw profile names, and compare progress.finish.json observation_count",
+      "exit_code": 0,
+      "sha256": [
+        "f16e2ffd7aafd18dc8068d299dfc0228f04b0df4719f295a61f887f54a727c54",
+        "da2925784dec352af6d5d3c48339a55de031f1592c125b14e35a82afa98764c1",
+        "9c8935009aa29969fa57816cbe4e196c52c20718cca882e39f47d962b215a448",
+        "a227b63c87ae6628c874671195aa16694c1be926c03a1c33cbe55144e24844d6"
+      ],
+      "observed_at": "2026-07-16T05:19:16Z",
+      "decision": "accepted",
+      "evidence": [
+        "The frozen directory contains one raw-zero.json, one raw-one.json, and one raw-two.json.",
+        "observe.mjs exits before sampling when its output path already exists.",
+        "progress.finish.json records one observation per control and zero repeats after result.",
+        "This verifies the saved study boundary; it does not claim visibility into observations outside the frozen directory."
+      ]
+    },
+    {
+      "claim_id": "DKR-P4-FRESHNESS",
+      "check": "The checkpoint remains within its 30 minute freshness window",
+      "threshold": "age_seconds <= 1800",
+      "value": "age_seconds=433",
+      "source_of_truth": "workers/dkr-p4-allocation-leaf/checkpoint.v1.json observed_at and max_age",
+      "replay": "Read observed_at and max_age and compare with date -u +%Y-%m-%dT%H:%M:%SZ",
+      "exit_code": 0,
+      "sha256": [
+        "6a2c98b6f5b6a0a9ac66efc718dc64186062f3f0fb0a97fc75205d520b13774e"
+      ],
+      "observed_at": "2026-07-16T05:19:16Z",
+      "decision": "accepted",
+      "evidence": [
+        "checkpoint observed_at=2026-07-16T05:12:03Z",
+        "validator observed_at=2026-07-16T05:19:16Z",
+        "max_age=30m"
+      ]
+    },
+    {
+      "claim_id": "DKR-P4-DOWNSTREAM-BOUNDARY",
+      "check": "Only the calibration method may advance as reducing discovery; product allocation, retained-memory, regression, and optimization claims remain blocked",
+      "threshold": "method calibration supported under frozen controls; no pumped-fn allocation or optimization claim",
+      "value": "dedicated-leaf method calibration accepted for reducing discovery only; product claims remain blocked",
+      "source_of_truth": "The one-shot replay and workers/dkr-p4-allocation-leaf/checkpoint.v1.json calibration_boundary",
+      "replay": "Compare the replay decision with checkpoint questions_unanswered, downstream_decision, calibration_boundary, and wall_gate",
+      "exit_code": 0,
+      "sha256": [
+        "6a2c98b6f5b6a0a9ac66efc718dc64186062f3f0fb0a97fc75205d520b13774e"
+      ],
+      "observed_at": "2026-07-16T05:19:16Z",
+      "decision": "accepted",
+      "evidence": [
+        "The replay accepts the dedicated allocateOne leaf under the frozen Node 26 controls.",
+        "No pumped-fn workload was measured and no baseline-versus-candidate allocation comparison exists.",
+        "The probe does not measure retained heap after cleanup.",
+        "CKR performance, product allocation claims, retained-memory claims, and optimization remain blocked."
+      ]
+    }
+  ],
+  "active_wall_verification": [
+    {
+      "metric_id": "invalid_performance_comparison_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_for_frozen_calibration_controls",
+      "evidence_claim_id": "DKR-P4-ONE-SHOT-REPLAY"
+    },
+    {
+      "metric_id": "unsupported_performance_claim_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_for_reducing_discovery",
+      "evidence_claim_id": "DKR-P4-DOWNSTREAM-BOUNDARY"
+    },
+    {
+      "metric_id": "allocation_regression_case_count",
+      "value": null,
+      "threshold": 0,
+      "verdict": "blocked_no_product_comparison",
+      "evidence_claim_id": "DKR-P4-DOWNSTREAM-BOUNDARY"
+    },
+    {
+      "metric_id": "single_llm_truth_acceptance_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_by_independent_replay",
+      "evidence_claim_id": "DKR-P4-ONE-SHOT-REPLAY"
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_within_saved_study_boundary",
+      "evidence_claim_id": "DKR-P4-NO-FAVORABLE-REPEAT"
+    }
+  ],
+  "summary": {
+    "accepted": 8,
+    "rejected": 0,
+    "rejected_claim_ids": [],
+    "decision": "accepted_reducing_discovery_only"
+  },
+  "wall_gate": {
+    "verdict": "blocked_for_product_claims",
+    "dkr_learning_advance": "allowed_reducing_discovery_only",
+    "allocation_method_calibration": "accepted_under_frozen_controls",
+    "ckr_performance_advance": "blocked",
+    "product_allocation_claims": "blocked",
+    "retained_memory_claims": "blocked",
+    "optimization": "blocked",
+    "reason": "The dedicated-leaf calibration replay is valid under its frozen Node 26 controls, but no pumped-fn workload, retained-memory outcome, or baseline-versus-candidate allocation comparison was measured."
+  }
+}

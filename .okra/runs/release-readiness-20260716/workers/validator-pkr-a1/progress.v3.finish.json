@@ -1,0 +1,15 @@
+{
+  "type": "worker_finish",
+  "worker_id": "validator-pkr-a1",
+  "worker_kind": "verification",
+  "unit_id": "PKR-A1",
+  "status": "complete",
+  "recorded_at": "2026-07-16T05:32:17Z",
+  "verification_ref": "workers/validator-pkr-a1/verification.v3.json",
+  "accepted": 4,
+  "rejected": 0,
+  "rejected_claim_ids": [],
+  "decision": "accepted",
+  "downstream_advance": "allowed",
+  "product_files_changed": false
+}

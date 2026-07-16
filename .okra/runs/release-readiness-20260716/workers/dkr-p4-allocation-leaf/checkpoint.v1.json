@@ -1,0 +1,190 @@
+{
+  "checkpoint_id": "dkr-p4-allocation-leaf.node26-dedicated-leaf.v1",
+  "conclusion_id": "node26-allocation-sampling-dedicated-leaf-linear-signal",
+  "decision_target": "Whether a dedicated named allocation leaf can provide a calibrated Node 26 allocation-sampling primitive for later product workload comparisons.",
+  "source_of_truth": "The frozen predeclaration, one raw Node HeapProfiler sampling profile for each of zero, one, and two controls, and deterministic replay output under /tmp/dkr-p4-allocation-leaf.",
+  "read_method": "Run replay.mjs against raw-zero.json, raw-one.json, and raw-two.json; it rejects metadata drift and sums node.selfSize only for callFrame.functionName equal to allocateOne.",
+  "observed_at": "2026-07-16T05:12:03Z",
+  "recorded_at": "2026-07-16T05:12:59Z",
+  "max_age": "30m",
+  "freshness_status": "fresh",
+  "confidence": 0.95,
+  "confidence_probability_update": {
+    "prior": null,
+    "posterior": 0.95,
+    "reason": "The packet supplied no numeric prior. The posterior is limited to this runtime, object shape, batch, sampler settings, and dedicated-leaf attribution."
+  },
+  "frozen_thresholds": {
+    "zero_attributed_bytes_max": 0,
+    "one_attributed_bytes_min_exclusive": 0,
+    "two_to_one_ratio_min": 1.8,
+    "two_to_one_ratio_max": 2.2,
+    "signal_to_noise_min": 10
+  },
+  "raw_observations": {
+    "zero_attributed_bytes": 0,
+    "one_attributed_bytes": 12882032,
+    "two_attributed_bytes": 25534256,
+    "two_to_one_ratio": 1.9821605783932223,
+    "signal_to_noise": 12882032,
+    "formulae": {
+      "two_to_one_ratio": "25534256 / 12882032",
+      "signal_to_noise": "12882032 / max(1, 0)"
+    }
+  },
+  "controls": {
+    "runtime": "Node.js 26.4.0",
+    "v8": "14.6.202.34-node.21",
+    "batch_objects": 200000,
+    "sampling_interval_bytes": 32768,
+    "stack_depth": 64,
+    "include_objects_collected_by_major_gc": false,
+    "zero_batches": 0,
+    "one_batches": 1,
+    "two_batches": 2,
+    "retention": "Every allocated batch remains reachable through the process-local retained array until profiling stops."
+  },
+  "evidence_refs_or_hashes": [
+    "sha256:8b09f1c204301c6d9f10dcafe596648dd13641650d5b12834921640401e74377",
+    "sha256:f16e2ffd7aafd18dc8068d299dfc0228f04b0df4719f295a61f887f54a727c54",
+    "sha256:11fced10e13681bbd79609cdfa36815f926fc6ad0301fabb85528e0c748b5452",
+    "sha256:da2925784dec352af6d5d3c48339a55de031f1592c125b14e35a82afa98764c1",
+    "sha256:9c8935009aa29969fa57816cbe4e196c52c20718cca882e39f47d962b215a448",
+    "sha256:a227b63c87ae6628c874671195aa16694c1be926c03a1c33cbe55144e24844d6",
+    "sha256:bd9b590d5bf137d89fa6b0a3f637c385b735473e792db0635b9db0f12864874e"
+  ],
+  "replay_command_or_checker": "/tmp/dkr-p4-allocation-leaf/replay.mjs raw-zero.json raw-one.json raw-two.json",
+  "questions_answered": [
+    "The zero control attributes exactly 0 bytes to allocateOne because it never calls that leaf.",
+    "The one control has a positive 12882032-byte attributed signal.",
+    "The two control has a 25534256-byte signal and a two-to-one ratio of 1.9821605783932223, within the frozen 1.8 to 2.2 interval.",
+    "The signal-to-noise calculation is 12882032, above the frozen minimum of 10.",
+    "A raw profile plus a saved replay script can isolate allocations to a dedicated named leaf without using heapUsed deltas."
+  ],
+  "questions_unanswered": [
+    "Whether actual pumped-fn lifecycle operations can be isolated behind dedicated named leaves without adding benchmark-only production branches.",
+    "The variance of this method across multiple independently authorized observations, runtimes, object shapes, and machines.",
+    "Whether retained-memory behavior regresses; this probe measures sampled allocation bytes, not retained heap after cleanup.",
+    "Whether any existing or proposed pumped-fn workload has an allocation regression relative to its frozen baseline."
+  ],
+  "risk_or_anti_goal_implications": [
+    "The method avoids treating heapUsed delta as allocation bytes.",
+    "The result supports only method calibration under the frozen controls; it does not support a pumped-fn performance or allocation-improvement claim.",
+    "No observation was repeated after the favorable result, and the observer refuses to overwrite a raw profile.",
+    "Independent replay and wall review remain mandatory before the result can steer downstream work."
+  ],
+  "candidate_pkrs": [
+    "Add a Node 26 allocation-sampling calibration gate with zero, one, and two controls around dedicated benchmark leaves.",
+    "Measure frozen representative pumped-fn workloads with the calibrated method, keeping sampled allocation bytes separate from retained-memory checks.",
+    "Add an independent retained-memory cleanup probe for scope and session lifecycle workloads."
+  ],
+  "decision": "candidate_method_supported_pending_independent_review",
+  "downstream_decision": "Do not claim product allocation improvement. After independent validation, the orchestrator may fund a PKR that uses this calibrated dedicated-leaf method on frozen product workloads.",
+  "flag_if_missing_or_stale": "breaking",
+  "reviewer_audit_status": "pending_independent_review",
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "allocation_regression_case_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "metric_id": "invalid_performance_comparison_count",
+      "source_of_truth": "Frozen predeclare plus one raw profile per control and deterministic replay",
+      "read_method": "Inspect predeclare.json and replay the three profiles with replay.mjs",
+      "observed_at": "2026-07-16T05:12:03Z",
+      "recorded_at": "2026-07-16T05:12:59Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "unknown",
+      "evidence_ref": "sha256:bd9b590d5bf137d89fa6b0a3f637c385b735473e792db0635b9db0f12864874e",
+      "replay_command_or_checker": "/tmp/dkr-p4-allocation-leaf/replay.mjs",
+      "verification_record_ref": "missing:independent-validator-record"
+    },
+    {
+      "metric_id": "unsupported_performance_claim_count",
+      "source_of_truth": "Worker checkpoint and raw replay output",
+      "read_method": "Check that the checkpoint limits the conclusion to method calibration and makes no pumped-fn performance claim",
+      "observed_at": "2026-07-16T05:12:03Z",
+      "recorded_at": "2026-07-16T05:12:59Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "unknown",
+      "evidence_ref": "sha256:bd9b590d5bf137d89fa6b0a3f637c385b735473e792db0635b9db0f12864874e",
+      "replay_command_or_checker": "/tmp/dkr-p4-allocation-leaf/replay.mjs",
+      "verification_record_ref": "missing:independent-validator-record"
+    },
+    {
+      "metric_id": "allocation_regression_case_count",
+      "source_of_truth": "Worker checkpoint scope and raw calibration profiles",
+      "read_method": "Confirm this probe makes no baseline-versus-candidate product comparison",
+      "observed_at": "2026-07-16T05:12:03Z",
+      "recorded_at": "2026-07-16T05:12:59Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "unknown",
+      "evidence_ref": "sha256:bd9b590d5bf137d89fa6b0a3f637c385b735473e792db0635b9db0f12864874e",
+      "replay_command_or_checker": "/tmp/dkr-p4-allocation-leaf/replay.mjs",
+      "verification_record_ref": "missing:independent-validator-record"
+    },
+    {
+      "metric_id": "single_llm_truth_acceptance_count",
+      "source_of_truth": "Checkpoint decision and reviewer status",
+      "read_method": "Require an independent validator record before acceptance",
+      "observed_at": "2026-07-16T05:12:03Z",
+      "recorded_at": "2026-07-16T05:12:59Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "unknown",
+      "evidence_ref": "sha256:bd9b590d5bf137d89fa6b0a3f637c385b735473e792db0635b9db0f12864874e",
+      "replay_command_or_checker": "/tmp/dkr-p4-allocation-leaf/replay.mjs",
+      "verification_record_ref": "missing:independent-validator-record"
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "source_of_truth": "Frozen predeclare, overwrite-rejecting observer, and raw profile manifest",
+      "read_method": "Inspect predeclare.json, observe.mjs, and the three raw profile hashes",
+      "observed_at": "2026-07-16T05:12:03Z",
+      "recorded_at": "2026-07-16T05:12:59Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "unknown",
+      "evidence_ref": "sha256:f16e2ffd7aafd18dc8068d299dfc0228f04b0df4719f295a61f887f54a727c54",
+      "replay_command_or_checker": "/tmp/dkr-p4-allocation-leaf/replay.mjs",
+      "verification_record_ref": "missing:independent-validator-record"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "unknown",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-16T05:12:59Z",
+    "reason": "Worker evidence is not acceptance; independent verification records are absent."
+  },
+  "stop_rule_observed": "One observation was run for each control. The study stopped after deterministic replay; no favorable repeat was attempted.",
+  "worker_boundary": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "persisted_at": "2026-07-16T05:16:04Z",
+  "calibration_boundary": {
+    "verdict": "supported_by_single_worker_probe",
+    "applies_when": "Node.js 26.4.0 with V8 14.6.202.34-node.21, a 32768-byte sampling interval, stack depth 64, retained in-heap JavaScript objects, fixed 200000-object batches, and attribution only to the allocateOne frame.",
+    "does_not_apply_when": "Claiming pumped-fn workload allocation, retained-memory behavior, cross-runtime behavior, or a baseline-versus-candidate regression.",
+    "downstream_product_claims": "blocked",
+    "independent_acceptance": "pending"
+  }
+}

@@ -1,0 +1,188 @@
+{
+  "checkpoint_id": "DKR-P3.allocation.2026-07-16T05:01:26Z",
+  "conclusion_id": "dkr-p3-in-heap-sampler-rejected-zero-noise",
+  "unit_id": "DKR-P3",
+  "worker_id": "dkr-p3-allocation",
+  "worker_kind": "discovery",
+  "decision_target": "Decide whether a Node 26 inspector allocation sampler using retained in-heap approximately 1 KiB controls is calibrated strongly enough to authorize measurement implementation.",
+  "source_of_truth": [
+    "/tmp/dkr-p3-allocation/predeclared.json",
+    "/tmp/dkr-p3-allocation/observe.mjs",
+    "/tmp/dkr-p3-allocation/raw.json",
+    "/tmp/dkr-p3-allocation/check-replay.mjs",
+    "/tmp/dkr-p3-allocation/replay.json",
+    ".okra/runs/release-readiness-20260716/worker-packets/dkr-p3-allocation.json",
+    ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-p2.v1.json"
+  ],
+  "read_method": "Freeze the runtime, sampler, batch, in-heap controls, script hashes, and acceptance thresholds; syntax-check without profiling; run each 0x, 1x, and 2x control exactly once in one Node process; preserve raw output; replay only saved arithmetic with a deterministic checker.",
+  "observed_at": "2026-07-16T05:00:49.828Z",
+  "recorded_at": "2026-07-16T05:01:26Z",
+  "max_age": "30m",
+  "freshness_status": "fresh",
+  "confidence_probability_update": {
+    "before": 0.5,
+    "after": 0.97,
+    "claim": "This exact allocateControl attribution method violates the predeclared zero-noise threshold and must be rejected."
+  },
+  "result": {
+    "status": "reducing_discovery_pending_independent_validation",
+    "decision": "rejected",
+    "fail_closed": true,
+    "measurement_implementation": "blocked",
+    "optimization": "blocked"
+  },
+  "predeclared_thresholds": {
+    "node_version": "v26.4.0",
+    "sampling_interval_bytes": 1,
+    "include_objects_collected_by_major_gc": false,
+    "include_objects_collected_by_minor_gc": false,
+    "iterations": 256,
+    "array_slots": 128,
+    "approximate_payload_bytes_per_object": 1024,
+    "control_units": [0, 1, 2],
+    "observation_count_per_control": 1,
+    "zero_attributed_bytes_max": 0,
+    "one_bytes_per_iteration_min": 768,
+    "one_bytes_per_iteration_max": 1408,
+    "signal_to_noise_min": 64,
+    "two_to_one_ratio_min": 1.8,
+    "two_to_one_ratio_max": 2.2
+  },
+  "raw_controls": [
+    {
+      "units": 0,
+      "retained_objects": 0,
+      "attributed_bytes": 168
+    },
+    {
+      "units": 1,
+      "retained_objects": 256,
+      "attributed_bytes": 278632
+    },
+    {
+      "units": 2,
+      "retained_objects": 512,
+      "attributed_bytes": 557160
+    }
+  ],
+  "acceptance_arithmetic": {
+    "zero_attributed_bytes": 168,
+    "one_signal_bytes": 278464,
+    "two_signal_bytes": 556992,
+    "one_bytes_per_iteration": 1087.75,
+    "two_bytes_per_iteration": 2175.75,
+    "signal_to_noise": 1087.75,
+    "two_to_one_ratio": 2.0002298322224776,
+    "checks": {
+      "config_hash": true,
+      "node_version": true,
+      "sampler": true,
+      "batch": true,
+      "control": true,
+      "retained_counts": true,
+      "zero_noise": false,
+      "one_signal_floor": true,
+      "one_signal_ceiling": true,
+      "signal_to_noise": true,
+      "proportionality_floor": true,
+      "proportionality_ceiling": true
+    },
+    "accepted": false,
+    "decisive_failure": "The zero control attributed 168 bytes, exceeding the frozen maximum of 0 bytes."
+  },
+  "questions_answered": [
+    "The retained JavaScript-array controls produce approximately 1088 attributed bytes per 1 KiB object per iteration.",
+    "The 2x control is proportional to the 1x control at 2.0002298322224776.",
+    "The current function-level attribution includes 168 bytes when no controlled object is retained, so it fails the declared zero-noise contract.",
+    "No repeat observation is needed or allowed to reject this method."
+  ],
+  "questions_unanswered": [
+    "Whether attributing only a leaf allocator that the zero control never invokes yields exactly zero attributed bytes while preserving the 1x and 2x signals.",
+    "Whether an independently replayed accepted calibration can support product allocation regression rows."
+  ],
+  "risk_or_anti_goal_implications": [
+    "Accepting the strong proportionality while ignoring the failed zero-noise gate would create an invalid performance comparison.",
+    "No product allocation claim or regression count can be derived from this rejected calibration.",
+    "Independent validation remains required before any discovery is accepted."
+  ],
+  "candidate_ckrs": [],
+  "candidate_pkrs": [],
+  "next_narrower_method": {
+    "unit": "candidate DKR-P4",
+    "method": "Move only the new Array(128).fill(value) expression into a named allocateOne leaf and attribute that leaf. The 0x control must never call allocateOne. Freeze the same Node version, sampler settings, batch, and thresholds before one 0x/1x/2x observation.",
+    "reason": "The observed 168 bytes are fixed scaffolding attributed to allocateControl. A never-called leaf gives the zero control an exact attribution boundary without subtracting or relaxing noise after seeing the result."
+  },
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "allocation_regression_case_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "active_wall_readings": [
+    {
+      "metric_id": "invalid_performance_comparison_count",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held_for_worker_discovery_by_rejecting_failed_calibration"
+    },
+    {
+      "metric_id": "unsupported_performance_claim_count",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held_for_worker_report"
+    },
+    {
+      "metric_id": "allocation_regression_case_count",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "blocked_rejected_calibration"
+    },
+    {
+      "metric_id": "single_llm_truth_acceptance_count",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_validation"
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held_for_worker_report"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "blocked_rejected_allocation_calibration_and_pending_independent_validation",
+    "dkr_learning_advance": "pending_independent_validation",
+    "measurement_implementation": "blocked",
+    "optimization": "blocked",
+    "worker_evidence_is_acceptance": false
+  },
+  "evidence_refs_or_hashes": {
+    "/tmp/dkr-p3-allocation/predeclared.json": "e0f244126ba1e04afe85d753f650b1575ff2900e827ae34fb61064e7bdf5ed6d",
+    "/tmp/dkr-p3-allocation/observe.mjs": "18183d8eff6af055dde6a22cbcc425603e5f5f80ef1bff9bdd1cb4607dab9ce4",
+    "/tmp/dkr-p3-allocation/raw.json": "73a837b771dfd7c572c3ac6f8d015051ec463a60c0149606dbdb6962c08154e6",
+    "/tmp/dkr-p3-allocation/check-replay.mjs": "f59e8aed8030068ce490d826c6b3393935bf4e164867d28383005b58b8f2e003",
+    "/tmp/dkr-p3-allocation/replay.json": "25a6532abf7d58825ea23f1dccf0c7dc6e806b13f7f06b3e6db6d62d018a1cb9",
+    ".okra/runs/release-readiness-20260716/worker-packets/dkr-p3-allocation.json": "5c620cb3761a7915d9c4685d9e80a63727eecee5f96b9b3a100bfe1aa59cae89",
+    ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-p2.v1.json": "a02fd97f389618e1e6a50fbc970cc8cbe0a9027d93f9838d03b6662ace7ff952"
+  },
+  "exact_commands": [
+    "node --check /tmp/dkr-p3-allocation/observe.mjs",
+    "node --check /tmp/dkr-p3-allocation/check-replay.mjs",
+    "node --expose-gc /tmp/dkr-p3-allocation/observe.mjs /tmp/dkr-p3-allocation/predeclared.json /tmp/dkr-p3-allocation/raw.json",
+    "node /tmp/dkr-p3-allocation/check-replay.mjs /tmp/dkr-p3-allocation/predeclared.json /tmp/dkr-p3-allocation/raw.json"
+  ],
+  "observation_command_count": 1,
+  "replay_command_or_checker": "/tmp/dkr-p3-allocation/check-replay.mjs deterministically recalculates every gate from predeclared.json and raw.json; its expected exit code is 1 for this preserved rejection.",
+  "downstream_decision": "Reject this allocation method. Keep measurement implementation and optimization blocked. The orchestrator may fund only the named leaf-attribution DKR as the next narrower probe.",
+  "flag_if_missing_or_stale": "breaking:rejected-allocation-calibration-or-independent-validation-missing",
+  "workspace_effect": "No product file was edited by this worker. Scratch evidence exists only under /tmp/dkr-p3-allocation; checkpoint.v1.json and progress.finish.json are the authorized durable worker records.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "worker_evidence_is_acceptance": false
+}

@@ -1,0 +1,8 @@
+{
+  "type": "estimation_record",
+  "phase": "estimate",
+  "unit_id": "DKR-P4",
+  "estimate": { "time_min": 30, "turns": 1, "tokens": null },
+  "observed_at": "2026-07-16T05:07:00Z",
+  "dispatch_ref": "worker-packets/dkr-p4-allocation-leaf.json"
+}
