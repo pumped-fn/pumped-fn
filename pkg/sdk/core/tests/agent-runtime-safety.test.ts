@@ -47,6 +47,87 @@ function authority(tools: readonly string[] = []): session.Authority {
 const engine = validation.standard<z.ZodType>({ id: "zod@4", toJsonSchema: (schema) => z.toJSONSchema(schema) })
 
 describe("agent runtime safety", () => {
+  it("refines the safe observation projection only for the selected tool", async () => {
+    const observed: { name: string; projection: session.ObservationProjection | undefined }[] = []
+    const schema = z.object({})
+    const inspect = flow({
+      name: "inspect",
+      tags: [agent.config.tool({ version: "1", description: "Inspect.", input: schema })],
+      deps: { projection: tags.required(session.observation.current) },
+      factory: (_ctx, { projection }) => projection,
+    })
+    const model = flow({
+      name: "safety.observation-model",
+      parse: typed<ModelRequest>(),
+      factory: (): ModelResponse => ({
+        content: "",
+        toolCalls: [{ name: "inspect", input: {} }],
+        stop: true,
+      }),
+    })
+    const granted = authority(["inspect"])
+    const scope = createScope({
+      tags: [
+        session.authority(granted),
+        session.record(initial(granted)),
+        session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
+        validation.engine(engine),
+        agent.config.role({ name: "observer", version: "1" }),
+        agent.impl.tool(inspect),
+        agent.impl.attempt(agent.fromModel),
+        modelImpl(model),
+        session.execution.turn({ flow: agent.turn }),
+      ],
+      extensions: [{
+        name: "observation-recorder",
+        async wrapExec(next, target, child) {
+          observed.push({
+            name: target.name ?? "",
+            projection: child.data.seekTag(session.observation.current),
+          })
+          return next()
+        },
+      }],
+    })
+    const ctx = scope.createContext()
+
+    const result = await ctx.exec({
+      flow: session.run,
+      tags: [session.observation.channel("github")],
+      input: {
+        work: { id: "observed", branchId: "main", role: "observer", policy: "all" },
+        input: { prompt: "Inspect." },
+      },
+    })
+
+    expect(result.toolResults[0]?.output).toEqual({
+      sessionId: "agent-runtime-safety",
+      activationId: "agent-runtime-safety:observed:1",
+      workId: "observed",
+      channel: "github",
+      role: "observer",
+      tool: "inspect",
+    })
+    expect(observed.find(({ name }) => name === "agent.turn")?.projection).toEqual({
+      sessionId: "agent-runtime-safety",
+      activationId: "agent-runtime-safety:observed:1",
+      workId: "observed",
+      channel: "github",
+      role: "observer",
+    })
+    expect(observed.find(({ name }) => name === "inspect")?.projection).toEqual({
+      sessionId: "agent-runtime-safety",
+      activationId: "agent-runtime-safety:observed:1",
+      workId: "observed",
+      channel: "github",
+      role: "observer",
+      tool: "inspect",
+    })
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
   it("resolves only lawful role tools and leaves excluded tools without a usable permit", async () => {
     const effects: string[] = []
     const advertised: string[][] = []

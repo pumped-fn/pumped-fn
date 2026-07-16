@@ -40,6 +40,7 @@ export const modelStub: Model = flow({
   factory: (ctx, { respond }) => respond(ctx.input),
 })
 
+/** Supplies streamed model events and the final response returned by an attempt stub. */
 export interface AttemptStubResult {
   readonly events: readonly agent.ModelEvent[]
   readonly result: ModelResponse

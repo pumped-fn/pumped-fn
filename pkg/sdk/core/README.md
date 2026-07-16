@@ -2,6 +2,59 @@
 
 Agent and session primitives built on Lite. Lite owns graph resolution, execution, streaming, lifetimes, and the `createScope` seam. The SDK supplies stable definitions and durable data contracts.
 
+## Migration to 3.0.0
+
+3.0.0 removes the `Agent` facade and the material `session()` object. Every capability is now a
+stable resource, flow, or tag composed through `createScope`. Migrate the removed facade imports
+with this table:
+
+| Removed in 2.x | Replacement in 3.0.0 |
+|---|---|
+| `agent(config)` facade | `agent.role` resource selected by `agent.config.role` |
+| `agent.turn(input)` method | `ctx.exec({ flow: agent.turn, input })` |
+| `session(record)` factory | `session.session` resource with `session.record` / `session.authority` tags |
+| `send(message)` | `ctx.exec({ flow: session.run, input })` |
+| `new Sandbox(policy)` | `sandbox.read`, `sandbox.write`, `sandbox.exec` flows with `sandbox.impl.*` bindings |
+
+Before, the 2.x facade wired provider, tools, and session state implicitly:
+
+```ts
+const a = agent({ role, model, tools })
+const before = await a.turn({ prompt: "Triage the ticket." })
+```
+
+In 3.0.0, the application declares the complete tree and then executes the entry flow:
+
+```ts
+const scope = createScope({
+  tags: [
+    session.authority(boundAuthority),
+    session.record(loadedRecord),
+    session.clock(clock),
+    session.store.commit(commitSession),
+    validation.engine(validationEngine),
+    agent.config.role({ name: "triage", version: "1", instructions: "Triage the ticket." }),
+    agent.impl.attempt(agent.fromModel),
+    model(myScalarModel),
+    session.execution.turn({ flow: agent.turn }),
+  ],
+})
+const ctx = scope.createContext()
+await ctx.resolve(session.session)
+const after = await ctx.exec({
+  flow: session.run,
+  input: {
+    work: { id: "t-1", branchId: "main", role: "triage", policy: "all" },
+    input: { prompt: "Triage the ticket." },
+  },
+})
+await ctx.close()
+await scope.dispose()
+```
+
+No facade auto-collects tools or MCP servers, injects implicit dependencies, or passes `ctx`/`scope`
+into callbacks. Tool selection stays tag-driven and fails closed when a required binding is absent.
+
 ## Package structure
 
 | Import | Owns |
@@ -175,7 +228,7 @@ The durable `SessionRecord` is data. The current-owned `SessionRuntime` coordina
 
 The session resource registers `deactivate()` as cleanup. Cleanup does not commit, schedule, write memory, or call a model. Finish-first makes deactivation wait for the existing finish. Deactivate-first makes later finish fail without a commit.
 
-`session.run` binds one `session.observation.current` projection for the activation. It contains `sessionId`, `activationId`, `workId`, optional `parentWorkId`, and `role`. Extensions can observe that stable projection without enumerating arbitrary execution tags or reading prompts, tool inputs, memory, or credentials.
+`session.run` binds one `session.observation.current` projection for the activation. It contains `sessionId`, `activationId`, `workId`, optional `parentWorkId`, `role`, and an optional application-owned `channel` from `session.observation.channel`. A selected tool refines only its child execution with `tool`; sibling executions keep the base projection. Extensions can observe that safe projection without enumerating arbitrary execution tags or reading prompts, tool inputs, memory, credentials, or backend handles.
 
 ## Providers
 

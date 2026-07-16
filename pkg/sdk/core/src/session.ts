@@ -6,6 +6,7 @@ export type WorkId = string
 export type BranchId = string
 export type InvocationId = string
 
+/** Defines the filesystem, command, write, and network authority available inside a sandbox. */
 export interface SandboxAuthority {
   readonly roots: readonly string[]
   readonly commands: readonly string[]
@@ -13,6 +14,7 @@ export interface SandboxAuthority {
   readonly network: boolean
 }
 
+/** Defines the tenant, resources, permissions, tools, and sandbox limits bound to a session. */
 export interface AuthorityInput {
   readonly tenant: string
   readonly roots: readonly string[]
@@ -21,10 +23,12 @@ export interface AuthorityInput {
   readonly sandbox: SandboxAuthority
 }
 
+/** Represents normalized session authority with its stable content fingerprint. */
 export interface Authority extends AuthorityInput {
   readonly fingerprint: `sha256:${string}`
 }
 
+/** Narrows the authority inherited by child work without granting new capabilities. */
 export interface AuthorityConstraints {
   readonly roots?: readonly string[]
   readonly permissions?: readonly string[]
@@ -71,12 +75,14 @@ export class BoundaryMismatchError extends Error {
   }
 }
 
+/** Identifies evidence attached to a branch, memory entry, or decision. */
 export interface EvidenceRef {
   readonly id: string
   readonly kind: string
   readonly digest?: string
 }
 
+/** Records a versioned session branch and the authority under which it was created. */
 export interface BranchRecord {
   readonly id: BranchId
   readonly parentId?: BranchId
@@ -87,6 +93,7 @@ export interface BranchRecord {
   readonly evidence: readonly EvidenceRef[]
 }
 
+/** Records the lifecycle, lineage, policy, and authority of one unit of session work. */
 export interface WorkRecord {
   readonly id: WorkId
   readonly parentId?: WorkId
@@ -99,6 +106,7 @@ export interface WorkRecord {
   readonly authority: Authority
 }
 
+/** Records one execution attempt for a unit of work. */
 export interface AttemptRecord {
   readonly workId: WorkId
   readonly attempt: number
@@ -108,6 +116,7 @@ export interface AttemptRecord {
   readonly settledAt?: string
 }
 
+/** Records one external or adapter invocation made by a work attempt. */
 export interface InvocationRecord {
   readonly id: InvocationId
   readonly workId: WorkId
@@ -117,6 +126,7 @@ export interface InvocationRecord {
   readonly idempotencyKey: string
 }
 
+/** Identifies a versioned artifact published by session work. */
 export interface ArtifactRef {
   readonly id: string
   readonly version: number
@@ -127,6 +137,7 @@ export interface ArtifactRef {
   readonly branchId: BranchId
 }
 
+/** Identifies a versioned memory entry and its acceptance state. */
 export interface MemoryRef {
   readonly id: string
   readonly version: number
@@ -136,6 +147,7 @@ export interface MemoryRef {
   readonly authorityFingerprint: string
 }
 
+/** Describes when and with what priority scheduled work should resume. */
 export interface ScheduleIntent {
   readonly id: string
   readonly workId: WorkId
@@ -144,6 +156,7 @@ export interface ScheduleIntent {
   readonly expectedSessionVersion: number
 }
 
+/** Captures the durable, versioned state of a session. */
 export interface SessionRecord {
   readonly id: SessionId
   readonly version: number
@@ -163,18 +176,21 @@ export interface SessionRecord {
   readonly nextEventSequence: number
 }
 
+/** Exposes a running attempt, its cancellation signal, and eventual settlement. */
 export interface ActiveAttempt {
   readonly record: AttemptRecord
   readonly signal: AbortSignal
   readonly settled: Promise<AttemptSettlement>
 }
 
+/** Describes the terminal outcome of a work attempt. */
 export interface AttemptSettlement {
   readonly status: "completed" | "failed" | "cancelled"
   readonly result?: Lite.JsonValue
   readonly error?: Lite.JsonValue
 }
 
+/** Supplies the identity, lineage, policy, and authority constraints for admitted work. */
 export interface AdmitWorkInput {
   readonly id: WorkId
   readonly parentId?: WorkId
@@ -184,6 +200,7 @@ export interface AdmitWorkInput {
   readonly authority?: AuthorityConstraints
 }
 
+/** Identifies the exact tool contract, validation engine, readiness edge, and flow. */
 export interface ToolIdentity {
   readonly id: string
   readonly version: string
@@ -193,12 +210,14 @@ export interface ToolIdentity {
   readonly flow: string
 }
 
+/** Proves that a tool identity is authorized for a session epoch. */
 export interface ToolPermit {
   readonly identity: ToolIdentity
   readonly authorityFingerprint: string
   readonly epoch: number
 }
 
+/** Carries an ordered steering action addressed to a work attempt. */
 export interface ControlEvent {
   readonly id: string
   readonly workId: WorkId
@@ -210,6 +229,7 @@ export interface ControlEvent {
   readonly payload: Lite.JsonValue
 }
 
+/** Represents an ordered observation emitted by session work. */
 export interface SessionEvent {
   readonly sessionId: SessionId
   readonly workId: WorkId
@@ -226,6 +246,7 @@ export interface SessionEvent {
   readonly observedAt: string
 }
 
+/** Projects session activation data for observation extensions. */
 export interface ObservationProjection {
   readonly sessionId: SessionId
   readonly activationId: string
@@ -238,6 +259,7 @@ export interface ObservationProjection {
 
 export type SessionEventInput = Omit<SessionEvent, "sessionId" | "sequence" | "observedAt">
 
+/** Manages admission, settlement, cancellation, and lookup of session work. */
 export interface WorkRegistry {
   admit(input: AdmitWorkInput): ActiveAttempt
   settle(workId: WorkId, attempt: number, settlement: AttemptSettlement): void
@@ -246,37 +268,44 @@ export interface WorkRegistry {
   cancel(workId: WorkId, reason: unknown): void
 }
 
+/** Issues, verifies, and revokes tool permits for session epochs. */
 export interface ToolRegistry {
   permit(identity: ToolIdentity, authority?: Authority, epoch?: number): ToolPermit
   authorize(identity: ToolIdentity, epoch: number, authorityFingerprint: string): ToolPermit
   revoke(epoch: number): void
 }
 
+/** Manages the current branch and records authority-constrained forks. */
 export interface BranchRegistry {
   current(): BranchRecord
   fork(input: { id: BranchId; parentId: BranchId; workId: WorkId; authority: AuthorityConstraints }): BranchRecord
   record(branch: BranchRecord): void
 }
 
+/** Tracks invocation start and terminal settlement by invocation identity. */
 export interface InvocationRegistry {
   start(record: Omit<InvocationRecord, "status">): InvocationRecord
   settle(id: InvocationId, status: Extract<InvocationRecord["status"], "completed" | "failed" | "cancelled" | "quarantined">): InvocationRecord
 }
 
+/** Records artifacts published within the session boundary. */
 export interface ArtifactRegistry {
   record(value: ArtifactRef): ArtifactRef
 }
 
+/** Records memory entries within the session boundary. */
 export interface MemoryRegistry {
   record(value: MemoryRef): MemoryRef
 }
 
+/** Stores opaque provider continuation tokens by provider key. */
 export interface ProviderContinuationRegistry {
   get(key: string): string | undefined
   set(key: string, value: string): void
   delete(key: string): void
 }
 
+/** Queues, drains, and fences ordered steering events for active work. */
 export interface ControlRegistry {
   enqueue(event: ControlEvent): void
   drain(workId: WorkId, afterSequence: number): readonly ControlEvent[]
@@ -284,6 +313,7 @@ export interface ControlRegistry {
   accepts(workId: WorkId, attempt: number, epoch: number): boolean
 }
 
+/** Provides the live authority, registries, events, and lifecycle of a session. */
 export interface SessionRuntime {
   readonly record: SessionRecord
   readonly authority: Authority
@@ -304,10 +334,12 @@ export interface SessionRuntime {
   emit(input: SessionEventInput): SessionEvent
 }
 
+/** Supplies timestamps for deterministic session operations. */
 export interface Clock {
   now(): string
 }
 
+/** Supplies artifact content and ownership for publication. */
 export interface PublishArtifactInput {
   readonly workId: WorkId
   readonly branchId: BranchId
@@ -315,12 +347,14 @@ export interface PublishArtifactInput {
   readonly content: Uint8Array
 }
 
+/** Defines a bounded memory query on behalf of session work. */
 export interface RecallMemoryInput {
   readonly workId: WorkId
   readonly query: string
   readonly limit: number
 }
 
+/** Supplies an evidence-backed memory value for a session branch. */
 export interface CommitMemoryInput {
   readonly workId: WorkId
   readonly branchId: BranchId
@@ -328,21 +362,25 @@ export interface CommitMemoryInput {
   readonly evidence: readonly EvidenceRef[]
 }
 
+/** Identifies the evidence used to accept a candidate memory entry. */
 export interface AcceptMemoryInput {
   readonly id: string
   readonly workId: WorkId
   readonly evidence: readonly EvidenceRef[]
 }
 
+/** Couples newly admitted work with the schedule intent that delays it. */
 export interface WaitWorkInput {
   readonly work: AdmitWorkInput
   readonly intent: Omit<ScheduleIntent, "workId">
 }
 
+/** Identifies scheduled work to wake. */
 export interface WakeInput {
   readonly id: string
 }
 
+/** Defines an authority-constrained fork from an existing session branch. */
 export interface ForkBranchInput {
   readonly id: BranchId
   readonly parentId: BranchId
@@ -350,11 +388,13 @@ export interface ForkBranchInput {
   readonly authority: AuthorityConstraints
 }
 
+/** Selects work units and the failure policy used when joining them. */
 export interface JoinWorkInput {
   readonly workIds: readonly WorkId[]
   readonly policy: "all" | "fail-fast"
 }
 
+/** Defines a version-checked merge of source branches into a target branch. */
 export interface MergeBranchesInput {
   readonly targetId: BranchId
   readonly sourceIds: readonly BranchId[]
@@ -362,22 +402,26 @@ export interface MergeBranchesInput {
   readonly expectedTargetVersion: number
 }
 
+/** Supplies the session identity and authority required to resume it. */
 export interface ResumeInput {
   readonly id: SessionId
   readonly authority: Authority
 }
 
+/** Bundles a session record, its verified authority, and execution tags. */
 export interface SessionBindings {
   readonly record: SessionRecord
   readonly authority: Authority
   readonly tags: readonly Lite.Tagged<any>[]
 }
 
+/** Couples admitted work metadata with the input for a session turn. */
 export interface RunInput<Input> {
   readonly work: AdmitWorkInput
   readonly input: Input
 }
 
+/** Selects the flow that executes a session turn. */
 export interface TurnSelection {
   readonly flow: Lite.AnyFlow
 }
@@ -1199,6 +1243,7 @@ export const current = Object.freeze({
 
 export const observation = Object.freeze({
   current: tag<ObservationProjection>({ label: "sdk.session.observation.current" }),
+  channel: tag<string>({ label: "sdk.session.observation.channel" }),
 })
 
 export const execution = Object.freeze({
@@ -1522,8 +1567,9 @@ export const run = flow({
     session,
     selection: tags.required(execution.turn),
     dispatch: controller(dispatch),
+    channel: tags.optional(observation.channel),
   },
-  factory: async function* (ctx, { session, selection, dispatch }) {
+  factory: async function* (ctx, { session, selection, dispatch, channel }) {
     const active = session.work.admit(ctx.input.work)
     const work = session.record.work.find((item) => item.id === active.record.workId)!
     const branch = session.record.branches.find((item) => item.id === work.branchId)!
@@ -1544,6 +1590,7 @@ export const run = flow({
           activationId: `${session.record.id}:${work.id}:${work.attempt}`,
           workId: work.id,
           ...(work.parentId === undefined ? {} : { parentWorkId: work.parentId }),
+          ...(channel === undefined ? {} : { channel }),
           role: work.role,
         })),
       ],

@@ -79,7 +79,7 @@ flowchart TD
   SendOne --> Claim["markReminderSent<br/>store flow, one tx"]
   SendOne --> Deliver["deliver port flow<br/>scalar SDK step kind=email"]
   SendOne --> Release["inline release-on-failure<br/>db.transaction + audit"]
-  Deliver --> Notifier["ctx.exec({ fn })<br/>notifier.send() edge"]
+  Deliver --> Notifier["ctx.exec({ deps, params, fn })<br/>notifier.send() edge"]
   StoreFlows -.-> OTel
   Complete -.-> OTel
   Deliver -.-> OTel
@@ -124,7 +124,7 @@ Long-lived loop flows such as `ingest` or `watchReviewQueue` never hold a transa
 - `dailyReport` owns report materialization over `listStored`.
 - `markReminderSent` updates `reminded_at` only when it is still null and writes the `reminded` audit row in one transaction — the idempotent reminder claim.
 - `sendReminder` runs the release-on-failure SQL inline: when delivery rejects, it clears `reminded_at` and writes `reminder_failed` in one transaction, then rethrows.
-- `deliver` owns mail delivery through the `notifier` client, wrapping the foreign call in `ctx.exec({ fn: (_ctx, target, content) => target.send(content), params: [notifier, message], name: "notifier.send" })` so the foreign transport becomes a named `notifier.send` edge with explicit execution inputs.
+- `deliver` owns mail delivery through its declared `notifier` dependency. It wraps the foreign call in `ctx.exec({ name: "notifier.send", deps: {}, params: [notifier, message], fn: (_deps, target, content) => target.send(content) })`, so the foreign transport becomes a named edge and every execution input stays explicit.
 
 `triage`, `importBatch`, `ingest`, `intake`, and `sendReminders` declare the child flows they compose with `controller(childFlow)` deps, then call `child.exec(...)` or `child.execStream(...)` from the injected handle. Those scalar flows use `step({ workflow: true, kind })`, so a production composition can add `workflowExtension({ log })` and replay completed scalar work without journaling streaming generators. `classify` no longer carries its own `kind: "llm"` step tag - the SDK `complete` port flow owns that span. A completed workflow run shows the model implementor's step followed by `model.complete`; `invoice.classify` itself is untracked plumbing around that call. When you build similar flows, put `step({ workflow: true })`, replay, suspend, and durable tags on the scalar child steps, not on streaming orchestration flows like `triage` or `importBatch`.
 
@@ -148,14 +148,14 @@ Tests wire scripted fakes built with `@pumped-fn/sdk-test`'s `modelStub` through
 
 Other provider seams are tags too:
 
-- `notifier` supplies the foreign delivery client. Roots bind `consoleNotifier()`; tests bind a plain-object client whose `send` routes through `this.record`. Wrapping the call as `ctx.exec({ fn: () => notifier.send(message) })` preserves the receiver through ordinary method-call syntax, so class-instance SDKs work without a plain-object facade.
+- `notifier` supplies the foreign delivery client. Roots bind `consoleNotifier()`; tests bind a plain-object client whose `send` routes through `this.record`. The parent flow declares the client dependency, then passes the resolved client and message through inline execution `params`. Calling `target.send(content)` preserves the receiver, so class-instance SDKs work without a facade.
 - `clock`, `reminderWindowDays`, `reminderRecipient`, and `requestId` carry runtime policy or ambient request data.
 - `databaseUrl` carries the Postgres connection string. Its default is `postgres://invoice:invoice@localhost:5432/invoice_triage`, matching `compose.yaml`.
 - `database` creates the pg pool, runs Drizzle migrations, and is preset to PGlite in tests. The store flows in `src/store.ts` dep it directly and run their SQL against it; product flows reach data only through those store flows.
 
 ## Postgres Queue And Cron
 
-The SDK `channel()` and `schedule()` helpers are agent-turn adapters. This example needs a lossless ingest queue and cron-capable registration, so it uses:
+The SDK has no generic `channel()` or `schedule()` handle factory. This example needs a lossless ingest queue and cron-capable registration, so it uses durable Postgres rows plus the Lite scheduler extension:
 
 - `enqueue` to parse raw lines or invoice objects and insert invoice batches into `invoice_pending`.
 - `ingest` to run a recovery read once, wake on `ctx.changes(queueSignal)`, read pending rows in deterministic order, and pass each batch to `importBatch`.

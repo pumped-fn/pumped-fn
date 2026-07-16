@@ -12,7 +12,7 @@ tags, controllers, flow handles, `scope.run*`, or `ctx.exec*`; transport atoms w
 depend on transports; feature nodes depend on capabilities. For review rules, see the
 [code review guide](../../../docs/code-review-guide.md).
 
-For foreign integration, wrap the client in an adapter atom (the substitution seam) and instrument each call with `ctx.exec({ fn: () => client.method(args), name: "client.method", tags })` — one named, tag-able edge per call. `fn`-exec is the one way to trace a specific call; a flow is the one way for a capability that is a graph node.
+For foreign integration, wrap the client in an adapter atom (the substitution seam) and instrument each call with `ctx.exec({ name: "client.method", deps: { client }, params: [args], fn: ({ client }, input) => client.method(input), tags })` — one named, tag-able edge per call. Inline execution traces a specific call; a flow defines a reusable graph capability.
 
 ## A. Fundamental Usage
 
@@ -391,7 +391,7 @@ sequenceDiagram
     App->>Scope: resolve(userService)
     Scope-->>App: { getUser, updateUser }
 
-    App->>Ctx: ctx.exec({ fn: svc.getUser, params: [userId] })
+    App->>Ctx: ctx.exec({ name, deps: { svc }, params: [userId], fn })
     Ctx->>Child: create child context
     Child->>Svc: getUser(childCtx, userId)
     Svc-->>Child: user
@@ -449,9 +449,9 @@ sequenceDiagram
     participant App
     participant Ctx as ExecutionContext
 
-    App->>Ctx: ctx.exec({ name, fn, params, tags })
+    App->>Ctx: ctx.exec({ name, deps, params, fn, tags })
     Ctx->>Ctx: create childCtx (name + tags)
-    Ctx->>Ctx: fn(childCtx, ...params)
+    Ctx->>Ctx: resolve deps, then fn(deps, ...params)
     Ctx->>Ctx: childCtx.close(result)
     Ctx-->>App: output
     Note right of Ctx: name makes sub-executions observable by extensions

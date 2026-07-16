@@ -7,6 +7,7 @@ export type EdgeCaseCategory =
   | "static_accessor"
   | "resolve_state"
 
+/** Records a source pattern that requires warning or manual migration. */
 export interface EdgeCase {
   file: string
   line: number
@@ -18,6 +19,7 @@ export interface EdgeCase {
   suggestion: string
 }
 
+/** Summarizes files and patterns handled by a codemod run. */
 export interface TransformStats {
   filesProcessed: number
   patternsTransformed: number
@@ -25,6 +27,7 @@ export interface TransformStats {
   patternsManual: number
 }
 
+/** Collects codemod statistics and unresolved edge cases for one migration. */
 export interface MigrationReport {
   generatedAt: string
   stats: TransformStats

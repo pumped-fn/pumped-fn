@@ -8,17 +8,19 @@ dev/test.
 ## Contract
 
 ```ts
-interface Scheduler.Backend {
-  register(
-    spec: {
-      name: string
-      cadence: { cron: string } | { every: string }
-      overlap: "skip" | "queue"
-      catchUp: "skip" | "last" | "all"
-      onError?: (error: unknown, run: { key: string; scheduledAt: Date }) => void
-    },
-    tick: (run: { key: string; scheduledAt: Date }) => Promise<void>
-  ): { trigger(dedupKey?: string): Promise<void>; next(): Date | undefined; stop(): Promise<void> }
+declare namespace Scheduler {
+  interface Backend {
+    register(
+      spec: {
+        name: string
+        cadence: { cron: string } | { every: string }
+        overlap: "skip" | "queue"
+        catchUp: "skip" | "last" | "all"
+        onError?: (error: unknown, run: { key: string; scheduledAt: Date }) => void
+      },
+      tick: (run: { key: string; scheduledAt: Date }) => Promise<void>
+    ): { trigger(dedupKey?: string): Promise<void>; next(): Date | undefined; stop(): Promise<void> }
+  }
 }
 ```
 

@@ -27,6 +27,7 @@ export type CodexAuth =
   | { kind: "api-key"; env?: string }
   | { kind: "global" }
 
+/** Configures Codex authentication, sandboxing, isolation, arguments, and timeout. */
 export interface CodexConfig {
   auth: CodexAuth
   command?: string
@@ -118,6 +119,7 @@ export const codexTurn = flow({
 
 export const codex = model(codexTurn)
 
+/** Configures a persistent Codex ACP process, roots, permissions, and shutdown bound. */
 export interface CodexAcpConfig {
   auth: CodexAuth
   command?: string

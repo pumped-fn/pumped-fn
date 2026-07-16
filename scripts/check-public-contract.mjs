@@ -155,6 +155,93 @@ const packageReadmeGaps = [];
 const packageChangelogGaps = [];
 const majorMigrationEvidenceGaps = [];
 const documentationExampleFailures = [];
+const currentGuidanceExecGaps = [];
+
+const collectMarkdown = (path) => {
+  if (!existsSync(path)) return [];
+  const entries = readdirSync(path, { withFileTypes: true });
+  return entries.flatMap((entry) => {
+    const target = join(path, entry.name);
+    if (entry.isDirectory()) return collectMarkdown(target);
+    return entry.isFile() && entry.name.endsWith(".md") && entry.name !== "CHANGELOG.md" ? [target] : [];
+  });
+};
+
+const guidancePaths = [...new Set([
+  join(root, "README.md"),
+  join(root, "scripts", "README.md"),
+  ...["docs", "examples", "skills", "pkg"].flatMap((path) => collectMarkdown(join(root, path))),
+].filter(existsSync))];
+
+const propertyName = (member) => {
+  if (ts.isPropertyAssignment(member) || ts.isMethodDeclaration(member) || ts.isShorthandPropertyAssignment(member)) {
+    return ts.isIdentifier(member.name) || ts.isStringLiteral(member.name) ? member.name.text : undefined;
+  }
+  return undefined;
+};
+
+const inspectGuidanceFence = (source, path, fence) => {
+  const file = ts.createSourceFile(`${path}.tsx`, source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX);
+  const visit = (node) => {
+    if (
+      ts.isCallExpression(node)
+      && ts.isPropertyAccessExpression(node.expression)
+      && ((node.expression.expression.getText(file) === "ctx" && node.expression.name.text === "exec")
+        || (node.expression.expression.getText(file) === "scope" && node.expression.name.text === "run"))
+      && node.arguments.length > 0
+      && ts.isObjectLiteralExpression(node.arguments[0])
+    ) {
+      const options = node.arguments[0];
+      const properties = new Map(options.properties.map((member) => [propertyName(member), member]));
+      if (properties.has("fn")) {
+        const required = ["name", "deps", "params", "fn"];
+        const missing = required.filter((name) => !properties.has(name));
+        const fn = properties.get("fn");
+        const callback = ts.isPropertyAssignment(fn) ? fn.initializer : undefined;
+        const first = callback && (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback))
+          ? callback.parameters[0]?.name.getText(file)
+          : undefined;
+        const callbackArgument = first && /^(?:_?ctx|_?scope)$/u.test(first) ? first : undefined;
+        if (missing.length > 0 || callbackArgument) {
+          const position = file.getLineAndCharacterOfPosition(node.getStart(file));
+          currentGuidanceExecGaps.push({
+            path: fromRoot(path),
+            fence,
+            line: position.line + 1,
+            receiver: node.expression.expression.getText(file),
+            missing,
+            ...(callbackArgument ? { callback_argument: callbackArgument } : {}),
+          });
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+};
+
+for (const path of guidancePaths) {
+  const content = readFileSync(path, "utf8");
+  const fences = [...content.matchAll(/```(ts|typescript|tsx)\s*\r?\n([\s\S]*?)```/giu)];
+  fences.forEach((match, index) => {
+    const lead = content.slice(Math.max(0, match.index - 240), match.index);
+    if (!/(?:^|\n)(?:Before|Legacy|Removed)\b[^\n]*:?\s*$/imu.test(lead)) {
+      inspectGuidanceFence(match[2], path, index + 1);
+    }
+  });
+  [...content.matchAll(/`((?:ctx\.exec|scope\.run)\(\{[^`\n]*\}\))`/gu)].forEach((match) => {
+    if (!/\bfn\b/u.test(match[1])) return;
+    const missing = ["name", "deps", "params", "fn"].filter((name) => !new RegExp(`\\b${name}\\b`, "u").test(match[1]));
+    if (missing.length === 0) return;
+    currentGuidanceExecGaps.push({
+      path: fromRoot(path),
+      fence: null,
+      line: content.slice(0, match.index).split(/\r?\n/u).length,
+      receiver: match[1].startsWith("ctx.") ? "ctx" : "scope",
+      missing,
+    });
+  });
+}
 
 for (const { directory, manifest } of packageDirectories) {
   const readme = join(directory, "README.md");
@@ -260,6 +347,7 @@ const prSnapshotGaps = actualHead === expectedHead
 
 const details = {
   changed_public_source_packages_without_changeset: changedWithoutChangeset,
+  current_guidance_exec_gaps: currentGuidanceExecGaps,
   documentation_example_failures: documentationExampleFailures,
   exported_symbol_tsdoc_gaps: exportedSymbolTsdocGaps,
   major_migration_evidence_gaps: majorMigrationEvidenceGaps,
@@ -277,6 +365,7 @@ Object.values(details).forEach((items) => sortBy(items, (entry) => JSON.stringif
 const metrics = {
   changed_public_source_package_count: changedPackages.length,
   changed_public_source_package_without_changeset_count: changedWithoutChangeset.length,
+  current_guidance_exec_gap_count: currentGuidanceExecGaps.length,
   documentation_example_failure_count: documentationExampleFailures.length,
   exported_symbol_count: exportedSymbols.length,
   exported_symbol_tsdoc_gap_count: exportedSymbolTsdocGaps.length,
@@ -295,6 +384,7 @@ const metrics = {
 
 metrics.public_contract_gap_count = [
   metrics.changed_public_source_package_without_changeset_count,
+  metrics.current_guidance_exec_gap_count,
   metrics.documentation_example_failure_count,
   metrics.major_migration_evidence_gap_count,
   metrics.missing_runtime_target_count,

@@ -12,6 +12,7 @@ export type ModelEvent =
 
 export type Attempt = Lite.Flow<ModelResponse, ModelRequest, never, ModelEvent>
 
+/** Configures the identity, instructions, and turn limit of an agent role. */
 export interface RoleConfig {
   readonly name: string
   readonly version: string
@@ -20,18 +21,21 @@ export interface RoleConfig {
   readonly maxRounds?: number
 }
 
+/** Configures a versioned tool and the schema used to validate its input. */
 export interface ToolConfig {
   readonly version: string
   readonly description: string
   readonly input: StandardSchemaV1
 }
 
+/** Configures the public identity and description of a skill. */
 export interface SkillConfig {
   readonly name: string
   readonly version: string
   readonly description: string
 }
 
+/** Configures the public identity and description of a subagent. */
 export interface SubagentConfig {
   readonly name: string
   readonly version: string
@@ -75,6 +79,7 @@ export const fromModel: Attempt = flow({
   factory: (ctx, { provider }) => provider.exec({ input: ctx.input }),
 })
 
+/** Captures the authority-bound tool contract visible to one turn. */
 export interface ToolSnapshot {
   readonly identity: session.ToolIdentity
   readonly name: string
@@ -86,6 +91,7 @@ export interface ToolSnapshot {
   readonly snapshotEpoch: number
 }
 
+/** Couples a permitted tool snapshot with its validation schema and executable flow. */
 export interface ResolvedTool<Output, Input, Fault = never, Yield = never> {
   readonly snapshot: ToolSnapshot
   readonly schema: StandardSchemaV1
@@ -104,6 +110,7 @@ export class ToolInputError extends Error {
   }
 }
 
+/** Couples resolved skill metadata with the flow that loads its content. */
 export interface ResolvedSkill {
   readonly name: string
   readonly version: string
@@ -111,6 +118,7 @@ export interface ResolvedSkill {
   readonly content: Lite.FlowHandle<string, void>
 }
 
+/** Couples resolved subagent metadata with its session-bound turn flow. */
 export interface ResolvedSubagent {
   readonly name: string
   readonly version: string
@@ -118,6 +126,7 @@ export interface ResolvedSubagent {
   readonly run: Lite.FlowHandle<TurnResult, session.RunInput<TurnInput>, session.SessionEvent>
 }
 
+/** Represents the fully resolved role, tools, skills, and subagents used by a turn. */
 export interface Role {
   readonly name: string
   readonly version: string
@@ -167,12 +176,14 @@ export const role = resource({
   },
 })
 
+/** Supplies prompt, message history, and metadata to an agent turn. */
 export interface TurnInput {
   readonly prompt?: string
   readonly messages?: readonly Message[]
   readonly metadata?: Lite.JsonValue
 }
 
+/** Records one tool call input and output returned during a turn. */
 export interface ToolResult {
   readonly name: string
   readonly callId?: string
@@ -180,12 +191,14 @@ export interface ToolResult {
   readonly output: unknown
 }
 
+/** Records skill content loaded during a turn. */
 export interface SkillResult {
   readonly name: string
   readonly callId?: string
   readonly content: string
 }
 
+/** Records the child work identity, input, and result of a subagent turn. */
 export interface SubagentResult {
   readonly name: string
   readonly workId: string
@@ -193,6 +206,7 @@ export interface SubagentResult {
   readonly output: TurnResult
 }
 
+/** Collects the content, messages, calls, and session events produced by a turn. */
 export interface TurnResult {
   readonly role: string
   readonly content: string
@@ -216,8 +230,9 @@ export const turn: Lite.Flow<TurnResult, TurnInput, never, session.SessionEvent>
       attempt: tags.optional(session.current.attempt),
       branch: tags.optional(session.current.branch),
       epoch: tags.optional(session.current.epoch),
+      projection: tags.optional(session.observation.current),
     },
-    factory: async function* (ctx, { role, invoke, runtime, validate, work, attempt, branch, epoch }): AsyncGenerator<session.SessionEvent, TurnResult, unknown> {
+    factory: async function* (ctx, { role, invoke, runtime, validate, work, attempt, branch, epoch, projection }): AsyncGenerator<session.SessionEvent, TurnResult, unknown> {
       const messages = initialMessages(ctx.input)
       const loadedSkills: LoadedSkill[] = []
       const skillResults: SkillResult[] = []
@@ -372,7 +387,12 @@ export const turn: Lite.Flow<TurnResult, TurnInput, never, session.SessionEvent>
               const parsed = await validate.exec({ input: { schema: selected.schema, input: call.input } })
               if (parsed.issues) throw new ToolInputError(selected.snapshot.name, parsed.issues)
               signal?.throwIfAborted()
-              output = await selected.flow.exec({ rawInput: parsed.value })
+              output = await selected.flow.exec({
+                rawInput: parsed.value,
+                tags: projection === undefined
+                  ? []
+                  : [session.observation.current({ ...projection, tool: selected.snapshot.name })],
+              })
               signal?.throwIfAborted()
               settleInvocation(runtime, activeInvocations, selectedInvocation.id, "completed")
             } catch (error) {

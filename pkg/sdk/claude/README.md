@@ -104,5 +104,19 @@ await scope.dispose()
 `claudeAttemptBinding` when composing `agent.turn`; `provider` remains the scalar model tag. Tests
 can preset `claudeAttempt`, `claudeLeases`, or `engine` through `createScope` without changing the caller.
 
+## Migration to 3.0.0
+
+3.0.0 tracks the `@pumped-fn/sdk` facade removal. The Claude provider no longer wires itself through
+an `agent()` object; bind it explicitly and drive the entry flow. The scope example above is the
+current, post-migration wiring.
+
+| Removed in 2.x | Replacement in 3.0.0 |
+|---|---|
+| implicit `agent()` provider wiring | `claude.config` tag + `claudeAttemptBinding` through `agent.impl.attempt` |
+| provider `.turn(input)` method | `ctx.exec({ flow: claude.turn, input })` |
+| shared long-lived process | `claude.claudeLeases`, one isolated `stream-json` process per logical session |
+
+The migration exposes no Claude tools or MCP servers and keeps the fail-closed permission policy.
+
 ---
 Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

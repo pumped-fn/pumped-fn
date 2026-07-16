@@ -57,7 +57,7 @@ await scope.dispose()
 
 ## Exact traps
 
-- `ctx.exec({ fn, params, name })` requires `params`, even empty. `fn(ctx, ...params)` receives them and extensions see `ctx.input === params`. Never close over call data: `ctx.exec({ fn: (_ctx, id) => client.get(id), params: [id], name: "client.get" })`.
+- `ctx.exec({ name, deps, params, fn })` requires every field. `fn(deps, ...params)` receives resolved graph dependencies first and explicit runtime inputs next. Never close over call data: `ctx.exec({ name: "client.get", deps: { client }, params: [id], fn: ({ client }, input) => client.get(input) })`.
 - Foreign calls fail as domain “no” and rejection. Convert both at the attributed exec site and declare the fault:
 
 ```ts
@@ -68,7 +68,12 @@ const charge = flow({
   deps: { gateway },
   factory: async (ctx, { gateway }) => {
     try {
-      const result = await ctx.exec({ fn: (_ctx, input: Charge) => gateway.charge(input), params: [ctx.input], name: "gateway.charge" })
+      const result = await ctx.exec({
+        name: "gateway.charge",
+        deps: {},
+        params: [gateway, ctx.input],
+        fn: (_deps, target, input) => target.charge(input),
+      })
       if (!result.ok) ctx.fail({ code: "declined", id: result.id })
       return result.receipt
     } catch (error) {

@@ -31,7 +31,7 @@ Write → `npm run lint` → fix every error and warning → repeat to zero → 
 - Don't hide config in a handle factory closure. Declare a tag and consume `tags.required/optional/all`. `(lint catches the enclosing-parameter closure: config-via-tags)`
 - Don't export a function that constructs/returns a handle. Export stable module-level handles. `(lint catches this: no-handle-factory)`
 - Don't read tags through `ctx.data` without a declared dependency. `(lint catches this: no-implicit-tag-read)`
-- Don't await a foreign client directly. Attribute it with named `ctx.exec({ fn, params, name })`. `(lint catches awaits rooted at a deps binding: no-unattributed-await)`
+- Don't await a foreign client directly. Attribute it with named `ctx.exec({ name, deps, params, fn })`. `(lint catches awaits rooted at a deps binding: no-unattributed-await)`
 - Don't name handles `storeAtom`/`runFlow`, spread handles, keep mutable module state, use `deps.x`, throw bare builtins, swallow errors, mock modules, or add test branches. `(lint catches these respective shapes)`
 - Don't inject a foreign capability as an atom: atoms construct scope-owned values; tags inject root/request/deployment values. `(review catches this)`
 - Don't use `atom<Port>`, facade objects, wiring-only interfaces, comments, defensive trusted-path guards, or `any` as an escape. `(review catches this)`

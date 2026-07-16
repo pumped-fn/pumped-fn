@@ -2,6 +2,106 @@
 
 This guide helps AI agents migrate code from `@pumped-fn/core-next` to `@pumped-fn/lite`.
 
+## Migration to lite 6.0.0 (session-kernel)
+
+Version 6.0.0 replaces the implicit inline-execution paths from the 5.x line with an explicit,
+graph-visible contract. Entry execution now recursively activates the entry's complete declared
+dependency tree before its factory runs, and there is no legacy execution loop behind it.
+
+### Inline one-off execution
+
+`scope.run` and `ctx.exec` keep the flow form and add a named `deps`/`params`/`fn` form for a single
+graph-visible operation that needs no reusable flow handle. `fn` receives resolved `deps` first and
+the declared `params` tuple next — never a `ctx` or `scope` argument.
+
+Before, lite 5.x allowed a bare closure to capture dependencies and inputs:
+
+```typescript
+const total = await scope.run({
+  fn: async (ctx) => {
+    const repo = await ctx.resolve(orders)
+    return repo.sum(customerId)
+  },
+})
+```
+
+In lite 6.0.0, `name`, `deps`, `params`, and `fn` are declared:
+
+```typescript
+const total = await scope.run({
+  name: "sum-orders",
+  deps: { repo: orders },
+  params: [customerId],
+  fn: ({ repo }, id) => repo.sum(id),
+})
+```
+
+`ctx.exec` uses the same inferred `deps`/`params`/`fn` shape inside a flow:
+
+```typescript
+const settle = flow({
+  name: "settle",
+  deps: { ledger },
+  factory: (ctx, { ledger }) =>
+    ctx.exec({
+      name: "post-entry",
+      deps: { poster },
+      params: [ctx.input.entryId],
+      fn: ({ poster }, id) => poster.post(id),
+    }),
+})
+```
+
+Declare `deps: {}` and `params: []` only when the operation genuinely has no dependencies and no
+captured inputs.
+
+### Explicit callback parameters
+
+Callback registration keeps the zero-parameter form and adds explicit trailing parameters, so
+captured inputs stay visible instead of closing over the surrounding factory.
+
+Before, captured inputs closed over the enclosing factory:
+
+```typescript
+ctx.cleanup(() => connection.close())
+ctx.onClose(() => flushBuffer(buffer))
+```
+
+In lite 6.0.0, captured inputs are explicit trailing parameters:
+
+```typescript
+ctx.cleanup((conn) => conn.close(), connection)
+ctx.onClose((result, target) => flushBuffer(target), buffer)
+```
+
+Zero-parameter callbacks remain valid only when they use no surrounding value. Use trailing parameters
+for every captured cleanup target.
+
+The same trailing-parameter shape applies to `ctrl.on`, `scope.on`, and `select.subscribe`.
+
+### Structured cancellation
+
+`ExecutionContext.signal` exposes the active `AbortSignal` for cooperative cancellation. Pass a
+`signal` to `scope.run`, `ctx.exec`, or `createContext` to abort a subtree.
+
+```typescript
+const poll = flow({
+  name: "poll",
+  factory: async (ctx) => {
+    while (!ctx.signal.aborted) {
+      await tick()
+    }
+  },
+})
+```
+
+### Preserved boundaries
+
+6.0.0 keeps the lite anti-goals intact: no MCP or tool auto-collection, no implicit dependencies,
+no `ctx` or `scope` callback arguments, no bare `ctx.exec` closure captures, and no hidden captures.
+Lite lint rejects hidden `ctx.exec` and inline `scope.run` captures and recognizes exported graph
+namespaces without requiring `Object.freeze`.
+
 ## Next major: CLI removal
 
 The next major version removes the text-only `pumped-lite` CLI from `@pumped-fn/lite`. The package

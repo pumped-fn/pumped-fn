@@ -25,6 +25,7 @@ import {
 } from "@pumped-fn/sdk"
 import * as agent from "@pumped-fn/sdk/agent"
 
+/** Selects a Pi provider, model, thinking level, and API-key environment variable. */
 export interface PiConfig {
   provider: string
   modelId: string

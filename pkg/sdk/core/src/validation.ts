@@ -6,6 +6,7 @@ type MaybePromise<T> = T | Promise<T>
 
 export type JsonSchema = boolean | Readonly<Record<string, unknown>>
 
+/** Adapts Standard Schema validation, JSON Schema projection, and stable schema digests. */
 export interface Engine {
   readonly id: string
   validate<const Schema extends StandardSchemaV1>(
@@ -16,6 +17,7 @@ export interface Engine {
   schemaDigest(schema: StandardSchemaV1): string
 }
 
+/** Configures a Standard Schema validation engine and its JSON Schema converter. */
 export interface StandardOptions<Schema extends StandardSchemaV1> {
   readonly id: string
   readonly toJsonSchema: (schema: Schema) => JsonSchema
@@ -23,6 +25,7 @@ export interface StandardOptions<Schema extends StandardSchemaV1> {
 
 export const engine = tag<Engine>({ label: "sdk.validation.engine" })
 
+/** Couples a Standard Schema contract with the unknown value to validate. */
 export interface ValidateInput {
   readonly schema: StandardSchemaV1
   readonly input: unknown

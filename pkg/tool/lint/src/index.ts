@@ -35,6 +35,7 @@ export type RuleId =
 
 export type Severity = "error" | "warn"
 
+/** Identifies one rule finding at an exact source location. */
 export interface Diagnostic {
   ruleId: RuleId
   severity: Severity
@@ -44,6 +45,7 @@ export interface Diagnostic {
   message: string
 }
 
+/** Collects lint diagnostics and the number of files inspected. */
 export interface ScanResult {
   diagnostics: Diagnostic[]
   filesScanned: number
@@ -1230,11 +1232,12 @@ function resolveLocalCallback(expression: ts.Expression, sourceFile: ts.SourceFi
   const direct = unwrapCallback(expression)
   if (ts.isArrowFunction(direct) || ts.isFunctionExpression(direct)) return direct
   if (!ts.isIdentifier(direct)) return null
+  const name = direct.text
   const variables: ts.VariableDeclaration[] = []
   const declarations: ts.FunctionDeclaration[] = []
   function collect(node: ts.Node): void {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === direct.text) variables.push(node)
-    if (ts.isFunctionDeclaration(node) && node.name?.text === direct.text && node.body) declarations.push(node)
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name) variables.push(node)
+    if (ts.isFunctionDeclaration(node) && node.name?.text === name && node.body) declarations.push(node)
     ts.forEachChild(node, collect)
   }
   collect(sourceFile)

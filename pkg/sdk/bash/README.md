@@ -108,5 +108,19 @@ await scope.dispose()
 
 Replace `engine`, `workspace`, `readiness`, or any named flow with `preset()` in tests. No module mock or shared scope is needed.
 
+## Migration to 3.0.0
+
+3.0.0 tracks the `@pumped-fn/sdk` sandbox change. `just-bash` no longer exposes a `Sandbox` method
+bag; it binds named flows and resources. The scope example above is the current, post-migration
+wiring.
+
+| Removed in 2.x | Replacement in 3.0.0 |
+|---|---|
+| `new Sandbox(...)` method bag | `bash.binding.read` / `bash.binding.write` / `bash.binding.run` through `sandbox.impl.*` |
+| direct sandbox method calls | `ctx.exec({ flow: sandbox.read, input })` and `ctx.execStream({ flow: sandbox.exec, input })` |
+
+The session authority and policy are checked before the implementation runs; the migration adds no
+implicit access.
+
 ---
 Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn).

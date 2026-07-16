@@ -18,6 +18,7 @@ export type ClaudeAuth =
   | { kind: "token"; env?: string }
   | { kind: "global" }
 
+/** Configures Claude authentication, roots, isolation, permission, and process timeouts. */
 export interface ClaudeConfig {
   auth: ClaudeAuth
   command?: string
@@ -225,6 +226,7 @@ export const claudeSession = resource({
   },
 })
 
+/** Manages reusable and transient Claude sessions keyed by session identity. */
 export interface ClaudeLeaseManager {
   prompt(
     sessionId: string,

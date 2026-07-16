@@ -110,10 +110,15 @@ interface ObservationProjection {
   readonly workId: string
   readonly parentWorkId?: string
   readonly role: string
+  readonly channel?: string
+  readonly tool?: string
 }
 ```
 
-Extensions may read this projection. Do not expose arbitrary tag enumeration, prompts, tool inputs, memory, credentials, or backend handles as observation context.
+Bind `session.observation.channel("github")` on an execution to add an application-owned channel label.
+`session.run` carries it into the activation projection. A selected tool refines only its child execution
+with the tool name. Siblings do not inherit that tool field. Extensions may read this projection. Do not
+expose arbitrary tag enumeration, prompts, tool inputs, memory, credentials, or backend handles.
 
 ## Separate finish from deactivation
 

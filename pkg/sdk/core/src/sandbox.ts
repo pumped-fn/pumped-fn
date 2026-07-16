@@ -1,6 +1,7 @@
 import { flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 import * as session from "./session.js"
 
+/** Defines the roots, effects, commands, and resource limits enforced by a sandbox. */
 export interface Policy {
   readonly roots: readonly string[]
   readonly write: boolean
@@ -10,20 +11,24 @@ export interface Policy {
   readonly maxOutputBytes: number
 }
 
+/** Identifies an absolute sandbox path to read. */
 export interface ReadInput {
   readonly path: string
 }
 
+/** Supplies content and an absolute sandbox path to write. */
 export interface WriteInput {
   readonly path: string
   readonly content: string
 }
 
+/** Selects an allowed sandbox command and its arguments. */
 export interface ExecInput {
   readonly command: string
   readonly args?: readonly string[]
 }
 
+/** Captures the output streams and exit status of a sandbox command. */
 export interface ExecResult {
   readonly stdout: string
   readonly stderr: string

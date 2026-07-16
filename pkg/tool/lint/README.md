@@ -28,7 +28,7 @@ pumped-lite-lint --config pumped-lite-lint.json src tests
 | `pumped/no-explicit-atom-type-argument` | Explicit type arguments on `atom<T>(...)`; let the atom infer its value and type substitutes with `satisfies` and `Lite.Utils.AtomValue`. Direct, aliased, and namespace imports from `@pumped-fn/lite` are recognized. Known syntactic false negatives: re-exported aliases and wrapper functions. |
 | `pumped/no-immediate-return-binding` (warn) | A block-local identifier with an initializer returned unchanged by the immediately following statement when that return is its only same-named reference in the block; inline the expression. Known conservative false negatives: destructuring, multi-declaration statements, aliases, and any other same-spelled identifier in the block. |
 | `pumped/no-direct-flow-composition` | Flows calling child flows with hidden `ctx.exec({ flow })` or raw same-file flow deps; use `controller(childFlow)` deps. |
-| `pumped/no-hidden-exec-dependencies` | Inline `ctx.exec({ fn, params })` and lexically direct `createScope()`-bound `scope.run({ deps, fn, params })` callbacks that close over runtime values. Declare graph values in `deps`; pass execution values through `params`. The unshadowed `Promise` runtime intrinsic is not a dependency; lexically visible local or imported bindings with that name remain captures. Named/imported callbacks and aliased scope values are conservative v1 false negatives. |
+| `pumped/no-hidden-exec-dependencies` | Inline `ctx.exec({ name, deps, params, fn })` and lexically direct `createScope()`-bound `scope.run({ name, deps, params, fn })` callbacks that close over runtime values. Declare graph values in `deps`; pass execution values through `params`. The unshadowed `Promise` runtime intrinsic is not a dependency; lexically visible local or imported bindings with that name remain captures. Named/imported callbacks and aliased scope values are conservative v1 false negatives. |
 | `pumped/no-ctx-argument` | Factory context parameters passed as values, and inline `scope.run` operations receiving a directly created execution context through `params`; `ctx` is a receiver, and ctx-taking contracts should be reified as a flow reached via deps. Direct binding tracking only in v1; aliases are not followed. |
 | `pumped/no-shared-scope-factory` | Helpers that return preconfigured `createScope(...)`; each use site should own tags, presets, and extensions. |
 | `pumped/no-scope-argument` | Exported product helpers accepting `scope`, and inline `scope.run` operations receiving a scope through `params`; composition roots and tests own scope. |
@@ -47,7 +47,7 @@ pumped-lite-lint --config pumped-lite-lint.json src tests
 | `pumped/no-untyped-throw` (warn) | `throw new Error(...)` and other builtin error constructors (`TypeError`, `RangeError`, etc.) inside atom/flow/resource factories; throw a domain error class carrying structured fields (kind/op/entity) so traces and edges can discriminate planned vs unplanned failures. Rethrow of a caught identifier (`throw error`) and user-defined error classes both pass. |
 | `pumped/no-swallowed-error` (warn) | Catch clauses inside atom/flow/resource factories that neither rethrow nor reference the caught error (empty catch bodies, `catch {}` with no throw, or bodies that discard the binding); swallowing the error here blinds the trace seam. Wrapping with a cause (`throw new StoreError(msg, error)`), rethrowing, or passing the error to a dep (e.g. logging) all pass. |
 | `pumped/no-handle-spread` (warn) | Object literals that spread a lite handle (`{ ...sharedFlow, tags: [...] }`), detected conservatively — the spread identifier is a same-file `atom`/`flow`/`resource`/... creator result, or the object literal also sets a `tags` property alongside any spread (the retrofit fingerprint); spreads fork node identity and silently miss presets targeting the original. Wrap the shared flow in a thin entry flow (`deps: { run: controller(sharedFlow) }`, `factory: (ctx, { run }) => run.exec(...)`) instead. Plain data object spreads are not flagged. |
-| `pumped/no-handle-factory` | Exported function declarations and exported arrow/function expressions that directly return an `atom`/`flow`/`resource`/`material`/`tag`, return one through a wrapper such as `model(...)`, or return a same-function local handle. Configure documented core constructors with `allowHandleFactories`; composition roots remain unrestricted because they return scopes, not handles. Known syntactic false negatives: handles routed through helper calls, assignments, collections, or cross-function aliases. |
+| `pumped/no-handle-factory` | Exported function declarations and exported arrow/function expressions that directly return an `atom`/`flow`/`resource`/`tag`, return one through a wrapper such as `model(...)`, or return a same-function local handle. Configure documented core constructors with `allowHandleFactories`; composition roots remain unrestricted because they return scopes, not handles. Known syntactic false negatives: handles routed through helper calls, assignments, collections, or cross-function aliases. |
 | `pumped/config-via-tags` (warn) | A graph factory that reads a direct identifier parameter from its enclosing function. Provider configuration belongs in a module-level tag declared through `deps`. Configure documented low-level constructors with `allowHandleFactories`. Known syntactic false negatives: destructured parameters, aliases, and values forwarded through helpers. |
 | `pumped/no-unattributed-await` | Inside an atom/flow/resource factory, an awaited (or `.then()`-chained) call rooted at the factory's deps parameter, unless it's graph machinery (`exec`/`execStream`/`prepare` by method name; `resolve` only when the dep's initializer is a `controller(...)` call) or the enclosing flow's `tags` array carries a `step(...)` tag imported from `@pumped-fn/sdk`; awaited foreign calls only happen inside declared spans. `for await` iteration and sync calls on deps are not flagged, and a nested function parameter that shadows the deps binding name is respected. Known false negatives, accepted for a syntactic rule: `exec`/`execStream`/`prepare` name collisions on non-handle deps, aliased bindings, rest/nested deps patterns, spread-built tags arrays, and un-awaited returned promises. |
 
@@ -87,7 +87,7 @@ const result = await scanPaths(["src", "tests"], {
   rules: {
     "pumped/no-implicit-tag-read": { allowImplicit: ["requestId"] },
     "pumped/no-naked-globals": { allowGlobals: ["fetch"] },
-    "pumped/no-handle-factory": { allowHandleFactories: ["cliWorker"] },
+    "pumped/no-handle-factory": { allowHandleFactories: ["defineTransport"] },
   },
 })
 ```
@@ -99,9 +99,9 @@ const result = await scanPaths(["src", "tests"], {
 (`JSON`, `Math`, `Object`, `Array`, `String`, `Number`, `structuredClone`, `URL`).
 `allowBuiltins` lists builtin error constructor names (e.g. `"TypeError"`) that are exempt from
 `no-untyped-throw`; empty by default.
-`allowHandleFactories` lists documented low-level constructors such as `agent`, `tool`, `skill`,
-`sub`, `session`, `guard`, `material`, `channel`, `schedule`, or `cliWorker`. Use the same list for
-`no-handle-factory` and `config-via-tags` when a constructor intentionally captures its inputs.
+`allowHandleFactories` lists project-owned, documented low-level constructors that intentionally create
+graph handles, such as `defineTransport`. Use the same list for `no-handle-factory` and `config-via-tags`.
+Do not use it to preserve facade factories that hide dependency composition.
 
 ## API
 

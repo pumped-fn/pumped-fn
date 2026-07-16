@@ -8,25 +8,30 @@ import { atom, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
 
 export type BashOptions = ConstructorParameters<typeof Bash>[0]
 
+/** Configures creation and default options for the in-memory Bash engine. */
 export interface EngineConfig {
   readonly create?: (options: BashOptions) => Bash
   readonly options?: BashOptions
 }
 
+/** Selects the root exposed by an in-memory Bash workspace. */
 export interface WorkspaceConfig {
   readonly root: string
 }
 
+/** Couples verified session authority with the sandbox policy it permits. */
 export interface SandboxAuthority {
   readonly fingerprint: string
   readonly policy: sandbox.Policy
 }
 
+/** Exposes an initialized in-memory Bash engine at its workspace root. */
 export interface Workspace {
   readonly root: string
   readonly bash: Bash
 }
 
+/** Proves that a workspace root is ready under a specific authority fingerprint. */
 export interface Readiness {
   readonly authorityFingerprint: string
   readonly root: string

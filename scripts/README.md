@@ -11,6 +11,10 @@
 | `act.mjs` | Repository wrapper for local GitHub Actions dry-runs with `act`. |
 | `check-changed-packages.mjs` | CI helper that rebuilds changed public workspace packages and dry-runs unpublished versions. |
 | `check-example-alignment.mjs` | Check example, guidance, package-map, dependency-policy, and script-surface drift. |
+| `check-inline-exec-contract.mjs` | Check inline `scope.run` and `ctx.exec` call sites for explicit names, dependencies, parameters, and callbacks. |
+| `check-inline-exec-contract.test.mjs` | Deterministic positive and negative fixtures for the inline execution contract checker. |
+| `check-public-contract.mjs` | Check package metadata, migration evidence, public interface TSDoc, README fences, changesets, and PR provenance. |
+| `check-public-contract.test.mjs` | Deterministic positive and negative fixtures for the public contract checker. |
 | `get-release-title.sh` | Release workflow helper for Changesets PR titles. |
 
 ## Naming

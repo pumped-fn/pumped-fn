@@ -55,4 +55,4 @@ watch -> claim lease -> delivery.exec(tags) -> session.run -> evidence tool
 
 The watcher is a controller-composed flow. Each claimed delivery enters through one child execution with its own `session.authority` and `session.record` tags. The session resource owns turns, tools, observations, storage, retries, cancellation, and cleanup. Tools depend on the session authority they consume; the session does not depend on its tools.
 
-Repository, PostgreSQL, Victoria, GitHub, process, clock, and timer effects are declared atoms, resources, or flows. Foreign calls use `ctx.exec({ fn, params })` with every runtime value received by the callback. Tests replace those edges through `createScope({ presets, tags, extensions })` only.
+Repository, PostgreSQL, Victoria, GitHub, process, clock, and timer effects are declared atoms, resources, or flows. Foreign calls use `ctx.exec({ name, deps, params, fn })` with every graph dependency and runtime value declared. Tests replace those edges through `createScope({ presets, tags, extensions })` only.

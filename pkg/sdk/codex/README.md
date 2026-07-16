@@ -82,5 +82,19 @@ managed ACP aliases `config`, `engine`, `run`, `turn`, and `provider`. They are 
 not a facade object or shared scope factory. Tests can preset `run` or `engine` through `createScope`
 without changing the agent graph.
 
+## Migration to 3.0.0
+
+3.0.0 tracks the `@pumped-fn/sdk` facade removal. The Codex provider no longer wires itself through
+an `agent()` object; bind an attempt and drive the entry flow. The scope example above is the
+current, post-migration wiring.
+
+| Removed in 2.x | Replacement in 3.0.0 |
+|---|---|
+| implicit `agent()` provider wiring | `codex.config` / `codex.codexConfig` tag + `codexAttemptBinding` or `codexAcpAttemptBinding` through `agent.impl.attempt` |
+| provider `.turn(input)` method | `ctx.exec({ flow: codex.turn, input })` |
+
+Every ACP prompt still sends `mcpServers: []`; pumped-fn tool collection and MCP projection remain
+deferred, not auto-collected.
+
 ---
 Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn) — start with the [docs](https://github.com/pumped-fn/pumped-fn/tree/main/docs) or the [mental model](https://github.com/pumped-fn/pumped-fn/blob/main/docs/mental-model.md).

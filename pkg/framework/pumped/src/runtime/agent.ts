@@ -39,5 +39,5 @@ export function normalizeAgentEntry(value: unknown): Pick<ManifestEntry, "flow" 
     }
   }
 
-  throw new Error("agents entry must default-export a flow or an Agent struct with a .turn flow")
+  throw new Error("agents entry must default-export a flow or a structural adapter with a .turn flow")
 }

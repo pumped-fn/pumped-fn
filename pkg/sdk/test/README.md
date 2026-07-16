@@ -91,5 +91,19 @@ The existing workflow helpers remain: `kit`, `suspense`, `MemoryWorkflowLog`, `M
 
 The bundled issue-triage verifier uses the same scope seam to prove a session-owned `agent.turn`, three evidence backends, independent verification, idempotent publication, and queue concurrency capped at two.
 
+## Migration to 3.0.0
+
+3.0.0 tracks the `@pumped-fn/sdk` facade removal. The test helpers no longer own or cache a scope;
+each test builds its own `createScope` seam. The scope example above is the current, post-migration
+wiring.
+
+| Removed in 2.x | Replacement in 3.0.0 |
+|---|---|
+| helper-owned scope or singleton | test-owned `createScope({ tags, presets, extensions })` |
+| provider mock object | `attemptStubConfig` / `config.attempt` / `attemptStub` |
+| session mock object | `sessionStoreStub` with `config`, `binding.load`, and `binding.commit` |
+
+None of these helpers creates or caches a scope, so the migration keeps `createScope` as the only seam.
+
 ---
 Part of [pumped-fn](https://github.com/pumped-fn/pumped-fn).

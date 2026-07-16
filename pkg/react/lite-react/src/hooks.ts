@@ -9,12 +9,14 @@ import type { ScopedValue, ScopedValueAccess, ScopedValueView } from './scoped-v
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
+/** Configures atom resolution with suspense enabled. */
 interface UseAtomSuspenseOptions {
   suspense?: true
   /** @default true */
   resolve?: boolean
 }
 
+/** Configures atom resolution with manual loading state. */
 interface UseAtomManualOptions {
   suspense: false
   /** @default false */
@@ -23,6 +25,7 @@ interface UseAtomManualOptions {
 
 type UseAtomOptions = UseAtomSuspenseOptions | UseAtomManualOptions
 
+/** Reports atom data, loading, failure, and its controller. */
 interface UseAtomState<T> {
   data: T | undefined
   loading: boolean
@@ -30,16 +33,19 @@ interface UseAtomState<T> {
   controller: Lite.Controller<T>
 }
 
+/** Configures eager resolution for a controller hook. */
 interface UseControllerOptions {
   resolve?: boolean
 }
 
+/** Configures selected atom state with suspense and custom equality. */
 interface UseSelectSuspenseOptions<S> {
   suspense?: true
   resolve?: boolean
   eq?: (a: S, b: S) => boolean
 }
 
+/** Configures selected atom state with manual loading and custom equality. */
 interface UseSelectManualOptions<S> {
   suspense: false
   resolve?: boolean
@@ -48,6 +54,7 @@ interface UseSelectManualOptions<S> {
 
 type UseSelectOptions<S> = UseSelectSuspenseOptions<S> | UseSelectManualOptions<S>
 
+/** Reports selected atom data, loading, and failure state. */
 interface UseSelectState<S> {
   data: S | undefined
   loading: boolean
@@ -59,30 +66,36 @@ type Load<Value> =
   | { status: 'ready'; data: Value; error: undefined }
   | { status: 'error'; data: undefined; error: Error }
 
+/** Configures resource resolution with suspense enabled. */
 interface UseResourceSuspenseOptions {
   suspense?: true
 }
 
+/** Configures resource resolution with manual loading state. */
 interface UseResourceManualOptions {
   suspense: false
 }
 
 type UseResourceOptions = UseResourceSuspenseOptions | UseResourceManualOptions
 
+/** Configures scoped-value resolution with suspense enabled. */
 interface UseScopedValueSuspenseOptions {
   suspense?: true
 }
 
+/** Configures scoped-value resolution with manual loading state. */
 interface UseScopedValueManualOptions {
   suspense: false
 }
 
+/** Configures a selected scoped-value view with suspense and custom equality. */
 interface UseScopedValueSelectSuspenseOptions<State, Selected> {
   suspense?: true
   select: (snapshot: State) => Selected
   eq?: (prev: Selected, next: Selected) => boolean
 }
 
+/** Configures a selected scoped-value view with manual loading and custom equality. */
 interface UseScopedValueSelectManualOptions<State, Selected> {
   suspense: false
   select: (snapshot: State) => Selected
@@ -104,6 +117,7 @@ type UseFlowSettle<Data, Input> =
   | { status: 'success'; data: Data; error: undefined; input: Input }
   | { status: 'error'; data: undefined; error: Error; input: Input | undefined }
 
+/** Defines success, failure, and settlement callbacks for a flow hook. */
 interface UseFlowOptions<Data, Input> {
   onSuccess?: (data: Data, input: Input) => MaybePromise<void>
   onError?: (error: Error, input: Input | undefined) => MaybePromise<void>

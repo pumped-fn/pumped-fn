@@ -3,6 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 import { resource, tag, tags, type Lite } from "@pumped-fn/lite"
 import { z, type ZodRawShape, type ZodType } from "zod"
 
+/** Supplies the MCP description and Zod input shape for a tool flow. */
 export interface McpToolMeta {
   description: string
   inputSchema: ZodRawShape
@@ -14,6 +15,7 @@ export class McpToolError extends Error {
 
 export const mcpToolMeta = tag<McpToolMeta>({ label: "mcp.tool.meta" })
 
+/** Configures MCP server identity and the tool flows it exposes. */
 export interface McpServerConfig {
   name: string
   version: string

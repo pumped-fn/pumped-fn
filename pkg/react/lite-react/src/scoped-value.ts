@@ -22,6 +22,7 @@ type ScopedValueCloseHelpers<State> = {
   get(): State
 }
 
+/** Exposes scoped state reads, writes, subscriptions, actions, and disposal state. */
 interface ScopedValueAccess<State, Actions extends ScopedValueActions = {}> {
   readonly disposed: boolean
   readonly actions: Actions
@@ -38,6 +39,7 @@ type ScopedValueView<State, Actions extends ScopedValueActions = {}> =
     readonly snapshot: State
   }
 
+/** Configures scoped state creation, graph dependencies, actions, tags, and cleanup. */
 interface ScopedValueConfig<
   State,
   Deps extends ScopedValueDeps = {},

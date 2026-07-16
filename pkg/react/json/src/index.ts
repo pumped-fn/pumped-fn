@@ -18,10 +18,12 @@ type FlowHandlers<Actions extends FlowActionTargets> = {
 type FlowActionTargets = Record<string, FlowActionTarget<Lite.Flow<any, any>>>
 type FlowActionTarget<Flow extends Lite.Flow<any, any>> = Flow | FlowActionOptions<Flow>
 
+/** Adapts a complete scoped-value state object to a JSON Render store. */
 interface ScopedValueStateStoreOptions<State extends object = StateModel> {
   value: ScopedValueStateSource<State>
 }
 
+/** Adapts a selected, writable scoped-value slice to a JSON Render store. */
 interface ScopedValueStateStoreSliceOptions<State extends object> {
   value: ScopedValueStateSource<State>
   selector(state: State): StateModel
@@ -34,11 +36,13 @@ interface FlowActionBaseOptions<Flow extends Lite.Flow<any, any>> {
   tags?: Lite.Tagged<any>[]
 }
 
+/** Maps JSON Render action parameters to a typed flow input. */
 interface FlowActionInputOptions<Flow extends Lite.Flow<any, any>> extends FlowActionBaseOptions<Flow> {
   input(params: JsonRenderActionParams): Lite.Utils.FlowInput<Flow>
   rawInput?: never
 }
 
+/** Maps JSON Render action parameters to raw flow input. */
 interface FlowActionRawInputOptions<Flow extends Lite.Flow<any, any>> extends FlowActionBaseOptions<Flow> {
   rawInput?(params: JsonRenderActionParams): unknown
   input?: never
@@ -48,6 +52,7 @@ type FlowActionOptions<Flow extends Lite.Flow<any, any>> =
   | FlowActionInputOptions<Flow>
   | FlowActionRawInputOptions<Flow>
 
+/** Binds named flow actions to the execution context used by their handlers. */
 interface FlowHandlersOptions<Actions extends FlowActionTargets> {
   ctx: Lite.ExecutionContext
   actions: Actions

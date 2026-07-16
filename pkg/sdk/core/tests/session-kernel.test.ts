@@ -671,6 +671,7 @@ describe("session runtime", () => {
     const [leftProjection, rightProjection] = await Promise.all([
       left.exec({
         flow: run,
+        tags: [observation.channel("github")],
         input: {
           work: { id: "left-work", branchId: "main", role: "writer", policy: "all" },
           input: undefined,
@@ -689,6 +690,7 @@ describe("session runtime", () => {
       sessionId: "left-session",
       activationId: "left-session:left-work:1",
       workId: "left-work",
+      channel: "github",
       role: "writer",
     })
     expect(rightProjection).toEqual({

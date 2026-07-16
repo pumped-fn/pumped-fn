@@ -111,7 +111,7 @@ Read the full guide: [Request context without AsyncLocalStorage](docs/request-co
 
 ## OpenTelemetry spans without touching business code
 
-Extensions wrap graph execution. Install `observable.extension()` at the scope, pass an OpenTelemetry sink through runtime tags, and business flows stay ordinary TypeScript functions. Foreign SDK calls can still be named with `ctx.exec({ fn, params, name, tags })` so traces show the edge.
+Extensions wrap graph execution. Install `observable.extension()` at the scope, pass an OpenTelemetry sink through runtime tags, and business flows stay ordinary TypeScript functions. Foreign SDK calls can still be named with `ctx.exec({ name, deps, params, fn, tags })` so traces show the edge.
 
 Read the full guide: [OpenTelemetry spans without editing business functions](docs/observability.md).
 

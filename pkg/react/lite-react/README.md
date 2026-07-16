@@ -199,12 +199,16 @@ When a newer execution starts, the older completion cannot update hook state or 
 Submit flows should compose graph state inside the graph instead of mapping browser events in React:
 
 ```tsx
-const submit = useFlow(submitLogin)
+function LoginForm() {
+  const submit = useFlow(submitLogin)
 
-<form onSubmit={(event) => {
-  event.preventDefault()
-  submit.execute()
-}} />
+  return (
+    <form onSubmit={(event) => {
+      event.preventDefault()
+      submit.execute()
+    }} />
+  )
+}
 ```
 
 ## Execution-Scoped Resources

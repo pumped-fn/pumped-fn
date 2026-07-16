@@ -3,6 +3,7 @@ import { extname, join, resolve } from "node:path"
 
 export type EntryKind = "server" | "cli" | "jobs" | "agents" | "workflows"
 
+/** Identifies a discovered application entry by kind, name, and source file. */
 export interface EntryDescriptor {
   kind: EntryKind
   name: string

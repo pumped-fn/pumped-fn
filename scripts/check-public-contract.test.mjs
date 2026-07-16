@@ -25,6 +25,7 @@ describe("public contract checker", () => {
     assert.deepEqual(result.output.metrics, {
       changed_public_source_package_count: 1,
       changed_public_source_package_without_changeset_count: 0,
+      current_guidance_exec_gap_count: 0,
       documentation_example_failure_count: 0,
       exported_symbol_count: 2,
       exported_symbol_tsdoc_gap_count: 1,
@@ -52,6 +53,7 @@ describe("public contract checker", () => {
     assert.deepEqual(first.output.metrics, {
       changed_public_source_package_count: 2,
       changed_public_source_package_without_changeset_count: 1,
+      current_guidance_exec_gap_count: 2,
       documentation_example_failure_count: 2,
       exported_symbol_count: 2,
       exported_symbol_tsdoc_gap_count: 1,
@@ -66,7 +68,7 @@ describe("public contract checker", () => {
       public_api_tsdoc_gap_count: 1,
       public_export_row_count: 3,
       public_package_count: 2,
-      public_contract_gap_count: 13,
+      public_contract_gap_count: 15,
     });
     assert.deepEqual(
       first.output.details.documentation_example_failures.map(({ fence, language }) => ({ fence, language })),

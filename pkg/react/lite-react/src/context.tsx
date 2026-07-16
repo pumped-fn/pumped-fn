@@ -97,6 +97,7 @@ function scheduleOrphanCheck(map: Map<string, ManagedEntry>, id: string, entry: 
   }, ORPHAN_GRACE_MS)
 }
 
+/** Supplies a Lite scope and child tree to the React scope provider. */
 interface ScopeProviderProps {
   scope: Lite.Scope
   children: ReactNode

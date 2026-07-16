@@ -21,6 +21,7 @@ export type WorkflowStepKey = SuspenseStepKey
 export type WorkflowStepEntry = SuspenseStepEntry
 export type WorkflowEventLog = SuspenseEventLog
 export type WorkflowExecEvent = SuspenseExecEvent
+/** Describes a traced execution offered to a remote runner. */
 export interface ExecEvent {
   readonly key?: WorkflowStepKey
   readonly target: Lite.ExecTarget
@@ -28,6 +29,7 @@ export interface ExecEvent {
   readonly targetName: string
   readonly input: unknown
 }
+/** Configures workflow, remote, durability, worker kind, and timeout behavior for a step. */
 export interface Step {
   workflow?: boolean
   remote?: boolean
@@ -38,16 +40,19 @@ export interface Step {
 
 export { SuspendSignal, SuspenseSignal } from "@pumped-fn/lite-extension-suspense"
 
+/** Delegates a traced execution while preserving the local continuation. */
 export interface RemoteRunner {
   run(event: ExecEvent, next: () => Promise<unknown>): Promise<unknown>
 }
 
+/** Configures workflow event storage and fallback task and run identities. */
 export interface WorkflowExtensionOptions {
   log: WorkflowEventLog
   defaultTaskId?: string
   defaultRunId?: string
 }
 
+/** Configures optional remote execution for the SDK extension. */
 export interface ExtensionOptions {
   remoteRunner?: RemoteRunner
 }
@@ -58,16 +63,19 @@ export function formatStepKey(key: WorkflowStepKey): string {
   return formatSuspenseStepKey(key)
 }
 
+/** Identifies the task and run attached to an execution scope. */
 export interface WorkflowRunOptions {
   taskId: string
   runId: string
 }
 
+/** Exposes the task and run identity resolved for workflow execution. */
 export interface WorkflowContext {
   readonly taskId: string
   readonly runId: string
 }
 
+/** Exposes the task and run identity resolved for agent execution. */
 export interface Runtime {
   readonly taskId: string
   readonly runId: string
@@ -253,12 +261,14 @@ function stepOf(target: Lite.ExecTarget, ctx: Lite.ExecutionContext): Step {
   return { ...flowStep, ...(ctx.data.seekTag(step) ?? {}) }
 }
 
+/** Maps a host path into an isolated CLI worker with explicit access mode. */
 export interface CliBind {
   source: string
   target?: string
   mode?: "ro" | "rw"
 }
 
+/** Configures filesystem, environment, write, and network isolation for a CLI worker. */
 export interface CliIsolateOptions {
   bwrap?: string
   workdir?: string
@@ -270,6 +280,7 @@ export interface CliIsolateOptions {
   env?: Record<string, string | undefined>
 }
 
+/** Captures a CLI worker's output, exit code, and terminating signal. */
 export interface CliResult {
   stdout: string
   stderr: string
@@ -285,6 +296,7 @@ export class CliWorkerError extends Error {
   }
 }
 
+/** Defines the command, process environment, isolation, timeout, and cancellation for a CLI run. */
 export interface RunCliOptions {
   command: string
   args?: readonly string[]
@@ -496,6 +508,7 @@ type ExecFileError = Error & {
   killed?: boolean
 }
 
+/** Supplies plain prompt text to a prompt-backed flow. */
 export interface PromptInput {
   prompt: string
 }
@@ -640,6 +653,7 @@ type MaybePromise<T> = T | Promise<T>
 
 export type Role = "system" | "user" | "assistant" | "tool" | "subagent" | "skill"
 
+/** Represents one model conversation message and optional call metadata. */
 export interface Message {
   role: Role
   content: string
@@ -648,23 +662,27 @@ export interface Message {
   input?: unknown
 }
 
+/** Requests a named tool with unvalidated input from a model response. */
 export interface ToolCall {
   name: string
   input: unknown
   id?: string
 }
 
+/** Requests a named subagent turn from a model response. */
 export interface SubCall {
   name: string
   input: TurnInput
   id?: string
 }
 
+/** Requests loading a named skill from a model response. */
 export interface SkillCall {
   name: string
   id?: string
 }
 
+/** Represents normalized model content and requested capability calls. */
 export interface ModelResponse {
   content: string
   guard?: string
@@ -674,6 +692,7 @@ export interface ModelResponse {
   stop?: boolean
 }
 
+/** Supplies role context, conversation state, capabilities, and round to a model. */
 export interface ModelRequest {
   agentName: string
   instructions: string
@@ -687,12 +706,14 @@ export interface ModelRequest {
 
 export type Model = Lite.Flow<ModelResponse, ModelRequest>
 
+/** Describes a model-visible tool, skill, or subagent capability. */
 export interface Capability {
   name: string
   description: string
   inputSchema?: boolean | Readonly<Record<string, unknown>>
 }
 
+/** Represents skill content loaded into the current model request. */
 export interface LoadedSkill {
   readonly name: string
   readonly description?: string
@@ -707,6 +728,7 @@ export const complete = flow({
   factory: (ctx, { impl }) => impl.exec({ input: ctx.input }),
 })
 
+/** Reports the outcome and optional details of a deterministic evaluation check. */
 export interface EvalCheckResult {
   name: string
   passed: boolean
@@ -715,6 +737,7 @@ export interface EvalCheckResult {
 
 export type EvalCheck = (result: TurnResult) => MaybePromise<EvalCheckResult>
 
+/** Reports a named judge verdict with optional score and reason. */
 export interface JudgeResult {
   name: string
   passed: boolean
@@ -722,17 +745,20 @@ export interface JudgeResult {
   reason?: string
 }
 
+/** Defines an independent evaluator for a completed agent turn. */
 export interface Judge {
   name: string
   evaluate(ctx: Lite.ExecutionContext, result: TurnResult): MaybePromise<JudgeResult>
 }
 
+/** Defines one turn input and its deterministic checks. */
 export interface EvalCase {
   name: string
   input: TurnInput
   checks?: readonly EvalCheck[]
 }
 
+/** Represents a resolved evaluation suite with its turn, cases, and judge quorum. */
 export interface Suite {
   name: string
   turn: Lite.Flow<TurnResult, TurnInput>
@@ -740,6 +766,7 @@ export interface Suite {
   judges: readonly Judge[]
 }
 
+/** Configures an evaluation suite and its optional judges. */
 export interface SuiteOptions {
   name: string
   turn: Lite.Flow<TurnResult, TurnInput>
@@ -747,6 +774,7 @@ export interface SuiteOptions {
   judges?: readonly Judge[]
 }
 
+/** Collects the turn result and all check and judge verdicts for one case. */
 export interface EvalCaseReport {
   name: string
   result: TurnResult
@@ -755,17 +783,20 @@ export interface EvalCaseReport {
   passed: boolean
 }
 
+/** Collects case reports and the aggregate verdict for an evaluation suite. */
 export interface EvalReport {
   name: string
   cases: readonly EvalCaseReport[]
   passed: boolean
 }
 
+/** Selects workflow events by task and run identity. */
 export interface RunQuery {
   taskId: string
   runId: string
 }
 
+/** Projects a stored workflow step and its input, output, and execution kind. */
 export interface RunStep {
   key: WorkflowStepKey
   status: WorkflowStepEntry["status"]
@@ -775,6 +806,7 @@ export interface RunStep {
   kind?: string
 }
 
+/** Represents the reconstructed status and steps of a workflow run. */
 export interface RunRecord {
   taskId: string
   runId: string
@@ -782,6 +814,7 @@ export interface RunRecord {
   steps: readonly RunStep[]
 }
 
+/** Provides workflow event storage with task and run filtering. */
 export interface RunLog extends WorkflowEventLog {
   entries(query?: Partial<RunQuery>): MaybePromise<readonly WorkflowStepEntry[]>
 }

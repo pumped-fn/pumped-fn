@@ -2,10 +2,12 @@ import { isStreamingExec, tag, type Lite } from "@pumped-fn/lite"
 
 type MaybePromise<T> = T | Promise<T>
 
+/** Tracks the next durable step number within a suspense run. */
 export interface SuspenseStepCounter {
   next: number
 }
 
+/** Identifies one durable step within a task and run. */
 export interface SuspenseStepKey {
   taskId: string
   runId: string
@@ -33,6 +35,7 @@ export type SuspenseStepEntry =
       result: unknown
     }
 
+/** Stores pending, resolved, and completed durable step outcomes. */
 export interface SuspenseEventLog {
   get(key: SuspenseStepKey): Promise<SuspenseStepEntry | undefined>
   putPending(entry: Extract<SuspenseStepEntry, { status: "pending" }>): Promise<void>
@@ -40,6 +43,7 @@ export interface SuspenseEventLog {
   resolve(key: SuspenseStepKey, value: unknown): Promise<void>
 }
 
+/** Describes the execution inspected by suspense policy hooks. */
 export interface SuspenseExecEvent {
   key: SuspenseStepKey
   target: Lite.ExecTarget
@@ -48,6 +52,7 @@ export interface SuspenseExecEvent {
   input: unknown
 }
 
+/** Configures durable step identity, storage, suspension, and execution hooks. */
 export interface SuspenseExtensionOptions {
   log: SuspenseEventLog
   name?: string
@@ -81,6 +86,7 @@ export function formatSuspenseStepKey(key: SuspenseStepKey): string {
   return `${key.taskId}:${key.runId}:${key.step}`
 }
 
+/** Binds a task, run, and optional tags to a suspense execution context. */
 export interface SuspenseRunOptions {
   taskId: string
   runId: string
