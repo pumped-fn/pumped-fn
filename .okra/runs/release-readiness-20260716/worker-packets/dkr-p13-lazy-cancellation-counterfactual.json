@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "unit_id": "DKR-P13",
+  "worker_kind": "DKR",
+  "frame": {
+    "objective": {
+      "metric_id": "release_readiness_gap_count",
+      "target": 0,
+      "performance_targets": {
+        "throughput_gm_min": 1.10,
+        "allocation_gm_max": 0.90,
+        "allocation_row_max": 1.05,
+        "retained_closed": 0,
+        "cleanup_walls": 0
+      }
+    },
+    "anti_goals": {
+      "full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"
+    },
+    "action_envelope": {
+      "allowed": [
+        "Create one scratch-only counterfactual from exact commit 293dcdf2 combining the proven V1+V2+V3 source boundary with lazy cancellation materialization.",
+        "Add scratch-only semantic tests that prove AbortSignal identity, parent and caller propagation, explicit abort, close classification, listener settlement, stream cancellation, boundary-child cancellation, and post-close signal behavior.",
+        "If every semantic test and provenance check passes, run the already frozen integrated lifecycle protocol once."
+      ],
+      "forbidden": [
+        "Edit product source, alter public types or behavior, weaken cancellation, change workloads or thresholds, rerun favorably, run the 47-row benchmark, commit, push, merge, release, publish, or deploy."
+      ],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human changes targets or authority."
+  },
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-ALLOCATION-REGRESSION",
+    "AG-RETAINED-MEMORY",
+    "AG-CLEANUP-EFFECT",
+    "AG-SESSION-ISOLATION",
+    "AG-BENCHMARK-BRANCH",
+    "AG-PRESERVATION",
+    "AG-AUTHORITY"
+  ],
+  "current_state": {
+    "baseline_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "baseline_build": "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/build-a",
+    "p12_checkpoint": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/checkpoint.v1.json#sha256=e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950",
+    "observed_hot_path": [
+      "Every execution context eagerly creates a local AbortController.",
+      "Every child context eagerly creates a second combined AbortController and registers parent and local abort listeners.",
+      "Successful executions that never read signal still pay both costs."
+    ],
+    "candidate_boundary": {
+      "include": [
+        "V1 seedTags fast paths",
+        "V2 lazy resourceListeners and resourceControllers",
+        "V3 lazy resources",
+        "lazy local AbortController and combined AbortSignal materialization until signal is observed or an error path requires classification"
+      ],
+      "exclude": [
+        "lazy cleanups",
+        "lazy descendants",
+        "lazy activeIterators",
+        "lazy children",
+        "public API changes",
+        "cancellation semantic changes"
+      ]
+    }
+  },
+  "assignment": "Use first principles to design the smallest lazy-cancellation implementation that preserves the exact public AbortSignal contract. Keep a stable signal identity once observed. Preserve parent, caller, explicit abort, close, stream, boundary-child, already-aborted, reason, and post-close behavior. Avoid materializing cancellation state on successful executions that never observe signal. Build the scratch candidate, run focused existing and new semantic tests, prove the candidate contains only the frozen V123 hunks plus cancellation hunks, freeze protocol and provenance, then run the accepted 96-observation comparison once. Return exact target reads pending independent validation. Stop before performance observation if semantics or provenance fail.",
+  "budget_and_stop_rule": {
+    "wall_clock": "70m",
+    "route_cap": 1,
+    "stop": "Stop after one semantically proven candidate and one frozen full comparison, pass or fail."
+  },
+  "hand_back_rule": "Hand back if stable signal identity or propagation cannot be preserved without eager allocation, if any semantic test fails, or if the variant boundary is ambiguous.",
+  "worker_progress": ".okra/runs/release-readiness-20260716/workers/dkr-p13-lazy-cancellation-counterfactual/progress.jsonl",
+  "worker_progress_command": "/home/lagz0ne/dev/okr/skills/reverse-tornado-okr/scripts/okra-store.sh worker-report dkr-p13-lazy-cancellation-counterfactual <payload.json> .okra/runs/release-readiness-20260716",
+  "heartbeat_cadence_and_next_check_at": "10m; next check at 2026-07-16T08:35:00Z",
+  "output_schema": {
+    "record_first": true,
+    "required": [
+      "checkpoint_id",
+      "variant_patch_sha256",
+      "variant_boundary_checks",
+      "semantic_test_matrix",
+      "frozen_protocol",
+      "provenance",
+      "raw_hashes",
+      "throughput_rows",
+      "throughput_geometric_mean",
+      "allocation_rows",
+      "allocation_geometric_mean",
+      "retained_controls",
+      "cleanup_walls",
+      "target_decisions",
+      "replay",
+      "claim_boundary",
+      "workspace_effect"
+    ],
+    "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  }
+}

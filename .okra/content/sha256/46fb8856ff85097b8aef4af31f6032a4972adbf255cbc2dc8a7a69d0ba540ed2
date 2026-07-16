@@ -1,0 +1,97 @@
+schema: pumped-fn.okra.independent-validation.v1
+unit_id: DKR-P9
+subject_checkpoint: /tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/checkpoint.v1.json
+subject_sha256: 4b31dfc058e6f0627edba61a2a4e3c83818eb132f6374cec8864c75eccbb77f4
+observed_at: 2026-07-16T07:01:12Z
+replay: cd /tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z && node verify.mjs .
+replay_exit_code: 0
+
+claim_id: dkr-p9-evidence-integrity
+check: frozen harness and all raw observations match their pinned hashes
+threshold: 9 of 9 frozen files and 72 of 72 raw observations match
+value: 9 of 9 frozen files and 72 of 72 raw observations match
+source_of_truth: frozen.json, raw.sha256, verify.mjs replay
+sha256: frozen.json=1b13afb797d1efabcb29b2bfbac555dc571dbd690ce83eeff1986c0ee0fe5611 raw.sha256=da37fe159287ebbd0bbc6f136f621c98862c6899b0794c7d39eded0b50a5c272 verify.mjs=4cfedb15a58480b45629a20e8badfc3651adfeb7dd9768b5a776724d27ee39e5
+decision: accepted
+evidence: replay checks frozenHarness=true and rawHashes=true; raw manifest has 30 throughput, 36 allocation, and 6 retained entries
+
+claim_id: dkr-p9-exact-archive-provenance
+check: both independent archives and both builds represent exact commit 293dcdf2d6d0b274418bcca8461f7eb122e10c52
+threshold: exact commit ids, identical archive hashes, and identical source, lockfile, manifest, dist-module, and declaration hashes
+value: both tar commit ids are 293dcdf2d6d0b274418bcca8461f7eb122e10c52; archive hashes are both bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0; every replayed provenance check is true
+source_of_truth: archives/head-a.tar, archives/head-b.tar, provenance.json, verify.mjs replay
+sha256: provenance.json=3165e072a478e13edb7230b9b48bb8fed738a1d89c04d4b7bde79bc401df7e27 archiveA=bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0 archiveB=bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0
+decision: accepted
+evidence: exactHead=true, archivesIdentical=true, buildHashesIdentical=true, sourceHashMatch=true, lockfileHashMatch=true, manifestHashMatch=true, distModuleHashMatch=true, declarationHashMatch=true
+
+claim_id: dkr-p9-chronology-and-recovery
+check: harness was frozen and the failed B build was successfully recovered before the first observation
+threshold: freeze before observations; successful recovery build and provenance before observations
+value: frozenAt=2026-07-16T06:51:44.674Z; failed B log mtime=2026-07-16T06:52:56.127Z; successful B recovery log mtime=2026-07-16T06:55:40.982Z; provenance mtime=2026-07-16T06:55:56.750Z; first raw mtime=2026-07-16T06:56:33.111Z
+source_of_truth: chronology.json, logs/build-b.log, logs/build-b-recovery.log, provenance.json, raw/throughput/scope_run-01-A.json
+sha256: chronology.json=0f57a1ca6f24c93cd5c4c48c1d3d6ca1d61a29a7115a4cbdfe9d554112f96347 build-b.log=322311871a418f9da9aadc48b80aaac4c8f1e698a19b7d25a5a83dfb9e878678 build-b-recovery.log=2015d8c36b607b16fc7b8e469aebcc66564c1c46f8853dfba05dfbbb5386d2ea
+decision: accepted
+evidence: chronology=true and createdBeforeObservation=true; the first B install ended with ERR_PNPM_ENOSPC, while the later recovery log completed the SDK build before provenance collection and raw observations
+boundary: the archive proves recovery from ENOSPC before observations; it does not preserve a historical df-inode read, so the narrower cause label inode exhaustion is not independently proved
+
+claim_id: dkr-p9-throughput-rejection
+check: every throughput B/A median ratio is within the frozen inclusive band 0.80 to 1.25
+threshold: all three ratios in [0.80,1.25]
+value: scope_run=0.851075624429661 accepted; managed_ctx_exec=1.2910628169223395 rejected; sdk_session_run=1.1659555306071323 accepted
+source_of_truth: protocol.json, raw/throughput, verify.mjs replay
+sha256: protocol.json=2587bfe897793c0c7a52756b63184a486689f5a02952381d158f8a2cc3017037
+decision: accepted
+evidence: replay throughput=false because managed_ctx_exec exceeds 1.25
+
+claim_id: dkr-p9-allocation-gate
+check: every corrected allocation signal is at least 1048576 bytes and every median B/A ratio is within 0.80 to 1.25
+threshold: 18 of 18 signals pass and all three ratios in [0.80,1.25]
+value: 18 of 18 signals pass; scope_run=1.007821458798688, managed_ctx_exec=1.0047206098328556, sdk_session_run=0.9880089748223106
+source_of_truth: protocol.json, raw/allocation, verify.mjs replay
+sha256: protocol.json=2587bfe897793c0c7a52756b63184a486689f5a02952381d158f8a2cc3017037
+decision: accepted
+evidence: replay allocation=true
+
+claim_id: dkr-p9-retained-rejection
+check: every archive and lifecycle row reports baseline=0, closed=0, positive=1
+threshold: 6 of 6 observations match
+value: 4 of 6 match; sdk_session_run A and B each report baseline=0, closed=1, positive=2
+source_of_truth: protocol.json, raw/retained, verify.mjs replay
+sha256: protocol.json=2587bfe897793c0c7a52756b63184a486689f5a02952381d158f8a2cc3017037
+decision: accepted
+evidence: replay retained=false for both SDK archives
+
+claim_id: dkr-p9-cleanup-walls
+check: cleanup, ownership, business-state, and SDK post-close rejection walls hold
+threshold: postCloseLiveResourceCount=0, crossOwnerLeakCount=0, cleanupBusinessStateMutationCount=0, every completed SDK operation rejects post-close mutation
+value: 0, 0, 0, and 2902 of 2902
+source_of_truth: all 72 raw lifecycle records aggregated by verify.mjs
+sha256: raw.sha256=da37fe159287ebbd0bbc6f136f621c98862c6899b0794c7d39eded0b50a5c272
+decision: accepted
+evidence: replay cleanup=true
+
+claim_id: dkr-p9-scratch-only-worker-effects
+check: the DKR-P9 worker changed no product or .okra files
+threshold: no worker-created product or .okra write
+value: every current changed source-worktree path has mtime at or before 2026-07-16T06:44:09.693Z, before the scratch freeze and observations; all measured worker output is in the DKR-P9 scratch directory
+source_of_truth: source-worktree git status and mtimes, worker packet, scratch artifact mtimes
+sha256: worker packet not pinned in the checkpoint; checkpoint workspaceEffect statement is independently bounded by filesystem chronology
+decision: accepted
+evidence: pre-dispatch orchestration packet and estimate exist under .okra, but no source-worktree changed path was written during the worker run
+boundary: the checkpoint phrase every DKR-P9 artifact is under scratch is overbroad because pre-dispatch orchestration metadata exists in .okra; the narrower worker-effect claim is supported
+
+claim_id: dkr-p9-rejection-and-nonclaims
+check: rejection follows without claiming product performance, baseline-candidate performance, CKR success, or optimization authority
+threshold: any frozen harness gate failure forces rejection; all out-of-scope claims remain unsupported or not run
+value: throughput=false and retained=false force harnessAccepted=false; productPerformanceClaim=not_supported, baselineCandidateComparison=not_run, ckrPerformanceClaim=not_supported, optimizationAuthority=not_granted
+source_of_truth: protocol.json stopRule and claimBoundary, verify.mjs replay
+sha256: protocol.json=2587bfe897793c0c7a52756b63184a486689f5a02952381d158f8a2cc3017037 checkpoint.v1.json=4b31dfc058e6f0627edba61a2a4e3c83818eb132f6374cec8864c75eccbb77f4
+decision: accepted
+evidence: the narrow DKR-P9 harness rejection follows from two independent frozen gate failures; no product-improvement conclusion follows from A/A
+
+overall_decision: accepted
+overall_evidence: the DKR-P9 rejection conclusion follows deterministically; the allocation and cleanup passes do not override the throughput and retained failures
+accepted_claim_count: 9
+rejected_claim_count: 0
+
+DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.

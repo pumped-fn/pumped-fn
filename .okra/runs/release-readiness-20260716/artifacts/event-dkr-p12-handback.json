@@ -1,0 +1,12 @@
+{
+  "type": "event",
+  "event_type": "handback_event",
+  "unit_id": "DKR-P12",
+  "observed_at": "2026-07-16T08:24:02Z",
+  "cause": "The isolated V1+V2+V3 counterfactual held every safety wall but missed both geometric-mean performance targets.",
+  "evidence_refs_or_hashes": [
+    "workers/dkr-p12-v123-counterfactual/checkpoint.v1.json#sha256=e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950",
+    "workers/validator-dkr-p12/verification.v1.txt#sha256=314950ea235eb5b32e8c6b14cb4cbb404e7fa548089b544e51f65a2e244c9f55"
+  ],
+  "handed_back_to": "DKR-P13 lazy cancellation counterfactual"
+}

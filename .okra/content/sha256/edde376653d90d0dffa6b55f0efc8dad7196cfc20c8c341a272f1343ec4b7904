@@ -1,0 +1,80 @@
+claim_id: DKR-P10A-FROZEN-EVIDENCE
+check: Frozen verifier inputs and raw manifest match the recorded hashes.
+replay: cd /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z && node verify.mjs . --check
+exit_code: 0
+value: 0 mismatches vs threshold: 0
+source_of_truth: /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z/frozen.json and replay output
+sha256: checkpoint=94c0a937fe0e318971d32713938e75ef12dfdc35f9bf6b9a1badf3eafe179aa1 protocol=365e62282bb578b18db58f359dc282550f28b29140e7c89a06fb33463e4ebe9a frozen=29e23890947f240adfd3ac6d2a9f5a52b173ee22cf1e19c78223c1d73baec1f1 verifier=2b030bc2baa65017c84120aaacf19b44df1821fe5f64368c939e88ef6d36ef2d raw_manifest=84909c907f89faab37ba02eceee60bfe907858d5e78995ca0ecd859633f3e9bf
+observed_at: 2026-07-16T07:15:08Z
+decision: accepted
+evidence: {"replay":"passed","protocolAccepted":true,"rawObservationCount":42,"rawManifestSha256":"84909c907f89faab37ba02eceee60bfe907858d5e78995ca0ecd859633f3e9bf"}
+
+claim_id: DKR-P10A-P9-PROVENANCE
+check: Exact P9 checkpoint, provenance, workloads, builds, and both archives remain the frozen source.
+replay: cd /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z && node verify.mjs . --check
+exit_code: 0
+value: 0 provenance mismatches vs threshold: 0
+source_of_truth: /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z/protocol.json, frozen.json, and /tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z
+sha256: prior_checkpoint=4b31dfc058e6f0627edba61a2a4e3c83818eb132f6374cec8864c75eccbb77f4 prior_provenance=3165e072a478e13edb7230b9b48bb8fed738a1d89c04d4b7bde79bc401df7e27 workloads=cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a archive_A=bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0 archive_B=bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0
+observed_at: 2026-07-16T07:15:08Z
+decision: accepted
+evidence: replay passed after checking exactHead=293dcdf2d6d0b274418bcca8461f7eb122e10c52, the P9 prior hashes, workload hash, and archive hashes.
+
+claim_id: DKR-P10A-BALANCED-SCHEDULE
+check: Each row has the frozen balanced 14-process A/B schedule with seven processes per archive.
+replay: cd /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z && node verify.mjs . --check
+exit_code: 0
+value: 42 valid observations, 14 per row and 7 per archive vs threshold: exactly 42, 14 per row and 7 per archive
+source_of_truth: /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z/protocol.json and raw/*/*.json
+sha256: raw_manifest=84909c907f89faab37ba02eceee60bfe907858d5e78995ca0ecd859633f3e9bf
+observed_at: 2026-07-16T07:15:08Z
+decision: accepted
+evidence: {"replay":"passed","protocolAccepted":true,"rawObservationCount":42,"rawManifestSha256":"84909c907f89faab37ba02eceee60bfe907858d5e78995ca0ecd859633f3e9bf"}
+
+claim_id: DKR-P10A-TIMED-BLOCKS
+check: Every process meets the frozen warmup and has seven timed blocks meeting the minimum batch and duration gates.
+replay: cd /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z && node verify.mjs . --check
+exit_code: 0
+value: 42 valid process observations with 7 timed blocks each vs threshold: all 42 observations valid and exactly 7 blocks each
+source_of_truth: /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z/protocol.json and raw/*/*.json
+sha256: protocol=365e62282bb578b18db58f359dc282550f28b29140e7c89a06fb33463e4ebe9a raw_manifest=84909c907f89faab37ba02eceee60bfe907858d5e78995ca0ecd859633f3e9bf
+observed_at: 2026-07-16T07:15:08Z
+decision: accepted
+evidence: verifier accepted minimum warmup of 5 batches and 1000 ms, exactly 7 timed blocks, and each block at least 3 batches and 500 ms.
+
+claim_id: DKR-P10A-AA-RATIOS
+check: Every archive median B/A throughput ratio is inside the frozen inclusive 0.80 to 1.25 A/A band.
+replay: cd /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z && node verify.mjs . --check
+exit_code: 0
+value: scope_run=0.9789381581845985, managed_ctx_exec=0.9864867444201343, sdk_session_run=0.998000745268827 vs threshold: each in [0.80,1.25]
+source_of_truth: /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z/checkpoint.v1.json#throughput and replay output
+sha256: checkpoint=94c0a937fe0e318971d32713938e75ef12dfdc35f9bf6b9a1badf3eafe179aa1
+observed_at: 2026-07-16T07:15:08Z
+decision: accepted
+evidence: {"replay":"passed","protocolAccepted":true,"rawObservationCount":42,"rawManifestSha256":"84909c907f89faab37ba02eceee60bfe907858d5e78995ca0ecd859633f3e9bf"}
+
+claim_id: DKR-P10A-STATIONARITY
+check: Every archive median early-to-late stationarity ratio is inside the frozen inclusive 0.80 to 1.25 band.
+replay: cd /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z && node verify.mjs . --check
+exit_code: 0
+value: scope_run A=1.0461198860643381 B=0.9889099649039961; managed_ctx_exec A=0.9487662946930367 B=0.9091963957135168; sdk_session_run A=1.0326068471367136 B=1.0514963466589407 vs threshold: each in [0.80,1.25]
+source_of_truth: /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z/checkpoint.v1.json#throughput and replay output
+sha256: checkpoint=94c0a937fe0e318971d32713938e75ef12dfdc35f9bf6b9a1badf3eafe179aa1
+observed_at: 2026-07-16T07:15:08Z
+decision: accepted
+evidence: {"replay":"passed","protocolAccepted":true,"rawObservationCount":42,"rawManifestSha256":"84909c907f89faab37ba02eceee60bfe907858d5e78995ca0ecd859633f3e9bf"}
+
+claim_id: DKR-P10A-PRODUCT-PERFORMANCE
+check: DKR-P10A establishes a product improvement or authorizes optimization.
+replay: cd /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z && node verify.mjs . --check
+exit_code: 0
+value: A/A method validation only vs threshold: direct baseline-candidate product evidence required
+source_of_truth: /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z/protocol.json#claimBoundary and checkpoint.v1.json#decision
+sha256: protocol=365e62282bb578b18db58f359dc282550f28b29140e7c89a06fb33463e4ebe9a checkpoint=94c0a937fe0e318971d32713938e75ef12dfdc35f9bf6b9a1badf3eafe179aa1
+observed_at: 2026-07-16T07:15:08Z
+decision: rejected (unsupported)
+evidence: claimBoundary says this DKR cannot authorize optimization or establish a product improvement; the replay only reports protocolAccepted=true for an A/A control.
+
+6 accepted, 1 rejected: DKR-P10A-PRODUCT-PERFORMANCE
+
+DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.

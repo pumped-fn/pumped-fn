@@ -1,0 +1,9 @@
+{
+  "estimate": {
+    "time_min": 12,
+    "turns": 1,
+    "tokens": null
+  },
+  "observed_at": "2026-07-16T09:55:10Z",
+  "dispatch_ref": "worker-packets/validator-dkr-p16-semantic-timeout-classification.json"
+}

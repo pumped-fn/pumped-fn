@@ -1,0 +1,20 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P10A",
+  "accepted_at": "2026-07-16T07:16:00Z",
+  "accepted_scope": "The frozen CPU-pinned, block-based throughput A/A method is accepted for the three representative lifecycle rows.",
+  "method_decision": "accepted",
+  "checkpoint_ref": "workers/dkr-p10a-throughput-stability/checkpoint.v1.json",
+  "checkpoint_sha256": "94c0a937fe0e318971d32713938e75ef12dfdc35f9bf6b9a1badf3eafe179aa1",
+  "verification_ref": "workers/validator-dkr-p10a/verification.v1.txt",
+  "verification_sha256": "edde376653d90d0dffa6b55f0efc8dad7196cfc20c8c341a272f1343ec4b7904",
+  "accepted_reads": {
+    "throughput_ratios": [0.9789381581845985, 0.9864867444201343, 0.998000745268827],
+    "stationarity_ratios": [1.0461198860643381, 0.9889099649039961, 0.9487662946930367, 0.9091963957135168, 1.0326068471367136, 1.0514963466589407],
+    "raw_observations": 42
+  },
+  "rejected_claims": [
+    "DKR-P10A does not establish product improvement or authorize an improvement claim."
+  ],
+  "downstream_authority": "Use this exact method for one frozen baseline-candidate lifecycle comparison after a narrow product candidate passes semantic gates."
+}

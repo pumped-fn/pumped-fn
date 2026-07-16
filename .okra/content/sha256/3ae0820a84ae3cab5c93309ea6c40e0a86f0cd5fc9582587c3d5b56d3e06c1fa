@@ -1,0 +1,21 @@
+{
+  "type": "claim_acceptance",
+  "unit_id": "DKR-P20",
+  "accepted_at": "2026-07-16T11:11:57Z",
+  "decision": "accepted_frozen_protocol_exhausted_narrow_wall_progression",
+  "accepted_scope": "PKR-P19 exhausted its predeclared five-pair and nine-pair looks. The 39 gaps are directional disagreement rather than missing rows or identity drift. More captures would be post-hoc favorable-repeat fishing. The smallest valid progression is independent replay followed by acceptance only of the frozen wall value.",
+  "reads": {
+    "row_count": 47,
+    "missing_row_count": 0,
+    "confirmed_regression_count": 0,
+    "performance_evidence_gap_count": 39,
+    "lite_react_representative_mad": 0.272346,
+    "fallback_net_row_change": 1
+  },
+  "wall_gate": {
+    "verdict": "held_with_claim_boundary",
+    "downstream_advance": "authorized_for_independent_checkpoint_validation",
+    "decided_at": "2026-07-16T11:11:57Z"
+  },
+  "claim_boundary": "This accepts only that the protocol is exhausted and the frozen metric can be read after independent validation. It does not establish that regressions are absent and does not authorize more benchmark captures."
+}

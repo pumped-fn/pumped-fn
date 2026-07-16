@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "checkpoint_id": "DKR-P10A-CHECKPOINT-1",
+  "conclusion_id": "DKR-P10A-THROUGHPUT-STABILITY-1",
+  "unit_id": "DKR-P10A",
+  "decision_target": "Choose whether this frozen A/A throughput method is stable enough for a later baseline-candidate comparison.",
+  "source_of_truth": "./raw and ./protocol.json",
+  "read_method": "Replay the frozen verifier. It validates provenance, schedule, minimum warmup, seven timed blocks, median aggregation, A/A ratios, and early-to-late stationarity.",
+  "observed_at": "2026-07-16T07:13:03.404Z",
+  "recorded_at": "2026-07-16T07:13:03.404Z",
+  "max_age": "PT24H",
+  "freshness_status": "fresh",
+  "confidence": 0.9,
+  "evidence_refs_or_hashes": {
+    "protocol_sha256": "365e62282bb578b18db58f359dc282550f28b29140e7c89a06fb33463e4ebe9a",
+    "freeze_sha256": "29e23890947f240adfd3ac6d2a9f5a52b173ee22cf1e19c78223c1d73baec1f1",
+    "raw_manifest_sha256": "84909c907f89faab37ba02eceee60bfe907858d5e78995ca0ecd859633f3e9bf",
+    "prior_checkpoint_sha256": "4b31dfc058e6f0627edba61a2a4e3c83818eb132f6374cec8864c75eccbb77f4",
+    "prior_provenance_sha256": "3165e072a478e13edb7230b9b48bb8fed738a1d89c04d4b7bde79bc401df7e27",
+    "archive_a_sha256": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0",
+    "archive_b_sha256": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0"
+  },
+  "replay_command_or_checker": "cd . && node verify.mjs . --check",
+  "questions_answered": [
+    "A longer block-based, CPU-pinned, balanced-schedule protocol was frozen and observed once.",
+    "All three row A/A and archive stationarity gates held."
+  ],
+  "questions_unanswered": [
+    "Will independent deterministic validation accept this method for the later baseline-candidate comparison?"
+  ],
+  "decision": "Worker observed the frozen protocol pass. Independent validation is required before the orchestrator can accept the method.",
+  "flag_if_missing_or_stale": "Fail closed and block downstream optimization.",
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-PRESERVATION",
+    "AG-STORAGE-WRITE",
+    "AG-AUTHORITY"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "metric_id": "AG-INTEGRITY",
+      "source": "./frozen.json",
+      "method": "Verify frozen file and prior-evidence hashes before reading observations.",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held"
+    },
+    {
+      "metric_id": "AG-PERF-COMPARISON",
+      "source": "./protocol.json and prior DKR-P9 provenance",
+      "method": "Verify both archive hashes, exact head, balanced schedule, and unchanged 0.80 to 1.25 bands.",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held"
+    },
+    {
+      "metric_id": "AG-PERF-CLAIM",
+      "source": "./checkpoint.v1.json",
+      "method": "Check the decision and claim boundary do not assert product improvement or authorize optimization.",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held"
+    },
+    {
+      "metric_id": "AG-PRESERVATION",
+      "source": "/tmp/session-kernel-publish-20260715-0746",
+      "method": "Require an empty exact-head diff across product, benchmark, example, script, manifest, and lockfile paths.",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held"
+    },
+    {
+      "metric_id": "AG-STORAGE-WRITE",
+      "source": ".",
+      "method": "Keep measurement artifacts under the packet-authorized scratch root; the only repo write is designated worker progress.",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held"
+    },
+    {
+      "metric_id": "AG-AUTHORITY",
+      "source": "./protocol.json",
+      "method": "Stop after one observation without optimization, candidate comparison, push, merge, or release.",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "held",
+    "downstream_advance": "blocked pending independent validation"
+  },
+  "candidate_next_dkr_or_pkr": "Independent validator replays DKR-P10A, then the orchestrator decides whether to use the method in a new exact-head A/A harness.",
+  "throughput": {
+    "scope_run": {
+      "archives": {
+        "A": {
+          "processOperationsPerSecond": [
+            19061.082131974348,
+            19390.35163830681,
+            18345.355743094486,
+            19678.20593875169,
+            18500.259162422168,
+            18076.485950412825,
+            18626.63408531016
+          ],
+          "medianOperationsPerSecond": 18626.63408531016,
+          "processStationarity": [
+            1.0177281283134592,
+            1.0275295300664742,
+            1.1362264695652087,
+            0.897353265485476,
+            1.0461198860643381,
+            1.0624358907506324,
+            1.060504868963481
+          ],
+          "medianStationarityRatio": 1.0461198860643381,
+          "stationarityAccepted": true
+        },
+        "B": {
+          "processOperationsPerSecond": [
+            18387.713404679693,
+            18234.322864651993,
+            18275.126909448652,
+            17079.893384686577,
+            17265.946643790398,
+            17863.665062020278,
+            18671.32798029368
+          ],
+          "medianOperationsPerSecond": 18234.322864651993,
+          "processStationarity": [
+            0.96840652109508,
+            1.045115262862473,
+            0.9481824975689103,
+            0.9889099649039961,
+            1.0931865513103995,
+            0.9203150824917499,
+            1.0765470720445778
+          ],
+          "medianStationarityRatio": 0.9889099649039961,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioBToA": 0.9789381581845985,
+      "aaAccepted": true,
+      "accepted": true
+    },
+    "managed_ctx_exec": {
+      "archives": {
+        "A": {
+          "processOperationsPerSecond": [
+            15368.18109506524,
+            14776.01783522979,
+            14436.524432800732,
+            13594.135763073939,
+            14485.14613989704,
+            11738.266656568105,
+            14192.450900892343
+          ],
+          "medianOperationsPerSecond": 14436.524432800732,
+          "processStationarity": [
+            0.98249370342088,
+            0.9473700860583445,
+            0.9487662946930367,
+            0.9042410664903093,
+            1.1240830904448444,
+            0.9632363037277865,
+            0.7846264704408312
+          ],
+          "medianStationarityRatio": 0.9487662946930367,
+          "stationarityAccepted": true
+        },
+        "B": {
+          "processOperationsPerSecond": [
+            14241.43998845532,
+            14466.2671721395,
+            16396.158445005123,
+            11837.558955186743,
+            11882.798296806834,
+            14269.333676715334,
+            13870.826640392175
+          ],
+          "medianOperationsPerSecond": 14241.43998845532,
+          "processStationarity": [
+            0.8306425489799443,
+            0.834375199871754,
+            1.0589424397297835,
+            0.7220255532240891,
+            1.002570368946079,
+            0.9091963957135168,
+            1.3820605342727614
+          ],
+          "medianStationarityRatio": 0.9091963957135168,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioBToA": 0.9864867444201343,
+      "aaAccepted": true,
+      "accepted": true
+    },
+    "sdk_session_run": {
+      "archives": {
+        "A": {
+          "processOperationsPerSecond": [
+            2245.6941005174326,
+            2393.087432937065,
+            2501.0532292441667,
+            2360.485097076356,
+            2431.3209277857445,
+            2364.725871311181,
+            2473.4715581795213
+          ],
+          "medianOperationsPerSecond": 2393.087432937065,
+          "processStationarity": [
+            0.9431923699668446,
+            1.2067836139064971,
+            1.0552269565627461,
+            1.0326068471367136,
+            0.9621972803775518,
+            1.2413156666818443,
+            0.9614584494711512
+          ],
+          "medianStationarityRatio": 1.0326068471367136,
+          "stationarityAccepted": true
+        },
+        "B": {
+          "processOperationsPerSecond": [
+            2310.3770591387156,
+            2293.0522757503363,
+            2388.303041564655,
+            2284.1924001069983,
+            2571.01104500652,
+            2564.2528593773004,
+            2652.320422116644
+          ],
+          "medianOperationsPerSecond": 2388.303041564655,
+          "processStationarity": [
+            1.0514963466589407,
+            1.1532546152138232,
+            0.9471654637348933,
+            1.0415358227888551,
+            1.0731909529331418,
+            1.1084698748926727,
+            0.9597511834652602
+          ],
+          "medianStationarityRatio": 1.0514963466589407,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioBToA": 0.998000745268827,
+      "aaAccepted": true,
+      "accepted": true
+    }
+  },
+  "raw_observation_count": 42,
+  "workspace_effect": "Created one scratch-only study and the designated worker progress record. Product and prior evidence stayed read-only.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "worker_evidence_is_acceptance": false,
+  "favorable_reruns_refused": true
+}

@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "unit_id": "PKR-P2",
+  "worker_kind": "PKR",
+  "model_phrasing": "gpt-5 family detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4",
+  "frame": {
+    "objective": {
+      "metric_id": "release_readiness_gap_count",
+      "target": 0,
+      "performance_targets": {
+        "throughput_geometric_mean_candidate_over_baseline": 1.10,
+        "allocation_geometric_mean_candidate_over_baseline": 0.90,
+        "allocation_per_row_ceiling": 1.05,
+        "retained_product_object_count": 0,
+        "cleanup_wall_count": 0
+      }
+    },
+    "anti_goals": {
+      "full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"
+    },
+    "action_envelope": {
+      "allowed": [
+        "Read the accepted DKR-P8, P10A, and P10B methods.",
+        "Create one scratch-only baseline-candidate lifecycle study under /tmp.",
+        "Reuse the immutable exact-head baseline build and create one clean candidate build from the exact baseline plus the frozen scope.ts patch.",
+        "Write governed progress through okra-store.sh worker-report."
+      ],
+      "forbidden": [
+        "Edit product files, the candidate diff, prior evidence, docs, benchmarks, or release metadata.",
+        "Change workloads, target thresholds, row weights, or protocols after the first observation.",
+        "Run favorable retries or peek and retune.",
+        "Add benchmark-only product paths or claim causality from source inspection.",
+        "Commit, push, merge, release, publish, deploy, or contact production services."
+      ],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human may change objective thresholds, row weights, authority, merge, or release."
+  },
+  "linked_ckr": "CKR-PERFORMANCE",
+  "source_dkr_checkpoint": [
+    "artifacts/accept-dkr-p5.v1.json",
+    "artifacts/accept-dkr-p8.v1.json",
+    "artifacts/accept-dkr-p10a.v1.json",
+    "artifacts/accept-dkr-p10b.v1.json"
+  ],
+  "contribution_metric": {
+    "throughput": "equal-weight geometric mean candidate/baseline >= 1.10",
+    "allocation": "equal-weight geometric mean candidate/baseline <= 0.90 and every row <= 1.05",
+    "retained": "baseline and candidate closed product object counts equal 0; deliberate positive control equals 1",
+    "cleanup": "all ownership and post-close walls equal 0"
+  },
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-ALLOCATION-REGRESSION",
+    "AG-RETAINED-MEMORY",
+    "AG-CLEANUP-EFFECT",
+    "AG-SESSION-ISOLATION",
+    "AG-BENCHMARK-BRANCH",
+    "AG-PRESERVATION",
+    "AG-AUTHORITY"
+  ],
+  "current_state": {
+    "baseline_product_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "baseline_build": "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/build-a",
+    "baseline_archive_sha256": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0",
+    "candidate_patch_command": "git diff 293dcdf2d6d0b274418bcca8461f7eb122e10c52 -- pkg/core/lite/src/scope.ts",
+    "candidate_patch_sha256": "3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599",
+    "rows": ["scope_run", "managed_ctx_exec", "sdk_session_run"],
+    "representative_weighting": "equal weight because no production weighting evidence exists"
+  },
+  "previous_dkr_checkpoint": {
+    "throughput": "/tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z/checkpoint.v1.json",
+    "allocation": "/tmp/dkr-p8-sampled-byte-aggregate-20260716T063455Z/checkpoint.json",
+    "retained": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/checkpoint.v1.json"
+  },
+  "assignment": "Freeze one integrated baseline-candidate protocol before observation. Candidate provenance must be the exact baseline product tree plus only the frozen scope.ts patch. Build Lite and SDK from that candidate using the frozen lockfile and offline dependencies. Throughput must use P10A's CPU affinity, balanced 14-process schedule, warmup, seven timed blocks, archive aggregation, and stationarity checks, changing only A/A labels into baseline/candidate and reading candidate divided by baseline. Allocation must use P8's samples[].size aggregate, P9's matched zero subtraction, sampling interval, three trials, accepted operations, minimum 1 MiB signal, and candidate divided by baseline. Retained controls must use P10B's event-loop-turn boundary after explicit GC and require 0/0/1 for both variants. Preserve P9 lifecycle and cleanup assertions. Compute the equal-weight geometric means and exact target decisions. Observe once, preserve every raw hash, and return a checkpoint pending independent validation. Do not edit the candidate or run existing 47-row benchmarks in this unit.",
+  "budget_and_stop_rule": {
+    "wall_clock": "55m",
+    "route_cap": 1,
+    "stop": "Stop after one frozen integrated comparison is observed once, whether it passes or fails. Hand back on provenance drift, missing capacity, or a method mismatch."
+  },
+  "hand_back_rule": "PKRs hand back on unknown discovery instead of researching or resolving unknowns inside execution.",
+  "progress_signals": [
+    "freeze timestamp before first observation",
+    "candidate patch and build provenance hashes",
+    "raw observation manifest",
+    "per-row throughput, allocation, retained, and cleanup reads",
+    "geometric means and target decisions"
+  ],
+  "worker_progress": ".okra/runs/release-readiness-20260716/workers/pkr-p2-lifecycle-performance-comparison/progress.jsonl",
+  "worker_progress_command": "/home/lagz0ne/dev/okr/skills/reverse-tornado-okr/scripts/okra-store.sh worker-report pkr-p2-lifecycle-performance-comparison <payload.json> .okra/runs/release-readiness-20260716",
+  "heartbeat_cadence_and_next_check_at": "10m; next check at 2026-07-16T07:28:00Z",
+  "output_schema": {
+    "record_first": true,
+    "required": [
+      "checkpoint_id",
+      "source_of_truth",
+      "candidate_provenance",
+      "frozen_protocol",
+      "raw_hashes",
+      "throughput_rows",
+      "throughput_geometric_mean",
+      "allocation_rows",
+      "allocation_geometric_mean",
+      "retained_controls",
+      "cleanup_walls",
+      "target_decisions",
+      "replay_command_or_checker",
+      "active_anti_goals",
+      "active_anti_goal_verification",
+      "wall_gate",
+      "workspace_effect"
+    ],
+    "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  }
+}

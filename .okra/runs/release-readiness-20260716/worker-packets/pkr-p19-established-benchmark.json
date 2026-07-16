@@ -1,0 +1,44 @@
+{
+  "worker_id": "pkr-p19-established-benchmark",
+  "worker_kind": "progression",
+  "unit_id": "PKR-P19",
+  "objective": "Run the repaired checked-in full 47-row Lite and Lite React benchmark protocol for exact baseline product 293dcdf2 versus candidate be78c8be and determine whether confirmed regressions remain zero.",
+  "inputs": {
+    "baseline_product_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "benchmark_control_commit": "be78c8be",
+    "candidate_commit": "be78c8be",
+    "candidate_root": "/tmp/session-kernel-publish-20260715-0746",
+    "baseline_root": "/tmp/pkr-p17-baseline-293dcdf2",
+    "candidate_scope_sha256": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611",
+    "baseline_scope_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "rows": {
+      "lite": 39,
+      "lite_react": 8,
+      "total": 47
+    }
+  },
+  "predeclared_method": {
+    "baseline_overlay": "Cherry-pick only benchmark-control commit be78c8be onto detached baseline 293dcdf2, then prove pkg/core/lite and pkg/react/lite-react source paths remain byte-identical to 293dcdf2 and benchmark-control hashes match candidate.",
+    "first_stage_pairs": 5,
+    "first_stage_order": [
+      ["baseline", "candidate"],
+      ["candidate", "baseline"],
+      ["baseline", "candidate"],
+      ["candidate", "baseline"],
+      ["baseline", "candidate"]
+    ],
+    "fallback": "Only if the full five-pair comparator returns evidence_inconclusive, capture pairs 6 through 9 once in the checked-in continuing order and compare once after pair 9.",
+    "capture": "Use scripts/capture.mjs for each lane in its variant root and rebuild the named artifact before every capture.",
+    "comparison": "Use scripts/compare.mjs --mode full with the predeclared pair count.",
+    "acceptance": "All 47 rows present, semantic environment and artifact checks held, and confirmed_regression row count equals zero."
+  },
+  "anti_goals": [
+    "Do not edit product, benchmark, tests, docs, configuration, PR, or prior evidence after freeze.",
+    "Do not inspect partial comparisons or stop after pairs 6, 7, or 8.",
+    "Do not repeat a pair, row, lane, or capture until favorable.",
+    "Do not mix writers, controls, product artifacts, or semantic environments.",
+    "Do not claim the lifecycle target from the 47-row benchmark or the 47-row result from P15.",
+    "Do not merge, release, publish, or deploy."
+  ],
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

@@ -1,0 +1,18 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P11A",
+  "accepted_at": "2026-07-16T08:04:00Z",
+  "accepted_scope": "The replayable-empty attribution is accepted. No stack location or causality claim is accepted.",
+  "checkpoint_ref": "workers/dkr-p11a-allocation-stack-attribution/checkpoint.v1.json",
+  "checkpoint_sha256": "e0b05a9a6d243b2ea717aaf1a4edcc255bd62a7821ad0d434224303af7db8f9a",
+  "verification_ref": "workers/validator-dkr-p11a/verification.v1.json",
+  "verification_sha256": "9a7983a0e36f71a4a87ddcec54616fc15ff84f25c50509eba54e31ad6b2a5741",
+  "accepted_reads": {
+    "allocation_observation_hashes": "36/36",
+    "affected_profiles": 4,
+    "unresolved_samples": 36,
+    "unresolved_sampled_bytes": 283064
+  },
+  "decision": "accepted_replayable_empty_only",
+  "downstream_authority": "Do not use stack attribution. Preserve the evidence and use source-component counterfactuals instead."
+}

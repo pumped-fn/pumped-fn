@@ -1,0 +1,18 @@
+{
+  "type": "claim_acceptance",
+  "unit_id": "PKR-P1-ROLLBACK",
+  "accepted_at": "2026-07-16T08:14:00Z",
+  "accepted_scope": "The dead full-candidate product artifact is removed from the working tree and preserved by content hash.",
+  "metric_id": "dead_hypothesis_product_artifact_count",
+  "target": 0,
+  "comparator": "==",
+  "value": 0,
+  "restored_source_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+  "preserved_candidate_sha256": "a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65",
+  "writer_ref": "workers/pkr-p1-rollback-dead-candidate/progress.jsonl#seq=1",
+  "verification_ref": "workers/validator-pkr-p1-rollback/verification.v1.txt",
+  "verification_sha256": "d9c453f3e58d9b0915f65633f4cd4aad39d391ed1205a7712f04a844a1dc8779",
+  "active_anti_goals": ["AG-INTEGRITY", "AG-PRESERVATION", "AG-AUTHORITY"],
+  "active_anti_goal_verification": "Validator accepted exact baseline hash, empty product diff, preserved candidate hash, and no other product changes.",
+  "wall_gate": {"verdict": "held", "downstream_advance": "allowed", "decided_at": "2026-07-16T08:14:00Z"}
+}

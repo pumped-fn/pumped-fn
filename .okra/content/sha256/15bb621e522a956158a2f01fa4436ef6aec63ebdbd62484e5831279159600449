@@ -1,0 +1,134 @@
+{
+  "schema": "pumped-fn.okra.pkr-checkpoint.v1",
+  "unit_id": "PKR-P19",
+  "worker_id": "pkr-p19-established-benchmark",
+  "status": "measurement_complete_evidence_inconclusive",
+  "validation_status": "pending_independent_validation",
+  "recorded_at": "2026-07-16T11:05:03Z",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "objective": "Run the repaired checked-in full 47-row Lite and Lite React benchmark protocol for exact baseline product 293dcdf2 versus candidate be78c8be and determine whether confirmed regressions remain zero.",
+  "freeze": {
+    "path": "/tmp/pkr-p19-established-benchmark-be78c8be-20260716T102614Z/freeze.v1.json",
+    "sha256": "c33977ed57ad1b78cc79e44fc11781aeb036623be6dea601579d04f3cb21991b"
+  },
+  "raw_evidence": {
+    "directory": "/tmp/pkr-p19-established-benchmark-be78c8be-20260716T102614Z",
+    "manifest": "raw-manifest.sha256",
+    "manifest_sha256": "a0ee7dcfab501da969b7708ad71f0c04e2d675f3d7786292733a42b16dafeb9e",
+    "manifest_entries": 184,
+    "observations": 36,
+    "vitest_reports": 36,
+    "stdout_logs": 36,
+    "stderr_logs": 36,
+    "resolution_traces": 36,
+    "comparisons": 2
+  },
+  "identity": {
+    "baseline_product_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "baseline_overlay_commit": "6e7645457885c5257fb8586d0cc0e415393bab1c",
+    "candidate_commit": "be78c8be197232a17fa6b90e8a3116f874eef4f0",
+    "baseline_product_paths_match_293dcdf2": true,
+    "baseline_scope_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "candidate_scope_sha256": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611",
+    "benchmark_control_hashes_match": true,
+    "shared_environment_fingerprint": "e24e6bda92528398ceda83b914f42169168ce937c81f05d3a461c150691b5347",
+    "lite_environment_fingerprint": "5bd1ad8f085c2f6932e405e75ca4dec74c6fdf96fdcaaf1326b8e8d27375dbf2",
+    "lite_react_environment_fingerprint": "d17b6de3896df24122c16b64a2ef801e8fd9093f533e510cadd0bc31bc3153f2",
+    "baseline_lite_artifact_fingerprint": "413877f7c25aa68c51b23b41b73ee240bdab76cc7e13dc7619e933ab61279c86",
+    "candidate_lite_artifact_fingerprint": "11015e3689b04996eda65226bc0499bc0c7d5d406833a73e9eb695d692434472",
+    "baseline_lite_react_artifact_fingerprint": "c709ea77a2b518c581d4484bf7ed114712bb6d613dd447c77b9a0e95b731c817",
+    "candidate_lite_react_artifact_fingerprint": "695adff9d6c9ba3611796bc21e3ecbd888dc6c8870f4ec20bfcd9e85307d8370"
+  },
+  "schedule": {
+    "first_stage_pairs": 5,
+    "first_stage_comparisons": 1,
+    "first_stage_decision": "evidence_inconclusive",
+    "fallback_activated": true,
+    "fallback_pairs_captured_once": [6, 7, 8, 9],
+    "fallback_intermediate_comparisons": 0,
+    "final_comparisons": 1,
+    "favorable_repeats": 0
+  },
+  "five_pair_read": {
+    "path": "full-comparison-5-pair.json",
+    "file_sha256": "dab047fd6f5e28e1ccd7dbfb9ecbb05086451c0afd21427071798243038b8ebd",
+    "comparison_sha256": "58932b4293c5bec21a6651c1a43d7cd9dddf13ec85d5b7efccf055e95e29e5dc",
+    "decision": "evidence_inconclusive",
+    "row_count": 47,
+    "confirmed_regression_count": 0,
+    "performance_evidence_gap_count": 40,
+    "representative_lane_ratio": 1.137687
+  },
+  "nine_pair_read": {
+    "path": "full-comparison-9-pair.json",
+    "file_sha256": "686088b9b5641c2555412763d4c1ee4ff6626472e13b2308334d722ef2ae6a16",
+    "comparison_sha256": "9337838c8a72d2ddcf13c24991c8b947bf1dda565ea91a974b7b3f3b72c82f41",
+    "decision": "evidence_inconclusive",
+    "row_count": 47,
+    "confirmed_regression_count": 0,
+    "performance_evidence_gap_count": 39,
+    "representative_lane_ratio": 1.126562,
+    "classification_counts": {
+      "lite": {
+        "no_regression": 8,
+        "inconclusive": 31,
+        "confirmed_regression": 0
+      },
+      "lite_react": {
+        "no_regression": 0,
+        "inconclusive": 8,
+        "confirmed_regression": 0
+      }
+    },
+    "representative": {
+      "lite": {
+        "median_ratio": 1.146058,
+        "mad": 0.049393,
+        "agreement_at_0_95": 9,
+        "agreement_at_1_10": 7,
+        "classification": "no_regression",
+        "improvement_supported": false
+      },
+      "lite_react": {
+        "median_ratio": 1.126562,
+        "mad": 0.272346,
+        "agreement_at_0_95": 6,
+        "agreement_at_1_10": 5,
+        "classification": "inconclusive",
+        "improvement_supported": false
+      }
+    }
+  },
+  "setup_failure": {
+    "path": "setup-failure-1.v1.json",
+    "sha256": "e3ea368dd0fe4f60d9acb9d610ae4909dde3f235cfccc4195d2f36100285cef1",
+    "observation_created": false,
+    "benchmark_process_started": false,
+    "performance_data_available": false,
+    "resolution": "Mechanical pnpm root-option placement correction authorized by the orchestrator before pair 1."
+  },
+  "result": {
+    "all_47_rows_present": true,
+    "environment_checks_held": true,
+    "artifact_checks_held": true,
+    "confirmed_regression_row_count": 0,
+    "no_regression_claim_allowed": false,
+    "performance_claim": "The protocol found zero confirmed regression rows, but 39 rows remain inconclusive. It does not establish that regressions are absent.",
+    "downstream_decision": "pending_independent_validation"
+  },
+  "active_anti_goals": {
+    "post_freeze_product_benchmark_test_docs_configuration_pr_prior_evidence_edits": 0,
+    "partial_comparison_inspections": 0,
+    "stops_after_pair_6_7_or_8": 0,
+    "favorable_repeats": 0,
+    "mixed_writers_controls_product_artifacts_semantic_environments": 0,
+    "cross_claim_contamination": 0,
+    "merge_release_publish_deploy_actions": 0
+  },
+  "replay": {
+    "manifest": "cd /tmp/pkr-p19-established-benchmark-be78c8be-20260716T102614Z && sha256sum -c raw-manifest.sha256",
+    "five_pair": "cd /tmp/session-kernel-publish-20260715-0746/benchmarks/lite-perf && node scripts/compare.mjs --mode full --input-dir /tmp/pkr-p19-established-benchmark-be78c8be-20260716T102614Z --pairs 5 --output /tmp/pkr-p19-replay-5.json",
+    "nine_pair": "cd /tmp/session-kernel-publish-20260715-0746/benchmarks/lite-perf && node scripts/compare.mjs --mode full --input-dir /tmp/pkr-p19-established-benchmark-be78c8be-20260716T102614Z --pairs 9 --output /tmp/pkr-p19-replay-9.json",
+    "baseline_product": "git -C /tmp/pkr-p17-baseline-293dcdf2 diff --quiet 293dcdf2d6d0b274418bcca8461f7eb122e10c52 -- pkg/core/lite pkg/react/lite-react"
+  }
+}

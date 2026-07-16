@@ -1,0 +1,40 @@
+{
+  "worker_id": "pkr-p17-established-benchmark",
+  "worker_kind": "progression",
+  "unit_id": "PKR-P17",
+  "objective": "Run the checked-in full 47-row Lite and Lite React benchmark protocol for exact baseline 293dcdf2 versus candidate 32e09eed and determine whether confirmed regressions remain zero.",
+  "inputs": {
+    "baseline_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "candidate_commit": "32e09eed",
+    "candidate_root": "/tmp/session-kernel-publish-20260715-0746",
+    "candidate_scope_sha256": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611",
+    "rows": {
+      "lite": 39,
+      "lite_react": 8,
+      "total": 47
+    }
+  },
+  "predeclared_method": {
+    "first_stage_pairs": 5,
+    "first_stage_order": [
+      ["baseline", "candidate"],
+      ["candidate", "baseline"],
+      ["baseline", "candidate"],
+      ["candidate", "baseline"],
+      ["baseline", "candidate"]
+    ],
+    "fallback": "Only if the full five-pair comparator returns evidence_inconclusive, capture pairs 6 through 9 once in the checked-in continuing order and compare once after pair 9.",
+    "capture": "Use benchmarks/lite-perf/scripts/capture.mjs for each lane and rebuild the named artifact in its exact root before every capture.",
+    "comparison": "Use scripts/compare.mjs --mode full with the predeclared pair count.",
+    "acceptance": "All 47 rows present, environment and artifact checks held, and confirmed_regression row count equals zero."
+  },
+  "anti_goals": [
+    "Do not edit product, benchmark, test, docs, configuration, Git, PR, or prior evidence.",
+    "Do not inspect partial comparisons or stop after pairs 6, 7, or 8.",
+    "Do not repeat a pair, row, lane, or capture until favorable.",
+    "Do not mix source-tree imports, environments, writers, artifacts, or baselines.",
+    "Do not claim the lifecycle target from the 47-row benchmark or the 47-row result from P15.",
+    "Do not merge, release, publish, or deploy."
+  ],
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

@@ -1,0 +1,12 @@
+{
+  "type": "event",
+  "event_type": "late_discovery_event",
+  "unit_id": "DKR-P14",
+  "observed_at": "2026-07-16T09:14:17Z",
+  "cause": "Independent validation found that P14's semantic counts were copied into the protocol without preserved logs or a replay command.",
+  "finding": "The test source hash is replayable, but the claimed pass counts are not independently supported.",
+  "impact": "P14 semantic counts are rejected. Later candidates must preserve exact semantic commands, logs, exit codes, and hashes before performance observation.",
+  "evidence_refs_or_hashes": [
+    "workers/validator-dkr-p14/verification.v1.txt#sha256=1e731fcdc85973d6b33899f1ea5268131cf8292f4e0a6d3f89db7bf1331c056a"
+  ]
+}

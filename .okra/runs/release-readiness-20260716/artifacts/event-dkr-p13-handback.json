@@ -1,0 +1,12 @@
+{
+  "type": "event",
+  "event_type": "handback_event",
+  "unit_id": "DKR-P13",
+  "observed_at": "2026-07-16T08:49:00Z",
+  "cause": "Independent validation accepted the SDK allocation ceiling breach, and the challenger isolated the changed explicit caller-signal branch as the smallest reducing boundary.",
+  "evidence_refs_or_hashes": [
+    "artifacts/reject-dkr-p13.v1.json",
+    "workers/challenger-p13-next/progress.jsonl#seq=1#record_hash=110240598f2f85ae59420494393466c7174ec2eaedc2361d92b41449cbb1defd"
+  ],
+  "handed_back_to": "DKR-P14 caller-signal hybrid"
+}

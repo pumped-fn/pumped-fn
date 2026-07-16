@@ -1,0 +1,21 @@
+{
+  "type": "claim_acceptance",
+  "unit_id": "PKR-P17",
+  "accepted_at": "2026-07-16T10:13:30Z",
+  "accepted_scope": "The pre-observation setup and exact-root conflict are accepted. No benchmark capture or comparison occurred. The checked-in harness hashes root-specific dependency manifest paths into the shared environment while the comparator requires one shared fingerprint, so its documented two-root protocol is currently impossible.",
+  "reads": {
+    "capture_count": 0,
+    "comparison_count": 0,
+    "baseline_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "candidate_commit": "32e09eed42740d577a11b6a5d6c6eebee7d90f78",
+    "harness_test_status": "pass",
+    "shared_fingerprint_path_conflict": true
+  },
+  "decision": "rejected_pre_observation_harness_identity_conflict",
+  "wall_gate": {
+    "verdict": "benchmark_integrity_blocked",
+    "downstream_advance": "blocked_pending_harness_identity_dkr",
+    "decided_at": "2026-07-16T10:13:30Z"
+  },
+  "downstream_authority": "Fund a no-observation DKR that defines a root-independent package identity while retaining version and manifest-byte integrity, adds deterministic coverage, and returns an exact common harness amendment for both roots."
+}

@@ -1,0 +1,28 @@
+role: OKRA validator (verification worker)
+observed_at: 2026-07-16T07:47:59Z
+workspace: /tmp/session-kernel-publish-20260715-0746
+checkpoint: /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/checkpoint.v1.json
+checkpoint_sha256: c6b3842247bdd5e7ec6a31e2b4d777adbb3b4bb2d3a9c0da2653b2f9a795a3a8
+checkpoint_hash_decision: accepted
+replay: cd /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z && node verify.mjs . --check
+replay_exit_code: 0
+replay_decision: accepted
+raw_observation_count: 96
+raw_manifest_sha256: 486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18
+throughput_geometric_mean: 1.0487701891470118 < 1.10
+throughput_target_decision: rejected
+allocation_geometric_mean: 0.9450922673611655 > 0.90
+allocation_target_decision: rejected
+managed_allocation_ratio: 1.065984527077614 > 1.05
+managed_allocation_ceiling_decision: rejected
+sdk_allocation_ratio: 1.0960133932263103 > 1.05
+sdk_allocation_ceiling_decision: rejected
+retained_controls: accepted
+cleanup_wall_count: 0
+cleanup_wall_decision: accepted
+integratedTarget: false
+integrated_target_decision: rejected
+improvement_claim: rejected
+release_readiness_claim: rejected
+required_sentence: DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.
+summary: REJECTED - replay and evidence integrity passed, but performance targets failed and integratedTarget=false; no improvement or release-readiness claim is accepted.

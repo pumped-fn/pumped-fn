@@ -1,0 +1,21 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P11B",
+  "accepted_at": "2026-07-16T08:04:00Z",
+  "accepted_scope": "The 2/3/5 context trees, seven collection materialization counts, and build separability are accepted. The V4 cause ranking and four-variant measurement route are not accepted as decisions.",
+  "worker_ref": "workers/dkr-p11b-component-lifecycle-map/progress.jsonl#seq=1",
+  "worker_record_hash": "4777ed9baf7561892f79368641dc44b566402c06bee51ae100adfeaba548e597",
+  "challenger_ref": "workers/challenger-performance-component-isolation/progress.jsonl#seq=1",
+  "challenger_record_hash": "6f5b6aae5ff1c0d9a72d6f43b72a819e1ee5eb537e787d47f9e0a41812111fd9",
+  "accepted_reads": {
+    "contexts_per_operation": {"scope_run": 2, "managed_ctx_exec": 3, "sdk_session_run": 5},
+    "variant_build_separability": true,
+    "observer_maps_never_materialized": true
+  },
+  "hypothesis_verdicts": {
+    "full_lazy_candidate_meets_target": "dead",
+    "measure_all_four_atomic_variants_is_smallest_route": "drifted"
+  },
+  "orchestrator_decision": "Measure one V1+V2+V3 counterfactual: seedTags fast paths plus lazy resources, resourceListeners, and resourceControllers; keep structured execution collections eager.",
+  "downstream_authority": "Fund DKR-P12 scratch-only counterfactual. Roll the dead full candidate out of the product working tree. AbortController remains unauthorized."
+}

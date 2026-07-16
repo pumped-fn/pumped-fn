@@ -1,0 +1,83 @@
+{
+  "schema": "pumped-fn.okra.independent-validation.v1",
+  "validationId": "DKR-P8.sampled-byte-aggregate.independent.2026-07-16T06:41:40Z",
+  "validatorRole": "read-only independent deterministic verifier",
+  "unitId": "DKR-P8",
+  "recordedAt": "2026-07-16T06:41:40Z",
+  "requiredProtocolSentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "subject": {
+    "root": "/tmp/dkr-p8-sampled-byte-aggregate-20260716T063455Z",
+    "checkpoint": "/tmp/dkr-p8-sampled-byte-aggregate-20260716T063455Z/checkpoint.json",
+    "checkpointSha256": "a94cb36777062f29adc1dbec71c116a8191849aa65024c56ad67106b47fc5e27",
+    "runtime": {
+      "node": "v26.4.0",
+      "v8": "14.6.202.34-node.21"
+    }
+  },
+  "replay": {
+    "command": "node /tmp/dkr-p8-sampled-byte-aggregate-20260716T063455Z/verify.mjs",
+    "exitCode": 0,
+    "outputSha256": "a94cb36777062f29adc1dbec71c116a8191849aa65024c56ad67106b47fc5e27",
+    "checkpointHashBefore": "a94cb36777062f29adc1dbec71c116a8191849aa65024c56ad67106b47fc5e27",
+    "checkpointHashAfter": "a94cb36777062f29adc1dbec71c116a8191849aa65024c56ad67106b47fc5e27",
+    "byteIdenticalToCheckpoint": true
+  },
+  "claims": [
+    {
+      "id": "freeze-chronology",
+      "verdict": "accept",
+      "evidence": "All five protocol and verifier inputs have mtime 2026-07-16T06:36:42.221Z; frozen.json was created at 2026-07-16T06:36:54.555Z; collection started at 2026-07-16T06:37:06.076Z. The collection-start event pins frozen.json sha256 47f08bc129e597e1315410233dcf7a9a3eaaa5953fe8d74be7cb337865bf8a07."
+    },
+    {
+      "id": "raw-hash-replay",
+      "verdict": "accept",
+      "evidence": "Nine planned observations completed exactly once, nine unique raw files replayed to their chronology hashes, no observation-failed event exists, and the chronology closes with observationCount 9."
+    },
+    {
+      "id": "canonical-sampled-byte-aggregate",
+      "verdict": "accept",
+      "evidence": "The official V8 HeapProfiler protocol defines SamplingHeapProfile.samples and each sample.size as allocation size in bytes attributed to that sample. The verifier independently sums every finite non-negative profile.samples[].size. Tree-node selfSize is recomputed only as informational output and does not gate acceptance."
+    },
+    {
+      "id": "zero-subtraction-and-signal",
+      "verdict": "accept",
+      "evidence": "Within each trial, corrected bytes are max(0, N-batch sampled bytes minus zero-control sampled bytes). Corrected one-batch values are 21257960, 21344528, and 21635696 bytes, each more than 1 MiB."
+    },
+    {
+      "id": "three-proportionality-gates",
+      "verdict": "accept",
+      "evidence": "Corrected two-to-one ratios are 2.052075740099238, 2.019499142824803, and 1.9769551208336444; all are inside the frozen 1.75 to 2.25 band."
+    },
+    {
+      "id": "three-pairwise-stationarity-gates",
+      "verdict": "accept",
+      "evidence": "Pairwise corrected one-batch ratios are 0.9959442532531054, 0.9825410747128265, and 0.986542240194168; all are inside the frozen 0.80 to 1.25 band."
+    },
+    {
+      "id": "window-and-process-isolation",
+      "verdict": "accept",
+      "evidence": "Every raw record asserts warmup completion before sampling and retention through stopSampling. collect.mjs launches each control with a separate spawnSync Node process."
+    },
+    {
+      "id": "single-run-guard",
+      "verdict": "accept",
+      "evidence": "freeze.mjs creates frozen.json with flag wx; collect.mjs requires creation of the raw directory before writing chronology; measure.mjs creates each raw file with flag wx. A rerun cannot replace frozen or raw evidence. The guard was inspected, not triggered, to preserve the one-shot artifact."
+    },
+    {
+      "id": "workspace-boundary",
+      "verdict": "accept",
+      "evidence": "All DKR-P8 scripts resolve protocol, frozen state, chronology, raw profiles, and checkpoint relative to the scratch root, while measure.mjs writes only its supplied scratch output path. No product or .okra path is referenced. Concurrent orchestrator .okra state is outside the worker's write paths."
+    },
+    {
+      "id": "bounded-conclusion",
+      "verdict": "accept",
+      "evidence": "The checkpoint claims only the aggregate and calibration protocol. It explicitly does not measure pumped-fn lifecycle rows, candidate-to-baseline allocation, lifecycle throughput, or CKR-PERFORMANCE success; node selfSize remains informational."
+    }
+  ],
+  "officialEvidence": [
+    "https://nodejs.org/api/inspector.html",
+    "https://chromedevtools.github.io/devtools-protocol/v8/HeapProfiler/"
+  ],
+  "verdict": "accept",
+  "advance": "The sampled-byte aggregate and warmup-separated calibration may be used as the frozen basis for a separate exact-head lifecycle baseline/candidate measurement. No product performance target is established by DKR-P8."
+}

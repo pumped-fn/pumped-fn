@@ -1,0 +1,230 @@
+{
+  "schema": "pumped-fn.okra.independent-validation.v1",
+  "unit_id": "DKR-P15",
+  "validated_checkpoint": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/checkpoint.v1.json",
+  "verdict": "rejected_pending_successful_independent_semantic_replay",
+  "summary": "The frozen performance evidence, calculations, lifecycle walls, source boundary, and product preservation independently validate. The unchanged independent semantic replay exited 1 because one SDK package-export test exceeded its 5000 ms timeout, so the candidate is not accepted and downstream advance remains blocked.",
+  "checkpoint": {
+    "expected_sha256": "56a4a5435ccfc5ade38577fc3a86a49364d76faf0ffe361320f1794248b15cb2",
+    "actual_sha256": "56a4a5435ccfc5ade38577fc3a86a49364d76faf0ffe361320f1794248b15cb2",
+    "matched": true
+  },
+  "frozen_replay": {
+    "command": "cd /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z && node verify.mjs . --check",
+    "exit_code": 0,
+    "result": {
+      "replay": "passed",
+      "integratedTarget": true,
+      "throughputGeometricMean": 1.241825781342104,
+      "allocationGeometricMean": 0.6797858473843519,
+      "rawObservationCount": 96,
+      "rawManifestSha256": "8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02"
+    }
+  },
+  "integrity": {
+    "raw_manifest_sha256": "8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02",
+    "raw_manifest_entries": 96,
+    "raw_files": 96,
+    "every_raw_hash_matched": true,
+    "baseline_archive_sha256": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0",
+    "variant_patch_sha256": "63d75555af4d0d4defeaf80a62aa7c53e367beb0d74b352dacf4e60e1e582125",
+    "semantic_tests_patch_sha256": "c49a367cf3719e223c24deb7249bef8364c600e7f5ce75b5c952634bfebcb800",
+    "variant_exclusion_sha256": "608571543872cbc6382fa754fb2a598a3dd479a4dd402f53e445fa25804fde9d",
+    "semantic_evidence_manifest_sha256": "25a8d3af48d045ef2bbbf3dacc45c6f59f41c0faff251e376a7c6d51090bb6a8",
+    "provenance_sha256": "1c4188645ccc2e84968c510336e560b31b8f86e68c6edaeb6c7963ab2478d0b4",
+    "frozen_sha256": "acd9f541e5e9a4e30820532bc3eac9d34e97fc7dd9a177644a11dfe1c4cc2ecf",
+    "chronology_sha256": "226109a1d363dcabd156972ce4b2d116af77a410beaca841c8802637e8d7d4ee",
+    "all_frozen_file_hashes_matched": true,
+    "all_accepted_evidence_hashes_matched": true
+  },
+  "chronology": {
+    "frozen_at": "2026-07-16T09:36:53.367Z",
+    "first_raw_observation_at": "2026-07-16T09:37:06.618Z",
+    "last_raw_observation_at": "2026-07-16T09:41:30.259Z",
+    "observation_count_at_freeze": 0,
+    "freeze_preceded_first_observation": true,
+    "failed_typecheck_finished_at": "2026-07-16T09:28:21.778Z",
+    "final_semantic_matrix_started_at": "2026-07-16T09:30:25.346Z",
+    "failed_launcher_sha256": "529f94a7e2a72c01c656ae0a008947e38f9c9a38281877b26d75ac287ca7a5d4",
+    "failed_typecheck_metadata_sha256": "9c7ffc5312ca0d1df1ee3cbcba7c2e9a2a3ff58fb2bfce84a7951b5156b643fb",
+    "failed_typecheck_log_sha256": "53b438997e791464924538e2be96582386b3386707001f260d6c75ac64d3fdfe",
+    "failed_typecheck_exit_code": 2,
+    "failed_launcher_exit_code": 2,
+    "failed_launcher_semantic_commands_started": 0,
+    "failed_attempts_preserved_before_freeze": true,
+    "note": "The launcher record is hash-bound into the pre-observation semantic manifest and frozen harness. Its event time is not independently timestamped beyond that preservation boundary."
+  },
+  "recorded_semantic_evidence": {
+    "commands": 11,
+    "all_recorded_exit_codes_zero": true,
+    "all_metadata_hashes_matched": true,
+    "all_log_hashes_matched": true,
+    "all_log_sizes_matched": true,
+    "recorded_counts": {
+      "focused_inherited_mode": "23/23",
+      "new_inherited_mode": "4/4",
+      "prior_hybrid_cases": "19/19",
+      "existing_lifetime_and_stream": "42/42",
+      "lite_non_docs": "256/256",
+      "sdk": "59/59",
+      "typechecks": "2/2",
+      "builds": "2/2"
+    },
+    "claim_boundary": "This validates the frozen recorded evidence and its hashes, not reliable live replay."
+  },
+  "independent_semantic_replay": {
+    "command": "bash /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/replay-semantics.sh /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z",
+    "executions": 1,
+    "script_unchanged": true,
+    "exit_code": 1,
+    "passed_before_failure": {
+      "lite_build": true,
+      "sdk_dependency_closure_build": true,
+      "focused_inherited_mode": "23/23",
+      "existing_lifetime_and_stream": "42/42",
+      "lite_non_docs": "256/256"
+    },
+    "sdk_result": {
+      "passed": 58,
+      "total": 59,
+      "failed": 1,
+      "test": "resolves packed ESM and CJS declarations under strict NodeNext",
+      "file": "pkg/sdk/core/tests/package-exports.test.ts",
+      "test_source_sha256": "1670af50c3d86e89340fb109881f00cc49aa5c1e2eada5a35b9ed98fe2360458",
+      "failure": "Test timed out in 5000ms."
+    },
+    "remaining_typechecks_not_reached": [
+      "@pumped-fn/lite typecheck:full",
+      "@pumped-fn/sdk typecheck"
+    ],
+    "fresh_replay_build": "/tmp/validator-dkr-p15-inherited-baseline-mode-20260716T095000Z/semantic-replay-build",
+    "fresh_candidate_scope_sha256": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611",
+    "fresh_semantic_test_sha256": "132f76211b1bfdce329d454ef3e22fca7813493d97244bf482a64ac586b92b3e",
+    "favorable_rerun_performed": false,
+    "decision": "fail_closed"
+  },
+  "variant_boundary": {
+    "replay_artifact": "/tmp/validator-dkr-p15-inherited-baseline-mode-20260716T095000Z/variant-boundary-replay.json",
+    "replay_artifact_sha256": "608571543872cbc6382fa754fb2a598a3dd479a4dd402f53e445fa25804fde9d",
+    "held": true,
+    "exact_head": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "exact_head_scope_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "baseline_scope_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "candidate_scope_sha256": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611",
+    "changed_sources": [
+      "pkg/core/lite/src/scope.ts"
+    ],
+    "v123_and_inherited_mode_boundary_held": true,
+    "v4_collections_remained_eager": true,
+    "bound_listener_bridge_absent": true,
+    "public_api_changes": 0,
+    "baseline_composer_matches_after_storage_rename": true,
+    "baseline_abort_matches": true,
+    "combine_abort_signals_matches_baseline": true,
+    "baseline_source_order_indexes": [
+      642,
+      693,
+      745,
+      801,
+      857
+    ],
+    "baseline_source_order_held": true,
+    "sdk_source_manifest_baseline": "416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099",
+    "sdk_source_manifest_candidate": "416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099",
+    "sdk_source_unchanged": true
+  },
+  "independent_calculations": {
+    "throughput": {
+      "scope_run": {
+        "baseline_median_operations_per_second": 15068.402504611098,
+        "candidate_median_operations_per_second": 20396.191741375962,
+        "candidate_over_baseline": 1.3535735944891638,
+        "baseline_median_stationarity": 1.0530542108539163,
+        "candidate_median_stationarity": 1.013443454193024
+      },
+      "managed_ctx_exec": {
+        "baseline_median_operations_per_second": 11934.85659287167,
+        "candidate_median_operations_per_second": 15923.25113967386,
+        "candidate_over_baseline": 1.3341803494467068,
+        "baseline_median_stationarity": 0.9591527247989502,
+        "candidate_median_stationarity": 1.0839946214685963
+      },
+      "sdk_session_run": {
+        "baseline_median_operations_per_second": 1878.5841142339798,
+        "candidate_median_operations_per_second": 1992.1234506630897,
+        "candidate_over_baseline": 1.0604387823621129,
+        "baseline_median_stationarity": 1.0242223625620708,
+        "candidate_median_stationarity": 1.033489146707638
+      },
+      "geometric_mean": 1.241825781342104,
+      "minimum": 1.1,
+      "stationarity_band": [
+        0.8,
+        1.25
+      ],
+      "decision": "pass"
+    },
+    "allocation": {
+      "scope_run": {
+        "baseline_median_bytes_per_operation": 8910.5792,
+        "candidate_median_bytes_per_operation": 4228.7776,
+        "candidate_over_baseline": 0.47457943025746296
+      },
+      "managed_ctx_exec": {
+        "baseline_median_bytes_per_operation": 4539.5,
+        "candidate_median_bytes_per_operation": 3015.696,
+        "candidate_over_baseline": 0.6643233836325586
+      },
+      "sdk_session_run": {
+        "baseline_median_bytes_per_operation": 35247.2,
+        "candidate_median_bytes_per_operation": 35119.84,
+        "candidate_over_baseline": 0.996386663337797
+      },
+      "geometric_mean": 0.6797858473843519,
+      "maximum": 0.9,
+      "per_row_maximum": 1.05,
+      "every_corrected_signal_met_minimum": true,
+      "every_row_met_ceiling": true,
+      "decision": "pass"
+    },
+    "retained": {
+      "observations": 18,
+      "expected": {
+        "baseline": 0,
+        "closed": 0,
+        "positive": 1
+      },
+      "every_observation_matched": true,
+      "decision": "pass"
+    },
+    "cleanup": {
+      "invalid_lifecycle_summaries": 0,
+      "post_close_live_resources": 0,
+      "cross_owner_leaks": 0,
+      "cleanup_business_state_mutations": 0,
+      "sdk_completed_operations": 130306,
+      "sdk_post_close_mutation_rejections": 130306,
+      "sdk_post_close_mutation_mismatch": 0,
+      "cleanup_wall_count": 0,
+      "decision": "pass"
+    },
+    "integrated_performance_target": "pass"
+  },
+  "product_preservation": {
+    "repo": "/tmp/session-kernel-publish-20260715-0746",
+    "current_product_scope_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "exact_head_product_scope_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "git_diff_293dcdf2_pkg_core_lite_src_and_pkg_sdk_core_src_exit_code": 0,
+    "working_tree_product_source_diff_exit_code": 0,
+    "candidate_remained_scratch_only": true
+  },
+  "claim_boundary": {
+    "performance_evidence": "independently_validated",
+    "semantic_acceptance": "not_validated",
+    "product_improvement_claim": "not_authorized",
+    "release_readiness_claim": "not_made",
+    "existing_47_row_benchmark": "not_run",
+    "downstream_advance": "blocked"
+  },
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

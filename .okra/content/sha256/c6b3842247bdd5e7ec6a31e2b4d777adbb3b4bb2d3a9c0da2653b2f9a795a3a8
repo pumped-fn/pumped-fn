@@ -1,0 +1,1417 @@
+{
+  "schema": "pumped-fn.okra.progression-checkpoint.v1",
+  "checkpoint_id": "PKR-P2.lifecycle-performance.2026-07-16T07:40:19.361Z",
+  "unit_id": "PKR-P2",
+  "linked_ckr": "CKR-PERFORMANCE",
+  "source_of_truth": [
+    "git:293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/protocol.json",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/frozen.json",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/provenance.json",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw.sha256"
+  ],
+  "candidate_provenance": {
+    "exact_head": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "baseline_archive_sha256": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0",
+    "candidate_patch_sha256": "3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599",
+    "changed_sources": [
+      "pkg/core/lite/src/scope.ts"
+    ],
+    "candidate_scope_sha256": "a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65",
+    "checks": {
+      "exactHead": true,
+      "baselineArchive": true,
+      "baselineSourceMatchesAcceptedBuild": true,
+      "baselineLockfileMatchesAcceptedBuild": true,
+      "baselineManifestsMatchAcceptedBuild": true,
+      "baselineDistMatchesAcceptedBuild": true,
+      "baselineDeclarationsMatchAcceptedBuild": true,
+      "patchHash": true,
+      "changedSources": true,
+      "candidateScopeMatchesFrozenWorkspace": true,
+      "lockfileUnchanged": true,
+      "manifestsUnchanged": true,
+      "declarationsUnchanged": true,
+      "allRecordedChecks": true,
+      "createdBeforeObservation": true,
+      "provenanceFrozen": true,
+      "baselineArchiveFrozen": true,
+      "candidatePatchStillFrozen": true,
+      "onlyCandidateProductPathChanged": true
+    }
+  },
+  "frozen_protocol": {
+    "frozen_at": "2026-07-16T07:35:08.620Z",
+    "first_observation_at": "2026-07-16T07:35:31.647Z",
+    "chronology_held": true,
+    "frozen_checks": [
+      {
+        "file": "protocol.json",
+        "expected": "1f389599dc37106d9dac6654707a69773a0b4809091067a752ee5b4827f0d00d",
+        "actual": "1f389599dc37106d9dac6654707a69773a0b4809091067a752ee5b4827f0d00d",
+        "matched": true
+      },
+      {
+        "file": "workloads.mjs",
+        "expected": "cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a",
+        "actual": "cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a",
+        "matched": true
+      },
+      {
+        "file": "observe-throughput.mjs",
+        "expected": "e6965f81d506eaa4c17fbaa4184317b14b06ae6ff27ff0d2771110ac836103b5",
+        "actual": "e6965f81d506eaa4c17fbaa4184317b14b06ae6ff27ff0d2771110ac836103b5",
+        "matched": true
+      },
+      {
+        "file": "observe-allocation.mjs",
+        "expected": "d121e126b4901312a615e05f479412f67609f87d79c1357fa699cb7b56890d98",
+        "actual": "d121e126b4901312a615e05f479412f67609f87d79c1357fa699cb7b56890d98",
+        "matched": true
+      },
+      {
+        "file": "observe-retained.mjs",
+        "expected": "8ff0a15fdefeec7408e1412760219462f6b1546fd8d79b662c69ed4f9f88e254",
+        "actual": "8ff0a15fdefeec7408e1412760219462f6b1546fd8d79b662c69ed4f9f88e254",
+        "matched": true
+      },
+      {
+        "file": "prepare-candidate.sh",
+        "expected": "72d671f77a572840752400265d5861aa9bd99fef99e42322325f6e4ce9bdd8c7",
+        "actual": "72d671f77a572840752400265d5861aa9bd99fef99e42322325f6e4ce9bdd8c7",
+        "matched": true
+      },
+      {
+        "file": "collect-provenance.mjs",
+        "expected": "51abc7fd946ca9c8879831a83ee0c68428fb2e4019dcbdba3204d1728bd3f4d2",
+        "actual": "51abc7fd946ca9c8879831a83ee0c68428fb2e4019dcbdba3204d1728bd3f4d2",
+        "matched": true
+      },
+      {
+        "file": "verify.mjs",
+        "expected": "e88b283f5b57da56913b0fb2c42f8dc714a8356efb992c734b606ca76788175d",
+        "actual": "e88b283f5b57da56913b0fb2c42f8dc714a8356efb992c734b606ca76788175d",
+        "matched": true
+      },
+      {
+        "file": "run-once.sh",
+        "expected": "bd22f1877bc99acc88192f441c5b9beb331a6eff30fecdbd262da116493b3bb9",
+        "actual": "bd22f1877bc99acc88192f441c5b9beb331a6eff30fecdbd262da116493b3bb9",
+        "matched": true
+      },
+      {
+        "file": "freeze.mjs",
+        "expected": "61caae0fc39d643f16da378cd70983623e4db3f9b1fba286df1149bb3550332c",
+        "actual": "61caae0fc39d643f16da378cd70983623e4db3f9b1fba286df1149bb3550332c",
+        "matched": true
+      }
+    ],
+    "accepted_evidence_checks": {
+      "dkrP8": true,
+      "dkrP10A": true,
+      "dkrP10B": true,
+      "p9Workloads": true
+    }
+  },
+  "observed_at": "2026-07-16T07:40:19.361Z",
+  "recorded_at": "2026-07-16T07:40:19.361Z",
+  "max_age": "PT24H",
+  "freshness_status": "fresh",
+  "raw_hashes": {
+    "observation_count": 96,
+    "manifest_sha256": "486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+    "every_hash_matched": true,
+    "files": [
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-baseline-measure.json",
+        "expected": "ec2bc1548d137395f37b48cd4db5675450e8b4999cf3e21457a8455347ce2040",
+        "actual": "ec2bc1548d137395f37b48cd4db5675450e8b4999cf3e21457a8455347ce2040",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-baseline-zero.json",
+        "expected": "03ef868664cdd822122e64e19dd70277df2974768bff4a2ba1f8e55f059f222a",
+        "actual": "03ef868664cdd822122e64e19dd70277df2974768bff4a2ba1f8e55f059f222a",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-candidate-measure.json",
+        "expected": "3b4a85bc3cd7afa6953684efe3e2dae746d9af8823cc543301ef10bbddc89a93",
+        "actual": "3b4a85bc3cd7afa6953684efe3e2dae746d9af8823cc543301ef10bbddc89a93",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-candidate-zero.json",
+        "expected": "6e43592328d36097560372bf4f094fb6ee1c0ee7bbead96a5a7d7d4c5267d20c",
+        "actual": "6e43592328d36097560372bf4f094fb6ee1c0ee7bbead96a5a7d7d4c5267d20c",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-baseline-measure.json",
+        "expected": "41d8db12a1ba9c309b6a14a2e5a471f174f7819d8120b3298197bbae5e6cfd0d",
+        "actual": "41d8db12a1ba9c309b6a14a2e5a471f174f7819d8120b3298197bbae5e6cfd0d",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-baseline-zero.json",
+        "expected": "fa49c178cca26efd8dc36d1cf2721db2155388f7e5deffc1cea2c0c965f8e28b",
+        "actual": "fa49c178cca26efd8dc36d1cf2721db2155388f7e5deffc1cea2c0c965f8e28b",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-candidate-measure.json",
+        "expected": "a92723e46a7e20b9868367a853a74e678672539910fd7ef8785bb3298d0a851f",
+        "actual": "a92723e46a7e20b9868367a853a74e678672539910fd7ef8785bb3298d0a851f",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-candidate-zero.json",
+        "expected": "9fcd850623c407e54630193ff7216aaaad45d367d2bbe181e5593b5211ea412c",
+        "actual": "9fcd850623c407e54630193ff7216aaaad45d367d2bbe181e5593b5211ea412c",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-baseline-measure.json",
+        "expected": "379a1bfa5866245d384c4bd88ec11c0ce449aa90e53f99ea1e525eb5153005ff",
+        "actual": "379a1bfa5866245d384c4bd88ec11c0ce449aa90e53f99ea1e525eb5153005ff",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-baseline-zero.json",
+        "expected": "2cc13b25c4523350b62b0ff0de243b15a01be91cc376f8526023597ab86c76fb",
+        "actual": "2cc13b25c4523350b62b0ff0de243b15a01be91cc376f8526023597ab86c76fb",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-candidate-measure.json",
+        "expected": "2547fdc6f8e38b9bec13520dd0eff4f0cd4a1c01a270ed234afa18fd523bd9fe",
+        "actual": "2547fdc6f8e38b9bec13520dd0eff4f0cd4a1c01a270ed234afa18fd523bd9fe",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-candidate-zero.json",
+        "expected": "6521ee0d908ff2732cc2d1ab13f9ae02fae8eb8085f8850d40bb060d760d3252",
+        "actual": "6521ee0d908ff2732cc2d1ab13f9ae02fae8eb8085f8850d40bb060d760d3252",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-baseline-measure.json",
+        "expected": "22ed0e52f1dc5dd05195b1375e0f8b3fb9c94155fda27b2abf4339b7461620f3",
+        "actual": "22ed0e52f1dc5dd05195b1375e0f8b3fb9c94155fda27b2abf4339b7461620f3",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-baseline-zero.json",
+        "expected": "facf26d5dc0236dcb3e87f613373bbd21be47d9910eae8f48817173af1bd98c8",
+        "actual": "facf26d5dc0236dcb3e87f613373bbd21be47d9910eae8f48817173af1bd98c8",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-candidate-measure.json",
+        "expected": "962e169dccb0bbecb55245cc47d22a14dbf1a83e50a311069b714df038f80850",
+        "actual": "962e169dccb0bbecb55245cc47d22a14dbf1a83e50a311069b714df038f80850",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-candidate-zero.json",
+        "expected": "c742aeda1cb00f86c9e6200f3c8254755434cb2a5fa2e216adebd69f97379d9d",
+        "actual": "c742aeda1cb00f86c9e6200f3c8254755434cb2a5fa2e216adebd69f97379d9d",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-baseline-measure.json",
+        "expected": "789b35eb021d7f1552d30cb074fe923ffa106a0b6d28455182ec8d3fa8bf7951",
+        "actual": "789b35eb021d7f1552d30cb074fe923ffa106a0b6d28455182ec8d3fa8bf7951",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-baseline-zero.json",
+        "expected": "9e7eb578ab003a87304895c905d1a19d3f4b77c77a459c31705278efcbea9de4",
+        "actual": "9e7eb578ab003a87304895c905d1a19d3f4b77c77a459c31705278efcbea9de4",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-candidate-measure.json",
+        "expected": "450539b9bd97fd6e0be13c23708e68e7a667f5b2ef06977aff482e591aafed62",
+        "actual": "450539b9bd97fd6e0be13c23708e68e7a667f5b2ef06977aff482e591aafed62",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-candidate-zero.json",
+        "expected": "fb94ed5d98eca09f9cccdf117dff45d1025f6dbc99d67c45e4c977f2ba2936be",
+        "actual": "fb94ed5d98eca09f9cccdf117dff45d1025f6dbc99d67c45e4c977f2ba2936be",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-baseline-measure.json",
+        "expected": "dea8ec6d84a862b45554f233c4c5959a5fe39d6ce95d812bfc45832a096d0b97",
+        "actual": "dea8ec6d84a862b45554f233c4c5959a5fe39d6ce95d812bfc45832a096d0b97",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-baseline-zero.json",
+        "expected": "b81aa0cc60bf4c74c6d884c6e64649596e0be3544f592e28c94308aa1dff2aed",
+        "actual": "b81aa0cc60bf4c74c6d884c6e64649596e0be3544f592e28c94308aa1dff2aed",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-candidate-measure.json",
+        "expected": "5b8f58085ee12fe1682b6ac90dfdb48668e35e2ed33e5dbeaf6071d3a253d5ad",
+        "actual": "5b8f58085ee12fe1682b6ac90dfdb48668e35e2ed33e5dbeaf6071d3a253d5ad",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-candidate-zero.json",
+        "expected": "5d7994dc9f0fa1668221e2eb78b6a98d1c15cc6a41cd2ff84fdb076e3f81ae8d",
+        "actual": "5d7994dc9f0fa1668221e2eb78b6a98d1c15cc6a41cd2ff84fdb076e3f81ae8d",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-baseline-measure.json",
+        "expected": "f086b31b7596a3a1d432b58ebaabcb02f1acaf7d7e4aa68665d8ab8f52094c8d",
+        "actual": "f086b31b7596a3a1d432b58ebaabcb02f1acaf7d7e4aa68665d8ab8f52094c8d",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-baseline-zero.json",
+        "expected": "75afd28e30f38e57dba7ec3c314337ba9b33f120b2bfdf37009f40ff58ffd5b6",
+        "actual": "75afd28e30f38e57dba7ec3c314337ba9b33f120b2bfdf37009f40ff58ffd5b6",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-candidate-measure.json",
+        "expected": "2f6ebbd4e0dc6de3a0055bf7fdb093c6811cdc4caef59c2d8f8569ff4ff5bcff",
+        "actual": "2f6ebbd4e0dc6de3a0055bf7fdb093c6811cdc4caef59c2d8f8569ff4ff5bcff",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-candidate-zero.json",
+        "expected": "ee8403589095d4707136718ba5f51a754bd703eddb1e328dcd8ea9296f4df542",
+        "actual": "ee8403589095d4707136718ba5f51a754bd703eddb1e328dcd8ea9296f4df542",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-baseline-measure.json",
+        "expected": "ebc96c79d830b4fb579d818caec6f7b53cb09cafce2ad5fc010ff44e81dca1b2",
+        "actual": "ebc96c79d830b4fb579d818caec6f7b53cb09cafce2ad5fc010ff44e81dca1b2",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-baseline-zero.json",
+        "expected": "d650963f0c6bce4f198ee009a90f06ddf7f14200960ec702fd357f8e28da10c0",
+        "actual": "d650963f0c6bce4f198ee009a90f06ddf7f14200960ec702fd357f8e28da10c0",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-candidate-measure.json",
+        "expected": "fef38ee0b0d0e26ffb9ac77da98ec5e90dd9907dddc716a4a193c3317b6a0911",
+        "actual": "fef38ee0b0d0e26ffb9ac77da98ec5e90dd9907dddc716a4a193c3317b6a0911",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-candidate-zero.json",
+        "expected": "2c02358c9d3c7f4f2a81230ced6e5ac8c6459ed1e8546f9db494cfd203cf20f3",
+        "actual": "2c02358c9d3c7f4f2a81230ced6e5ac8c6459ed1e8546f9db494cfd203cf20f3",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-baseline-measure.json",
+        "expected": "f76a42097a3e1e3417977b9b15d8d407249c728771467c459cca382b3746d582",
+        "actual": "f76a42097a3e1e3417977b9b15d8d407249c728771467c459cca382b3746d582",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-baseline-zero.json",
+        "expected": "f66075f773b881182435814a4fd326dbeb99e7209334b209156c31e80ca7a869",
+        "actual": "f66075f773b881182435814a4fd326dbeb99e7209334b209156c31e80ca7a869",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-candidate-measure.json",
+        "expected": "c03d0b4fb9ddfc83f615d48c1b9300adc72abb96c60c71b8e60abe2db9e418cc",
+        "actual": "c03d0b4fb9ddfc83f615d48c1b9300adc72abb96c60c71b8e60abe2db9e418cc",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-candidate-zero.json",
+        "expected": "d295e29cb0928bbc535f71dd167ef4041877ccb47b3a6f1cf4ace1dd12d9bd99",
+        "actual": "d295e29cb0928bbc535f71dd167ef4041877ccb47b3a6f1cf4ace1dd12d9bd99",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-1-baseline.json",
+        "expected": "0bf5bb0927da5d31655ab4154b17590bc3e39fac2992116b619e47a33f409cfe",
+        "actual": "0bf5bb0927da5d31655ab4154b17590bc3e39fac2992116b619e47a33f409cfe",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-1-candidate.json",
+        "expected": "8fd0df982d6e591d3e2d5bbe98df705a462ec111eab7143eda36df87f62338fc",
+        "actual": "8fd0df982d6e591d3e2d5bbe98df705a462ec111eab7143eda36df87f62338fc",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-2-baseline.json",
+        "expected": "3db6064661583c066aa5917c7bc24399027d20cbb4df84e60077e1146a6a88e4",
+        "actual": "3db6064661583c066aa5917c7bc24399027d20cbb4df84e60077e1146a6a88e4",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-2-candidate.json",
+        "expected": "2c77d24282fd831240babe68abb9a4192e07d1430fa286c9792d584d3db73f93",
+        "actual": "2c77d24282fd831240babe68abb9a4192e07d1430fa286c9792d584d3db73f93",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-3-baseline.json",
+        "expected": "4b6215065209f23c25cb5e61e6ea3473aae48ad350fedf17e6c4cff94854e52d",
+        "actual": "4b6215065209f23c25cb5e61e6ea3473aae48ad350fedf17e6c4cff94854e52d",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-3-candidate.json",
+        "expected": "0ab0d1150515fe4883ddf874baa1965c34224ac90c1f608f236f7a90338694c1",
+        "actual": "0ab0d1150515fe4883ddf874baa1965c34224ac90c1f608f236f7a90338694c1",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-1-baseline.json",
+        "expected": "2427049ea0d7a6cb48b53f1d4ac27005ca40818c7a3f31772eb7d69a17468d69",
+        "actual": "2427049ea0d7a6cb48b53f1d4ac27005ca40818c7a3f31772eb7d69a17468d69",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-1-candidate.json",
+        "expected": "5acc37600e1d77adea7e3867a9d5a6a5a6d58d7457d5cea4875388a5a43bf823",
+        "actual": "5acc37600e1d77adea7e3867a9d5a6a5a6d58d7457d5cea4875388a5a43bf823",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-2-baseline.json",
+        "expected": "8dfd49ffa669671936f556b6bf58db13d456d8fe530da9fcb7230b9e12384d47",
+        "actual": "8dfd49ffa669671936f556b6bf58db13d456d8fe530da9fcb7230b9e12384d47",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-2-candidate.json",
+        "expected": "447df89fe88f4afacb4157fcf0700cc9228115f47f99cf5fe0eb944895a192d8",
+        "actual": "447df89fe88f4afacb4157fcf0700cc9228115f47f99cf5fe0eb944895a192d8",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-3-baseline.json",
+        "expected": "3901a87c2001e6df33e05435eac034f269e033507a3ebb796d58c6386f12cbcb",
+        "actual": "3901a87c2001e6df33e05435eac034f269e033507a3ebb796d58c6386f12cbcb",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-3-candidate.json",
+        "expected": "766ac136d09581270c498f0c623051b0e2aace9ef06768e0f09a6b5fceb812a7",
+        "actual": "766ac136d09581270c498f0c623051b0e2aace9ef06768e0f09a6b5fceb812a7",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-1-baseline.json",
+        "expected": "98f6bd54213d885c8c61e02b18cf6c88ad007abeefbce613d87c1d2f82c9a49a",
+        "actual": "98f6bd54213d885c8c61e02b18cf6c88ad007abeefbce613d87c1d2f82c9a49a",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-1-candidate.json",
+        "expected": "e35d1f0da497bd0abb85ac8a612430ff27ab137b4b8e585f8c88cf3b86ef4a58",
+        "actual": "e35d1f0da497bd0abb85ac8a612430ff27ab137b4b8e585f8c88cf3b86ef4a58",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-2-baseline.json",
+        "expected": "d18ba3868152fcb88445d8ac8a7b3278786959f7c72f56ff38e5dfedbbbfded2",
+        "actual": "d18ba3868152fcb88445d8ac8a7b3278786959f7c72f56ff38e5dfedbbbfded2",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-2-candidate.json",
+        "expected": "332a036ce4321bd4bb62123be610d0f89439b3614a37bd1dea5a383391ad3545",
+        "actual": "332a036ce4321bd4bb62123be610d0f89439b3614a37bd1dea5a383391ad3545",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-3-baseline.json",
+        "expected": "c443f02ed1f7d43b8760734655761ebe75a41502f3335b16c27e6a0cb0040e5a",
+        "actual": "c443f02ed1f7d43b8760734655761ebe75a41502f3335b16c27e6a0cb0040e5a",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-3-candidate.json",
+        "expected": "f3d6e282e7c81c6112eeda22874355d59c91918970cfd792d6682a5593332565",
+        "actual": "f3d6e282e7c81c6112eeda22874355d59c91918970cfd792d6682a5593332565",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-01-baseline.json",
+        "expected": "052b10817a6175bb250827272e3a7f5c00cd78765484e4c423e67b9f8bb31765",
+        "actual": "052b10817a6175bb250827272e3a7f5c00cd78765484e4c423e67b9f8bb31765",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-02-candidate.json",
+        "expected": "233b333a494ea674b75eb5543b4724c9c7757ce810a4b4b524871a6a75b0303e",
+        "actual": "233b333a494ea674b75eb5543b4724c9c7757ce810a4b4b524871a6a75b0303e",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-03-candidate.json",
+        "expected": "593a58f4fcc2b38d5948975b738b5c4ec31b94a70b689c7c6e11413c4904654b",
+        "actual": "593a58f4fcc2b38d5948975b738b5c4ec31b94a70b689c7c6e11413c4904654b",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-04-baseline.json",
+        "expected": "e334fec4d77656c8b35821ae2b52d8d39e5b27309712449e7697e6c0b61a1bd8",
+        "actual": "e334fec4d77656c8b35821ae2b52d8d39e5b27309712449e7697e6c0b61a1bd8",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-05-baseline.json",
+        "expected": "30c66357e3b824dff0ee64b3e64ca049f990618176bed8479cca3c5ec408f852",
+        "actual": "30c66357e3b824dff0ee64b3e64ca049f990618176bed8479cca3c5ec408f852",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-06-candidate.json",
+        "expected": "6b157111eeb045092bfd535ac9f6bd714af4b4664ddf12548fec0b06838912fb",
+        "actual": "6b157111eeb045092bfd535ac9f6bd714af4b4664ddf12548fec0b06838912fb",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-07-baseline.json",
+        "expected": "46b2c9aa5c4ba8114a3e69b0a8b0e9b0c23700b747e902e9491e3c3233c497a6",
+        "actual": "46b2c9aa5c4ba8114a3e69b0a8b0e9b0c23700b747e902e9491e3c3233c497a6",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-08-candidate.json",
+        "expected": "a8252b139783ab522c4fd237449cebac1aeac04abddfe5511ee33e8b45816432",
+        "actual": "a8252b139783ab522c4fd237449cebac1aeac04abddfe5511ee33e8b45816432",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-09-candidate.json",
+        "expected": "651945eaa975df9a33e6afa9347df525f9760d0e4a104e6eb951c3f70a1ddaaf",
+        "actual": "651945eaa975df9a33e6afa9347df525f9760d0e4a104e6eb951c3f70a1ddaaf",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-10-baseline.json",
+        "expected": "a3131c830c97af9eaf5c63cb237551c9b907f1d1fd5cedeb0a35fd206ebf4b68",
+        "actual": "a3131c830c97af9eaf5c63cb237551c9b907f1d1fd5cedeb0a35fd206ebf4b68",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-11-baseline.json",
+        "expected": "f1fa89f60d7293ab207db769f6dde1525774bbbeb49451e4e401ecfeb16671fa",
+        "actual": "f1fa89f60d7293ab207db769f6dde1525774bbbeb49451e4e401ecfeb16671fa",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-12-candidate.json",
+        "expected": "b872b5701a22b7feabfb95eb1ab340da36be8e79c01c094bbfc2dee096cb8827",
+        "actual": "b872b5701a22b7feabfb95eb1ab340da36be8e79c01c094bbfc2dee096cb8827",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-13-candidate.json",
+        "expected": "b5e986416b6b8e3fc74993728ebec0ba1f6d42b35733c83b9db0edc14e7c4b4a",
+        "actual": "b5e986416b6b8e3fc74993728ebec0ba1f6d42b35733c83b9db0edc14e7c4b4a",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-14-baseline.json",
+        "expected": "f27e2afe0fc2f46d2ad9a23f641aa05daded05e718ceadda9509f5ef94721f45",
+        "actual": "f27e2afe0fc2f46d2ad9a23f641aa05daded05e718ceadda9509f5ef94721f45",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-01-baseline.json",
+        "expected": "10c6373d18cbdd0239307532b8c55db59ef1e62f80b31a7472b7026a101a3356",
+        "actual": "10c6373d18cbdd0239307532b8c55db59ef1e62f80b31a7472b7026a101a3356",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-02-candidate.json",
+        "expected": "f406738ff6a6129b730cc1e426a1eebd91008f3adf33fd30aa916933fbfad9a5",
+        "actual": "f406738ff6a6129b730cc1e426a1eebd91008f3adf33fd30aa916933fbfad9a5",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-03-candidate.json",
+        "expected": "2e3e2f5525b07ace1b64ea4c2c7415f427563e1368e4ec728fb05ddd654dab96",
+        "actual": "2e3e2f5525b07ace1b64ea4c2c7415f427563e1368e4ec728fb05ddd654dab96",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-04-baseline.json",
+        "expected": "ef0786ee1fb46cd1e4022f80e49f680f9c968056fa4a8bea7aedb5db51f15478",
+        "actual": "ef0786ee1fb46cd1e4022f80e49f680f9c968056fa4a8bea7aedb5db51f15478",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-05-baseline.json",
+        "expected": "18af13c990d9d1bcec0b999751b04d42125ff064f3a18688c087af4a24940a3b",
+        "actual": "18af13c990d9d1bcec0b999751b04d42125ff064f3a18688c087af4a24940a3b",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-06-candidate.json",
+        "expected": "9be58f2f46c5eee5b1bd493c06a934bb1bd7bfec76954900aec8c07539315157",
+        "actual": "9be58f2f46c5eee5b1bd493c06a934bb1bd7bfec76954900aec8c07539315157",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-07-baseline.json",
+        "expected": "27c14e3cd6ed427fe6198d32e474cb79c7b46754c0c896227d81ee72fc411334",
+        "actual": "27c14e3cd6ed427fe6198d32e474cb79c7b46754c0c896227d81ee72fc411334",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-08-candidate.json",
+        "expected": "d9fdbaa44287bbbeaf0e4723a09962c2f37cc6c031979712b502855eca46b7b0",
+        "actual": "d9fdbaa44287bbbeaf0e4723a09962c2f37cc6c031979712b502855eca46b7b0",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-09-candidate.json",
+        "expected": "8508ad67e36c991dddb9b42a46a9db3a5646fbcf02492d8fc4d9b095f872caff",
+        "actual": "8508ad67e36c991dddb9b42a46a9db3a5646fbcf02492d8fc4d9b095f872caff",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-10-baseline.json",
+        "expected": "9ac30e36adce20823c295c5f849b2768d6ae6df1d19d24002b221c13a83146eb",
+        "actual": "9ac30e36adce20823c295c5f849b2768d6ae6df1d19d24002b221c13a83146eb",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-11-baseline.json",
+        "expected": "51c9ec13affe65253a12a3be30167336628d8e14b6b22ac2ba83fbdde19653ac",
+        "actual": "51c9ec13affe65253a12a3be30167336628d8e14b6b22ac2ba83fbdde19653ac",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-12-candidate.json",
+        "expected": "95cc9f4200d889dff587379efb75acb155618e5933f8acd3ea8e3f6d008b51cf",
+        "actual": "95cc9f4200d889dff587379efb75acb155618e5933f8acd3ea8e3f6d008b51cf",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-13-candidate.json",
+        "expected": "e804c0651103ffb806a54656b5b74fd33d1b5b905371b3ea355737027e2d31a4",
+        "actual": "e804c0651103ffb806a54656b5b74fd33d1b5b905371b3ea355737027e2d31a4",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-14-baseline.json",
+        "expected": "6ff79cc30ad906addcec6a36e29a31ee663f0ea15c71666877d745cab45cc75d",
+        "actual": "6ff79cc30ad906addcec6a36e29a31ee663f0ea15c71666877d745cab45cc75d",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-01-baseline.json",
+        "expected": "87940c0b59777b27a07ff6a4f00a5d6a3ae47a3d4f33b59f4df62d6c4128449c",
+        "actual": "87940c0b59777b27a07ff6a4f00a5d6a3ae47a3d4f33b59f4df62d6c4128449c",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-02-candidate.json",
+        "expected": "4207688eb88a34eff37c467f925d727b4d185733bcf51696459ba60b9f325ec9",
+        "actual": "4207688eb88a34eff37c467f925d727b4d185733bcf51696459ba60b9f325ec9",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-03-candidate.json",
+        "expected": "4e862c0c3baba1b83dc6657605c2d5a337cc864945ea9177b6785a818bf6f884",
+        "actual": "4e862c0c3baba1b83dc6657605c2d5a337cc864945ea9177b6785a818bf6f884",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-04-baseline.json",
+        "expected": "bf252080ba90fbae20f1ddc355785aee84fb6ee5bde622abaacf1b58a64ecdd5",
+        "actual": "bf252080ba90fbae20f1ddc355785aee84fb6ee5bde622abaacf1b58a64ecdd5",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-05-baseline.json",
+        "expected": "82ae30e72f3d5304b48e1573faa255a8db413872f347f9996ccbabcf336482ce",
+        "actual": "82ae30e72f3d5304b48e1573faa255a8db413872f347f9996ccbabcf336482ce",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-06-candidate.json",
+        "expected": "255ab10e552ed2129b5922b92f3e39569a02a77d64a0b812a81d0ca78db94612",
+        "actual": "255ab10e552ed2129b5922b92f3e39569a02a77d64a0b812a81d0ca78db94612",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-07-baseline.json",
+        "expected": "4acf591a9c84ecada31e0aec727cc739f142bc8e2270fc4331238946c6e75084",
+        "actual": "4acf591a9c84ecada31e0aec727cc739f142bc8e2270fc4331238946c6e75084",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-08-candidate.json",
+        "expected": "820f34d2d8244b00cc03d031034698d6d158d1bec6b4ca3fcd89a07cbc50b7a0",
+        "actual": "820f34d2d8244b00cc03d031034698d6d158d1bec6b4ca3fcd89a07cbc50b7a0",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-09-candidate.json",
+        "expected": "81ad9206e4eddf6c84a01ed93b47270ef249aba509c450ca822a1c258959cae8",
+        "actual": "81ad9206e4eddf6c84a01ed93b47270ef249aba509c450ca822a1c258959cae8",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-10-baseline.json",
+        "expected": "f40d974237f402ff0a682cb7694f453c03e281f3f4fa042193203e42d9e82f4d",
+        "actual": "f40d974237f402ff0a682cb7694f453c03e281f3f4fa042193203e42d9e82f4d",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-11-baseline.json",
+        "expected": "bbe43126c9e57bd06c1474ff20e5791457ed271c34e6d07eb2f977b171038e02",
+        "actual": "bbe43126c9e57bd06c1474ff20e5791457ed271c34e6d07eb2f977b171038e02",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-12-candidate.json",
+        "expected": "4d0a17cc2df256be21626f673e5d83f4d287a5571e4e00a4a3d0dfab07a6b25a",
+        "actual": "4d0a17cc2df256be21626f673e5d83f4d287a5571e4e00a4a3d0dfab07a6b25a",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-13-candidate.json",
+        "expected": "0d90cd2a8ffc92e731ffbfd59264579e4f41df314cb3b7d24623daedb246f964",
+        "actual": "0d90cd2a8ffc92e731ffbfd59264579e4f41df314cb3b7d24623daedb246f964",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-14-baseline.json",
+        "expected": "8a2a562b8976048aeb293956f3e26181ff051d50875546dc3abb96f1e2557d52",
+        "actual": "8a2a562b8976048aeb293956f3e26181ff051d50875546dc3abb96f1e2557d52",
+        "matched": true
+      }
+    ]
+  },
+  "throughput_rows": {
+    "scope_run": {
+      "variants": {
+        "baseline": {
+          "processOperationsPerSecond": [
+            15673.267623541946,
+            14692.949730226239,
+            14119.920615217648,
+            15046.515437299775,
+            13086.900168883176,
+            13607.060692000292,
+            14495.502166473594
+          ],
+          "medianOperationsPerSecond": 14495.502166473594,
+          "processStationarity": [
+            0.9271496068689242,
+            1.0308620756315987,
+            0.9705998189932076,
+            1.0013319891252301,
+            1.0181938993735378,
+            0.9709986970443962,
+            1.0023616531153854
+          ],
+          "medianStationarityRatio": 1.0013319891252301,
+          "stationarityAccepted": true
+        },
+        "candidate": {
+          "processOperationsPerSecond": [
+            16618.73475032874,
+            16393.424796221123,
+            16819.17132570794,
+            14757.760837710324,
+            16714.53051231486,
+            15082.867290226,
+            14907.976749251118
+          ],
+          "medianOperationsPerSecond": 16393.424796221123,
+          "processStationarity": [
+            0.9001054000261683,
+            0.9648294465394892,
+            0.9285498685962996,
+            0.8741587621133712,
+            1.0148070724688822,
+            0.921685738472636,
+            1.0422676882715527
+          ],
+          "medianStationarityRatio": 0.9285498685962996,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioCandidateToBaseline": 1.1309318302981737,
+      "stationarityAccepted": true
+    },
+    "managed_ctx_exec": {
+      "variants": {
+        "baseline": {
+          "processOperationsPerSecond": [
+            10031.9894394451,
+            9700.609412654581,
+            10451.62184374542,
+            9605.828878440743,
+            11165.478597093195,
+            10565.423705318923,
+            10800.758107371708
+          ],
+          "medianOperationsPerSecond": 10451.62184374542,
+          "processStationarity": [
+            0.7884919297226026,
+            1.0449196083258476,
+            0.9123248309021103,
+            0.9102549389465134,
+            0.8788814668895526,
+            1.0593411816562193,
+            0.815266295766886
+          ],
+          "medianStationarityRatio": 0.9102549389465134,
+          "stationarityAccepted": true
+        },
+        "candidate": {
+          "processOperationsPerSecond": [
+            9742.338195362494,
+            11037.588060958877,
+            11333.530471280914,
+            9946.898795763944,
+            9294.942630080423,
+            11567.21909102421,
+            9867.016155063277
+          ],
+          "medianOperationsPerSecond": 9946.898795763944,
+          "processStationarity": [
+            0.9942305132251141,
+            0.9357527862553343,
+            1.0215296661009599,
+            0.9531555393723606,
+            1.2864487076505755,
+            0.7777422995320795,
+            1.005283553631654
+          ],
+          "medianStationarityRatio": 0.9942305132251141,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioCandidateToBaseline": 0.9517086385704321,
+      "stationarityAccepted": true
+    },
+    "sdk_session_run": {
+      "variants": {
+        "baseline": {
+          "processOperationsPerSecond": [
+            1691.979938613479,
+            1569.7438343277915,
+            1818.6631951829606,
+            1657.0805770476882,
+            1821.316552329726,
+            1815.8972213794443,
+            1749.020109297491
+          ],
+          "medianOperationsPerSecond": 1749.020109297491,
+          "processStationarity": [
+            0.9138357350876747,
+            0.984427683265068,
+            0.8539834169989643,
+            1.0485323704625813,
+            1.1894543396192538,
+            1.2186673980633114,
+            1.1240969730744126
+          ],
+          "medianStationarityRatio": 1.0485323704625813,
+          "stationarityAccepted": true
+        },
+        "candidate": {
+          "processOperationsPerSecond": [
+            1925.8303011761136,
+            1874.54282478,
+            1738.6993915485812,
+            1747.317324491218,
+            1874.7092232259317,
+            1711.148929936097,
+            1874.8246335908352
+          ],
+          "medianOperationsPerSecond": 1874.54282478,
+          "processStationarity": [
+            1.2464742259358648,
+            1.2441093300620771,
+            0.892930009691653,
+            1.0118574522697672,
+            0.8801188889486016,
+            0.9878474209415363,
+            0.848812990258066
+          ],
+          "medianStationarityRatio": 0.9878474209415363,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioCandidateToBaseline": 1.0717674512804352,
+      "stationarityAccepted": true
+    }
+  },
+  "throughput_geometric_mean": {
+    "value": 1.0487701891470118,
+    "target_minimum": 1.1,
+    "decision": "fail"
+  },
+  "allocation_rows": {
+    "scope_run": {
+      "trials": {
+        "baseline": [
+          {
+            "trial": 1,
+            "zeroBytes": 18752,
+            "measuredBytes": 44793568,
+            "correctedBytes": 44774816,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8954.9632,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 13400,
+            "measuredBytes": 44636168,
+            "correctedBytes": 44622768,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8924.5536,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 18880,
+            "measuredBytes": 44674168,
+            "correctedBytes": 44655288,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8931.0576,
+            "signalAccepted": true
+          }
+        ],
+        "candidate": [
+          {
+            "trial": 1,
+            "zeroBytes": 3248,
+            "measuredBytes": 32268032,
+            "correctedBytes": 32264784,
+            "completedOperations": 5000,
+            "bytesPerOperation": 6452.9568,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 3264,
+            "measuredBytes": 33589928,
+            "correctedBytes": 33586664,
+            "completedOperations": 5000,
+            "bytesPerOperation": 6717.3328,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 34512,
+            "measuredBytes": 32278584,
+            "correctedBytes": 32244072,
+            "completedOperations": 5000,
+            "bytesPerOperation": 6448.8144,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "baseline": 8931.0576,
+        "candidate": 6452.9568
+      },
+      "ratioCandidateToBaseline": 0.7225299722621876,
+      "everySignalAccepted": true,
+      "perRowCeilingAccepted": true
+    },
+    "managed_ctx_exec": {
+      "trials": {
+        "baseline": [
+          {
+            "trial": 1,
+            "zeroBytes": 16600,
+            "measuredBytes": 7828800,
+            "correctedBytes": 7812200,
+            "completedOperations": 2000,
+            "bytesPerOperation": 3906.1,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 13192,
+            "measuredBytes": 8988872,
+            "correctedBytes": 8975680,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4487.84,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 13320,
+            "measuredBytes": 8995312,
+            "correctedBytes": 8981992,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4490.996,
+            "signalAccepted": true
+          }
+        ],
+        "candidate": [
+          {
+            "trial": 1,
+            "zeroBytes": 17752,
+            "measuredBytes": 9698784,
+            "correctedBytes": 9681032,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4840.516,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 17552,
+            "measuredBytes": 9208064,
+            "correctedBytes": 9190512,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4595.256,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 14416,
+            "measuredBytes": 9582352,
+            "correctedBytes": 9567936,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4783.968,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "baseline": 4487.84,
+        "candidate": 4783.968
+      },
+      "ratioCandidateToBaseline": 1.065984527077614,
+      "everySignalAccepted": true,
+      "perRowCeilingAccepted": false
+    },
+    "sdk_session_run": {
+      "trials": {
+        "baseline": [
+          {
+            "trial": 1,
+            "zeroBytes": 14456,
+            "measuredBytes": 5366608,
+            "correctedBytes": 5352152,
+            "completedOperations": 150,
+            "bytesPerOperation": 35681.013333333336,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 15464,
+            "measuredBytes": 5112864,
+            "correctedBytes": 5097400,
+            "completedOperations": 150,
+            "bytesPerOperation": 33982.666666666664,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 15448,
+            "measuredBytes": 5142816,
+            "correctedBytes": 5127368,
+            "completedOperations": 150,
+            "bytesPerOperation": 34182.45333333333,
+            "signalAccepted": true
+          }
+        ],
+        "candidate": [
+          {
+            "trial": 1,
+            "zeroBytes": 31240,
+            "measuredBytes": 5650904,
+            "correctedBytes": 5619664,
+            "completedOperations": 150,
+            "bytesPerOperation": 37464.426666666666,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 12392,
+            "measuredBytes": 5703472,
+            "correctedBytes": 5691080,
+            "completedOperations": 150,
+            "bytesPerOperation": 37940.53333333333,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 14280,
+            "measuredBytes": 5534072,
+            "correctedBytes": 5519792,
+            "completedOperations": 150,
+            "bytesPerOperation": 36798.613333333335,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "baseline": 34182.45333333333,
+        "candidate": 37464.426666666666
+      },
+      "ratioCandidateToBaseline": 1.0960133932263103,
+      "everySignalAccepted": true,
+      "perRowCeilingAccepted": false
+    }
+  },
+  "allocation_geometric_mean": {
+    "value": 0.9450922673611655,
+    "target_maximum": 0.9,
+    "decision": "fail"
+  },
+  "retained_controls": {
+    "scope_run": {
+      "baseline": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      },
+      "candidate": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      }
+    },
+    "managed_ctx_exec": {
+      "baseline": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      },
+      "candidate": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      }
+    },
+    "sdk_session_run": {
+      "baseline": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      },
+      "candidate": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      }
+    }
+  },
+  "cleanup_walls": {
+    "invalidLifecycleSummaryCount": 0,
+    "postCloseLiveResourceCount": 0,
+    "crossOwnerLeakCount": 0,
+    "cleanupBusinessStateMutationCount": 0,
+    "sdkCompletedOperationCount": 119706,
+    "sdkPostCloseMutationRejectedCount": 119706,
+    "sdkPostCloseMutationMismatchCount": 0,
+    "cleanupWallCount": 0
+  },
+  "target_decisions": {
+    "throughputStationarity": true,
+    "throughputGeometricMean": false,
+    "allocationSignal": true,
+    "allocationGeometricMean": false,
+    "allocationPerRowCeiling": false,
+    "retainedControls": true,
+    "cleanupWalls": true,
+    "integratedTarget": false
+  },
+  "replay_command_or_checker": "cd /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z && node verify.mjs . --check",
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-ALLOCATION-REGRESSION",
+    "AG-RETAINED-MEMORY",
+    "AG-CLEANUP-EFFECT",
+    "AG-SESSION-ISOLATION",
+    "AG-BENCHMARK-BRANCH",
+    "AG-PRESERVATION",
+    "AG-AUTHORITY"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "metric_id": "AG-INTEGRITY",
+      "source_of_truth": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/frozen.json, provenance.json, and raw.sha256",
+      "read_method": "Replay all frozen, prior-evidence, provenance, chronology, and raw hashes.",
+      "observed_at": "2026-07-16T07:40:19.361Z",
+      "recorded_at": "2026-07-16T07:40:19.361Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+      "replay_command_or_checker": "cd /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PERF-COMPARISON",
+      "source_of_truth": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/protocol.json and raw observations",
+      "read_method": "Replay the accepted balanced schedule, stationarity bands, allocation aggregate, matched zeros, and minimum signals.",
+      "observed_at": "2026-07-16T07:40:19.361Z",
+      "recorded_at": "2026-07-16T07:40:19.361Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+      "replay_command_or_checker": "cd /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PERF-CLAIM",
+      "source_of_truth": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/checkpoint.v1.json",
+      "read_method": "Require pending independent validation and no release-readiness claim.",
+      "observed_at": "2026-07-16T07:40:19.361Z",
+      "recorded_at": "2026-07-16T07:40:19.361Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+      "replay_command_or_checker": "cd /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-ALLOCATION-REGRESSION",
+      "source_of_truth": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation",
+      "read_method": "Check every candidate-to-baseline row ratio against 1.05.",
+      "observed_at": "2026-07-16T07:40:19.361Z",
+      "recorded_at": "2026-07-16T07:40:19.361Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 1,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+      "replay_command_or_checker": "cd /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-RETAINED-MEMORY",
+      "source_of_truth": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/retained",
+      "read_method": "Require 0/0/1 in every event-loop-turn retained-control observation.",
+      "observed_at": "2026-07-16T07:40:19.361Z",
+      "recorded_at": "2026-07-16T07:40:19.361Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+      "replay_command_or_checker": "cd /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-CLEANUP-EFFECT",
+      "source_of_truth": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw",
+      "read_method": "Aggregate lifecycle ownership, cleanup, business-state, and post-close rejection counters.",
+      "observed_at": "2026-07-16T07:40:19.361Z",
+      "recorded_at": "2026-07-16T07:40:19.361Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+      "replay_command_or_checker": "cd /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-SESSION-ISOLATION",
+      "source_of_truth": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw",
+      "read_method": "Replay every lifecycle owner and session post-close assertion.",
+      "observed_at": "2026-07-16T07:40:19.361Z",
+      "recorded_at": "2026-07-16T07:40:19.361Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+      "replay_command_or_checker": "cd /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-BENCHMARK-BRANCH",
+      "source_of_truth": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/chronology.json and raw.sha256",
+      "read_method": "Confirm this unit contains only the three lifecycle rows and no 47-row benchmark output.",
+      "observed_at": "2026-07-16T07:40:19.361Z",
+      "recorded_at": "2026-07-16T07:40:19.361Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+      "replay_command_or_checker": "cd /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PRESERVATION",
+      "source_of_truth": "git:293dcdf2d6d0b274418bcca8461f7eb122e10c52 and /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/provenance.json",
+      "read_method": "Require the exact baseline plus only the frozen scope.ts patch.",
+      "observed_at": "2026-07-16T07:40:19.361Z",
+      "recorded_at": "2026-07-16T07:40:19.361Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+      "replay_command_or_checker": "cd /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-AUTHORITY",
+      "source_of_truth": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/protocol.json",
+      "read_method": "Stop after one observation without commit, push, merge, release, publish, deploy, or production contact.",
+      "observed_at": "2026-07-16T07:40:19.361Z",
+      "recorded_at": "2026-07-16T07:40:19.361Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+      "replay_command_or_checker": "cd /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "pending_independent_validation",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-16T07:40:19.361Z"
+  },
+  "workspace_effect": "Created one scratch-only comparison under /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z and the designated worker progress records. Product, candidate diff, prior evidence, docs, benchmarks, and release metadata remained read-only.",
+  "result": {
+    "target": "fail_pending_independent_validation",
+    "release_readiness_claim": "not_made",
+    "existing_47_row_benchmark": "not_run",
+    "worker_evidence_is_acceptance": false,
+    "favorable_reruns_refused": true
+  },
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

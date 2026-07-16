@@ -1,0 +1,159 @@
+{
+  "type": "challenger_progress",
+  "unit_id": "CHALLENGER-P13-NEXT",
+  "status": "finished",
+  "observed_at": "2026-07-16T08:49:27Z",
+  "objective_from_frame": "Reduce release_readiness_gap_count to 0 on the exact PR head by meeting the frozen lifecycle throughput and allocation targets while every active anti-goal holds.",
+  "evidence_reviewed": [
+    "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/checkpoint.v1.json#sha256=e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950",
+    "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/protocol.json#sha256=1ad184e88d999c16f3d74555f7eaf7c6a6fab7fab681c615502d28513716b4fc",
+    "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/variant.patch#sha256=c4d93b8eca26644f5a1fd286227a3380e76328bedbab91967953b3d10b6352f1",
+    "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/checkpoint.v1.json#sha256=9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e",
+    "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/protocol.json#sha256=881d6556223fe5894db17e5e28d4bd8226850031cbf48956fa9027555e08266a",
+    "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/variant.patch#sha256=62ae8f06d2f9adcbabc597b5cf1037cc2436397dfe60867e08d32e68e03b0a0a",
+    "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/cancellation.patch#sha256=5db7e1a4fe7b204d6353249370f6929caeacda91ae7f5c8f314d71aae91b7868",
+    "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/workloads.mjs#sha256=cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a",
+    "git:293dcdf2d6d0b274418bcca8461f7eb122e10c52:pkg/core/lite/src/scope.ts#sha256=0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "pkg/sdk/core/src/session.ts:1576"
+  ],
+  "recomputed_reads": {
+    "p12": {
+      "throughput_geometric_mean": 1.011645384781946,
+      "allocation_geometric_mean": 0.91324586128266,
+      "allocation_rows": {
+        "scope_run": 0.9296813265154205,
+        "managed_ctx_exec": 0.9841513301467536,
+        "sdk_session_run": 0.8324672299325336
+      }
+    },
+    "p13": {
+      "throughput_geometric_mean": 1.3543167113879728,
+      "allocation_geometric_mean": 0.6819184733486838,
+      "allocation_rows": {
+        "scope_run": 0.47236762070988636,
+        "managed_ctx_exec": 0.6091728058796586,
+        "sdk_session_run": 1.101987679622239
+      },
+      "sdk_paired_allocation_ratios": [
+        1.1308197031063811,
+        1.101987679622239,
+        1.0837463338720297
+      ],
+      "sdk_baseline_relative_spread": 0.018098906957341492,
+      "sdk_candidate_relative_spread": 0.024343877018097572
+    },
+    "cross_study_directional_only": {
+      "sdk_baseline_p13_over_p12": 0.9967834711632366,
+      "sdk_candidate_p13_over_p12": 1.319503116731692,
+      "claim": "This is directional evidence, not an additive or causal estimate."
+    }
+  },
+  "hypothesis_verdicts": [
+    {
+      "hypothesis_id": "H1",
+      "statement": "P13's SDK allocation ceiling breach is measurement noise.",
+      "spine_artifact_ref": "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/checkpoint.v1.json#sha256=9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e",
+      "narrowing_toward_wrong_tip": "yes",
+      "verdict": "dead",
+      "verdict_evidence": "All three paired SDK allocation ratios exceed 1.05: 1.131, 1.102, and 1.084. Baseline relative spread is 1.8%, candidate spread is 2.4%, every signal exceeds the minimum, and the frozen workload and environment match P12.",
+      "proposed_next": "Do not waive or rerun the ceiling. Isolate the explicit-caller-signal path."
+    },
+    {
+      "hypothesis_id": "H2",
+      "statement": "V123 plus lazy cancellation should progress despite the breach.",
+      "spine_artifact_ref": "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/checkpoint.v1.json#sha256=9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e",
+      "narrowing_toward_wrong_tip": "yes",
+      "verdict": "dead",
+      "verdict_evidence": "The frozen allocationPerRowCeiling decision is false and integratedTarget is false. AG-ALLOCATION-REGRESSION rejects progression when any representative row exceeds 1.05.",
+      "proposed_next": "Keep P13 only as rejected discovery evidence. Do not promote its combined patch."
+    },
+    {
+      "hypothesis_id": "H3",
+      "statement": "Lazy cancellation without V123 is the smallest next counterfactual.",
+      "spine_artifact_ref": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/checkpoint.v1.json#sha256=e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950",
+      "narrowing_toward_wrong_tip": "yes",
+      "verdict": "dead",
+      "verdict_evidence": "V123 alone held the SDK allocation ceiling at 0.832. After adding lazy cancellation, the SDK candidate median rose 31.95% across studies while the baseline median changed by -0.32%. This cross-study comparison is not causal, but it contradicts removing the only isolated component with favorable SDK evidence and supplies no reducing mechanism.",
+      "proposed_next": "Do not spend the next one-shot comparison on cancellation-only."
+    },
+    {
+      "hypothesis_id": "H4",
+      "statement": "Another source boundary is smaller or more defensible.",
+      "spine_artifact_ref": "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/cancellation.patch#sha256=5db7e1a4fe7b204d6353249370f6929caeacda91ae7f5c8f314d71aae91b7868",
+      "narrowing_toward_wrong_tip": "no",
+      "verdict": "intact",
+      "verdict_evidence": "Only sdk_session_run passes an explicit signal through Session.run and dispatch.prepare. The scope_run and managed_ctx_exec workloads pass no explicit signal and both gain strongly under P13. The P13 patch replaces baseline signal composition with a custom callerSignal listener path, so the explicit-caller boundary is the smallest source interaction that matches the row split.",
+      "proposed_next": "Run DKR-P14 caller-signal hybrid cancellation."
+    }
+  ],
+  "next_dkr": {
+    "id": "DKR-P14",
+    "name": "caller-signal hybrid cancellation",
+    "decision_target": "Determine whether preserving baseline cancellation composition only for contexts with an explicit caller signal removes the SDK allocation breach while retaining the no-caller lifecycle gains.",
+    "include": [
+      "Exact source baseline 293dcdf2d6d0b274418bcca8461f7eb122e10c52.",
+      "The accepted V123 boundary: seedTags fast paths plus lazy resources, resourceListeners, and resourceControllers.",
+      "P13 lazy local AbortController state, first-abort recording, signal getter, and parent propagation through the existing children registry for contexts created without options.signal.",
+      "For contexts created with options.signal, retain or restore baseline combineAbortSignals composition of local, parent, and caller signals. Do not use the P13 callerSignal field, handleEvent method, or direct caller listener path for this branch.",
+      "Semantic probes covering all twelve P13 cases, all existing cancellation tests, already-aborted callers, caller-before-parent, parent-before-caller, local close, stream return, boundary close, and SDK active-work cancellation.",
+      "The frozen P13 workload, environment, allocation aggregate, throughput protocol, retained controls, cleanup walls, and thresholds unchanged."
+    ],
+    "exclude": [
+      "V4 lazy cleanups, descendants, activeIterators, or children.",
+      "Any SDK session source change.",
+      "Any public API, declaration, tag, dependency, ownership, cleanup-order, or cancellation semantic change.",
+      "Any workload, weighting, threshold, sample count, allocation aggregate, stationarity band, or favorable-rerun change.",
+      "Any product edit or progression claim before accepted discovery and independent validation.",
+      "The existing 47-row benchmark."
+    ],
+    "stop_rule": [
+      "If the hybrid cannot pass the full frozen cancellation semantic matrix and focused Lite and SDK suites, stop before performance and return a replayable rejected or empty checkpoint.",
+      "If semantics hold, freeze provenance and the harness, then run exactly one integrated baseline-candidate comparison.",
+      "Stop after that comparison whether it passes or fails. Progression remains blocked unless throughput geometric mean is at least 1.10, allocation geometric mean is at most 0.90, every allocation row is at most 1.05, stationarity holds, retained controls are 0/0/1, and cleanup wall count is 0."
+    ],
+    "claim_boundary": "This challenger selects a reducing probe only. It does not establish causality, product improvement, semantic equivalence, release readiness, or permission to edit product."
+  },
+  "contribution_reviews": [
+    {
+      "type": "first_principles_contribution_review",
+      "node_id": "CKR-PERFORMANCE",
+      "problem_now": "Meet both aggregate lifecycle targets without any representative allocation regression.",
+      "objective_contribution": "It directly removes the performance target misses counted by release_readiness_gap_count.",
+      "evidence_refs": [
+        "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/checkpoint.v1.json#sha256=9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e"
+      ],
+      "simpler_alternative": "Waiving the SDK row is simpler but violates the frozen wall; cancellation-only is smaller in diff count but lacks a reducing mechanism.",
+      "anti_goal_effects": [
+        "AG-ALLOCATION-REGRESSION: breached by P13",
+        "AG-PERF-COMPARISON: held",
+        "AG-PERF-CLAIM: must remain held by making no improvement claim"
+      ],
+      "decision": "keep",
+      "reviewer_role": "challenger",
+      "progress_ref": "workers/challenger-p13-next/progress.jsonl#seq=1"
+    },
+    {
+      "type": "first_principles_contribution_review",
+      "node_id": "DKR-P13",
+      "problem_now": "Identify which part of lazy cancellation creates the SDK-only allocation regression.",
+      "objective_contribution": "P13 proves aggregate movement and isolates the remaining failing row, but its combined candidate cannot progress.",
+      "evidence_refs": [
+        "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/checkpoint.v1.json#sha256=9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e",
+        "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/cancellation.patch#sha256=5db7e1a4fe7b204d6353249370f6929caeacda91ae7f5c8f314d71aae91b7868"
+      ],
+      "simpler_alternative": "Cancellation-only removes V123 but moves away from the only isolated favorable SDK allocation evidence.",
+      "anti_goal_effects": [
+        "AG-ALLOCATION-REGRESSION: blocks the P13 combined candidate",
+        "AG-RETAINED-MEMORY: held",
+        "AG-CLEANUP-EFFECT: held",
+        "AG-PRESERVATION: retain P13 as rejected evidence"
+      ],
+      "decision": "reshape",
+      "reviewer_role": "challenger",
+      "progress_ref": "workers/challenger-p13-next/progress.jsonl#seq=1"
+    }
+  ],
+  "active_performance_pkr_count": 0,
+  "summary": "1 intact, 0 drifted, 3 dead: H1, H2, H3.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

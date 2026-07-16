@@ -1,0 +1,36 @@
+{
+  "type": "claim_acceptance",
+  "unit_id": "PKR-P1",
+  "accepted_at": "2026-07-16T07:31:00Z",
+  "accepted_scope": "The one-file lazy ExecutionContext state candidate and its semantic gates are accepted. No performance contribution or CKR target is accepted yet.",
+  "contribution_metric": "semantic_candidate_gate_failure_count == 0",
+  "value": 0,
+  "target": 0,
+  "comparator": "==",
+  "candidate_diff_sha256": "3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599",
+  "writer_progress_ref": "workers/pkr-p1-lazy-execution-context-state/progress.jsonl#seq=1",
+  "verification_ref": "workers/validator-pkr-p1/verification.v1.txt",
+  "verification_sha256": "fb6a25786ff2e0feba8c6fbb1e3bbe752661a842f870546eb84de52231f9d962",
+  "verified_gates": {
+    "test_files": 12,
+    "tests": 262,
+    "typechecks": 2,
+    "diff_audits": 7,
+    "rejected_claims": 0
+  },
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-CLEANUP-EFFECT",
+    "AG-SESSION-ISOLATION",
+    "AG-CONTEXT-ARGUMENT",
+    "AG-STYLE",
+    "AG-REGRESSION"
+  ],
+  "active_anti_goal_verification": "See validator report; all activated semantic walls replayed with zero failures.",
+  "wall_gate": {
+    "verdict": "held",
+    "downstream_advance": "allowed",
+    "decided_at": "2026-07-16T07:31:00Z"
+  },
+  "downstream_authority": "Measure this exact candidate with PKR-P2. Do not commit or claim performance until that comparison is independently accepted."
+}

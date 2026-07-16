@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "unit_id": "PKR-P1-ROLLBACK",
+  "worker_kind": "PKR",
+  "model_phrasing": "gpt-5 family detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4",
+  "frame": {
+    "objective": "Remove the dead full-candidate artifact from the product working tree while preserving its evidence.",
+    "anti_goals": {"full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"},
+    "action_envelope": {
+      "allowed": ["Restore only pkg/core/lite/src/scope.ts to exact commit 293dcdf2 content using apply_patch; verify hashes and no remaining product diff."],
+      "forbidden": ["Touch OKRA history, other product files, discard unrelated work, use destructive git reset/checkout, commit, push, merge, release, publish, or deploy."],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human changes the frame or release authority."
+  },
+  "linked_ckr": "CKR-PERFORMANCE",
+  "source_dkr_checkpoint": ["artifacts/accept-dkr-p11b.v1.json", "workers/challenger-performance-component-isolation/progress.jsonl#seq=1"],
+  "contribution_metric": "dead_hypothesis_product_artifact_count == 0",
+  "active_anti_goals": ["AG-INTEGRITY", "AG-PRESERVATION", "AG-STYLE", "AG-AUTHORITY"],
+  "current_state": {
+    "dead_candidate_source_sha256": "a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65",
+    "preserved_ref": "artifacts/dead-pkr-p1/scope.ts#sha256=a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65",
+    "baseline_source_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "baseline_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52"
+  },
+  "previous_dkr_checkpoint": {"hypothesis_verdict": "full lazy-state candidate is dead as target-satisfying"},
+  "assignment": "Use apply_patch to reverse only the current scope.ts candidate diff. Verify the resulting file hash equals the exact baseline source hash and `git diff 293dcdf2 -- pkg/core/lite/src/scope.ts` is empty. Do not run product tests because the result is byte-identical to the already accepted product commit. Record one governed finish report.",
+  "budget_and_stop_rule": "10 minutes; stop when exact hash and empty product diff hold, or hand back on any unrelated overlap.",
+  "hand_back_rule": "PKRs hand back on unknown discovery instead of resolving overlap or discarding work.",
+  "progress_signals": ["preserved content hash", "restored source hash", "empty product diff"],
+  "worker_progress": ".okra/runs/release-readiness-20260716/workers/pkr-p1-rollback-dead-candidate/progress.jsonl",
+  "worker_progress_command": "/home/lagz0ne/dev/okr/skills/reverse-tornado-okr/scripts/okra-store.sh worker-report pkr-p1-rollback-dead-candidate <payload.json> .okra/runs/release-readiness-20260716",
+  "output_schema": {"required": ["changed_files", "restored_sha256", "diff_empty", "progress_ref", "workspace_effect"], "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."}
+}

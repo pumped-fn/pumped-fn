@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "unit_id": "DKR-P14",
+  "worker_kind": "DKR",
+  "frame": {
+    "objective": {
+      "metric_id": "release_readiness_gap_count",
+      "target": 0,
+      "performance_targets": {
+        "throughput_gm_min": 1.10,
+        "allocation_gm_max": 0.90,
+        "allocation_row_max": 1.05,
+        "retained_closed": 0,
+        "cleanup_walls": 0
+      }
+    },
+    "anti_goals": {
+      "full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"
+    },
+    "action_envelope": {
+      "allowed": [
+        "Create one scratch-only hybrid from exact commit 293dcdf2 with V123, P13 lazy cancellation for contexts without options.signal, and baseline combineAbortSignals behavior for contexts with options.signal.",
+        "Run the complete P13 semantic matrix plus explicit-signal equivalence cases, then one frozen integrated comparison if all semantic and provenance checks pass."
+      ],
+      "forbidden": [
+        "Edit product source, change SDK code, include V4, change public types or behavior, change workloads or thresholds, rerun favorably, run the 47-row benchmark, commit, push, merge, release, publish, or deploy."
+      ],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human changes targets or authority."
+  },
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-ALLOCATION-REGRESSION",
+    "AG-RETAINED-MEMORY",
+    "AG-CLEANUP-EFFECT",
+    "AG-SESSION-ISOLATION",
+    "AG-BENCHMARK-BRANCH",
+    "AG-PRESERVATION",
+    "AG-AUTHORITY"
+  ],
+  "current_state": {
+    "baseline_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "baseline_build": "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/build-a",
+    "p12_checkpoint": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/checkpoint.v1.json#sha256=e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950",
+    "p13_checkpoint": "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/checkpoint.v1.json#sha256=9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e",
+    "challenger": ".okra/runs/release-readiness-20260716/workers/challenger-p13-next/progress.jsonl#seq=1",
+    "variant": {
+      "include": [
+        "V1 seedTags fast paths",
+        "V2 lazy resourceListeners and resourceControllers",
+        "V3 lazy resources",
+        "P13 lazy cancellation when options.signal is absent",
+        "baseline eager local plus combineAbortSignals composition when options.signal is present"
+      ],
+      "exclude": [
+        "P13 callerSignal field",
+        "P13 handleEvent path",
+        "P13 direct caller listener",
+        "V4 lazy collections",
+        "SDK changes",
+        "public API changes"
+      ]
+    }
+  },
+  "assignment": "Build the smallest caller-signal hybrid. Contexts without an explicit options.signal may use P13 first-abort propagation and one lazy local controller. Contexts with options.signal must retain baseline composition semantics and source order using combineAbortSignals. Prove both branches with stable identity, parent and caller ordering, already-aborted sources, close classification, stream, boundary-child, listener settlement, and post-close cases. Prove exact source boundary and unchanged SDK. Freeze before observation, then run the accepted 96-observation protocol once. Return exact target reads pending independent validation.",
+  "budget_and_stop_rule": {
+    "wall_clock": "65m",
+    "route_cap": 1,
+    "stop": "Stop after one semantically proven hybrid and one frozen full comparison, pass or fail."
+  },
+  "hand_back_rule": "Hand back before measurement if branch selection or semantic equivalence is ambiguous. Never waive the SDK allocation ceiling.",
+  "worker_progress": ".okra/runs/release-readiness-20260716/workers/dkr-p14-caller-signal-hybrid/progress.jsonl",
+  "worker_progress_command": "/home/lagz0ne/dev/okr/skills/reverse-tornado-okr/scripts/okra-store.sh worker-report dkr-p14-caller-signal-hybrid <payload.json> .okra/runs/release-readiness-20260716",
+  "heartbeat_cadence_and_next_check_at": "10m; next check at 2026-07-16T08:59:00Z",
+  "output_schema": {
+    "record_first": true,
+    "required": [
+      "checkpoint_id",
+      "variant_patch_sha256",
+      "variant_boundary_checks",
+      "semantic_test_matrix",
+      "frozen_protocol",
+      "provenance",
+      "raw_hashes",
+      "throughput_rows",
+      "throughput_geometric_mean",
+      "allocation_rows",
+      "allocation_geometric_mean",
+      "retained_controls",
+      "cleanup_walls",
+      "target_decisions",
+      "replay",
+      "claim_boundary",
+      "workspace_effect"
+    ],
+    "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  }
+}

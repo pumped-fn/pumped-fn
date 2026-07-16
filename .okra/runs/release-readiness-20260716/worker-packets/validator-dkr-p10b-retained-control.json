@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "unit_id": "VALIDATOR-DKR-P10B",
+  "worker_kind": "verification",
+  "model_phrasing": "gpt-5 family detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4",
+  "frame": {
+    "objective": "Validate or reject the DKR-P10B retained-control checkpoint without judgement.",
+    "anti_goals": {
+      "full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"
+    },
+    "action_envelope": {
+      "allowed": ["Read and replay the DKR-P10B scratch evidence once."],
+      "forbidden": ["Edit files, fix findings, rerun until green, infer a production leak, optimize product code, merge, release, publish, deploy, or push."],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human may change thresholds or authority."
+  },
+  "active_anti_goals": ["AG-INTEGRITY", "AG-INDEPENDENCE", "AG-PERF-COMPARISON", "AG-PERF-CLAIM", "AG-RETAINED-MEMORY"],
+  "current_state": {
+    "checkpoint": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/checkpoint.v1.json",
+    "checkpoint_sha256": "070d5bc9d674060c56f0a3a74ffe60bad2a21736af9e13718dbcf0ca29da3d9e"
+  },
+  "previous_dkr_checkpoint": {
+    "unit_id": "DKR-P9",
+    "decision": "rejected",
+    "verification_ref": "/tmp/dkr-p9-independent-validation-20260716T070112Z/verification.v1.txt"
+  },
+  "assignment": "Run exactly one replay of DKR-P10B. Verify frozen and raw hashes, exact product/workload provenance, six same-microtask 0/1/2 reproductions, six event-loop-turn 0/0/1 corrections, unchanged lifecycle walls, and the narrow harness-timing conclusion. Reject any unsupported reference-path or product-leak claim.",
+  "budget_and_stop_rule": "One replay, 10 minutes. Stop at the first deterministic result.",
+  "hand_back_rule": "Return rejected for missing, stale, contradicted, non-replayable, or wrong-source evidence. Do not repair.",
+  "output_schema": "Use the exact audit-trace blocks from references/roles/validator.md and save one immutable verification file under /tmp.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

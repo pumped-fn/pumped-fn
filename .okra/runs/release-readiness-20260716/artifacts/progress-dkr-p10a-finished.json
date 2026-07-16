@@ -1,0 +1,11 @@
+{
+  "unit_id": "DKR-P10A",
+  "status": "finished",
+  "event": "checkpoint_written",
+  "detail": "The single frozen observation passed all three A/A ratio and stationarity gates. Independent validation remained required before acceptance.",
+  "checkpoint": "/tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z/checkpoint.v1.json",
+  "checkpoint_sha256": "94c0a937fe0e318971d32713938e75ef12dfdc35f9bf6b9a1badf3eafe179aa1",
+  "replay": "cd /tmp/dkr-p10a-throughput-stability-293dcdf2-20260716T071500Z && node verify.mjs . --check",
+  "observed_at": "2026-07-16T07:13:26Z",
+  "next_check_at": "orchestrator dispatch"
+}

@@ -1,0 +1,12 @@
+{
+  "type": "estimation_record",
+  "phase": "estimate",
+  "unit_id": "DKR-P10B",
+  "estimate": {
+    "time_min": 25,
+    "turns": 1,
+    "tokens": null
+  },
+  "observed_at": "2026-07-16T07:04:50Z",
+  "dispatch_ref": "worker-packets/dkr-p10b-retained-control.json"
+}

@@ -1,0 +1,12 @@
+{
+  "type": "estimation_record",
+  "phase": "actual",
+  "unit_id": "PKR-P2",
+  "actual": {
+    "time_min": 22,
+    "turns": 1,
+    "tokens": null
+  },
+  "observed_at": "2026-07-16T07:48:00Z",
+  "result_ref": "artifacts/reject-pkr-p2.v1.json"
+}

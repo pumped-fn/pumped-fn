@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "unit_id": "VALIDATOR-DKR-P11A",
+  "worker_kind": "verification",
+  "model_phrasing": "gpt-5 family detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4",
+  "frame": {
+    "objective": "Validate or reject the DKR-P11A replayable-empty attribution checkpoint.",
+    "anti_goals": {"full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"},
+    "action_envelope": {
+      "allowed": ["Replay the immutable analyzer once and compare byte-for-byte."],
+      "forbidden": ["Edit, drop unresolved samples, infer stacks, observe new profiles, optimize, commit, push, merge, release, publish, or deploy."],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human may change targets or authority."
+  },
+  "active_anti_goals": ["AG-INTEGRITY", "AG-INDEPENDENCE", "AG-PERF-COMPARISON", "AG-PERF-CLAIM", "AG-PRESERVATION"],
+  "current_state": {
+    "checkpoint": "/tmp/dkr-p11a-allocation-stack-attribution-20260716T083000Z/checkpoint.v1.json",
+    "checkpoint_sha256": "e0b05a9a6d243b2ea717aaf1a4edcc255bd62a7821ad0d434224303af7db8f9a",
+    "analyzer_sha256": "fc1b6ca90a808b52a2dbc0b2aca2e5a0892499f9d57a01686fa9ed483c76b8aa"
+  },
+  "previous_dkr_checkpoint": {"comparison_failure": "artifacts/reject-pkr-p2.v1.json"},
+  "assignment": "Run one byte-for-byte replay. Verify 36 allocation hashes, four affected profiles, 36 unresolved samples, 283064 unresolved sampled bytes, and the fail-closed empty conclusion. Reject any stack location or causality claim.",
+  "budget_and_stop_rule": "One replay, 10 minutes.",
+  "hand_back_rule": "Reject missing, contradicted, non-replayable, or wrong-source evidence. Do not repair.",
+  "output_schema": "Compact validator audit file under /tmp with hash and accepted/rejected counts.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

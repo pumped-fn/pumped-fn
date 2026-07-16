@@ -1,0 +1,27 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P9",
+  "accepted_at": "2026-07-16T07:04:50Z",
+  "accepted_scope": "The independently replayed learning is accepted: the frozen exact-head A/A harness is rejected and cannot authorize product optimization.",
+  "method_decision": "rejected",
+  "checkpoint_ref": "workers/dkr-p9-exact-head-aa-harness/checkpoint.v1.json",
+  "checkpoint_sha256": "4b31dfc058e6f0627edba61a2a4e3c83818eb132f6374cec8864c75eccbb77f4",
+  "verification_ref": "workers/validator-dkr-p9/verification.v1.txt",
+  "verification_sha256": "46fb8856ff85097b8aef4af31f6032a4972adbf255cbc2dc8a7a69d0ba540ed2",
+  "replay_command": "cd /tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z && node verify.mjs .",
+  "replay_exit_code": 0,
+  "failures": {
+    "managed_ctx_exec_throughput_ratio": 1.2910628169223395,
+    "throughput_aa_ceiling": 1.25,
+    "sdk_retained_baseline_closed_positive": [0, 1, 2],
+    "sdk_retained_expected": [0, 0, 1]
+  },
+  "held_checks": {
+    "frozen_hashes": "9/9",
+    "raw_hashes": "72/72",
+    "allocation_ratio_count": "3/3",
+    "cleanup_walls": [0, 0, 0],
+    "sdk_post_close_rejections": "2902/2902"
+  },
+  "downstream_authority": "Fund DKR-P10A for throughput stability and DKR-P10B for retained-control diagnosis. Product optimization remains blocked."
+}

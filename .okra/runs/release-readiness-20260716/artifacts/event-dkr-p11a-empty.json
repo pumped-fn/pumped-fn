@@ -1,0 +1,11 @@
+{
+  "type": "event",
+  "event_type": "dkr_empty_event",
+  "unit_id": "DKR-P11A",
+  "observed_at": "2026-07-16T08:04:00Z",
+  "cause": "Complete sample-to-stack closure failed for four immutable profiles, so the analyzer returned no attribution instead of dropping or inventing evidence.",
+  "evidence_refs_or_hashes": [
+    "workers/dkr-p11a-allocation-stack-attribution/checkpoint.v1.json#sha256=e0b05a9a6d243b2ea717aaf1a4edcc255bd62a7821ad0d434224303af7db8f9a",
+    "workers/validator-dkr-p11a/verification.v1.json#sha256=9a7983a0e36f71a4a87ddcec54616fc15ff84f25c50509eba54e31ad6b2a5741"
+  ]
+}

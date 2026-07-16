@@ -1,0 +1,28 @@
+{
+  "type": "claim_acceptance",
+  "unit_id": "DKR-P13",
+  "accepted_at": "2026-07-16T08:46:25Z",
+  "accepted_scope": "The semantics-proven lazy-cancellation counterfactual, its independently replayed aggregate gains, and its SDK allocation ceiling breach are accepted. Product progression and integrated-target claims are rejected.",
+  "checkpoint_ref": "workers/dkr-p13-lazy-cancellation-counterfactual/checkpoint.v1.json",
+  "checkpoint_sha256": "9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e",
+  "verification_ref": "workers/validator-dkr-p13/verification.v1.txt",
+  "verification_sha256": "7adb777038c9b8988ea87943b536fc339870dd5bc6001af85ccf017762acee6b",
+  "reads": {
+    "throughput_geometric_mean": 1.3543167113879728,
+    "throughput_target_minimum": 1.1,
+    "allocation_geometric_mean": 0.6819184733486838,
+    "allocation_target_maximum": 0.9,
+    "sdk_allocation_ratio": 1.101987679622239,
+    "allocation_per_row_ceiling": 1.05,
+    "retained_controls_held": true,
+    "cleanup_wall_count": 0,
+    "integrated_target": false
+  },
+  "decision": "rejected_sdk_allocation_ceiling",
+  "wall_gate": {
+    "verdict": "breached_candidate_performance_wall",
+    "downstream_advance": "blocked_for_product_progression",
+    "decided_at": "2026-07-16T08:46:25Z"
+  },
+  "downstream_authority": "Use an independent challenger to select one smaller counterfactual. Do not waive the SDK allocation ceiling, rerun P13 favorably, or progress its composite patch."
+}

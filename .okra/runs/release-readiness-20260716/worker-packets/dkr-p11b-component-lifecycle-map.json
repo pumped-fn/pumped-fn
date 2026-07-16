@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "unit_id": "DKR-P11B",
+  "worker_kind": "DKR",
+  "model_phrasing": "gpt-5 family detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4",
+  "frame": {
+    "objective": "Map each candidate component to actual lifecycle-row use and define separable next variants without changing product code.",
+    "anti_goals": {
+      "full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"
+    },
+    "action_envelope": {
+      "allowed": ["Read the exact candidate diff, Lite source, lifecycle workloads, and accepted comparison."],
+      "forbidden": ["Edit files, create product variants, observe performance, change targets, commit, push, merge, release, publish, or deploy."],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human may change targets or authority."
+  },
+  "active_anti_goals": ["AG-INTEGRITY", "AG-PERF-CLAIM", "AG-CLEANUP-EFFECT", "AG-SESSION-ISOLATION", "AG-BENCHMARK-BRANCH", "AG-STYLE"],
+  "current_state": {
+    "candidate_diff_sha256": "3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599",
+    "candidate_file": "pkg/core/lite/src/scope.ts",
+    "workloads": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/workloads.mjs",
+    "performance_reads": {
+      "scope_run": {"throughput": 1.1309318302981737, "allocation": 0.7225299722621876},
+      "managed_ctx_exec": {"throughput": 0.9517086385704321, "allocation": 1.065984527077614},
+      "sdk_session_run": {"throughput": 1.0717674512804352, "allocation": 1.0960133932263103}
+    }
+  },
+  "previous_dkr_checkpoint": {
+    "candidate_review": "The prior read-only review recommended zero-tag seedTags plus seven lazy lifecycle collections and deferred AbortController work.",
+    "comparison_failure": "artifacts/reject-pkr-p2.v1.json"
+  },
+  "assignment": "Trace the three workload rows through ExecutionContextImpl and make a component-use table for seedTags and each of cleanups, resources, resourceListeners, resourceControllers, descendants, activeIterators, and children. For every component and row, state whether the baseline allocates it eagerly, whether the candidate materializes it, how many contexts exercise it, and which semantic gates guard it. Partition the current diff into independently buildable variants with exact hunks: seedTags only; never-used collections only; ownership collections only; and any smaller split supported by the row map. Rank variants by expected allocation impact, throughput impact, semantic risk, and ability to explain the observed row divergence. Review the deferred AbortController idea only as a separate future DKR candidate, not as authorized work. Do not claim performance from source inspection.",
+  "budget_and_stop_rule": {
+    "wall_clock": "20m",
+    "route_cap": 1,
+    "stop": "Stop after one complete row-component map and at most four separable candidate variants."
+  },
+  "hand_back_rule": "Hand back if a component cannot be mapped without runtime evidence; name that exact evidence gap.",
+  "worker_progress": ".okra/runs/release-readiness-20260716/workers/dkr-p11b-component-lifecycle-map/progress.jsonl",
+  "worker_progress_command": "/home/lagz0ne/dev/okr/skills/reverse-tornado-okr/scripts/okra-store.sh worker-report dkr-p11b-component-lifecycle-map <payload.json> .okra/runs/release-readiness-20260716",
+  "output_schema": {
+    "required": ["row_component_table", "variant_table", "exact_hunk_refs", "semantic_gate_map", "questions_answered", "questions_unanswered", "candidate_next_measurement", "claim_boundary", "workspace_effect"],
+    "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  }
+}

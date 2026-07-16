@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "unit_id": "VALIDATOR-PKR-P1-ROLLBACK",
+  "worker_kind": "verification",
+  "frame": {
+    "objective": "Validate the dead-candidate rollback without editing.",
+    "anti_goals": {"full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"},
+    "action_envelope": {"allowed": ["Read hashes and diff only."], "forbidden": ["Edit, test, commit, push, merge, release, publish, or deploy."], "permission_owner": "User and runtime"},
+    "human_confirmation_boundary": "Only the human changes authority."
+  },
+  "active_anti_goals": ["AG-INTEGRITY", "AG-INDEPENDENCE", "AG-PRESERVATION", "AG-AUTHORITY"],
+  "current_state": {"workspace": "/tmp/session-kernel-publish-20260715-0746", "file": "pkg/core/lite/src/scope.ts", "expected_baseline_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e", "preserved_candidate_sha256": "a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65"},
+  "previous_dkr_checkpoint": {"dead_hypothesis": "workers/challenger-performance-component-isolation/progress.jsonl#seq=1"},
+  "assignment": "Verify the workspace scope.ts hash equals the exact commit 293dcdf2 blob hash, git diff 293dcdf2 for that path is empty, the preserved content ref reads hash a6fb78..., and no other product path changed after the rollback.",
+  "budget_and_stop_rule": "One read, 5 minutes.",
+  "hand_back_rule": "Reject any mismatch; do not repair.",
+  "output_schema": "Compact immutable report under /tmp with hash and accepted/rejected summary.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

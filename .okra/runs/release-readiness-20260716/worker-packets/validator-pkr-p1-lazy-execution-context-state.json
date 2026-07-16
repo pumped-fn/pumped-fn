@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "unit_id": "VALIDATOR-PKR-P1",
+  "worker_kind": "verification",
+  "model_phrasing": "gpt-5 family detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4",
+  "frame": {
+    "objective": "Validate or reject the PKR-P1 semantic-gate and narrow-diff claims without editing.",
+    "anti_goals": {
+      "full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"
+    },
+    "action_envelope": {
+      "allowed": ["Read the one-file candidate diff and replay each named focused gate once."],
+      "forbidden": ["Edit or fix files, measure performance, rerun until green, commit, push, merge, release, publish, or deploy."],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human may change targets or authority."
+  },
+  "active_anti_goals": ["AG-INTEGRITY", "AG-INDEPENDENCE", "AG-CLEANUP-EFFECT", "AG-SESSION-ISOLATION", "AG-CONTEXT-ARGUMENT", "AG-STYLE", "AG-REGRESSION"],
+  "current_state": {
+    "workspace": "/tmp/session-kernel-publish-20260715-0746",
+    "candidate_file": "pkg/core/lite/src/scope.ts",
+    "candidate_diff_sha256": "3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599",
+    "writer_progress_ref": ".okra/runs/release-readiness-20260716/workers/pkr-p1-lazy-execution-context-state/progress.jsonl#seq=1"
+  },
+  "previous_dkr_checkpoint": {
+    "source": ["artifacts/accept-dkr-p10a.v1.json", "artifacts/accept-dkr-p10b.v1.json"]
+  },
+  "assignment": "Replay once: candidate changed path is only pkg/core/lite/src/scope.ts; diff hash matches; git diff --check; role-tags, scope, structured-lifetime, exec-stream, SDK tests, Lite typecheck, and SDK typecheck. Deterministically inspect the diff for added comments, Object.freeze, callback/runtime ctx or scope arguments, new helpers/getters/glue types, public interface edits, and AbortController behavior edits. Reject unsupported performance claims.",
+  "budget_and_stop_rule": "One replay per claim, 15 minutes. Stop on the first deterministic result for each claim.",
+  "hand_back_rule": "Reject missing, stale, contradicted, non-replayable, or wrong-source evidence. Do not repair.",
+  "output_schema": "Use the exact audit-trace blocks from references/roles/validator.md and save one immutable verification file under /tmp.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

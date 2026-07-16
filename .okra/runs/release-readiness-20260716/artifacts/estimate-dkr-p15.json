@@ -1,0 +1,9 @@
+{
+  "estimate": {
+    "time_min": 70,
+    "turns": 1,
+    "tokens": null
+  },
+  "observed_at": "2026-07-16T09:16:00Z",
+  "dispatch_ref": "worker-packets/dkr-p15-inherited-baseline-mode.json"
+}

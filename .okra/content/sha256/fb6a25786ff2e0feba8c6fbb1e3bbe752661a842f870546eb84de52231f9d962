@@ -1,0 +1,189 @@
+claim_id: PKR-P1-CHANGED-PATH
+check: candidate changed path is only pkg/core/lite/src/scope.ts outside governed OKRA and worker evidence
+replay: git diff --name-only -- . ':(exclude).okra/**' ':(exclude)workers/**'
+exit_code: 0
+value: 1 changed product path vs threshold: exactly 1 named candidate path
+source_of_truth: git index and working tree at 1cf2211dfae614c3583840c9296567ba17642622
+sha256: a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65 pkg/core/lite/src/scope.ts
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: pkg/core/lite/src/scope.ts
+
+claim_id: PKR-P1-DIFF-HASH
+check: candidate diff hash matches the validator packet
+replay: git diff -- pkg/core/lite/src/scope.ts | sha256sum
+exit_code: 0
+value: 3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599 vs threshold: 3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599
+source_of_truth: pkg/core/lite/src/scope.ts diff and .okra/runs/release-readiness-20260716/worker-packets/validator-pkr-p1-lazy-execution-context-state.json
+sha256: 03953d8081d3ef1a3b129a87cf1206ebc6615c451f22582e249da3210f987b15 validator packet
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: 3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599  -
+
+claim_id: PKR-P1-DIFF-CHECK
+check: candidate diff has no whitespace errors
+replay: git diff --check -- pkg/core/lite/src/scope.ts
+exit_code: 0
+value: 0 diagnostics vs threshold: 0
+source_of_truth: git diff --check
+sha256: 3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599 candidate diff
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: command emitted no diagnostics
+
+claim_id: PKR-P1-ROLE-TAGS
+check: role-tag projection semantics
+replay: pnpm exec vitest run pkg/core/lite/tests/role-tags.test.ts
+exit_code: 0
+value: 14 tests passed, 0 failed vs threshold: all tests pass
+source_of_truth: pkg/core/lite/tests/role-tags.test.ts and Vitest 4.1.8
+sha256: a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65 candidate source
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: Test Files 1 passed (1); Tests 14 passed (14)
+
+claim_id: PKR-P1-SCOPE
+check: scope semantics
+replay: pnpm exec vitest run pkg/core/lite/tests/scope.test.ts
+exit_code: 0
+value: 147 tests passed, 0 failed vs threshold: all tests pass
+source_of_truth: pkg/core/lite/tests/scope.test.ts and Vitest 4.1.8
+sha256: a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65 candidate source
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: Test Files 1 passed (1); Tests 147 passed (147)
+
+claim_id: PKR-P1-STRUCTURED-LIFETIME
+check: structured lifetime cleanup and ownership semantics
+replay: pnpm exec vitest run pkg/core/lite/tests/structured-lifetime.test.ts
+exit_code: 0
+value: 26 tests passed, 0 failed vs threshold: all tests pass
+source_of_truth: pkg/core/lite/tests/structured-lifetime.test.ts and Vitest 4.1.8
+sha256: a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65 candidate source
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: Test Files 1 passed (1); Tests 26 passed (26)
+
+claim_id: PKR-P1-EXEC-STREAM
+check: execStream lifecycle semantics
+replay: pnpm exec vitest run pkg/core/lite/tests/exec-stream.test.ts
+exit_code: 0
+value: 16 tests passed, 0 failed vs threshold: all tests pass
+source_of_truth: pkg/core/lite/tests/exec-stream.test.ts and Vitest 4.1.8
+sha256: a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65 candidate source
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: Test Files 1 passed (1); Tests 16 passed (16)
+
+claim_id: PKR-P1-SDK-TESTS
+check: SDK semantic tests
+replay: pnpm exec vitest run pkg/sdk/core/tests
+exit_code: 0
+value: 8 files and 59 tests passed, 0 failed vs threshold: all tests pass
+source_of_truth: pkg/sdk/core/tests and Vitest 4.1.8
+sha256: a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65 candidate source
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: Test Files 8 passed (8); Tests 59 passed (59)
+
+claim_id: PKR-P1-LITE-TYPECHECK
+check: Lite type contract
+replay: pnpm --filter @pumped-fn/lite typecheck
+exit_code: 0
+value: tsgo --noEmit passed vs threshold: exit 0
+source_of_truth: pkg/core/lite TypeScript project
+sha256: a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65 candidate source
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: @pumped-fn/lite@5.0.0 typecheck; tsgo --noEmit
+
+claim_id: PKR-P1-SDK-TYPECHECK
+check: SDK type contract
+replay: pnpm --filter @pumped-fn/sdk typecheck
+exit_code: 0
+value: tsgo --noEmit passed vs threshold: exit 0
+source_of_truth: pkg/sdk/core TypeScript project
+sha256: a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65 candidate source
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: @pumped-fn/sdk@2.0.0 typecheck; tsgo --noEmit
+
+claim_id: PKR-P1-NO-COMMENTS
+check: no comments were added
+replay: git diff --unified=0 -- pkg/core/lite/src/scope.ts | awk '/^\+\+\+/{next} /^\+/{print substr($0,2)}' | rg '(^|[^:])//|/\*|\*/' | wc -l
+exit_code: 0
+value: 0 added comment markers vs threshold: 0
+source_of_truth: candidate diff added lines
+sha256: 3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599 candidate diff
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: 0
+
+claim_id: PKR-P1-NO-OBJECT-FREEZE
+check: no Object.freeze call was added
+replay: git diff --unified=0 -- pkg/core/lite/src/scope.ts | awk '/^\+\+\+/{next} /^\+/{print substr($0,2)}' | rg 'Object\.freeze' | wc -l
+exit_code: 0
+value: 0 added Object.freeze tokens vs threshold: 0
+source_of_truth: candidate diff added lines
+sha256: 3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599 candidate diff
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: 0
+
+claim_id: PKR-P1-NO-CONTEXT-ARGUMENTS
+check: no callback or runtime ctx or scope argument token was added
+replay: git diff --unified=0 -- pkg/core/lite/src/scope.ts | awk '/^\+\+\+/{next} /^\+/{print substr($0,2)}' | rg '(^|[^[:alnum:]_])(ctx|scope)([^[:alnum:]_]|$)' | wc -l
+exit_code: 0
+value: 0 added ctx or scope tokens vs threshold: 0
+source_of_truth: candidate diff added lines
+sha256: 3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599 candidate diff
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: 0
+
+claim_id: PKR-P1-NO-GLUE
+check: no helper function, getter, interface, or glue type declaration was added
+replay: git diff --unified=0 -- pkg/core/lite/src/scope.ts | awk '/^\+\+\+/{next} /^\+/{print substr($0,2)}' | rg '^\s*(function|interface|type)\b|^\s*(public\s+)?get\s+[A-Za-z_$][A-Za-z0-9_$]*\s*\(' | wc -l
+exit_code: 0
+value: 0 added helper or glue declarations vs threshold: 0
+source_of_truth: candidate diff added lines
+sha256: 3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599 candidate diff
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: 0
+
+claim_id: PKR-P1-NO-PUBLIC-INTERFACE-EDIT
+check: no export, interface, or namespace declaration was added or removed
+replay: git diff --unified=0 -- pkg/core/lite/src/scope.ts | awk '/^---|^\+\++/{next} /^[+-]/{print substr($0,2)}' | rg '^\s*(export|interface|namespace)\b' | wc -l
+exit_code: 0
+value: 0 changed public-shape declaration markers vs threshold: 0
+source_of_truth: candidate diff changed lines
+sha256: 3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599 candidate diff
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: 0
+
+claim_id: PKR-P1-NO-ABORT-BEHAVIOR-EDIT
+check: no AbortController or abort behavior line was added or removed
+replay: git diff --unified=0 -- pkg/core/lite/src/scope.ts | awk '/^---|^\+\++/{next} /^[+-]/{print substr($0,2)}' | rg 'AbortController|abortController|\bthis\.abort\s*\(' | wc -l
+exit_code: 0
+value: 0 changed abort behavior markers vs threshold: 0
+source_of_truth: candidate diff changed lines
+sha256: 3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599 candidate diff
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: 0
+
+claim_id: PKR-P1-PERFORMANCE-CLAIM-BOUNDARY
+check: candidate source diff makes no unsupported performance-result claim
+replay: git diff --unified=0 -- pkg/core/lite/src/scope.ts | awk '/^\+\+\+/{next} /^\+/{print substr($0,2)}' | rg -i 'throughput|allocation ratio|performance target|benchmark result|retained memory' | wc -l
+exit_code: 0
+value: 0 performance-result claim markers vs threshold: 0
+source_of_truth: candidate diff added lines
+sha256: 3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599 candidate diff; 378960b4bfc150d169c275bdc590b03b1bc95d937416f5f5577842689db6e5e3 writer progress
+observed_at: 2026-07-16T07:30:19Z
+decision: accepted
+evidence: 0; writer progress says performance_claim_made false
+
+DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.
+17 accepted, 0 rejected; rejected claim_ids: none

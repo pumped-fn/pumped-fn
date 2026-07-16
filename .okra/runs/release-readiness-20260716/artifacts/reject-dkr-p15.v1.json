@@ -1,0 +1,28 @@
+{
+  "type": "claim_acceptance",
+  "unit_id": "DKR-P15",
+  "accepted_at": "2026-07-16T09:49:52Z",
+  "accepted_scope": "The frozen performance evidence, calculations, lifecycle walls, source boundary, and product preservation are independently accepted. Semantic acceptance is rejected because the independent replay timed out in one SDK package-export test and did not reach the two typechecks.",
+  "checkpoint_ref": "workers/dkr-p15-inherited-baseline-mode/checkpoint.v1.json",
+  "checkpoint_sha256": "56a4a5435ccfc5ade38577fc3a86a49364d76faf0ffe361320f1794248b15cb2",
+  "verification_ref": "workers/validator-dkr-p15/verification.v1.json",
+  "verification_sha256": "91c8aab0d1b517d3924f3d7529df4cdd7484eee7b4f65c6fb749766cc325c2f1",
+  "reads": {
+    "throughput_geometric_mean": 1.241825781342104,
+    "allocation_geometric_mean": 0.6797858473843519,
+    "maximum_allocation_ratio": 0.996386663337797,
+    "retained_controls_held": true,
+    "cleanup_wall_count": 0,
+    "semantic_replay_exit_code": 1,
+    "sdk_tests_passed": 58,
+    "sdk_tests_total": 59,
+    "integrated_target": false
+  },
+  "decision": "rejected_pending_successful_independent_semantic_replay",
+  "wall_gate": {
+    "verdict": "performance_accepted_semantic_validation_blocked",
+    "downstream_advance": "blocked_for_product_progression",
+    "decided_at": "2026-07-16T09:49:52Z"
+  },
+  "downstream_authority": "Fund one bounded semantic validation slice that preserves the failed replay, runs the unchanged package-export test once with an explicit 60000 ms test budget, replays the remaining SDK behavior and both skipped typechecks, and performs no performance rerun or product edit."
+}

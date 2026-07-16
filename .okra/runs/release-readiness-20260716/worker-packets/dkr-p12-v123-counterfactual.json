@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "unit_id": "DKR-P12",
+  "worker_kind": "DKR",
+  "model_phrasing": "gpt-5 family detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4",
+  "frame": {
+    "objective": {
+      "metric_id": "release_readiness_gap_count",
+      "target": 0,
+      "performance_targets": {"throughput_gm_min": 1.10, "allocation_gm_max": 0.90, "allocation_row_max": 1.05, "retained_closed": 0, "cleanup_walls": 0}
+    },
+    "anti_goals": {"full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"},
+    "action_envelope": {
+      "allowed": ["Create one scratch-only V1+V2+V3 variant from exact commit 293dcdf2 and run the already frozen integrated lifecycle protocol once."],
+      "forbidden": ["Edit product, include V4 structured-execution lazy fields, alter AbortController behavior, change workloads or thresholds, rerun favorably, run 47-row benchmarks, commit, push, merge, release, publish, or deploy."],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human changes targets or authority."
+  },
+  "active_anti_goals": ["AG-INTEGRITY", "AG-PERF-COMPARISON", "AG-PERF-CLAIM", "AG-ALLOCATION-REGRESSION", "AG-RETAINED-MEMORY", "AG-CLEANUP-EFFECT", "AG-SESSION-ISOLATION", "AG-BENCHMARK-BRANCH", "AG-PRESERVATION", "AG-AUTHORITY"],
+  "current_state": {
+    "baseline_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "baseline_build": "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/build-a",
+    "p2_study": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z",
+    "variant": {
+      "include": ["V1 seedTags fast paths", "V2 lazy resourceListeners and resourceControllers", "V3 lazy resources"],
+      "exclude": ["lazy cleanups", "lazy descendants", "lazy activeIterators", "lazy children", "AbortController changes"],
+      "source_ref": "workers/dkr-p11b-component-lifecycle-map/progress.jsonl#seq=1"
+    },
+    "failed_full_candidate": "artifacts/reject-pkr-p2.v1.json"
+  },
+  "previous_dkr_checkpoint": {
+    "component_map": "artifacts/accept-dkr-p11b.v1.json",
+    "challenger": "workers/challenger-performance-component-isolation/progress.jsonl#seq=1",
+    "attribution": "artifacts/accept-dkr-p11a.v1.json"
+  },
+  "assignment": "Construct the V1+V2+V3 variant in scratch from the exact baseline using only the accepted seedTags and three resource-map hunks. Prove the variant excludes every V4 hunk and AbortController change. Build Lite and SDK with the frozen lockfile. Reuse PKR-P2's accepted throughput, allocation, retained, cleanup, provenance, target, and chronology methods without retuning. Freeze the variant patch, protocol, harness, build provenance, and verifier before the first observation. Run the single full three-row baseline-versus-V123 comparison once. Return exact per-row ratios, geometric means, retained and cleanup reads, raw hashes, and target decisions pending independent validation. Do not edit the product working tree.",
+  "budget_and_stop_rule": {"wall_clock": "50m", "route_cap": 1, "stop": "Stop after one frozen comparison, pass or fail; hand back on variant contamination or capacity failure."},
+  "hand_back_rule": "Hand back on any source hunk ambiguity or method mismatch. Do not add another variant.",
+  "worker_progress": ".okra/runs/release-readiness-20260716/workers/dkr-p12-v123-counterfactual/progress.jsonl",
+  "worker_progress_command": "/home/lagz0ne/dev/okr/skills/reverse-tornado-okr/scripts/okra-store.sh worker-report dkr-p12-v123-counterfactual <payload.json> .okra/runs/release-readiness-20260716",
+  "heartbeat_cadence_and_next_check_at": "10m; next check at 2026-07-16T08:15:00Z",
+  "output_schema": {"record_first": true, "required": ["checkpoint_id", "variant_patch_sha256", "variant_exclusion_checks", "frozen_protocol", "provenance", "raw_hashes", "throughput_rows", "throughput_geometric_mean", "allocation_rows", "allocation_geometric_mean", "retained_controls", "cleanup_walls", "target_decisions", "replay", "claim_boundary", "workspace_effect"], "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."}
+}

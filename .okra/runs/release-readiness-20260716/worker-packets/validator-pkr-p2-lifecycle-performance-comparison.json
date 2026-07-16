@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "unit_id": "VALIDATOR-PKR-P2",
+  "worker_kind": "verification",
+  "model_phrasing": "gpt-5 family detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4",
+  "frame": {
+    "objective": "Validate or reject the PKR-P2 baseline-candidate lifecycle comparison without judgement.",
+    "anti_goals": {
+      "full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"
+    },
+    "action_envelope": {
+      "allowed": ["Read and replay the frozen PKR-P2 comparison once."],
+      "forbidden": ["Edit or fix files, rerun observations, diagnose the miss, change thresholds, optimize, commit, push, merge, release, publish, or deploy."],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human may change targets or authority."
+  },
+  "active_anti_goals": ["AG-INTEGRITY", "AG-INDEPENDENCE", "AG-PERF-COMPARISON", "AG-PERF-CLAIM", "AG-ALLOCATION-REGRESSION", "AG-RETAINED-MEMORY", "AG-CLEANUP-EFFECT"],
+  "current_state": {
+    "checkpoint": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/checkpoint.v1.json",
+    "checkpoint_sha256": "c6b3842247bdd5e7ec6a31e2b4d777adbb3b4bb2d3a9c0da2653b2f9a795a3a8",
+    "candidate_patch_sha256": "3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599"
+  },
+  "previous_dkr_checkpoint": {
+    "throughput_method": "artifacts/accept-dkr-p10a.v1.json",
+    "allocation_method": "artifacts/accept-dkr-p8.v1.json",
+    "retained_method": "artifacts/accept-dkr-p10b.v1.json"
+  },
+  "assignment": "Run exactly one verifier replay. Check chronology, frozen and raw hashes, exact baseline commit and candidate-only patch provenance, accepted method hashes, 42 throughput observations and stationarity, 36 allocation observations and minimum signals, 18 retained observations, cleanup counters, equal-weight geometric means, per-row allocation ceiling, and target decisions. Accept the failure conclusion only if throughput geometric mean 1.0487701891470118 is below 1.10, allocation geometric mean 0.9450922673611655 is above 0.90, managed allocation 1.065984527077614 and SDK allocation 1.0960133932263103 exceed 1.05, while retained and cleanup walls hold. Reject any improvement or release-readiness claim.",
+  "budget_and_stop_rule": "One replay, 15 minutes. Stop at the first deterministic result.",
+  "hand_back_rule": "Reject missing, stale, contradicted, non-replayable, or wrong-source evidence. Do not repair.",
+  "output_schema": "Use the exact audit-trace blocks from references/roles/validator.md and save one immutable verification file under /tmp.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

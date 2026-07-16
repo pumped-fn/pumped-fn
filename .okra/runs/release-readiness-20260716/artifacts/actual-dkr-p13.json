@@ -1,0 +1,9 @@
+{
+  "actual": {
+    "time_min": 20,
+    "turns": 1,
+    "tokens": null
+  },
+  "observed_at": "2026-07-16T08:46:25Z",
+  "result_ref": "artifacts/reject-dkr-p13.v1.json"
+}

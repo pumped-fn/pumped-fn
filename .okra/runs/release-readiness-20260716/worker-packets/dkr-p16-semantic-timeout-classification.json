@@ -1,0 +1,28 @@
+{
+  "worker_id": "dkr-p16-semantic-timeout-classification",
+  "worker_kind": "discovery",
+  "unit_id": "DKR-P16",
+  "objective": "Determine whether P15's independent semantic failure is an SDK package-export timeout-budget fault or a candidate semantic failure, without rerunning performance or editing product source.",
+  "inputs": {
+    "candidate_root": "/tmp/validator-dkr-p15-inherited-baseline-mode-20260716T095000Z/semantic-replay-build",
+    "candidate_scope_sha256": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611",
+    "failed_validation_ref": "/tmp/validator-dkr-p15-inherited-baseline-mode-20260716T095000Z/verification.v1.json",
+    "failed_validation_sha256": "91c8aab0d1b517d3924f3d7529df4cdd7484eee7b4f65c6fb749766cc325c2f1"
+  },
+  "predeclared_method": {
+    "observations": 1,
+    "package_export_command": "pnpm --filter @pumped-fn/sdk exec vitest run tests/package-exports.test.ts --testTimeout=60000",
+    "remaining_sdk_command": "pnpm --filter @pumped-fn/sdk exec vitest run tests --exclude tests/package-exports.test.ts",
+    "lite_typecheck_command": "pnpm --filter @pumped-fn/lite typecheck:full",
+    "sdk_typecheck_command": "pnpm --filter @pumped-fn/sdk typecheck",
+    "acceptance": "All four commands exit zero, the candidate hashes remain unchanged, and no product or performance evidence changes."
+  },
+  "anti_goals": [
+    "Do not rerun throughput, allocation, retained, cleanup, or the 47-row benchmark.",
+    "Do not edit product, test, benchmark, configuration, PR, Git, or prior evidence.",
+    "Do not change the package-export assertion or omit failed commands.",
+    "Do not repeat an observation until favorable.",
+    "Do not claim product progression or release readiness."
+  ],
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

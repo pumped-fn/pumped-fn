@@ -1,0 +1,406 @@
+{
+  "schema": "pumped-fn.okra.discovery-checkpoint.v1",
+  "checkpoint_id": "DKR-P16.semantic-timeout-classification.2026-07-16T09:53:54.053Z",
+  "conclusion_id": "DKR-P16-SEMANTIC-TIMEOUT-CLASSIFICATION",
+  "unit_id": "DKR-P16",
+  "decision_target": "Classify the one P15 SDK timeout using four predeclared one-shot semantic commands.",
+  "source_of_truth": [
+    "/tmp/session-kernel-publish-20260715-0746/.okra/runs/release-readiness-20260716/worker-packets/dkr-p16-semantic-timeout-classification.json",
+    "/tmp/validator-dkr-p15-inherited-baseline-mode-20260716T095000Z/verification.v1.json",
+    "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/protocol.json",
+    "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/frozen.json",
+    "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/before.snapshot.json",
+    "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/after.snapshot.json",
+    "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands"
+  ],
+  "read_method": "Replay frozen method and hashes, require the four exact one-shot commands, and compare candidate and product snapshots.",
+  "observed_at": "2026-07-16T09:53:54.053Z",
+  "recorded_at": "2026-07-16T09:53:54.053Z",
+  "max_age": "PT24H",
+  "freshness_status": "fresh",
+  "confidence": 0.98,
+  "evidence_refs_or_hashes": [
+    "sha256:52ea6c7d8b66e8753b47f089312c99bc782ea6f0dad5cd326471663e05284404",
+    "sha256:91c8aab0d1b517d3924f3d7529df4cdd7484eee7b4f65c6fb749766cc325c2f1",
+    "sha256:f5cb62716ac10963fb518d49f8b5d206d780eb697889ef54d722715e1b3fd092",
+    "sha256:cdda2b97de9a24e949b37c6c4bb7060cc0c4edb659bb5077f266e04fc391721f",
+    "sha256:77320f54ed8da557e7099099cd6ba671f5ed3834849764ad51a76edc1cd20d89",
+    "sha256:2bf9d1e1a811fd4bb6d5770576262040b0136e8de38ffc162a1acef42158d2b8",
+    "sha256:2699c82ac0842d58a4ea754ff4a8b8ab26723ff23ce3353603531a58e1a03987"
+  ],
+  "replay_command_or_checker": "cd /tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z && node verify.mjs . --check",
+  "questions_answered": [
+    "Does the package-export test pass once under the predeclared 60000 ms timeout?",
+    "Do the remaining SDK tests pass once with package exports excluded?",
+    "Do Lite and SDK typechecks pass once?",
+    "Do candidate and product source hashes remain unchanged?"
+  ],
+  "questions_unanswered": [
+    "Whether the default 5000 ms timeout should change in product configuration.",
+    "Whether the established 47-row benchmark passes.",
+    "Whether the scratch candidate should progress into product."
+  ],
+  "command_results": [
+    {
+      "schema": "pumped-fn.dkr-p16.command.v1",
+      "label": "package-export-timeout-60000",
+      "cwd": "/tmp/validator-dkr-p15-inherited-baseline-mode-20260716T095000Z/semantic-replay-build",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@pumped-fn/sdk",
+        "exec",
+        "vitest",
+        "run",
+        "tests/package-exports.test.ts",
+        "--testTimeout=60000"
+      ],
+      "startedAt": "2026-07-16T09:53:32.001Z",
+      "finishedAt": "2026-07-16T09:53:47.417Z",
+      "durationMilliseconds": 15416.615278,
+      "exitCode": 0,
+      "signal": null,
+      "stdoutPath": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands/package-export-timeout-60000.stdout.log",
+      "stdoutSha256": "c9748ce41b84dc3dfe9727068414965a1c5b63309f7a312972d64c1e9e296de2",
+      "stdoutSize": 282,
+      "stderrPath": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands/package-export-timeout-60000.stderr.log",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSize": 0,
+      "metadataPath": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands/package-export-timeout-60000.json",
+      "metadataSha256": "cdda2b97de9a24e949b37c6c4bb7060cc0c4edb659bb5077f266e04fc391721f",
+      "commandMatched": true,
+      "stdoutHashMatched": true,
+      "stderrHashMatched": true
+    },
+    {
+      "schema": "pumped-fn.dkr-p16.command.v1",
+      "label": "remaining-sdk-tests",
+      "cwd": "/tmp/validator-dkr-p15-inherited-baseline-mode-20260716T095000Z/semantic-replay-build",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@pumped-fn/sdk",
+        "exec",
+        "vitest",
+        "run",
+        "tests",
+        "--exclude",
+        "tests/package-exports.test.ts"
+      ],
+      "startedAt": "2026-07-16T09:53:47.458Z",
+      "finishedAt": "2026-07-16T09:53:50.256Z",
+      "durationMilliseconds": 2799.450621,
+      "exitCode": 0,
+      "signal": null,
+      "stdoutPath": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands/remaining-sdk-tests.stdout.log",
+      "stdoutSha256": "0897b9ca170badd8e4f973ac691706494c577faef2cefe1650af735f7b1b358e",
+      "stdoutSize": 285,
+      "stderrPath": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands/remaining-sdk-tests.stderr.log",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSize": 0,
+      "metadataPath": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands/remaining-sdk-tests.json",
+      "metadataSha256": "77320f54ed8da557e7099099cd6ba671f5ed3834849764ad51a76edc1cd20d89",
+      "commandMatched": true,
+      "stdoutHashMatched": true,
+      "stderrHashMatched": true
+    },
+    {
+      "schema": "pumped-fn.dkr-p16.command.v1",
+      "label": "lite-typecheck-full",
+      "cwd": "/tmp/validator-dkr-p15-inherited-baseline-mode-20260716T095000Z/semantic-replay-build",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@pumped-fn/lite",
+        "typecheck:full"
+      ],
+      "startedAt": "2026-07-16T09:53:50.314Z",
+      "finishedAt": "2026-07-16T09:53:52.339Z",
+      "durationMilliseconds": 2025.01118,
+      "exitCode": 0,
+      "signal": null,
+      "stdoutPath": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands/lite-typecheck-full.stdout.log",
+      "stdoutSha256": "5ab830d38ad142e3cdfc8957423c75bbbaff41bbf30899bbebbb9561c23174ee",
+      "stdoutSize": 179,
+      "stderrPath": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands/lite-typecheck-full.stderr.log",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSize": 0,
+      "metadataPath": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands/lite-typecheck-full.json",
+      "metadataSha256": "2bf9d1e1a811fd4bb6d5770576262040b0136e8de38ffc162a1acef42158d2b8",
+      "commandMatched": true,
+      "stdoutHashMatched": true,
+      "stderrHashMatched": true
+    },
+    {
+      "schema": "pumped-fn.dkr-p16.command.v1",
+      "label": "sdk-typecheck",
+      "cwd": "/tmp/validator-dkr-p15-inherited-baseline-mode-20260716T095000Z/semantic-replay-build",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@pumped-fn/sdk",
+        "typecheck"
+      ],
+      "startedAt": "2026-07-16T09:53:52.400Z",
+      "finishedAt": "2026-07-16T09:53:54.053Z",
+      "durationMilliseconds": 1653.832364,
+      "exitCode": 0,
+      "signal": null,
+      "stdoutPath": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands/sdk-typecheck.stdout.log",
+      "stdoutSha256": "53efdc71086afb5799178ff1220f7b549386cefe6bf042d5b5a7c8b900f31cd5",
+      "stdoutSize": 150,
+      "stderrPath": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands/sdk-typecheck.stderr.log",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSize": 0,
+      "metadataPath": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands/sdk-typecheck.json",
+      "metadataSha256": "2699c82ac0842d58a4ea754ff4a8b8ab26723ff23ce3353603531a58e1a03987",
+      "commandMatched": true,
+      "stdoutHashMatched": true,
+      "stderrHashMatched": true
+    }
+  ],
+  "preservation": {
+    "candidate_checks": {
+      "scope": {
+        "before": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611",
+        "after": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611",
+        "matched": true
+      },
+      "semanticTest": {
+        "before": "132f76211b1bfdce329d454ef3e22fca7813493d97244bf482a64ac586b92b3e",
+        "after": "132f76211b1bfdce329d454ef3e22fca7813493d97244bf482a64ac586b92b3e",
+        "matched": true
+      },
+      "packageExportTest": {
+        "before": "1670af50c3d86e89340fb109881f00cc49aa5c1e2eada5a35b9ed98fe2360458",
+        "after": "1670af50c3d86e89340fb109881f00cc49aa5c1e2eada5a35b9ed98fe2360458",
+        "matched": true
+      },
+      "liteSourceManifest": {
+        "before": "f36c7f52bc3a886bbeeeab2445617a623d945f08fb624889ce6873486888c6db",
+        "after": "f36c7f52bc3a886bbeeeab2445617a623d945f08fb624889ce6873486888c6db",
+        "matched": true
+      },
+      "sdkSourceManifest": {
+        "before": "416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099",
+        "after": "416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099",
+        "matched": true
+      },
+      "liteTestManifest": {
+        "before": "569f207154836bb7c9dbfd955540bfc5b6dad179dcbf9ddf07d1ccc7d19599ed",
+        "after": "569f207154836bb7c9dbfd955540bfc5b6dad179dcbf9ddf07d1ccc7d19599ed",
+        "matched": true
+      },
+      "sdkTestManifest": {
+        "before": "a27dd1819cbb856cbefcb59ddbd298e03181aa799492a191fcea3462880c2e12",
+        "after": "a27dd1819cbb856cbefcb59ddbd298e03181aa799492a191fcea3462880c2e12",
+        "matched": true
+      },
+      "lockfile": {
+        "before": "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120",
+        "after": "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120",
+        "matched": true
+      },
+      "litePackage": {
+        "before": "d7fb756b7688a355a0ba6e7604a19c1269728527dc040b75f07f87c486b0efb4",
+        "after": "d7fb756b7688a355a0ba6e7604a19c1269728527dc040b75f07f87c486b0efb4",
+        "matched": true
+      },
+      "sdkPackage": {
+        "before": "c11f17b6ecd8746faa837ab92bf4489170dceede5add3062686ba8162e65e6c3",
+        "after": "c11f17b6ecd8746faa837ab92bf4489170dceede5add3062686ba8162e65e6c3",
+        "matched": true
+      }
+    },
+    "candidate_preserved": true,
+    "product_preserved": true,
+    "prior_failed_validation_preserved": true,
+    "product_source_diff_before": 0,
+    "product_source_diff_after": 0
+  },
+  "frozen_method": {
+    "frozen_at": "2026-07-16T09:53:26.325Z",
+    "first_command_at": "2026-07-16T09:53:32.001Z",
+    "chronology_held": true,
+    "frozen_checks": [
+      {
+        "file": "protocol.json",
+        "expected": "54ef8707e73552cda3b207f1095326db857fd2c7b59a5f18e8e9027c04fb368a",
+        "actual": "54ef8707e73552cda3b207f1095326db857fd2c7b59a5f18e8e9027c04fb368a",
+        "matched": true
+      },
+      {
+        "file": "snapshot.mjs",
+        "expected": "02ed014023c9c2d66d2be71c5a3b5a16c58cdd982a9df1951f63c85d33f6a9ea",
+        "actual": "02ed014023c9c2d66d2be71c5a3b5a16c58cdd982a9df1951f63c85d33f6a9ea",
+        "matched": true
+      },
+      {
+        "file": "record-command.mjs",
+        "expected": "4b7c4dc0b4e64045a3dd9c9bedfac6f0f04d5102e209e1c0cbaf5834d4a3c13f",
+        "actual": "4b7c4dc0b4e64045a3dd9c9bedfac6f0f04d5102e209e1c0cbaf5834d4a3c13f",
+        "matched": true
+      },
+      {
+        "file": "run-once.sh",
+        "expected": "fcf615b88fbbf102856d25d64f943148bbeea401a45529d7e11f5eccf1d2bc4f",
+        "actual": "fcf615b88fbbf102856d25d64f943148bbeea401a45529d7e11f5eccf1d2bc4f",
+        "matched": true
+      },
+      {
+        "file": "verify.mjs",
+        "expected": "a77c89044fa5d61122ce184954e35a724aa812ceaa016a9011dd21db304d2a72",
+        "actual": "a77c89044fa5d61122ce184954e35a724aa812ceaa016a9011dd21db304d2a72",
+        "matched": true
+      },
+      {
+        "file": "before.snapshot.json",
+        "expected": "091ddfb0df9ebf1a424abe01b99ff9486ecdec3ad11de7b0ac27f16607187670",
+        "actual": "091ddfb0df9ebf1a424abe01b99ff9486ecdec3ad11de7b0ac27f16607187670",
+        "matched": true
+      }
+    ],
+    "input_checks": {
+      "workerPacket": true,
+      "failedValidation": true,
+      "expectedScope": true,
+      "expectedSemanticTest": true,
+      "expectedPackageExportTest": true
+    },
+    "command_integrity_held": true
+  },
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-SEMANTIC-CLASSIFICATION",
+    "AG-PRESERVATION",
+    "AG-BENCHMARK-BRANCH",
+    "AG-AUTHORITY",
+    "AG-SINGLE-LLM-TRUTH"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "metric_id": "AG-INTEGRITY",
+      "source_of_truth": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/frozen.json and commands",
+      "read_method": "Replay frozen file, command, stdout, stderr, chronology, and input hashes.",
+      "observed_at": "2026-07-16T09:53:54.053Z",
+      "recorded_at": "2026-07-16T09:53:54.053Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "held_pending_independent_validation",
+      "evidence_ref": "sha256:f5cb62716ac10963fb518d49f8b5d206d780eb697889ef54d722715e1b3fd092",
+      "replay_command_or_checker": "cd /tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-SEMANTIC-CLASSIFICATION",
+      "source_of_truth": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/commands",
+      "read_method": "Require each of four predeclared commands to execute exactly once and exit zero.",
+      "observed_at": "2026-07-16T09:53:54.053Z",
+      "recorded_at": "2026-07-16T09:53:54.053Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "held_pending_independent_validation",
+      "evidence_ref": "sha256:f5cb62716ac10963fb518d49f8b5d206d780eb697889ef54d722715e1b3fd092",
+      "replay_command_or_checker": "cd /tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PRESERVATION",
+      "source_of_truth": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/before.snapshot.json and after.snapshot.json",
+      "read_method": "Compare candidate source/test/manifests and product source against exact head.",
+      "observed_at": "2026-07-16T09:53:54.053Z",
+      "recorded_at": "2026-07-16T09:53:54.053Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "held_pending_independent_validation",
+      "evidence_ref": "sha256:f5cb62716ac10963fb518d49f8b5d206d780eb697889ef54d722715e1b3fd092",
+      "replay_command_or_checker": "cd /tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-BENCHMARK-BRANCH",
+      "source_of_truth": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/protocol.json",
+      "read_method": "Confirm no performance or established benchmark command appears in the frozen command set.",
+      "observed_at": "2026-07-16T09:53:54.053Z",
+      "recorded_at": "2026-07-16T09:53:54.053Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "held_pending_independent_validation",
+      "evidence_ref": "sha256:f5cb62716ac10963fb518d49f8b5d206d780eb697889ef54d722715e1b3fd092",
+      "replay_command_or_checker": "cd /tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-AUTHORITY",
+      "source_of_truth": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/protocol.json",
+      "read_method": "Confirm scratch-only writes and no product, Git, PR, merge, release, or publish action.",
+      "observed_at": "2026-07-16T09:53:54.053Z",
+      "recorded_at": "2026-07-16T09:53:54.053Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "held_pending_independent_validation",
+      "evidence_ref": "sha256:f5cb62716ac10963fb518d49f8b5d206d780eb697889ef54d722715e1b3fd092",
+      "replay_command_or_checker": "cd /tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-SINGLE-LLM-TRUTH",
+      "source_of_truth": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/checkpoint.v1.json",
+      "read_method": "Keep the worker conclusion pending independent acceptance.",
+      "observed_at": "2026-07-16T09:53:54.053Z",
+      "recorded_at": "2026-07-16T09:53:54.053Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "held_pending_independent_validation",
+      "evidence_ref": "sha256:f5cb62716ac10963fb518d49f8b5d206d780eb697889ef54d722715e1b3fd092",
+      "replay_command_or_checker": "cd /tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "held_pending_independent_validation",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-16T09:53:54.053Z"
+  },
+  "decision": "timeout_budget_fault_supported_pending_independent_acceptance",
+  "decision_detail": "The package-export test passed under the predeclared 60000 ms timeout, the remaining SDK tests and both typechecks passed, and candidate/product hashes stayed unchanged. This supports classifying P15's lone failure as a timeout-budget fault rather than a reproduced candidate semantic failure.",
+  "flag_if_missing_or_stale": "Block downstream progression and rerun only under a newly governed DKR.",
+  "reviewer_audit_status": "pending_independent_validation",
+  "rejected_claim_classes": [
+    "fabricated-conclusion",
+    "superficial",
+    "tautological",
+    "false-positive",
+    "unsupported",
+    "single-LLM-truth"
+  ],
+  "claim_boundary": "This DKR may classify the timeout evidence pending independent acceptance. It cannot accept product progression, release readiness, or a performance claim.",
+  "workspace_effect": {
+    "scratch_root": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z",
+    "performance_reruns": 0,
+    "product_edits": 0,
+    "test_or_config_edits": 0,
+    "git_or_pr_edits": 0,
+    "release_actions": 0,
+    "favorable_repeats": 0
+  },
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

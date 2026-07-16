@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "unit_id": "DKR-P11A",
+  "worker_kind": "DKR",
+  "model_phrasing": "gpt-5 family detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4",
+  "frame": {
+    "objective": "Identify replayable allocation-stack deltas that explain why the full candidate regressed managed and SDK rows.",
+    "anti_goals": {
+      "full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"
+    },
+    "action_envelope": {
+      "allowed": ["Read PKR-P2 frozen allocation profiles and product source; create a deterministic scratch analyzer under /tmp."],
+      "forbidden": ["Edit product or prior evidence, observe new performance runs, change thresholds, optimize, commit, push, merge, release, publish, or deploy."],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human may change targets or authority."
+  },
+  "active_anti_goals": ["AG-INTEGRITY", "AG-PERF-COMPARISON", "AG-PERF-CLAIM", "AG-ALLOCATION-REGRESSION", "AG-PRESERVATION"],
+  "current_state": {
+    "accepted_failure_ref": "artifacts/reject-pkr-p2.v1.json",
+    "study_root": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z",
+    "checkpoint_sha256": "c6b3842247bdd5e7ec6a31e2b4d777adbb3b4bb2d3a9c0da2653b2f9a795a3a8",
+    "raw_manifest_sha256": "486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+    "failed_rows": {
+      "managed_ctx_exec": 1.065984527077614,
+      "sdk_session_run": 1.0960133932263103
+    }
+  },
+  "previous_dkr_checkpoint": {
+    "allocation_method": "artifacts/accept-dkr-p8.v1.json",
+    "comparison_failure": "artifacts/reject-pkr-p2.v1.json"
+  },
+  "assignment": "Build one deterministic analyzer for the existing P2 allocation profiles. Verify all source hashes first. Map every sample nodeId to its complete normalized stack. For each row, variant, and trial, aggregate samples[].size by normalized stack and by leaf call frame; apply the matched zero correction at the same normalized key and clamp negative keys to zero. Report medians across three trials, candidate-minus-baseline bytes per operation, percentage of the total delta explained by the top stacks, and whether each top stack belongs to candidate Lite code, Node runtime, SDK code, or the workload harness. Preserve exact file/function/line evidence. Distinguish a code-location correlation from a causal claim. Return the smallest next measurement that the attribution supports. Do not observe new profiles or edit the candidate.",
+  "budget_and_stop_rule": {
+    "wall_clock": "20m",
+    "route_cap": 1,
+    "stop": "Stop after one analyzer run over the immutable 36 allocation observations, or return replayable empty attribution if sampling cannot localize the delta."
+  },
+  "hand_back_rule": "Hand back if stack identity cannot be normalized across baseline and candidate or if attribution would require a new observation.",
+  "worker_progress": ".okra/runs/release-readiness-20260716/workers/dkr-p11a-allocation-stack-attribution/progress.jsonl",
+  "worker_progress_command": "/home/lagz0ne/dev/okr/skills/reverse-tornado-okr/scripts/okra-store.sh worker-report dkr-p11a-allocation-stack-attribution <payload.json> .okra/runs/release-readiness-20260716",
+  "output_schema": {
+    "record_first": true,
+    "required": ["checkpoint_id", "source_hashes", "replay", "normalization_method", "row_deltas", "top_stacks", "coverage", "questions_answered", "questions_unanswered", "candidate_next_measurement", "claim_boundary", "workspace_effect"],
+    "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  }
+}

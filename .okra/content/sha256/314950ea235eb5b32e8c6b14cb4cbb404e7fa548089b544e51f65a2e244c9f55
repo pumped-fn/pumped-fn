@@ -1,0 +1,153 @@
+validator_role: OKRA validator
+unit_id: DKR-P12
+observed_at: 2026-07-16T08:24:02Z
+scratch: /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z
+replay: cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check
+replay_exit_code: 0
+replay_output: {"replay":"passed","integratedTarget":false,"throughputGeometricMean":1.011645384781946,"allocationGeometricMean":0.91324586128266,"rawObservationCount":96,"rawManifestSha256":"81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4"}
+
+claim_id: DKR-P12-checkpoint-hash
+check: frozen checkpoint has the expected identity
+replay: sha256sum /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/checkpoint.v1.json
+exit_code: 0
+value: e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950 vs threshold: e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950
+source_of_truth: /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/checkpoint.v1.json
+sha256: e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950
+observed_at: 2026-07-16T08:24:02Z
+decision: accepted
+evidence: expected and observed checkpoint hashes are identical
+
+claim_id: DKR-P12-deterministic-replay
+check: recorded checkpoint exactly equals the checkpoint recalculated from the frozen protocol, provenance, exclusions, chronology, and raw observations
+replay: cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check
+exit_code: 0
+value: replay passed vs threshold: replay passed
+source_of_truth: /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/verify.mjs and checkpoint.v1.json
+sha256: verify.mjs=f310fc5baeecd2b9ff0be4707da2ea15bd7af81b062f8896297854de5556fdba; checkpoint=e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950
+observed_at: 2026-07-16T08:24:02Z
+decision: accepted
+evidence: {"replay":"passed","integratedTarget":false,"throughputGeometricMean":1.011645384781946,"allocationGeometricMean":0.91324586128266,"rawObservationCount":96,"rawManifestSha256":"81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4"}
+
+claim_id: DKR-P12-protocol-and-provenance
+check: exact-head baseline, archive, source, lockfile, manifests, dist, declarations, frozen files, and observation chronology all match their recorded hashes
+replay: cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check
+exit_code: 0
+value: every provenance and frozen check true; observation count at freeze 0 vs threshold: every check true and no observation before freeze
+source_of_truth: protocol.json, provenance.json, frozen.json, chronology.json
+sha256: protocol=1ad184e88d999c16f3d74555f7eaf7c6a6fab7fab681c615502d28513716b4fc; provenance=6942372d11dd63c30893446bfb6175480886df56393a59df50902613330154b8; frozen=4e69a9ae34a3d68fdcc64c37b18466117bb8fc1ff5baaca8679917e652c860c9
+observed_at: 2026-07-16T08:24:02Z
+decision: accepted
+evidence: exactHead=293dcdf2d6d0b274418bcca8461f7eb122e10c52; createdBeforeObservation=true; chronologyHeld=true; allRecordedChecks=true
+
+claim_id: DKR-P12-variant-boundary
+check: candidate contains V1 seedTags fast paths, V2 lazy resource listeners/controllers, and V3 lazy resources while excluding V4 collections and AbortController changes
+replay: cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check
+exit_code: 0
+value: variant exclusion held true vs threshold: true
+source_of_truth: variant.patch, variant-exclusion.json, provenance.json
+sha256: patch=c4d93b8eca26644f5a1fd286227a3380e76328bedbab91967953b3d10b6352f1; exclusion=d953c68483c29e2f1f4c755e9b2c6a11040e53546dd912ad209b2e14ef7a06f5; candidate_scope=daaa9c86817e4b3a8dfcd12ebf2f2fdf291befd093acbdd63923456b270bb2f4
+observed_at: 2026-07-16T08:24:02Z
+decision: accepted
+evidence: changedSources=["pkg/core/lite/src/scope.ts"]; variantExclusionHeld=true; abortController matched baseline; cleanups, descendants, activeIterators, and children matched baseline
+
+claim_id: DKR-P12-raw-integrity
+check: all raw observations are present and match the frozen manifest
+replay: cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check
+exit_code: 0
+value: 96 observations, every_hash_matched=true vs threshold: 96 observations, every hash matched
+source_of_truth: raw.sha256 and raw/
+sha256: raw.sha256=81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4
+observed_at: 2026-07-16T08:24:02Z
+decision: accepted
+evidence: rawObservationCount=96; rawManifestSha256=81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4
+
+claim_id: DKR-P12-throughput-stationarity
+check: every baseline and candidate row is stationary under the frozen 0.8 to 1.25 median band
+replay: cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check
+exit_code: 0
+value: scope 0.871992342492195/1.010478657111143; managed 1.0332474414986543/0.9428426857959243; sdk 1.0278167101077598/0.9932291079728934 vs threshold: every median in [0.8,1.25]
+source_of_truth: raw/throughput, protocol.json, checkpoint.v1.json
+sha256: raw_manifest=81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4
+observed_at: 2026-07-16T08:24:02Z
+decision: accepted
+evidence: target_decisions.throughputStationarity=true
+
+claim_id: DKR-P12-throughput-target
+check: equal-weight throughput geometric mean meets the frozen candidate/baseline minimum
+replay: cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check
+exit_code: 0
+value: 1.011645384781946 vs threshold: >=1.1
+source_of_truth: raw/throughput, protocol.json, checkpoint.v1.json
+sha256: raw_manifest=81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4
+observed_at: 2026-07-16T08:24:02Z
+decision: rejected (target missed)
+evidence: row ratios scope=1.0292944830433652, managed=1.0228628799070003, sdk=0.9833946710864174; throughputGeometricMean=false
+
+claim_id: DKR-P12-allocation-signal-and-row-ceiling
+check: every corrected allocation signal clears the minimum and every candidate/baseline row ratio stays at or below 1.05
+replay: cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check
+exit_code: 0
+value: signals all accepted; ratios 0.9296813265154205, 0.9841513301467536, 0.8324672299325336 vs threshold: every signal >=1048576 corrected bytes and every ratio <=1.05
+source_of_truth: raw/allocation, protocol.json, checkpoint.v1.json
+sha256: raw_manifest=81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4
+observed_at: 2026-07-16T08:24:02Z
+decision: accepted
+evidence: allocationSignal=true; allocationPerRowCeiling=true
+
+claim_id: DKR-P12-allocation-target
+check: equal-weight allocation geometric mean meets the frozen candidate/baseline maximum
+replay: cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check
+exit_code: 0
+value: 0.91324586128266 vs threshold: <=0.9
+source_of_truth: raw/allocation, protocol.json, checkpoint.v1.json
+sha256: raw_manifest=81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4
+observed_at: 2026-07-16T08:24:02Z
+decision: rejected (target missed)
+evidence: allocationGeometricMean=false
+
+claim_id: DKR-P12-retained-controls
+check: every retained-control observation matches baseline=0, closed=0, positive=1 after each event-loop-turn GC boundary
+replay: cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check
+exit_code: 0
+value: 18 of 18 matched vs threshold: 18 of 18 matched
+source_of_truth: raw/retained, protocol.json, checkpoint.v1.json
+sha256: raw_manifest=81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4
+observed_at: 2026-07-16T08:24:02Z
+decision: accepted
+evidence: target_decisions.retainedControls=true
+
+claim_id: DKR-P12-cleanup-and-session-walls
+check: lifecycle cleanup, ownership, business-state, post-close rejection, and session-isolation counters remain at zero
+replay: cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check
+exit_code: 0
+value: cleanupWallCount=0; crossOwnerLeakCount=0; sdkPostCloseMutationMismatchCount=0 vs threshold: all 0
+source_of_truth: raw/, protocol.json, checkpoint.v1.json
+sha256: raw_manifest=81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4
+observed_at: 2026-07-16T08:24:02Z
+decision: accepted
+evidence: invalidLifecycleSummaryCount=0; postCloseLiveResourceCount=0; crossOwnerLeakCount=0; cleanupBusinessStateMutationCount=0; sdkCompletedOperationCount=133706; sdkPostCloseMutationRejectedCount=133706
+
+claim_id: DKR-P12-product-source-unchanged
+check: publishing-clone scope.ts remains byte-identical to product commit 293dcdf2
+replay: cd /tmp/session-kernel-publish-20260715-0746 && git diff --exit-code 293dcdf2d6d0b274418bcca8461f7eb122e10c52 -- pkg/core/lite/src/scope.ts
+exit_code: 0
+value: working hash 0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e vs threshold: commit hash 0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e
+source_of_truth: /tmp/session-kernel-publish-20260715-0746/pkg/core/lite/src/scope.ts and git:293dcdf2d6d0b274418bcca8461f7eb122e10c52
+sha256: working=0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e; commit=0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e
+observed_at: 2026-07-16T08:24:02Z
+decision: accepted
+evidence: git diff exit 0; git status for scope.ts empty
+
+claim_id: DKR-P12-integrated-target
+check: V1+V2+V3 meets every frozen lifecycle performance target
+replay: cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check
+exit_code: 0
+value: integratedTarget=false vs threshold: integratedTarget=true
+source_of_truth: checkpoint.v1.json recalculated from protocol.json and raw/
+sha256: checkpoint=e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950; raw_manifest=81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4
+observed_at: 2026-07-16T08:24:02Z
+decision: rejected (target missed)
+evidence: throughput geometric mean 1.011645384781946 <1.1 and allocation geometric mean 0.91324586128266 >0.9; all other recorded target decisions passed
+
+verdict: reject V1+V2+V3 as the performance progression candidate; accept the checkpoint as replayable evidence of that rejection
+summary: 10 accepted, 3 rejected; rejected claim_ids: DKR-P12-throughput-target, DKR-P12-allocation-target, DKR-P12-integrated-target

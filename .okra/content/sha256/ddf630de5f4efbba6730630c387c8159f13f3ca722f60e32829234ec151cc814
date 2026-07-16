@@ -1,0 +1,72 @@
+{
+  "type": "release_gate_read",
+  "run_id": "release-readiness-20260716",
+  "observed_at": "2026-07-16T12:03:01Z",
+  "product_head": "1f0b4ee5987ac1822e7c33169f4e3510c4a6c9a2",
+  "product_scope_sha256": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611",
+  "local_gates": {
+    "workspace_build": "pass",
+    "workspace_typecheck": "pass",
+    "public_contract": {
+      "status": "pass",
+      "public_package_count": 26,
+      "public_interface_count": 153,
+      "public_contract_gap_count": 0,
+      "public_api_tsdoc_gap_count": 0,
+      "pr_snapshot_gap_count": 0
+    },
+    "inline_execution_contract": {
+      "status": "pass",
+      "callsite_count": 51,
+      "gap_count": 0,
+      "context_or_scope_callback_argument_count": 0,
+      "context_or_scope_capture_count": 0
+    },
+    "contract_checker_tests": "3/3 pass",
+    "inline_execution_checker_tests": "3/3 pass",
+    "lint": {
+      "status": "pass",
+      "file_count": 112,
+      "diagnostic_count": 0,
+      "example_alignment_gap_count": 0
+    },
+    "sdk": {
+      "core": "61 pass",
+      "bash": "4 pass",
+      "claude": "17 pass, 1 skipped",
+      "codex": "22 pass, 2 skipped",
+      "pi": "6 pass, 1 skipped",
+      "test_helpers": "14 pass"
+    },
+    "browser": {
+      "comparison_lanes": "5/5 pass",
+      "lightpanda": "1/1 pass"
+    },
+    "changeset_status": "pass",
+    "git_diff_check": "pass"
+  },
+  "performance": {
+    "lifecycle_throughput_geometric_mean": 1.241825781342104,
+    "lifecycle_throughput_target": 1.1,
+    "lifecycle_allocation_geometric_mean": 0.6797858473843519,
+    "lifecycle_allocation_target": 0.9,
+    "scope_run_allocation_ratio": 0.474579430257,
+    "managed_context_allocation_ratio": 0.664323383632,
+    "sdk_session_allocation_ratio": 0.996386663337797,
+    "per_row_allocation_ceiling": 1.05,
+    "retained_memory_pass_count": 18,
+    "retained_memory_total_count": 18,
+    "cleanup_wall_failure_count": 0,
+    "stationarity": "pass",
+    "established_row_count": 47,
+    "established_confirmed_regression_count": 0,
+    "established_inconclusive_row_count": 39,
+    "general_no_regression_claim_allowed": false
+  },
+  "external_gates": {
+    "independent_claude_review": "GO, no blockers",
+    "github_ci_exact_head": "pending",
+    "nats_container_integrations": "github_ci_authoritative"
+  },
+  "claim_boundary": "Validated lifecycle throughput and allocation targets passed. The established 47-row protocol found zero confirmed regression rows but 39 rows remain inconclusive, so no general no-regression claim is made."
+}

@@ -1,0 +1,8 @@
+{
+  "unit_id": "DKR-P10A",
+  "status": "running",
+  "event": "protocol_design",
+  "detail": "Diagnosed P9 fixed-operation process variance and prepared a longer block-based A/A protocol for freeze before observation.",
+  "observed_at": "2026-07-16T07:05:28Z",
+  "next_check_at": "2026-07-16T07:15:28Z"
+}

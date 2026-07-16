@@ -1,0 +1,173 @@
+validator_role: OKRA verification worker
+unit_id: DKR-P14
+scratch: /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z
+observed_at: 2026-07-16T09:14:17Z
+verdict: rejected
+reason: sdk_session_run allocation candidate/baseline is 1.2016265281015577, above the non-waivable 1.05 per-row ceiling.
+
+claim_id: dkr-p14-checkpoint-hash
+check: checkpoint.v1.json matches the expected immutable hash
+replay: sha256sum checkpoint.v1.json
+exit_code: 0
+value: 3e4d95607d093fd7bd76d4ca2a2d98551c879bee0dd31f03ca8ee2265b83d4de vs threshold: exact expected hash
+source_of_truth: /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/checkpoint.v1.json
+sha256: 3e4d95607d093fd7bd76d4ca2a2d98551c879bee0dd31f03ca8ee2265b83d4de
+observed_at: 2026-07-16T09:14:17Z
+decision: accepted
+evidence: 3e4d95607d093fd7bd76d4ca2a2d98551c879bee0dd31f03ca8ee2265b83d4de  checkpoint.v1.json
+
+claim_id: dkr-p14-deterministic-replay
+check: the recorded checkpoint exactly matches the frozen harness and observations
+replay: cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check
+exit_code: 0
+value: replay passed with integratedTarget=false and 96 observations vs threshold: exact replay
+source_of_truth: verify.mjs, checkpoint.v1.json, frozen.json, provenance.json, chronology.json, raw.sha256
+sha256: verify.mjs=7ae902bc04b297c5ab2762436e9e5c2c5791087aa6e6ea2f11afc1f877b3d632; checkpoint.v1.json=3e4d95607d093fd7bd76d4ca2a2d98551c879bee0dd31f03ca8ee2265b83d4de
+observed_at: 2026-07-16T09:14:17Z
+decision: accepted
+evidence: {"replay":"passed","integratedTarget":false,"throughputGeometricMean":1.3004497985686605,"allocationGeometricMean":0.7376126783723866,"rawObservationCount":96,"rawManifestSha256":"a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704"}
+
+claim_id: dkr-p14-raw-observation-integrity
+check: all 96 raw observations are present and match raw.sha256
+replay: cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && sha256sum -c raw.sha256
+exit_code: 0
+value: 96 matched of 96 vs threshold: 96
+source_of_truth: /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/raw.sha256 and raw/
+sha256: raw.sha256=a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704
+observed_at: 2026-07-16T09:14:17Z
+decision: accepted
+evidence: sha256sum reported OK for every manifest entry; wc -l raw.sha256=96 and find raw -type f=96.
+
+claim_id: dkr-p14-freeze-and-provenance
+check: harness, variant, accepted inputs, provenance, and baseline archive were frozen before the first observation
+replay: cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check
+exit_code: 0
+value: every frozen/provenance/chronology check true vs threshold: all true
+source_of_truth: frozen.json, provenance.json, chronology.json, protocol.json
+sha256: frozen.json=a53d799e537ddeb967fae1a3cff42ce89a28d9b0ff627792e6395332dedd62f2; provenance.json=bb5295a14cf03e8328625f80e03273b858a6f6138ea2cb9d3ed92dd90e4ce852; chronology.json=947bc3c8a6cfeb435e2f33701f6840fcf728ec25efabcd802061108fd681d8ab; protocol.json=de9819f4a50583a6a9a58c839c6aba83ccdebf05a1b27f80c1716cc34ca2abad; baseline_archive=bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0
+observed_at: 2026-07-16T09:14:17Z
+decision: accepted
+evidence: frozenAt=2026-07-16T09:06:01.163Z; first raw mtime=2026-07-16T09:06:17.787453898Z; observationCountAtFreeze=0; firstObservationAtFreeze=null; chronologyHeld=true.
+
+claim_id: dkr-p14-hybrid-source-boundary
+check: candidate contains only V1+V2+V3 plus the caller-signal hybrid, keeps V4 eager, preserves explicit-signal source order, and excludes P13 direct caller wiring
+replay: cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check
+exit_code: 0
+value: variantExclusion.held=true vs threshold: true
+source_of_truth: variant.patch, variant-exclusion.json, verify-variant.mjs, baseline scope, candidate scope
+sha256: variant.patch=7822cdd1e7a88d9b8e492345d611d6a0b348d2d5563135032b3dd85ea653b38f; variant-exclusion.json=3529eb67f347edcf19c2901d0681d4df3011e3a19c26608199987bda6b4c1e71; baseline_scope=0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e; candidate_scope=d0afa4226f78c6f1b6097007363014ecf84cbdaa8c74c0fc5fbd5d14202ce791
+observed_at: 2026-07-16T09:14:17Z
+decision: accepted
+evidence: all V123, explicit-branch, lazy-branch, source-order, eager-field, and forbidden-token checks are true; candidate diff is one source file with 75 insertions and 24 deletions.
+
+claim_id: dkr-p14-semantic-test-source
+check: the 19-case hybrid semantic test source is frozen and contains every required named case
+replay: cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check
+exit_code: 0
+value: semanticTestsFrozen=true and 19 named semanticCaseChecks=true vs threshold: all true
+source_of_truth: semantic-tests/pkg/core/lite/tests/caller-signal-hybrid.test.ts and variant-exclusion.json
+sha256: semantic_test_source=1ca0e7da969c2a219474ec5392602d06e45d40b6667bb81cafc9667d96317a29; semantic-tests.patch=b03f165e60fa56557d116b4f5d5879fe716c93a575d770705605fbf04037f953
+observed_at: 2026-07-16T09:14:17Z
+decision: accepted
+evidence: semanticTestsFrozen=true; every semanticCaseChecks entry=true.
+
+claim_id: dkr-p14-semantic-pass-counts
+check: 19 focused, 42 existing cancellation, 252 Lite, and 59 SDK tests plus typechecks and builds passed
+replay: none preserved
+exit_code: n/a
+value: assertion-only pass counts in protocol.json/progress-finished.json vs threshold: independently replayable execution evidence
+source_of_truth: protocol.json and progress-finished.json
+sha256: semantic_test_source=1ca0e7da969c2a219474ec5392602d06e45d40b6667bb81cafc9667d96317a29
+observed_at: 2026-07-16T09:14:17Z
+decision: rejected (unsupported)
+evidence: no test log or dedicated semantic replay command is preserved; verify.mjs hashes the test source and copies the pass counts from protocol.json but does not execute the semantic suites.
+
+claim_id: dkr-p14-sdk-source-preservation
+check: SDK source is unchanged between baseline and candidate
+replay: diff -qr /tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/build-a/pkg/sdk/core/src /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/build-candidate/pkg/sdk/core/src
+exit_code: 0
+value: no differences vs threshold: no differences
+source_of_truth: baseline and candidate pkg/sdk/core/src trees
+sha256: baseline_sdk_manifest=416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099; candidate_sdk_manifest=416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099
+observed_at: 2026-07-16T09:14:17Z
+decision: accepted
+evidence: diff produced no output and both SDK manifests are identical.
+
+claim_id: dkr-p14-throughput-target
+check: equal-weight throughput geometric mean meets 1.10 and every row is stationary
+replay: cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check
+exit_code: 0
+value: GM=1.3004497985686605 from ratios [1.4577150393601022,1.48947509626477,1.0129194125395649] vs threshold: >=1.10
+source_of_truth: raw/throughput, protocol.json, verify.mjs
+sha256: raw_manifest=a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704
+observed_at: 2026-07-16T09:14:17Z
+decision: accepted
+evidence: throughputStationarity=true; throughputGeometricMean=true.
+
+claim_id: dkr-p14-allocation-aggregate-target
+check: equal-weight allocation geometric mean meets 0.90 and every sampling signal is accepted
+replay: cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check
+exit_code: 0
+value: GM=0.7376126783723866 from ratios [0.4683828486879786,0.7130412051681956,1.2016265281015577] vs threshold: <=0.90
+source_of_truth: raw/allocation, protocol.json, verify.mjs
+sha256: raw_manifest=a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704
+observed_at: 2026-07-16T09:14:17Z
+decision: accepted
+evidence: allocationSignal=true; allocationGeometricMean=true.
+
+claim_id: dkr-p14-allocation-per-row-wall
+check: every allocation row is at or below 1.05 candidate/baseline
+replay: cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check
+exit_code: 0
+value: sdk_session_run=1.2016265281015577 vs threshold: <=1.05
+source_of_truth: raw/allocation/sdk_session_run-*, protocol.json, verify.mjs
+sha256: raw_manifest=a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704
+observed_at: 2026-07-16T09:14:17Z
+decision: rejected (threshold)
+evidence: allocationPerRowCeiling=false; scope_run=0.4683828486879786; managed_ctx_exec=0.7130412051681956; sdk_session_run=1.2016265281015577.
+
+claim_id: dkr-p14-retained-control-wall
+check: all retained controls match 0 baseline, 0 closed, 1 positive
+replay: cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check
+exit_code: 0
+value: 18 matched of 18 vs threshold: 18
+source_of_truth: raw/retained, protocol.json, verify.mjs
+sha256: raw_manifest=a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704
+observed_at: 2026-07-16T09:14:17Z
+decision: accepted
+evidence: retainedControls=true; every baseline and candidate trial reports {"baseline":0,"closed":0,"positive":1}.
+
+claim_id: dkr-p14-cleanup-and-isolation-walls
+check: lifecycle cleanup, ownership, post-close resources, business-state mutation, and SDK post-close rejection walls remain zero
+replay: cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check
+exit_code: 0
+value: cleanupWallCount=0 and sdkPostCloseMutationMismatchCount=0 vs threshold: 0
+source_of_truth: all 96 raw lifecycle summaries and verify.mjs
+sha256: raw_manifest=a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704
+observed_at: 2026-07-16T09:14:17Z
+decision: accepted
+evidence: invalidLifecycleSummaryCount=0; postCloseLiveResourceCount=0; crossOwnerLeakCount=0; cleanupBusinessStateMutationCount=0; sdkCompletedOperationCount=115506; sdkPostCloseMutationRejectedCount=115506; sdkPostCloseMutationMismatchCount=0.
+
+claim_id: dkr-p14-integrated-target
+check: all frozen lifecycle performance targets hold together
+replay: cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check
+exit_code: 0
+value: integratedTarget=false vs threshold: true
+source_of_truth: checkpoint.v1.json target_decisions and verify.mjs
+sha256: checkpoint.v1.json=3e4d95607d093fd7bd76d4ca2a2d98551c879bee0dd31f03ca8ee2265b83d4de
+observed_at: 2026-07-16T09:14:17Z
+decision: rejected (threshold)
+evidence: the non-waivable allocationPerRowCeiling decision is false because sdk_session_run=1.2016265281015577 >1.05.
+
+claim_id: dkr-p14-product-scope-preservation
+check: product scope.ts remains byte-identical to commit 293dcdf2 after the scratch-only DKR
+replay: cd /tmp/session-kernel-publish-20260715-0746 && git diff --exit-code 293dcdf2d6d0b274418bcca8461f7eb122e10c52 -- pkg/core/lite/src/scope.ts
+exit_code: 0
+value: no diff and current hash=0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e vs threshold: exact commit hash
+source_of_truth: /tmp/session-kernel-publish-20260715-0746/pkg/core/lite/src/scope.ts and git commit 293dcdf2d6d0b274418bcca8461f7eb122e10c52
+sha256: current_scope=0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e; commit_scope=0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e
+observed_at: 2026-07-16T09:14:17Z
+decision: accepted
+evidence: product_scope_diff_exit=0.
+
+12 accepted, 3 rejected: dkr-p14-semantic-pass-counts, dkr-p14-allocation-per-row-wall, dkr-p14-integrated-target

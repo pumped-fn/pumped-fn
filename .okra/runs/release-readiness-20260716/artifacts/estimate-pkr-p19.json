@@ -1,0 +1,9 @@
+{
+  "estimate": {
+    "time_min": 35,
+    "turns": 1,
+    "tokens": null
+  },
+  "observed_at": "2026-07-16T10:21:30Z",
+  "dispatch_ref": "worker-packets/pkr-p19-established-benchmark.json"
+}

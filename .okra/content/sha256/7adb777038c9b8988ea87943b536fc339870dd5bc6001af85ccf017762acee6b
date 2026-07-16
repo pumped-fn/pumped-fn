@@ -1,0 +1,155 @@
+claim_id: dkr_p13_checkpoint_identity
+check: Frozen checkpoint matches the requested sha256.
+replay: cd /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z && sha256sum checkpoint.v1.json
+exit_code: 0
+value: 9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e vs threshold: exact requested hash
+source_of_truth: /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/checkpoint.v1.json
+sha256: 9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: 9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e  checkpoint.v1.json
+
+claim_id: dkr_p13_checkpoint_replay
+check: The frozen checker deterministically reproduces the recorded checkpoint from the frozen evidence.
+replay: cd /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z && node verify.mjs . --check
+exit_code: 0
+value: replay=passed, rawObservationCount=96, integratedTarget=false vs threshold: replay must pass without changing the failed target decision
+source_of_truth: /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/verify.mjs and checkpoint.v1.json
+sha256: verify.mjs=f4bc01ce8842714a04fb29cf9d036f76d54fe36f7c05d6e3b939b3fa5af8f690; checkpoint.v1.json=9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: {"replay":"passed","integratedTarget":false,"throughputGeometricMean":1.3543167113879728,"allocationGeometricMean":0.6819184733486838,"rawObservationCount":96,"rawManifestSha256":"8cad536c2e3ab626ba0d2d6538f0a09f4c7d58bc8fc91d18a792c38169e815fb"}
+
+claim_id: dkr_p13_raw_observation_integrity
+check: All 96 raw observation files match the frozen manifest.
+replay: cd /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z && sha256sum -c raw.sha256
+exit_code: 0
+value: 96/96 matched vs threshold: 96/96
+source_of_truth: /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/raw.sha256 and raw/
+sha256: raw.sha256=8cad536c2e3ab626ba0d2d6538f0a09f4c7d58bc8fc91d18a792c38169e815fb
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: sha256sum -c reported OK for every manifest entry; checkpoint raw_hashes.observation_count=96 and every_hash_matched=true.
+
+claim_id: dkr_p13_freeze_and_provenance_chronology
+check: Protocol, candidate, harness, prior evidence, and provenance were frozen before the first observation.
+replay: cd /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z && node verify.mjs . --check
+exit_code: 0
+value: 15/15 frozen files matched, 6/6 accepted-evidence hashes matched, 28/28 provenance checks true, frozen_at=2026-07-16T08:37:54.058Z before first_observation_at=2026-07-16T08:38:13.759Z vs threshold: every check true and freeze precedes observation
+source_of_truth: frozen.json, chronology.json, provenance.json, protocol.json, raw.sha256
+sha256: frozen.json=c956396f1f82bb05ce95b85cdad4f43313b6dafc9826bfeafce77bec45c62feb; chronology.json=59f56f2313bf93ab9e7e9c3d4ec93118d2c3b67c2fada3aecaa7c9a98527abd4; provenance.json=dd243e93650acc8f09d5bda2f0f1bed90eb62b4cb51a0b0c611c381f3d845b2d; protocol.json=881d6556223fe5894db17e5e28d4bd8226850031cbf48956fa9027555e08266a
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: chronology_held=true; all frozen checks=true; dkrP8=true, dkrP10A=true, dkrP10B=true, dkrP11B=true, dkrP12=true, p9Workloads=true; every provenance check=true.
+
+claim_id: dkr_p13_exact_variant_boundary
+check: The candidate is exact V1+V2+V3 plus lazy cancellation, keeps V4 collections eager, changes only scope.ts, and changes no public type file.
+replay: cd /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z && node verify-variant.mjs . /dev/stdout
+exit_code: 0
+value: held=true, changedPath=pkg/core/lite/src/scope.ts, publicTypeFilesChanged=0 vs threshold: held=true and publicTypeFilesChanged=0
+source_of_truth: variant.patch, variant-exclusion.json, variant-source/pkg/core/lite/src/scope.ts, semantic-tests/pkg/core/lite/tests/lazy-cancellation.test.ts
+sha256: variant.patch=62ae8f06d2f9adcbabc597b5cf1037cc2436397dfe60867e08d32e68e03b0a0a; candidate scope=9491e030c8cfe23faf6282b96f12c3a5b1d40280792179e5a29aa873200cec9e; variant-exclusion.json=5a764e278eae090bfc26cd5c20f074ea5e4f6f7f23f7e90d5be967b2c773fbff; semantic test=19218362aa875a9f3e94224bcfb852cca5712f41214c8787fd106bce2b3a5231
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: {"held":true,"variantPatchSha256":"62ae8f06d2f9adcbabc597b5cf1037cc2436397dfe60867e08d32e68e03b0a0a","variantScopeSha256":"9491e030c8cfe23faf6282b96f12c3a5b1d40280792179e5a29aa873200cec9e","semanticTestsSha256":"19218362aa875a9f3e94224bcfb852cca5712f41214c8787fd106bce2b3a5231"}
+
+claim_id: dkr_p13_focused_semantics
+check: The frozen candidate passes the 12 focused lazy-cancellation cases.
+replay: cd /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/build-candidate/pkg/core/lite && pnpm exec vitest run tests/lazy-cancellation.test.ts
+exit_code: 0
+value: 12 passed, 0 failed vs threshold: 12 passed, 0 failed
+source_of_truth: build-candidate/pkg/core/lite/tests/lazy-cancellation.test.ts and candidate source
+sha256: semantic test=19218362aa875a9f3e94224bcfb852cca5712f41214c8787fd106bce2b3a5231; candidate scope=9491e030c8cfe23faf6282b96f12c3a5b1d40280792179e5a29aa873200cec9e
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: Test Files 1 passed (1); Tests 12 passed (12).
+
+claim_id: dkr_p13_existing_semantics
+check: The frozen candidate passes the recorded existing cancellation, non-doc Lite, SDK, and typecheck gates.
+replay: cd build-candidate/pkg/core/lite && pnpm exec vitest run tests/structured-lifetime.test.ts tests/exec-stream.test.ts; pnpm exec vitest run --exclude tests/docs-examples.test.ts; pnpm typecheck:full; cd ../../sdk/core && pnpm exec vitest run; pnpm typecheck
+exit_code: 0
+value: cancellation/stream=42/42, non-doc Lite=245/245, SDK=59/59, Lite typecheck=pass, SDK typecheck=pass vs threshold: all recorded counts and both typechecks pass
+source_of_truth: /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/build-candidate
+sha256: candidate scope=9491e030c8cfe23faf6282b96f12c3a5b1d40280792179e5a29aa873200cec9e
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: Test Files 2 passed, Tests 42 passed; Test Files 8 passed, Tests 245 passed; Test Files 8 passed, Tests 59 passed; both tsgo --noEmit commands exited 0.
+
+claim_id: dkr_p13_throughput_calculation_and_stationarity
+check: Replayed throughput calculations use the frozen schedule and all row-level median stationarity reads are within 0.8 through 1.25.
+replay: cd /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z && node verify.mjs . --check
+exit_code: 0
+value: ratios scope=1.5422858476086512, managed=1.5292992047611602, SDK=1.0531818743318924; geometric mean=1.3543167113879728; stationarity medians scope baseline/candidate=1.0666452139925555/0.9022770293901892, managed=1.0058917290879352/1.1141417972058532, SDK=1.0566621467588755/0.9726238632873035 vs threshold: geometric mean >=1.10 and each median stationarity in [0.8,1.25]
+source_of_truth: raw/throughput, protocol.json, verify.mjs
+sha256: raw.sha256=8cad536c2e3ab626ba0d2d6538f0a09f4c7d58bc8fc91d18a792c38169e815fb; verify.mjs=f4bc01ce8842714a04fb29cf9d036f76d54fe36f7c05d6e3b939b3fa5af8f690
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: throughputGeometricMean=1.3543167113879728; throughputStationarity=true; throughputGeometricMean target decision=true.
+
+claim_id: dkr_p13_allocation_calculation
+check: Replayed allocation calculations use matched zero correction, accepted signals, and the frozen equal-weight geometric mean.
+replay: cd /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z && node verify.mjs . --check
+exit_code: 0
+value: ratios scope=0.47236762070988636, managed=0.6091728058796586, SDK=1.101987679622239; geometric mean=0.6819184733486838; everySignalAccepted=true vs threshold: geometric mean <=0.90 and every corrected signal >=1048576 bytes
+source_of_truth: raw/allocation, protocol.json, verify.mjs
+sha256: raw.sha256=8cad536c2e3ab626ba0d2d6538f0a09f4c7d58bc8fc91d18a792c38169e815fb; verify.mjs=f4bc01ce8842714a04fb29cf9d036f76d54fe36f7c05d6e3b939b3fa5af8f690
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: allocationGeometricMean=0.6819184733486838; allocationSignal=true; allocationGeometricMean target decision=true.
+
+claim_id: dkr_p13_allocation_per_row_ceiling
+check: The candidate meets the allocation ceiling on every representative row.
+replay: cd /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z && node verify.mjs . --check
+exit_code: 0
+value: sdk_session_run=1.101987679622239 vs threshold: every row <=1.05
+source_of_truth: raw/allocation/sdk_session_run-*, protocol.json, verify.mjs
+sha256: raw.sha256=8cad536c2e3ab626ba0d2d6538f0a09f4c7d58bc8fc91d18a792c38169e815fb
+observed_at: 2026-07-16T08:46:25Z
+decision: rejected (threshold miss)
+evidence: allocation_rows.sdk_session_run.perRowCeilingAccepted=false; allocationPerRowCeiling=false. The 1.101987679622239 ratio is above 1.05 and is not reinterpreted as a pass.
+
+claim_id: dkr_p13_retained_controls
+check: Every retained-control observation matches 0/0/1 after event-loop-turn boundaries.
+replay: cd /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z && node verify.mjs . --check
+exit_code: 0
+value: 18/18 matched baseline=0, closed=0, positive=1 vs threshold: 18/18
+source_of_truth: raw/retained, protocol.json, verify.mjs
+sha256: raw.sha256=8cad536c2e3ab626ba0d2d6538f0a09f4c7d58bc8fc91d18a792c38169e815fb
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: retainedControls=true; all 18 count objects equal {"baseline":0,"closed":0,"positive":1}.
+
+claim_id: dkr_p13_cleanup_and_isolation_walls
+check: Lifecycle cleanup, post-close, cross-owner, business-state, and SDK post-close mutation walls remain zero.
+replay: cd /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z && node verify.mjs . --check
+exit_code: 0
+value: cleanupWallCount=0, invalidLifecycleSummaryCount=0, postCloseLiveResourceCount=0, crossOwnerLeakCount=0, cleanupBusinessStateMutationCount=0, sdkPostCloseMutationMismatchCount=0 vs threshold: all zero
+source_of_truth: all 96 raw observations and verify.mjs
+sha256: raw.sha256=8cad536c2e3ab626ba0d2d6538f0a09f4c7d58bc8fc91d18a792c38169e815fb
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: sdkCompletedOperationCount=145906; sdkPostCloseMutationRejectedCount=145906; cleanupWalls=true.
+
+claim_id: dkr_p13_integrated_target_decision
+check: The checkpoint correctly fails the integrated target when the SDK allocation row exceeds its ceiling.
+replay: cd /tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z && node verify.mjs . --check
+exit_code: 0
+value: integratedTarget=false because allocationPerRowCeiling=false vs threshold: integratedTarget must be false when any frozen target decision is false
+source_of_truth: checkpoint.v1.json, protocol.json, verify.mjs
+sha256: checkpoint.v1.json=9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: target decisions are throughputStationarity=true, throughputGeometricMean=true, allocationSignal=true, allocationGeometricMean=true, allocationPerRowCeiling=false, retainedControls=true, cleanupWalls=true, integratedTarget=false.
+
+claim_id: dkr_p13_product_source_preservation
+check: The publishing clone scope.ts remains byte-identical to exact head 293dcdf2 and has no recorded path diff.
+replay: cd /tmp/session-kernel-publish-20260715-0746 && git diff --exit-code 293dcdf2d6d0b274418bcca8461f7eb122e10c52 -- pkg/core/lite/src/scope.ts
+exit_code: 0
+value: working scope sha256=0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e equals exact-head blob sha256=0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e vs threshold: exact equality and empty diff/status
+source_of_truth: /tmp/session-kernel-publish-20260715-0746/pkg/core/lite/src/scope.ts and git:293dcdf2d6d0b274418bcca8461f7eb122e10c52
+sha256: 0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e
+observed_at: 2026-07-16T08:46:25Z
+decision: accepted
+evidence: git diff --exit-code returned 0; git diff --numstat and git status --porcelain for scope.ts were empty.
+
+13 accepted, 1 rejected: dkr_p13_allocation_per_row_ceiling

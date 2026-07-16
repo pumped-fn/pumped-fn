@@ -1,0 +1,12 @@
+{
+  "type": "event",
+  "event_type": "rework_event",
+  "unit_id": "PKR-P1",
+  "observed_at": "2026-07-16T08:04:00Z",
+  "cause": "Independent performance evidence killed the full lazy-state candidate as a target-satisfying hypothesis.",
+  "evidence_refs_or_hashes": [
+    "artifacts/reject-pkr-p2.v1.json",
+    "workers/challenger-performance-component-isolation/progress.jsonl#seq=1"
+  ],
+  "action": "Preserve the candidate source by content hash, then restore the product file to exact commit 293dcdf2 before the next counterfactual."
+}

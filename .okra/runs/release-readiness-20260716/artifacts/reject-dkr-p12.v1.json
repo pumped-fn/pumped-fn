@@ -1,0 +1,27 @@
+{
+  "type": "claim_acceptance",
+  "unit_id": "DKR-P12",
+  "accepted_at": "2026-07-16T08:24:02Z",
+  "accepted_scope": "The independently replayed V1+V2+V3 comparison and its failure conclusion are accepted. The integrated performance target and downstream progression claims are rejected.",
+  "checkpoint_ref": "workers/dkr-p12-v123-counterfactual/checkpoint.v1.json",
+  "checkpoint_sha256": "e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950",
+  "verification_ref": "workers/validator-dkr-p12/verification.v1.txt",
+  "verification_sha256": "314950ea235eb5b32e8c6b14cb4cbb404e7fa548089b544e51f65a2e244c9f55",
+  "reads": {
+    "throughput_geometric_mean": 1.011645384781946,
+    "throughput_target_minimum": 1.1,
+    "allocation_geometric_mean": 0.91324586128266,
+    "allocation_target_maximum": 0.9,
+    "allocation_per_row_ceiling_held": true,
+    "retained_controls_held": true,
+    "cleanup_wall_count": 0,
+    "integrated_target": false
+  },
+  "decision": "rejected_target_miss",
+  "wall_gate": {
+    "verdict": "candidate_did_not_reach_performance_target",
+    "downstream_advance": "blocked_for_product_progression",
+    "decided_at": "2026-07-16T08:24:02Z"
+  },
+  "downstream_authority": "Fund DKR-P13 to prove or kill lazy cancellation materialization in scratch. Do not commit V1+V2+V3 or claim improvement."
+}

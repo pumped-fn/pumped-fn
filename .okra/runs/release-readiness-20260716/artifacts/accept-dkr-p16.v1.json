@@ -1,0 +1,27 @@
+{
+  "type": "claim_acceptance",
+  "unit_id": "DKR-P16",
+  "accepted_at": "2026-07-16T10:02:30Z",
+  "accepted_scope": "The prior P15 SDK failure is accepted as a 5000 ms timeout-budget fault. The unchanged package-export assertions passed in 13.54 seconds under a command-local 60000 ms timeout; the remaining 55 SDK tests and both skipped typechecks passed once. Together with the independently accepted P15 performance evidence, the exact scratch candidate is authorized for product progression.",
+  "checkpoint_ref": "workers/dkr-p16-semantic-timeout-classification/checkpoint.v1.json",
+  "checkpoint_sha256": "25e8fe4937d20d775c04247c37ae2b546f7100027522c90ae64c908b3fc7a67a",
+  "verification_ref": "workers/validator-dkr-p16/verification.v1.json",
+  "verification_sha256": "8cce17f298dc9be0ba0a31c45ee55cdd81c8e4f07bf3207a9da023a9ae663191",
+  "reads": {
+    "package_export_tests": "4/4",
+    "package_export_test_duration_seconds": 13.54,
+    "remaining_sdk_tests": "55/55",
+    "lite_typecheck": "pass",
+    "sdk_typecheck": "pass",
+    "command_count": 4,
+    "performance_rerun_count": 0,
+    "product_edit_count": 0
+  },
+  "decision": "accepted_timeout_budget_classification_and_candidate_semantic_matrix",
+  "wall_gate": {
+    "verdict": "held",
+    "downstream_advance": "authorized_for_exact_candidate_product_progression",
+    "decided_at": "2026-07-16T10:02:30Z"
+  },
+  "claim_boundary": "This accepts timeout classification, the candidate semantic matrix, and exact-candidate progression. It does not accept the 47-row benchmark, final release gates, PR readiness, merge, or release."
+}

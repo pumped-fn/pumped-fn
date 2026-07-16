@@ -1,0 +1,16 @@
+{
+  "type": "event",
+  "event_type": "regression_event",
+  "unit_id": "PKR-P2",
+  "observed_at": "2026-07-16T07:48:00Z",
+  "cause": "The exact one-file candidate exceeded the frozen per-row allocation ceiling in managed and SDK lifecycle rows.",
+  "evidence_refs_or_hashes": [
+    "workers/pkr-p2-lifecycle-performance-comparison/checkpoint.v1.json#sha256=c6b3842247bdd5e7ec6a31e2b4d777adbb3b4bb2d3a9c0da2653b2f9a795a3a8",
+    "workers/validator-pkr-p2/verification.v1.txt#sha256=9a4f1cc4a0ff1b984faa070fd5452eebb588c231d74c54cb57ac122319cda81a"
+  ],
+  "metric_reads": {
+    "managed_allocation_ratio": 1.065984527077614,
+    "sdk_allocation_ratio": 1.0960133932263103,
+    "ceiling": 1.05
+  }
+}

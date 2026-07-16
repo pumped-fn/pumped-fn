@@ -1,0 +1,17 @@
+{
+  "type": "event",
+  "event_type": "late_discovery_event",
+  "unit_id": "DKR-P9",
+  "observed_at": "2026-07-16T07:04:50Z",
+  "cause": "The second exact-head build hit ENOSPC before any performance observation.",
+  "finding": "Older scratch studies were archived outside /tmp, then the exact same frozen P9 build resumed and completed before the first observation.",
+  "impact": "No observation was lost or repeated. The evidence proves ENOSPC and successful pre-observation recovery; it does not prove a narrower inode-specific cause.",
+  "evidence_refs_or_hashes": [
+    "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/logs/build-b.log",
+    "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/logs/build-b-recovery.log",
+    "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/chronology.json",
+    "/home/lagz0ne/.cache/pumped-fn-okra-scratch/release-readiness-20260716/dkr-p5-lifecycle-rows-7745ad0c.tar#sha256=1d2a2476000791ea5383e7273f5bd7420cefb377b8d645c0330489d9619128ec",
+    "/home/lagz0ne/.cache/pumped-fn-okra-scratch/release-readiness-20260716/dkr-p6-measurement-protocol-7745ad0c.tar",
+    "/home/lagz0ne/.cache/pumped-fn-okra-scratch/release-readiness-20260716/dkr-p7-allocation-window-7745ad0c.tar#sha256=f96aa71bb560ce8d5e59d5940a6c12adb3623e0a84b2ca6efedeaf2e343477e2"
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "unit_id": "DKR-P10A",
+  "worker_kind": "DKR",
+  "model_phrasing": "gpt-5 family detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4",
+  "frame": {
+    "objective": {
+      "metric_id": "release_readiness_gap_count",
+      "target": 0,
+      "source_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json"
+    },
+    "anti_goals": {
+      "full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals",
+      "coverage": "Every frame wall remains active by its recorded activation condition."
+    },
+    "action_envelope": {
+      "allowed": [
+        "Read the rejected P9 throughput protocol and raw observations.",
+        "Create a scratch-only reducing probe under /tmp.",
+        "Freeze and run one improved A/A throughput protocol on exact commit 293dcdf2d6d0b274418bcca8461f7eb122e10c52."
+      ],
+      "forbidden": [
+        "Edit product files, committed benchmark files, or prior evidence.",
+        "Optimize product code or compare a candidate.",
+        "Relax the existing 0.80 to 1.25 A/A band after observing results.",
+        "Merge, release, publish, deploy, push, or contact production services."
+      ],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human may change objective thresholds, the action envelope, merge, or release."
+  },
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-PRESERVATION",
+    "AG-STORAGE-WRITE",
+    "AG-AUTHORITY"
+  ],
+  "current_state": {
+    "exact_product_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "p9_checkpoint": "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/checkpoint.v1.json",
+    "p9_checkpoint_sha256": "4b31dfc058e6f0627edba61a2a4e3c83818eb132f6374cec8864c75eccbb77f4",
+    "observed_failure": "managed_ctx_exec B/A median throughput ratio 1.2910628169223395 exceeded the frozen 1.25 ceiling",
+    "claim_boundary": "This is a method-stability probe, not product performance evidence."
+  },
+  "previous_dkr_checkpoint": {
+    "unit_id": "DKR-P9",
+    "path": "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/checkpoint.v1.json",
+    "decision": "rejected pending independent validation",
+    "questions_unanswered": [
+      "Which predeclared throughput batch and repetition protocol produces stable A/A ratios for all three lifecycle rows?"
+    ]
+  },
+  "assignment": "Design, freeze, and run one reducing A/A probe that makes throughput stable enough for a later baseline-candidate comparison. Diagnose P9 variance from raw data first. Predeclare warmup, minimum timed duration or operation count, schedule, repetitions, aggregation, stationarity check, A/A band, and refusal of favorable reruns before observing the new results. Use the exact product commit in two independent archives. Return a replayable learning checkpoint; do not authorize optimization.",
+  "budget_and_stop_rule": {
+    "wall_clock": "25m",
+    "route_cap": 1,
+    "stop": "Stop after one frozen reducing protocol is observed once, or earlier if no defensible protocol fits the budget. Empty is valid only with a replayable trace."
+  },
+  "hand_back_rule": "Hand back immediately if the method needs changed product code, a threshold change, more than one observed protocol, or an unavailable system capability.",
+  "worker_progress": ".okra/runs/release-readiness-20260716/workers/dkr-p10a-throughput-stability/progress.jsonl",
+  "heartbeat_cadence": "10m",
+  "output_schema": {
+    "record_first": true,
+    "required": [
+      "checkpoint_id",
+      "conclusion_id",
+      "decision_target",
+      "source_of_truth",
+      "read_method",
+      "observed_at",
+      "recorded_at",
+      "max_age",
+      "freshness_status",
+      "confidence",
+      "evidence_refs_or_hashes",
+      "replay_command_or_checker",
+      "questions_answered",
+      "questions_unanswered",
+      "decision",
+      "flag_if_missing_or_stale",
+      "active_anti_goals",
+      "active_anti_goal_verification",
+      "wall_gate",
+      "candidate_next_dkr_or_pkr",
+      "workspace_effect"
+    ],
+    "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  }
+}

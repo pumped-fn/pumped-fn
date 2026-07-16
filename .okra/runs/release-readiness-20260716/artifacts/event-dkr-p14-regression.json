@@ -1,0 +1,15 @@
+{
+  "type": "event",
+  "event_type": "regression_event",
+  "unit_id": "DKR-P14",
+  "observed_at": "2026-07-16T09:14:17Z",
+  "cause": "The hybrid scratch candidate exceeded the frozen SDK allocation ceiling.",
+  "evidence_refs_or_hashes": [
+    "workers/dkr-p14-caller-signal-hybrid/checkpoint.v1.json#sha256=3e4d95607d093fd7bd76d4ca2a2d98551c879bee0dd31f03ca8ee2265b83d4de",
+    "workers/validator-dkr-p14/verification.v1.txt#sha256=1e731fcdc85973d6b33899f1ea5268131cf8292f4e0a6d3f89db7bf1331c056a"
+  ],
+  "metric_reads": {
+    "ceiling": 1.05,
+    "sdk_allocation_ratio": 1.2016265281015577
+  }
+}

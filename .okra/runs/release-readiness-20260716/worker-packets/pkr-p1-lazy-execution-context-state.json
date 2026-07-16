@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "unit_id": "PKR-P1",
+  "worker_kind": "PKR",
+  "model_phrasing": "gpt-5 family detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4",
+  "frame": {
+    "objective": {
+      "metric_id": "release_readiness_gap_count",
+      "target": 0,
+      "domain_target": "Representative lifecycle throughput geometric mean at least 1.10, allocation geometric mean at most 0.90, every allocation row at most 1.05, retained and cleanup walls held, and no established-row confirmed regression."
+    },
+    "anti_goals": {
+      "full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"
+    },
+    "action_envelope": {
+      "allowed": [
+        "Edit pkg/core/lite/src/scope.ts with the accepted empty-state allocation candidate.",
+        "Run focused Lite and SDK semantic gates and typechecks.",
+        "Write governed progress through okra-store.sh worker-report."
+      ],
+      "forbidden": [
+        "Edit public API shape, docs, examples, benchmarks, SDK behavior, provider code, or release metadata.",
+        "Add benchmark-only branches, flags, helpers, getters, glue types, comments, Object.freeze calls, or new dependencies.",
+        "Pass ctx or scope as callback or runtime arguments.",
+        "Hide or infer dependencies; every effect edge remains declared.",
+        "Change AbortController behavior in this candidate.",
+        "Commit, push, merge, release, publish, deploy, or contact production services."
+      ],
+      "permission_owner": "User and runtime",
+      "rollback": "Restore only this uncommitted candidate if a gate fails; preserve all prior product commits and OKRA evidence."
+    },
+    "human_confirmation_boundary": "Only the human may change targets, scope, merge, release, or standing walls."
+  },
+  "linked_ckr": "CKR-PERFORMANCE",
+  "source_dkr_checkpoint": [
+    "artifacts/accept-dkr-p5.v1.json",
+    "artifacts/accept-dkr-p8.v1.json",
+    "artifacts/accept-dkr-p10a.v1.json",
+    "artifacts/accept-dkr-p10b.v1.json"
+  ],
+  "contribution_metric": {
+    "primary": "lifecycle_representative_allocation_ratio <= 0.90",
+    "paired": "lifecycle_representative_throughput_ratio >= 1.10",
+    "walls": ["allocation_regression_case_count == 0", "retained_memory_regression_count == 0", "post_close_live_resource_count == 0"]
+  },
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-CLEANUP-EFFECT",
+    "AG-SESSION-ISOLATION",
+    "AG-PRODUCT-TRUTH",
+    "AG-STABILITY",
+    "AG-SCOPE-SEAM",
+    "AG-CONTEXT-ARGUMENT",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-PERF-REGRESSION",
+    "AG-ALLOCATION-REGRESSION",
+    "AG-RETAINED-MEMORY",
+    "AG-BENCHMARK-BRANCH",
+    "AG-STYLE",
+    "AG-REGRESSION",
+    "AG-AUTHORITY"
+  ],
+  "current_state": {
+    "product_head": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "candidate_file": "pkg/core/lite/src/scope.ts",
+    "accepted_candidate": "Lazy allocation of cleanups, resources, resourceListeners, resourceControllers, descendants, activeIterators, and children; plus a zero-flow-tag fast path in seedTags.",
+    "claim_boundary": "This PKR implements and semantically verifies the candidate. It does not claim the performance target until the frozen paired comparison is run independently."
+  },
+  "previous_dkr_checkpoint": {
+    "throughput_method": "artifacts/accept-dkr-p10a.v1.json",
+    "allocation_method": "artifacts/accept-dkr-p8.v1.json",
+    "retained_method": "artifacts/accept-dkr-p10b.v1.json",
+    "candidate_review": "The independent read-only source review recommended the coherent empty-state patch and deferred AbortController changes."
+  },
+  "assignment": "Implement one coherent empty-state allocation candidate in ExecutionContextImpl. Make the seven lifecycle collections optional and allocate them directly with ??= at their existing first mutation sites. Read them with optional access and preserve Map insertion order, cleanup LIFO order, controller identity, listener ordering, child registration, descendant joins, iterator returns, and resource cleanup. In seedTags, append exec tags first, return immediately when there are no flow tags, append flow tags directly when there are no exec or blocked tags, otherwise build one Set by loops and filter flow tags. Keep type inference and existing public contracts. Run the exact focused gates listed below. If any semantic fix requires a new design or a different product surface, hand back instead of broadening.",
+  "focused_gates": [
+    "pnpm exec vitest run pkg/core/lite/tests/role-tags.test.ts",
+    "pnpm exec vitest run pkg/core/lite/tests/scope.test.ts",
+    "pnpm exec vitest run pkg/core/lite/tests/structured-lifetime.test.ts",
+    "pnpm exec vitest run pkg/core/lite/tests/exec-stream.test.ts",
+    "pnpm exec vitest run pkg/sdk/core/tests",
+    "pnpm --filter @pumped-fn/lite typecheck",
+    "pnpm --filter @pumped-fn/sdk typecheck"
+  ],
+  "budget_and_stop_rule": {
+    "wall_clock": "35m",
+    "route_cap": 1,
+    "stop": "Stop after the narrow diff and focused gates pass, or hand back on the first design-level unknown. Do not measure performance or add a second optimization."
+  },
+  "hand_back_rule": "PKRs hand back on unknown discovery instead of researching or resolving unknowns inside execution.",
+  "progress_signals": [
+    "narrow changed-path manifest",
+    "focused gate exit codes and test counts",
+    "typecheck exits",
+    "unknown or regression event if encountered"
+  ],
+  "worker_progress": ".okra/runs/release-readiness-20260716/workers/pkr-p1-lazy-execution-context-state/progress.jsonl",
+  "worker_progress_command": "/home/lagz0ne/dev/okr/skills/reverse-tornado-okr/scripts/okra-store.sh worker-report pkr-p1-lazy-execution-context-state <payload.json> .okra/runs/release-readiness-20260716",
+  "heartbeat_cadence_and_next_check_at": "10m; next check at 2026-07-16T07:26:00Z",
+  "output_schema": {
+    "required": [
+      "changed_files",
+      "diff_summary",
+      "commands_and_key_output",
+      "progress_record_ref",
+      "unknowns",
+      "workspace_effect",
+      "performance_claim_made"
+    ],
+    "performance_claim_made": false,
+    "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  }
+}

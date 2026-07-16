@@ -1,0 +1,16 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P8",
+  "accepted_at": "2026-07-16T06:41:40Z",
+  "accepted_scope": "Reducing discovery only: the canonical Node/V8 sampled-allocation aggregate and warmup-separated stationarity calibration are accepted.",
+  "method_decision": "accepted",
+  "aggregate": "sum HeapProfiler.SamplingHeapProfile.samples[].size",
+  "checkpoint_ref": "workers/dkr-p8-sampled-byte-aggregate/checkpoint.v1.json",
+  "checkpoint_sha256": "a94cb36777062f29adc1dbec71c116a8191849aa65024c56ad67106b47fc5e27",
+  "verification_ref": "workers/validator-dkr-p8/verification.v1.json",
+  "verification_sha256": "85ccdc3f3adaf9a7517f709a83f7ba4b58e28289eab3916829581f776f3102ca",
+  "proportionality_ratios": [2.0520757401, 2.0194991428, 1.9769551208],
+  "stationarity_ratios": [0.9959442533, 0.9825410747, 0.9865422402],
+  "raw_profile_count": 9,
+  "downstream_authority": "Use samples[].size with matched zero subtraction in the exact-head lifecycle A/A harness. Node selfSize is informational only. No product ratio or CKR claim follows from calibration."
+}

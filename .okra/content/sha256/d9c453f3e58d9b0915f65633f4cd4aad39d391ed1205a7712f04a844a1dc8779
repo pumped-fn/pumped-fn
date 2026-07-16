@@ -1,0 +1,42 @@
+unit_id: VALIDATOR-PKR-P1-ROLLBACK
+packet_sha256: d1cc1371d55e2d1347f41f4b0f20713b7d2c28301b1ec32a9fdfc2b168011923
+observed_at: 2026-07-16T08:13:12Z
+
+claim_id: rollback-baseline-sha256
+check: workspace scope.ts bytes equal commit 293dcdf2 bytes
+replay: sha256sum pkg/core/lite/src/scope.ts; git show 293dcdf2:pkg/core/lite/src/scope.ts | sha256sum
+exit_code: 0
+value: 0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e == 0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e
+source_of_truth: pkg/core/lite/src/scope.ts; git object 293dcdf2:pkg/core/lite/src/scope.ts
+sha256: 0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e
+decision: accepted
+
+claim_id: rollback-path-diff-empty
+check: git diff 293dcdf2 for scope.ts is empty
+replay: git diff --no-ext-diff --exit-code 293dcdf2 -- pkg/core/lite/src/scope.ts
+exit_code: 0
+value: empty vs threshold: empty
+source_of_truth: git diff 293dcdf2
+sha256: 0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e
+decision: accepted
+
+claim_id: dead-candidate-preserved
+check: preserved candidate content has the recorded SHA-256
+replay: sha256sum artifacts/dead-pkr-p1/scope.ts
+exit_code: 0
+value: a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65 == a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65
+source_of_truth: artifacts/dead-pkr-p1/scope.ts
+sha256: a6fb78b2366141c0a40c2c46b5767864515eb27d66014925bb242dc8bd55cc65
+decision: accepted
+
+claim_id: no-other-product-path-changed
+check: product diff from 293dcdf2 is empty
+replay: git diff --no-ext-diff --name-only 293dcdf2 -- ':!/.okra' ':!/.okra/**'
+exit_code: 0
+value: empty vs threshold: empty
+source_of_truth: git diff 293dcdf2 excluding .okra
+sha256: n/a
+decision: accepted
+
+DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.
+4 accepted, 0 rejected; rejected claim_ids: none

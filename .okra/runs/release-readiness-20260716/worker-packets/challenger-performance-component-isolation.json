@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "unit_id": "CHALLENGER-PERFORMANCE-1",
+  "worker_kind": "challenger",
+  "model_phrasing": "gpt-5 family detected from the system prompt; Phrasing profile id RTM-PH6OCQ6MX4",
+  "frame": {
+    "objective": "Bring PR 346 to release-readiness with release_readiness_gap_count == 0, including throughput geometric mean >= 1.10, allocation geometric mean <= 0.90, every allocation row <= 1.05, retained and cleanup walls held, and established-row regressions == 0.",
+    "anti_goals": {"full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"},
+    "action_envelope": {
+      "allowed": ["Read the frame, PKR-P2 failure, DKR-P11A empty checkpoint, DKR-P11B progress map, exact diff, and workloads."],
+      "forbidden": ["Edit, steer, measure, build variants, change targets, commit, push, merge, release, publish, or deploy."],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human changes the frame."
+  },
+  "active_anti_goals": ["AG-INTEGRITY", "AG-INDEPENDENCE", "AG-PERF-CLAIM", "AG-ALLOCATION-REGRESSION", "AG-BENCHMARK-BRANCH"],
+  "current_state": {
+    "pkr_p2_failure": "artifacts/reject-pkr-p2.v1.json",
+    "dkr_p11a": "/tmp/dkr-p11a-allocation-stack-attribution-20260716T083000Z/checkpoint.v1.json",
+    "dkr_p11b": ".okra/runs/release-readiness-20260716/workers/dkr-p11b-component-lifecycle-map/progress.jsonl#seq=1",
+    "candidate_diff_sha256": "3bf3d62f71d66e9902c9e5d3f366a0d3d2f7c12a257e4b9ae967bb2caa32a599"
+  },
+  "previous_dkr_checkpoint": {"accepted_methods": ["artifacts/accept-dkr-p10a.v1.json", "artifacts/accept-dkr-p10b.v1.json"]},
+  "assignment": "Independently challenge two live hypotheses. H1: the full lazy-state candidate can meet the frozen performance target. H2: measuring the four DKR-P11B separable variants is the smallest defensible next route. Recompute the 2/3/5 context trees and all seven candidate materialization counts from source and workloads. Verify the four variants are actually build-separable and that V4's stronger divergence ranking is only a source hypothesis. Return intact, drifted, or dead for H1 and H2 with exact refs. Review CKR-PERFORMANCE, DKR-P11A, DKR-P11B, PKR-P1, and PKR-P2 as keep, reshape, or drop. Propose at most one next DKR; do not steer or accept your own verdict.",
+  "budget_and_stop_rule": "One read-only challenge, 20 minutes.",
+  "hand_back_rule": "Mark a hypothesis drifted when required evidence is missing; do not fill gaps with judgement.",
+  "worker_progress": ".okra/runs/release-readiness-20260716/workers/challenger-performance-component-isolation/progress.jsonl",
+  "worker_progress_command": "/home/lagz0ne/dev/okr/skills/reverse-tornado-okr/scripts/okra-store.sh worker-report challenger-performance-component-isolation <payload.json> .okra/runs/release-readiness-20260716",
+  "output_schema": "Use the exact challenger verdict and first_principles_contribution_review blocks from references/roles/challenger.md.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

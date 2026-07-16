@@ -1,0 +1,2476 @@
+{
+  "schema": "pumped-fn.okra.discovery-checkpoint.v1",
+  "checkpoint_id": "DKR-P14.caller-signal-hybrid.2026-07-16T09:10:51.156Z",
+  "conclusion_id": "DKR-P14-CALLER-SIGNAL-HYBRID",
+  "unit_id": "DKR-P14",
+  "decision_target": "Determine whether the semantically proven V1+V2+V3 caller-signal hybrid meets the frozen lifecycle performance target.",
+  "source_of_truth": [
+    "git:293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/protocol.json",
+    "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/frozen.json",
+    "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/provenance.json",
+    "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/raw.sha256"
+  ],
+  "candidate_provenance": {
+    "exact_head": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "baseline_archive_sha256": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0",
+    "candidate_patch_sha256": "7822cdd1e7a88d9b8e492345d611d6a0b348d2d5563135032b3dd85ea653b38f",
+    "changed_sources": [
+      "pkg/core/lite/src/scope.ts"
+    ],
+    "candidate_scope_sha256": "d0afa4226f78c6f1b6097007363014ecf84cbdaa8c74c0fc5fbd5d14202ce791",
+    "checks": {
+      "exactHead": true,
+      "baselineArchive": true,
+      "baselineSourceMatchesAcceptedBuild": true,
+      "baselineLockfileMatchesAcceptedBuild": true,
+      "baselineManifestsMatchAcceptedBuild": true,
+      "baselineDistMatchesAcceptedBuild": true,
+      "baselineDeclarationsMatchAcceptedBuild": true,
+      "patchHash": true,
+      "changedSources": true,
+      "candidateScopeMatchesFrozenVariant": true,
+      "variantExclusionHeld": true,
+      "variantExclusionPatchMatches": true,
+      "variantExclusionScopeMatches": true,
+      "semanticTestsFrozen": true,
+      "semanticBoundaryHeld": true,
+      "lockfileUnchanged": true,
+      "manifestsUnchanged": true,
+      "declarationsUnchanged": true,
+      "allRecordedChecks": true,
+      "createdBeforeObservation": true,
+      "provenanceFrozen": true,
+      "baselineArchiveFrozen": true,
+      "candidatePatchStillFrozen": true,
+      "candidateScopeStillFrozen": true,
+      "variantPatchFrozen": true,
+      "semanticTestsPatchFrozen": true,
+      "variantExclusionFrozen": true
+    }
+  },
+  "variant_patch_sha256": "7822cdd1e7a88d9b8e492345d611d6a0b348d2d5563135032b3dd85ea653b38f",
+  "variant_boundary_checks": {
+    "held": true,
+    "field_checks": {
+      "private cleanups:": {
+        "baseline": "  private cleanups: CloseCleanup[] = []",
+        "candidate": "  private cleanups: CloseCleanup[] = []",
+        "matched": true
+      },
+      "private descendants": {
+        "baseline": "  private descendants = new Set<Promise<unknown>>()",
+        "candidate": "  private descendants = new Set<Promise<unknown>>()",
+        "matched": true
+      },
+      "private activeIterators": {
+        "baseline": "  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()",
+        "candidate": "  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()",
+        "matched": true
+      },
+      "private children": {
+        "baseline": "  private children = new Set<ExecutionContextImpl>()",
+        "candidate": "  private children = new Set<ExecutionContextImpl>()",
+        "matched": true
+      }
+    },
+    "semantic_model": {
+      "noExplicitSignalUsesLazyLocalController": true,
+      "noExplicitSignalUsesFirstAbortChildPropagation": true,
+      "explicitSignalUsesBaselineComposition": true,
+      "explicitSignalSourceOrder": [
+        "local",
+        "parent",
+        "caller"
+      ],
+      "stableSignalIdentity": true,
+      "postCloseFirstReadReplaysRecordedReason": true
+    },
+    "v123_checks": {
+      "private resources: Map<Lite.Resource<unknown>, ResourceEntry<unknown>> | undefined": true,
+      "private resourceListeners: Map<Lite.Resource<unknown>, ResourceListeners> | undefined": true,
+      "private resourceControllers: Map<Lite.Resource<unknown>, ResourceControllerImpl<unknown>> | undefined": true,
+      "this.resources ??= new Map()": true,
+      "this.resourceControllers ??= new Map()": true,
+      "this.resourceListeners ??= new Map()": true,
+      "if (!flowTags?.length) return": true,
+      "const blocked = new Set<symbol>()": true,
+      "this.resources?.values()": true,
+      "this.resources?.keys()": true
+    },
+    "explicit_branch_checks": {
+      "if (options?.signal) {": true,
+      "this.abortController = new AbortController()": true,
+      "const signals = [this.abortController.signal]": true,
+      "if (this.parent) signals.push(this.parent.signal)": true,
+      "signals.push(options.signal)": true,
+      "this.signalOverride = combineAbortSignals(signals)": true,
+      "this.signalOverride.addEventListener(\"abort\", this.captureComposedAbort.bind(this), { once: true })": true,
+      "if (this.signalOverride) return this.signalOverride": true
+    },
+    "lazy_branch_checks": {
+      "private abortController: AbortController | undefined": true,
+      "private abortReason: unknown = pendingAbort": true,
+      "private signalOverride: AbortSignal | undefined": true,
+      "if (!options?.signal && this.parent.abortReason !== pendingAbort) this.captureAbort(this.parent.abortReason)": true,
+      "if (!this.abortController) {": true,
+      "if (this.abortReason !== pendingAbort) this.abortController.abort(this.abortReason)": true,
+      "if (this.abortReason !== pendingAbort) return": true,
+      "for (const child of this.children) child.captureAbort(reason)": true
+    },
+    "explicit_source_order": {
+      "tokens": [
+        "if (options?.signal) {",
+        "this.abortController = new AbortController()",
+        "const signals = [this.abortController.signal]",
+        "if (this.parent) signals.push(this.parent.signal)",
+        "signals.push(options.signal)",
+        "this.signalOverride = combineAbortSignals(signals)"
+      ],
+      "indexes": [
+        456,
+        485,
+        536,
+        588,
+        644,
+        679
+      ],
+      "held": true
+    },
+    "combine_abort_signals_matches_baseline": true,
+    "sdk_source_manifest": {
+      "baseline": "416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099",
+      "candidate": "416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099"
+    },
+    "forbidden_checks": {
+      "private cleanups: CloseCleanup[] | undefined": true,
+      "private descendants: Set<Promise<unknown>> | undefined": true,
+      "private activeIterators: Set<AsyncIterator<unknown, unknown, unknown>> | undefined": true,
+      "private children: Set<ExecutionContextImpl> | undefined": true,
+      "this.parent.children ??=": true,
+      "activeIterators ??=": true,
+      "activeIterators?.": true,
+      "const cleanups = this.cleanups ??=": true,
+      "this.children ??": true,
+      "children?.": true,
+      "const descendants = this.descendants ??=": true,
+      "this.descendants ??": true,
+      "this.cleanups?.": true,
+      "this.cleanups!": true,
+      "callerSignal": true,
+      "handleEvent(event: Event)": true,
+      "options.signal.addEventListener": true,
+      "this.callerSignal.addEventListener": true
+    },
+    "semantic_case_checks": {
+      "keeps one signal identity and propagates caller cancellation": true,
+      "propagates cancellation from an observed parent signal": true,
+      "observes an already-aborted caller with its original reason": true,
+      "keeps caller precedence when cancellation happens before the first signal read": true,
+      "keeps parent-source precedence before the child first reads its signal": true,
+      "keeps already-aborted construction precedence through close and first read": true,
+      "detaches an unobserved caller source when local close wins": true,
+      "settles abort listeners once when a context closes": true,
+      "materializes the closed signal with the close reason after close": true,
+      "classifies caller cancellation as an aborted close": true,
+      "cancels a streaming child when the consumer returns": true,
+      "cancels a boundary child before parent cleanup settles": true,
+      "keeps explicit-signal identity stable before and after caller cancellation": true,
+      "keeps parent before caller in already-aborted explicit source order": true,
+      "keeps caller reason when it is the only already-aborted explicit source": true,
+      "keeps the first live explicit source when caller aborts before parent": true,
+      "keeps the first live explicit source when parent aborts before caller": true,
+      "keeps local close ahead of a later explicit caller abort": true,
+      "propagates an explicit parent caller to a child without its own signal": true
+    }
+  },
+  "semantic_test_matrix": {
+    "path": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/semantic-tests/pkg/core/lite/tests/caller-signal-hybrid.test.ts",
+    "sha256": "1ca0e7da969c2a219474ec5392602d06e45d40b6667bb81cafc9667d96317a29",
+    "focusedPassed": 19,
+    "focusedTotal": 19,
+    "p13CasesPassed": 12,
+    "p13CasesTotal": 12,
+    "explicitEquivalencePassed": 7,
+    "explicitEquivalenceTotal": 7,
+    "existingCancellationPassed": 42,
+    "existingCancellationTotal": 42,
+    "liteNonDocsPassed": 252,
+    "liteNonDocsTotal": 252,
+    "sdkPassed": 59,
+    "sdkTotal": 59,
+    "typechecks": "Lite full and SDK passed",
+    "builds": "Lite and SDK dependency closure passed"
+  },
+  "provenance": {
+    "schema": "pumped-fn.dkr-p14.provenance.v1",
+    "exactHead": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "createdBeforeObservation": true,
+    "baselineArchive": {
+      "path": "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/archives/head-a.tar",
+      "sha256": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0"
+    },
+    "candidatePatch": {
+      "path": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/variant.patch",
+      "sha256": "7822cdd1e7a88d9b8e492345d611d6a0b348d2d5563135032b3dd85ea653b38f",
+      "changedSources": [
+        "pkg/core/lite/src/scope.ts"
+      ],
+      "candidateScopeSha256": "d0afa4226f78c6f1b6097007363014ecf84cbdaa8c74c0fc5fbd5d14202ce791"
+    },
+    "variantExclusion": {
+      "path": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/variant-exclusion.json",
+      "sha256": "3529eb67f347edcf19c2901d0681d4df3011e3a19c26608199987bda6b4c1e71",
+      "held": true,
+      "fieldChecks": {
+        "private cleanups:": {
+          "baseline": "  private cleanups: CloseCleanup[] = []",
+          "candidate": "  private cleanups: CloseCleanup[] = []",
+          "matched": true
+        },
+        "private descendants": {
+          "baseline": "  private descendants = new Set<Promise<unknown>>()",
+          "candidate": "  private descendants = new Set<Promise<unknown>>()",
+          "matched": true
+        },
+        "private activeIterators": {
+          "baseline": "  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()",
+          "candidate": "  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()",
+          "matched": true
+        },
+        "private children": {
+          "baseline": "  private children = new Set<ExecutionContextImpl>()",
+          "candidate": "  private children = new Set<ExecutionContextImpl>()",
+          "matched": true
+        }
+      },
+      "semanticModel": {
+        "noExplicitSignalUsesLazyLocalController": true,
+        "noExplicitSignalUsesFirstAbortChildPropagation": true,
+        "explicitSignalUsesBaselineComposition": true,
+        "explicitSignalSourceOrder": [
+          "local",
+          "parent",
+          "caller"
+        ],
+        "stableSignalIdentity": true,
+        "postCloseFirstReadReplaysRecordedReason": true
+      },
+      "v123Checks": {
+        "private resources: Map<Lite.Resource<unknown>, ResourceEntry<unknown>> | undefined": true,
+        "private resourceListeners: Map<Lite.Resource<unknown>, ResourceListeners> | undefined": true,
+        "private resourceControllers: Map<Lite.Resource<unknown>, ResourceControllerImpl<unknown>> | undefined": true,
+        "this.resources ??= new Map()": true,
+        "this.resourceControllers ??= new Map()": true,
+        "this.resourceListeners ??= new Map()": true,
+        "if (!flowTags?.length) return": true,
+        "const blocked = new Set<symbol>()": true,
+        "this.resources?.values()": true,
+        "this.resources?.keys()": true
+      },
+      "explicitBranchChecks": {
+        "if (options?.signal) {": true,
+        "this.abortController = new AbortController()": true,
+        "const signals = [this.abortController.signal]": true,
+        "if (this.parent) signals.push(this.parent.signal)": true,
+        "signals.push(options.signal)": true,
+        "this.signalOverride = combineAbortSignals(signals)": true,
+        "this.signalOverride.addEventListener(\"abort\", this.captureComposedAbort.bind(this), { once: true })": true,
+        "if (this.signalOverride) return this.signalOverride": true
+      },
+      "lazyBranchChecks": {
+        "private abortController: AbortController | undefined": true,
+        "private abortReason: unknown = pendingAbort": true,
+        "private signalOverride: AbortSignal | undefined": true,
+        "if (!options?.signal && this.parent.abortReason !== pendingAbort) this.captureAbort(this.parent.abortReason)": true,
+        "if (!this.abortController) {": true,
+        "if (this.abortReason !== pendingAbort) this.abortController.abort(this.abortReason)": true,
+        "if (this.abortReason !== pendingAbort) return": true,
+        "for (const child of this.children) child.captureAbort(reason)": true
+      },
+      "explicitSourceOrder": {
+        "tokens": [
+          "if (options?.signal) {",
+          "this.abortController = new AbortController()",
+          "const signals = [this.abortController.signal]",
+          "if (this.parent) signals.push(this.parent.signal)",
+          "signals.push(options.signal)",
+          "this.signalOverride = combineAbortSignals(signals)"
+        ],
+        "indexes": [
+          456,
+          485,
+          536,
+          588,
+          644,
+          679
+        ],
+        "held": true
+      },
+      "combineAbortSignalsMatchesBaseline": true,
+      "sdkSourceManifest": {
+        "baseline": "416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099",
+        "candidate": "416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099"
+      },
+      "semanticCaseChecks": {
+        "keeps one signal identity and propagates caller cancellation": true,
+        "propagates cancellation from an observed parent signal": true,
+        "observes an already-aborted caller with its original reason": true,
+        "keeps caller precedence when cancellation happens before the first signal read": true,
+        "keeps parent-source precedence before the child first reads its signal": true,
+        "keeps already-aborted construction precedence through close and first read": true,
+        "detaches an unobserved caller source when local close wins": true,
+        "settles abort listeners once when a context closes": true,
+        "materializes the closed signal with the close reason after close": true,
+        "classifies caller cancellation as an aborted close": true,
+        "cancels a streaming child when the consumer returns": true,
+        "cancels a boundary child before parent cleanup settles": true,
+        "keeps explicit-signal identity stable before and after caller cancellation": true,
+        "keeps parent before caller in already-aborted explicit source order": true,
+        "keeps caller reason when it is the only already-aborted explicit source": true,
+        "keeps the first live explicit source when caller aborts before parent": true,
+        "keeps the first live explicit source when parent aborts before caller": true,
+        "keeps local close ahead of a later explicit caller abort": true,
+        "propagates an explicit parent caller to a child without its own signal": true
+      },
+      "forbiddenChecks": {
+        "private cleanups: CloseCleanup[] | undefined": true,
+        "private descendants: Set<Promise<unknown>> | undefined": true,
+        "private activeIterators: Set<AsyncIterator<unknown, unknown, unknown>> | undefined": true,
+        "private children: Set<ExecutionContextImpl> | undefined": true,
+        "this.parent.children ??=": true,
+        "activeIterators ??=": true,
+        "activeIterators?.": true,
+        "const cleanups = this.cleanups ??=": true,
+        "this.children ??": true,
+        "children?.": true,
+        "const descendants = this.descendants ??=": true,
+        "this.descendants ??": true,
+        "this.cleanups?.": true,
+        "this.cleanups!": true,
+        "callerSignal": true,
+        "handleEvent(event: Event)": true,
+        "options.signal.addEventListener": true,
+        "this.callerSignal.addEventListener": true
+      },
+      "semanticTests": {
+        "path": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/semantic-tests/pkg/core/lite/tests/caller-signal-hybrid.test.ts",
+        "sha256": "1ca0e7da969c2a219474ec5392602d06e45d40b6667bb81cafc9667d96317a29",
+        "results": {
+          "path": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/semantic-tests/pkg/core/lite/tests/caller-signal-hybrid.test.ts",
+          "sha256": "1ca0e7da969c2a219474ec5392602d06e45d40b6667bb81cafc9667d96317a29",
+          "focusedPassed": 19,
+          "focusedTotal": 19,
+          "p13CasesPassed": 12,
+          "p13CasesTotal": 12,
+          "explicitEquivalencePassed": 7,
+          "explicitEquivalenceTotal": 7,
+          "existingCancellationPassed": 42,
+          "existingCancellationTotal": 42,
+          "liteNonDocsPassed": 252,
+          "liteNonDocsTotal": 252,
+          "sdkPassed": 59,
+          "sdkTotal": 59,
+          "typechecks": "Lite full and SDK passed",
+          "builds": "Lite and SDK dependency closure passed"
+        }
+      }
+    },
+    "builds": {
+      "baseline": {
+        "sources": {
+          "files": [
+            {
+              "path": "pkg/core/lite/src/atom.ts",
+              "size": 7588,
+              "sha256": "b79ed37b0fce76cad3e287e9a35c6a8ae368e27a677d39f4e93b88af645cdaca"
+            },
+            {
+              "path": "pkg/core/lite/src/deps-graph.ts",
+              "size": 1855,
+              "sha256": "d12c9b6101e6da6546bad9ed6840f27349ac0b7c7e1a6be16f9f60383104f3f1"
+            },
+            {
+              "path": "pkg/core/lite/src/flow.ts",
+              "size": 8699,
+              "sha256": "2c544313b24ad18dcb40953724eff08a560c1a7168be22decb045dc042f065bf"
+            },
+            {
+              "path": "pkg/core/lite/src/index.ts",
+              "size": 801,
+              "sha256": "c7dea3a0529247b9d67051a7c91a3832c3546c175e017cf426333c5f2fefb298"
+            },
+            {
+              "path": "pkg/core/lite/src/latest.ts",
+              "size": 2550,
+              "sha256": "45738b1ef457f87fc11ea585deb0877c77108797bfea1da878bc4f4b019ede11"
+            },
+            {
+              "path": "pkg/core/lite/src/preset.ts",
+              "size": 3029,
+              "sha256": "93a7afe4a91e36fb3b707981357ab1a08b6cdedfb582dab2b6982517be55eb8d"
+            },
+            {
+              "path": "pkg/core/lite/src/resource.ts",
+              "size": 2307,
+              "sha256": "8f4fedfe27e44221d389dde4c814d1f3adc39fa9548f97b2cab457e0e2d7fc27"
+            },
+            {
+              "path": "pkg/core/lite/src/scope.ts",
+              "size": 99830,
+              "sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e"
+            },
+            {
+              "path": "pkg/core/lite/src/streaming.ts",
+              "size": 3234,
+              "sha256": "a8332fb9fb6fbe652fbbed12a2696fc493425b204445c1fc8b53b73a280333ba"
+            },
+            {
+              "path": "pkg/core/lite/src/tag.ts",
+              "size": 9153,
+              "sha256": "29952e51943419c1cd193ddbf1b54b50ce6caff1ae0018c8cd68fb150c5b8f59"
+            },
+            {
+              "path": "pkg/core/lite/src/tracker.ts",
+              "size": 880,
+              "sha256": "677839ad60b2d97b2e83c3b05e14d998ce8ef049c27384131e33ffbd600295a5"
+            },
+            {
+              "path": "pkg/core/lite/src/types.ts",
+              "size": 25632,
+              "sha256": "03545f324721e87752c2d7748a6c4fac7d07a0165539ad81767d19744e3182b3"
+            },
+            {
+              "path": "pkg/sdk/core/src/agent.ts",
+              "size": 26199,
+              "sha256": "2bd1146e69bc62112f5209a4947343a6c303785c66902e614b5b87ffb483369d"
+            },
+            {
+              "path": "pkg/sdk/core/src/index.ts",
+              "size": 31931,
+              "sha256": "095a4860c9209946ecd8b64c042a7c40971580320d4249474e400021ddfb473e"
+            },
+            {
+              "path": "pkg/sdk/core/src/internal/digest.ts",
+              "size": 3111,
+              "sha256": "9ea3117d5b09b2c16e720d9afbb48e1a63869db61479f994a801dc7778cd4cf9"
+            },
+            {
+              "path": "pkg/sdk/core/src/model.ts",
+              "size": 137,
+              "sha256": "039239eabf9417e1c3481bf11fb3db0b0ed4234cf3910990ce857fd7ec952adc"
+            },
+            {
+              "path": "pkg/sdk/core/src/sandbox.ts",
+              "size": 5193,
+              "sha256": "c2e3b94896ac42237c2693a768212ce93abdbdb173cf8f95215ef8630dbee170"
+            },
+            {
+              "path": "pkg/sdk/core/src/session.ts",
+              "size": 63554,
+              "sha256": "f03273e76923655460a42a1e748ca470bd6ee906d541029ec1040d5733d01ad3"
+            },
+            {
+              "path": "pkg/sdk/core/src/validation.ts",
+              "size": 3166,
+              "sha256": "e0c50ec76537be19f24b39ff37f552d9064477d4d0a58c5d62360d146bb87fcd"
+            }
+          ],
+          "sha256": "1393894a23decd6be1a5853e08f051468c35b2725a910d5e77c9b364fe510c15"
+        },
+        "lockfile": {
+          "files": [
+            {
+              "path": "pnpm-lock.yaml",
+              "size": 301142,
+              "sha256": "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120"
+            }
+          ],
+          "sha256": "10f648b1520528a2ab60e4deac76268cd3314b8f2f7a6f03bb27a676e5372dcf"
+        },
+        "manifests": {
+          "files": [
+            {
+              "path": "package.json",
+              "size": 2686,
+              "sha256": "d01d6911abf560cd32dc1d39d84b7a5617f037bffffbd7e94aa987dcd490cdcb"
+            },
+            {
+              "path": "pkg/core/lite/package.json",
+              "size": 1440,
+              "sha256": "d7fb756b7688a355a0ba6e7604a19c1269728527dc040b75f07f87c486b0efb4"
+            },
+            {
+              "path": "pkg/core/lite/tsconfig.json",
+              "size": 233,
+              "sha256": "3cc8918a46ad0d4795b5340f51eee4642b84a2da5cb9708dd6fd576d122aa0bd"
+            },
+            {
+              "path": "pkg/sdk/core/package.json",
+              "size": 2449,
+              "sha256": "c11f17b6ecd8746faa837ab92bf4489170dceede5add3062686ba8162e65e6c3"
+            },
+            {
+              "path": "pkg/sdk/core/tsconfig.json",
+              "size": 309,
+              "sha256": "db8490ca9d3340f8d2b07db80f6a5cbfcc21b866a4ca61641ed2350c5802e966"
+            },
+            {
+              "path": "pnpm-workspace.yaml",
+              "size": 5813,
+              "sha256": "603341c9b78a2d0fe71767c77f2a0146be2babc49cc744e8b66b6fd732cdaed6"
+            }
+          ],
+          "sha256": "75bcb1b36e9a941d120db03e2f3b80475e67962ffc0153662df9ebc01712724b"
+        },
+        "distModules": {
+          "files": [
+            {
+              "path": "pkg/core/lite/dist/index.cjs",
+              "size": 92042,
+              "sha256": "b8977289be908729ff2f96dd79ee9e2c53b6d0b158cd1d86542c9b52aa963cad"
+            },
+            {
+              "path": "pkg/core/lite/dist/index.mjs",
+              "size": 91116,
+              "sha256": "f57fd25f992f1e70a4997b46d1f10ad912eac3bb26caddf7daa389652285e705"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.cjs",
+              "size": 18665,
+              "sha256": "bb01bc2f787c6fcc1fbe68b323f7ac8a37922839d6a671d2931eaecae2ce078a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.mjs",
+              "size": 17696,
+              "sha256": "13250c39d47359a1686d3d0b813822b20657be99a40007b6f4e22093d852fea8"
+            },
+            {
+              "path": "pkg/sdk/core/dist/digest-B-CJeRAR.cjs",
+              "size": 3062,
+              "sha256": "c23603720410152087e8fb23172be4692460a21faaca845f13478d14dae3362c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/digest-DHsSofmQ.mjs",
+              "size": 2981,
+              "sha256": "abf728ccce0d8bd0223d15c573c300c406d7ae9e77189a299ba6c8a6f02d0d86"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.cjs",
+              "size": 21817,
+              "sha256": "97c979c6c67be34669458df3ae483a202518dc114baa7f183912ae78c99b16cc"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.mjs",
+              "size": 20719,
+              "sha256": "5875f89c68808625656fe8060e6f280a9883d94bb929454a15c9b7880f304885"
+            },
+            {
+              "path": "pkg/sdk/core/dist/model-CrBY1TBn.cjs",
+              "size": 216,
+              "sha256": "bbcba2fb0796810c7632bedab348367aeb4a316d44037eb40ff34782365e226a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/model-KPdR5sdU.mjs",
+              "size": 143,
+              "sha256": "e1686873c958865dc79c4292ed95743dd4a3186a7787b56bfb9315440d6c3e50"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.cjs",
+              "size": 4210,
+              "sha256": "062fa7fc1d9d4a9ece19f33979c48a1ede27dd29b0a595c62f17e81ca7d41c7f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.mjs",
+              "size": 3606,
+              "sha256": "6aa65bcdbf3c2093123a85bb2704d19fbfb672304234d0ec04687ce74e35e635"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.cjs",
+              "size": 45940,
+              "sha256": "8a0a7f6f45e8bd98ac777739b87367bcc1ff62c509180356a004b8ad9cd4424f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.mjs",
+              "size": 43574,
+              "sha256": "b9b99e680699ec18b8ae2d63b66ec279bcf46e8cd2c7dfb74bc0cfdff2929135"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.cjs",
+              "size": 1988,
+              "sha256": "1d5be33c174d58eff6b94177fadf0558b50b9c272dd1842922bf610dc0cc8a1e"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.mjs",
+              "size": 1781,
+              "sha256": "5e48118d1cfc4bbb71558f7df611609f1286c3a0e6142af2311c95e805667a1e"
+            }
+          ],
+          "sha256": "850a7112f2298addd28e7e41fe30aa219996a67697dcb240aed15f982cfbd6f9"
+        },
+        "declarations": {
+          "files": [
+            {
+              "path": "pkg/core/lite/dist/index.d.cts",
+              "size": 47268,
+              "sha256": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713"
+            },
+            {
+              "path": "pkg/core/lite/dist/index.d.mts",
+              "size": 47268,
+              "sha256": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent-BqBU9EIv.d.mts",
+              "size": 15681,
+              "sha256": "83ede6fae6f92119761410fd47d72f3322c7aae7fb0de9941e97bcd7ede7d3cb"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent-DRCH3dW3.d.cts",
+              "size": 15677,
+              "sha256": "d7afdd17d2b661383eb270413e301c34453c73bdd27d76f39b5200ffdeeb5771"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.d.cts",
+              "size": 735,
+              "sha256": "bffc46cb95c03da8808cfa5a0c753bbb4c4a157e0947c744ea5a1057d8019012"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.d.mts",
+              "size": 735,
+              "sha256": "3931fc9ff268a859395ccf26a77d057543f730e2e4057b45ee74c02dd36aff16"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.d.cts",
+              "size": 2062,
+              "sha256": "4871f2ac669eaad30b5c7f9a47f2f863245f7c4ef8b006059d1f6f3025d5dac9"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.d.mts",
+              "size": 2062,
+              "sha256": "986e6d093ed78e8da4e25f3fd5072be38cb0e4c6b8b764704b89693a81667049"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.d.cts",
+              "size": 1741,
+              "sha256": "0de634451807e69b9619efb5a5b064e669968dd245031bb6217b7232ad00512c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.d.mts",
+              "size": 1741,
+              "sha256": "0de634451807e69b9619efb5a5b064e669968dd245031bb6217b7232ad00512c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session-CS_mRWkC.d.cts",
+              "size": 19685,
+              "sha256": "3c43bec659df00d3aeb221c95cf4aba33c705f2d6c83993f78882a5c10d4778f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session-CS_mRWkC.d.mts",
+              "size": 19685,
+              "sha256": "3c43bec659df00d3aeb221c95cf4aba33c705f2d6c83993f78882a5c10d4778f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.d.cts",
+              "size": 2972,
+              "sha256": "e733e06b8953d2436d32f42ce5e61cb2c9686cc90dcd93bba67758bc6e40918c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.d.mts",
+              "size": 2972,
+              "sha256": "1c61ab34af2908afe187a8a5eba8c1e12db16238c66a432028242708d8632aec"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation-Du4wlGIT.d.cts",
+              "size": 1465,
+              "sha256": "791e4bf7904684b13cb5bf58e7cdb123e03d3fbe18563d0be5b7f53b23dc4ecf"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation-Du4wlGIT.d.mts",
+              "size": 1465,
+              "sha256": "791e4bf7904684b13cb5bf58e7cdb123e03d3fbe18563d0be5b7f53b23dc4ecf"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.d.cts",
+              "size": 249,
+              "sha256": "7f0405fa07ce5e90faf4ea1e3a669a8e1d92b1c2f4795a0613007628065b332c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.d.mts",
+              "size": 249,
+              "sha256": "1bd36d1dd86e454bd14e49ac03b4ecc341a06902c8b0378421f5ba68eab8642f"
+            }
+          ],
+          "sha256": "a62902af2abdc320fb2c205406d91422ba1626a48e94397846fa0b29a2801d59"
+        }
+      },
+      "candidate": {
+        "sources": {
+          "files": [
+            {
+              "path": "pkg/core/lite/src/atom.ts",
+              "size": 7588,
+              "sha256": "b79ed37b0fce76cad3e287e9a35c6a8ae368e27a677d39f4e93b88af645cdaca"
+            },
+            {
+              "path": "pkg/core/lite/src/deps-graph.ts",
+              "size": 1855,
+              "sha256": "d12c9b6101e6da6546bad9ed6840f27349ac0b7c7e1a6be16f9f60383104f3f1"
+            },
+            {
+              "path": "pkg/core/lite/src/flow.ts",
+              "size": 8699,
+              "sha256": "2c544313b24ad18dcb40953724eff08a560c1a7168be22decb045dc042f065bf"
+            },
+            {
+              "path": "pkg/core/lite/src/index.ts",
+              "size": 801,
+              "sha256": "c7dea3a0529247b9d67051a7c91a3832c3546c175e017cf426333c5f2fefb298"
+            },
+            {
+              "path": "pkg/core/lite/src/latest.ts",
+              "size": 2550,
+              "sha256": "45738b1ef457f87fc11ea585deb0877c77108797bfea1da878bc4f4b019ede11"
+            },
+            {
+              "path": "pkg/core/lite/src/preset.ts",
+              "size": 3029,
+              "sha256": "93a7afe4a91e36fb3b707981357ab1a08b6cdedfb582dab2b6982517be55eb8d"
+            },
+            {
+              "path": "pkg/core/lite/src/resource.ts",
+              "size": 2307,
+              "sha256": "8f4fedfe27e44221d389dde4c814d1f3adc39fa9548f97b2cab457e0e2d7fc27"
+            },
+            {
+              "path": "pkg/core/lite/src/scope.ts",
+              "size": 101478,
+              "sha256": "d0afa4226f78c6f1b6097007363014ecf84cbdaa8c74c0fc5fbd5d14202ce791"
+            },
+            {
+              "path": "pkg/core/lite/src/streaming.ts",
+              "size": 3234,
+              "sha256": "a8332fb9fb6fbe652fbbed12a2696fc493425b204445c1fc8b53b73a280333ba"
+            },
+            {
+              "path": "pkg/core/lite/src/tag.ts",
+              "size": 9153,
+              "sha256": "29952e51943419c1cd193ddbf1b54b50ce6caff1ae0018c8cd68fb150c5b8f59"
+            },
+            {
+              "path": "pkg/core/lite/src/tracker.ts",
+              "size": 880,
+              "sha256": "677839ad60b2d97b2e83c3b05e14d998ce8ef049c27384131e33ffbd600295a5"
+            },
+            {
+              "path": "pkg/core/lite/src/types.ts",
+              "size": 25632,
+              "sha256": "03545f324721e87752c2d7748a6c4fac7d07a0165539ad81767d19744e3182b3"
+            },
+            {
+              "path": "pkg/sdk/core/src/agent.ts",
+              "size": 26199,
+              "sha256": "2bd1146e69bc62112f5209a4947343a6c303785c66902e614b5b87ffb483369d"
+            },
+            {
+              "path": "pkg/sdk/core/src/index.ts",
+              "size": 31931,
+              "sha256": "095a4860c9209946ecd8b64c042a7c40971580320d4249474e400021ddfb473e"
+            },
+            {
+              "path": "pkg/sdk/core/src/internal/digest.ts",
+              "size": 3111,
+              "sha256": "9ea3117d5b09b2c16e720d9afbb48e1a63869db61479f994a801dc7778cd4cf9"
+            },
+            {
+              "path": "pkg/sdk/core/src/model.ts",
+              "size": 137,
+              "sha256": "039239eabf9417e1c3481bf11fb3db0b0ed4234cf3910990ce857fd7ec952adc"
+            },
+            {
+              "path": "pkg/sdk/core/src/sandbox.ts",
+              "size": 5193,
+              "sha256": "c2e3b94896ac42237c2693a768212ce93abdbdb173cf8f95215ef8630dbee170"
+            },
+            {
+              "path": "pkg/sdk/core/src/session.ts",
+              "size": 63554,
+              "sha256": "f03273e76923655460a42a1e748ca470bd6ee906d541029ec1040d5733d01ad3"
+            },
+            {
+              "path": "pkg/sdk/core/src/validation.ts",
+              "size": 3166,
+              "sha256": "e0c50ec76537be19f24b39ff37f552d9064477d4d0a58c5d62360d146bb87fcd"
+            }
+          ],
+          "sha256": "536bba8e128db94a14c312aae0fa46f81dfec6954a5593536c0037e298aff6dd"
+        },
+        "lockfile": {
+          "files": [
+            {
+              "path": "pnpm-lock.yaml",
+              "size": 301142,
+              "sha256": "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120"
+            }
+          ],
+          "sha256": "10f648b1520528a2ab60e4deac76268cd3314b8f2f7a6f03bb27a676e5372dcf"
+        },
+        "manifests": {
+          "files": [
+            {
+              "path": "package.json",
+              "size": 2686,
+              "sha256": "d01d6911abf560cd32dc1d39d84b7a5617f037bffffbd7e94aa987dcd490cdcb"
+            },
+            {
+              "path": "pkg/core/lite/package.json",
+              "size": 1440,
+              "sha256": "d7fb756b7688a355a0ba6e7604a19c1269728527dc040b75f07f87c486b0efb4"
+            },
+            {
+              "path": "pkg/core/lite/tsconfig.json",
+              "size": 233,
+              "sha256": "3cc8918a46ad0d4795b5340f51eee4642b84a2da5cb9708dd6fd576d122aa0bd"
+            },
+            {
+              "path": "pkg/sdk/core/package.json",
+              "size": 2449,
+              "sha256": "c11f17b6ecd8746faa837ab92bf4489170dceede5add3062686ba8162e65e6c3"
+            },
+            {
+              "path": "pkg/sdk/core/tsconfig.json",
+              "size": 309,
+              "sha256": "db8490ca9d3340f8d2b07db80f6a5cbfcc21b866a4ca61641ed2350c5802e966"
+            },
+            {
+              "path": "pnpm-workspace.yaml",
+              "size": 5813,
+              "sha256": "603341c9b78a2d0fe71767c77f2a0146be2babc49cc744e8b66b6fd732cdaed6"
+            }
+          ],
+          "sha256": "75bcb1b36e9a941d120db03e2f3b80475e67962ffc0153662df9ebc01712724b"
+        },
+        "distModules": {
+          "files": [
+            {
+              "path": "pkg/core/lite/dist/index.cjs",
+              "size": 93356,
+              "sha256": "054a3b95d2c8ee55444709a52e21dc82882c76382c58571f43df2ce578254753"
+            },
+            {
+              "path": "pkg/core/lite/dist/index.mjs",
+              "size": 92430,
+              "sha256": "b4d9ed5b2f8e315504e094b6ce82a4d3c74d60836eeaf3e836bc3b0c08bc983a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.cjs",
+              "size": 18665,
+              "sha256": "bb01bc2f787c6fcc1fbe68b323f7ac8a37922839d6a671d2931eaecae2ce078a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.mjs",
+              "size": 17696,
+              "sha256": "13250c39d47359a1686d3d0b813822b20657be99a40007b6f4e22093d852fea8"
+            },
+            {
+              "path": "pkg/sdk/core/dist/digest-B-CJeRAR.cjs",
+              "size": 3062,
+              "sha256": "c23603720410152087e8fb23172be4692460a21faaca845f13478d14dae3362c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/digest-DHsSofmQ.mjs",
+              "size": 2981,
+              "sha256": "abf728ccce0d8bd0223d15c573c300c406d7ae9e77189a299ba6c8a6f02d0d86"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.cjs",
+              "size": 21817,
+              "sha256": "97c979c6c67be34669458df3ae483a202518dc114baa7f183912ae78c99b16cc"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.mjs",
+              "size": 20719,
+              "sha256": "5875f89c68808625656fe8060e6f280a9883d94bb929454a15c9b7880f304885"
+            },
+            {
+              "path": "pkg/sdk/core/dist/model-CrBY1TBn.cjs",
+              "size": 216,
+              "sha256": "bbcba2fb0796810c7632bedab348367aeb4a316d44037eb40ff34782365e226a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/model-KPdR5sdU.mjs",
+              "size": 143,
+              "sha256": "e1686873c958865dc79c4292ed95743dd4a3186a7787b56bfb9315440d6c3e50"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.cjs",
+              "size": 4210,
+              "sha256": "062fa7fc1d9d4a9ece19f33979c48a1ede27dd29b0a595c62f17e81ca7d41c7f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.mjs",
+              "size": 3606,
+              "sha256": "6aa65bcdbf3c2093123a85bb2704d19fbfb672304234d0ec04687ce74e35e635"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.cjs",
+              "size": 45940,
+              "sha256": "8a0a7f6f45e8bd98ac777739b87367bcc1ff62c509180356a004b8ad9cd4424f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.mjs",
+              "size": 43574,
+              "sha256": "b9b99e680699ec18b8ae2d63b66ec279bcf46e8cd2c7dfb74bc0cfdff2929135"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.cjs",
+              "size": 1988,
+              "sha256": "1d5be33c174d58eff6b94177fadf0558b50b9c272dd1842922bf610dc0cc8a1e"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.mjs",
+              "size": 1781,
+              "sha256": "5e48118d1cfc4bbb71558f7df611609f1286c3a0e6142af2311c95e805667a1e"
+            }
+          ],
+          "sha256": "53e45fc91db03050a8243fe957f53b3f44abd24036a8f11f733e8307e6440ac5"
+        },
+        "declarations": {
+          "files": [
+            {
+              "path": "pkg/core/lite/dist/index.d.cts",
+              "size": 47268,
+              "sha256": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713"
+            },
+            {
+              "path": "pkg/core/lite/dist/index.d.mts",
+              "size": 47268,
+              "sha256": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent-BqBU9EIv.d.mts",
+              "size": 15681,
+              "sha256": "83ede6fae6f92119761410fd47d72f3322c7aae7fb0de9941e97bcd7ede7d3cb"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent-DRCH3dW3.d.cts",
+              "size": 15677,
+              "sha256": "d7afdd17d2b661383eb270413e301c34453c73bdd27d76f39b5200ffdeeb5771"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.d.cts",
+              "size": 735,
+              "sha256": "bffc46cb95c03da8808cfa5a0c753bbb4c4a157e0947c744ea5a1057d8019012"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.d.mts",
+              "size": 735,
+              "sha256": "3931fc9ff268a859395ccf26a77d057543f730e2e4057b45ee74c02dd36aff16"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.d.cts",
+              "size": 2062,
+              "sha256": "4871f2ac669eaad30b5c7f9a47f2f863245f7c4ef8b006059d1f6f3025d5dac9"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.d.mts",
+              "size": 2062,
+              "sha256": "986e6d093ed78e8da4e25f3fd5072be38cb0e4c6b8b764704b89693a81667049"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.d.cts",
+              "size": 1741,
+              "sha256": "0de634451807e69b9619efb5a5b064e669968dd245031bb6217b7232ad00512c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.d.mts",
+              "size": 1741,
+              "sha256": "0de634451807e69b9619efb5a5b064e669968dd245031bb6217b7232ad00512c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session-CS_mRWkC.d.cts",
+              "size": 19685,
+              "sha256": "3c43bec659df00d3aeb221c95cf4aba33c705f2d6c83993f78882a5c10d4778f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session-CS_mRWkC.d.mts",
+              "size": 19685,
+              "sha256": "3c43bec659df00d3aeb221c95cf4aba33c705f2d6c83993f78882a5c10d4778f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.d.cts",
+              "size": 2972,
+              "sha256": "e733e06b8953d2436d32f42ce5e61cb2c9686cc90dcd93bba67758bc6e40918c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.d.mts",
+              "size": 2972,
+              "sha256": "1c61ab34af2908afe187a8a5eba8c1e12db16238c66a432028242708d8632aec"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation-Du4wlGIT.d.cts",
+              "size": 1465,
+              "sha256": "791e4bf7904684b13cb5bf58e7cdb123e03d3fbe18563d0be5b7f53b23dc4ecf"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation-Du4wlGIT.d.mts",
+              "size": 1465,
+              "sha256": "791e4bf7904684b13cb5bf58e7cdb123e03d3fbe18563d0be5b7f53b23dc4ecf"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.d.cts",
+              "size": 249,
+              "sha256": "7f0405fa07ce5e90faf4ea1e3a669a8e1d92b1c2f4795a0613007628065b332c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.d.mts",
+              "size": 249,
+              "sha256": "1bd36d1dd86e454bd14e49ac03b4ecc341a06902c8b0378421f5ba68eab8642f"
+            }
+          ],
+          "sha256": "a62902af2abdc320fb2c205406d91422ba1626a48e94397846fa0b29a2801d59"
+        }
+      }
+    },
+    "checks": {
+      "exactHead": true,
+      "baselineArchive": true,
+      "baselineSourceMatchesAcceptedBuild": true,
+      "baselineLockfileMatchesAcceptedBuild": true,
+      "baselineManifestsMatchAcceptedBuild": true,
+      "baselineDistMatchesAcceptedBuild": true,
+      "baselineDeclarationsMatchAcceptedBuild": true,
+      "patchHash": true,
+      "changedSources": true,
+      "candidateScopeMatchesFrozenVariant": true,
+      "variantExclusionHeld": true,
+      "variantExclusionPatchMatches": true,
+      "variantExclusionScopeMatches": true,
+      "semanticTestsFrozen": true,
+      "semanticBoundaryHeld": true,
+      "lockfileUnchanged": true,
+      "manifestsUnchanged": true,
+      "declarationsUnchanged": true
+    },
+    "environment": {
+      "node": "v26.4.0",
+      "v8": "14.6.202.34-node.21",
+      "platform": "linux",
+      "release": "6.12.95+deb13-amd64",
+      "cpu": "Intel(R) Xeon(R) CPU E3-1245 v5 @ 3.50GHz",
+      "logicalCpuCount": 8,
+      "totalMemoryBytes": 33432829952
+    },
+    "environmentSha256": "f44942f8a245e8fb5079ed7efca243d5041388f760888eaf39378dca95369b09"
+  },
+  "frozen_protocol": {
+    "frozen_at": "2026-07-16T09:06:01.163Z",
+    "first_observation_at": "2026-07-16T09:06:17.787Z",
+    "chronology_held": true,
+    "frozen_checks": [
+      {
+        "file": "protocol.json",
+        "expected": "de9819f4a50583a6a9a58c839c6aba83ccdebf05a1b27f80c1716cc34ca2abad",
+        "actual": "de9819f4a50583a6a9a58c839c6aba83ccdebf05a1b27f80c1716cc34ca2abad",
+        "matched": true
+      },
+      {
+        "file": "variant.patch",
+        "expected": "7822cdd1e7a88d9b8e492345d611d6a0b348d2d5563135032b3dd85ea653b38f",
+        "actual": "7822cdd1e7a88d9b8e492345d611d6a0b348d2d5563135032b3dd85ea653b38f",
+        "matched": true
+      },
+      {
+        "file": "semantic-tests.patch",
+        "expected": "b03f165e60fa56557d116b4f5d5879fe716c93a575d770705605fbf04037f953",
+        "actual": "b03f165e60fa56557d116b4f5d5879fe716c93a575d770705605fbf04037f953",
+        "matched": true
+      },
+      {
+        "file": "variant-exclusion.json",
+        "expected": "3529eb67f347edcf19c2901d0681d4df3011e3a19c26608199987bda6b4c1e71",
+        "actual": "3529eb67f347edcf19c2901d0681d4df3011e3a19c26608199987bda6b4c1e71",
+        "matched": true
+      },
+      {
+        "file": "verify-variant.mjs",
+        "expected": "b5fa0f3ee471517b62f457a35b03e3f884d047f25e04896f11f16dbc14da9479",
+        "actual": "b5fa0f3ee471517b62f457a35b03e3f884d047f25e04896f11f16dbc14da9479",
+        "matched": true
+      },
+      {
+        "file": "workloads.mjs",
+        "expected": "cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a",
+        "actual": "cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a",
+        "matched": true
+      },
+      {
+        "file": "observe-throughput.mjs",
+        "expected": "e6965f81d506eaa4c17fbaa4184317b14b06ae6ff27ff0d2771110ac836103b5",
+        "actual": "e6965f81d506eaa4c17fbaa4184317b14b06ae6ff27ff0d2771110ac836103b5",
+        "matched": true
+      },
+      {
+        "file": "observe-allocation.mjs",
+        "expected": "d121e126b4901312a615e05f479412f67609f87d79c1357fa699cb7b56890d98",
+        "actual": "d121e126b4901312a615e05f479412f67609f87d79c1357fa699cb7b56890d98",
+        "matched": true
+      },
+      {
+        "file": "observe-retained.mjs",
+        "expected": "8ff0a15fdefeec7408e1412760219462f6b1546fd8d79b662c69ed4f9f88e254",
+        "actual": "8ff0a15fdefeec7408e1412760219462f6b1546fd8d79b662c69ed4f9f88e254",
+        "matched": true
+      },
+      {
+        "file": "prepare-candidate.sh",
+        "expected": "fdea553c25065b82ea35251bea14e905a7898a0128f5d3ca918f8703611e4042",
+        "actual": "fdea553c25065b82ea35251bea14e905a7898a0128f5d3ca918f8703611e4042",
+        "matched": true
+      },
+      {
+        "file": "collect-provenance.mjs",
+        "expected": "9ee583c39013e89a3a709850954cd421c0fa652f842f4e2565cc3bf127e6b9c2",
+        "actual": "9ee583c39013e89a3a709850954cd421c0fa652f842f4e2565cc3bf127e6b9c2",
+        "matched": true
+      },
+      {
+        "file": "verify.mjs",
+        "expected": "7ae902bc04b297c5ab2762436e9e5c2c5791087aa6e6ea2f11afc1f877b3d632",
+        "actual": "7ae902bc04b297c5ab2762436e9e5c2c5791087aa6e6ea2f11afc1f877b3d632",
+        "matched": true
+      },
+      {
+        "file": "run-once.sh",
+        "expected": "bd22f1877bc99acc88192f441c5b9beb331a6eff30fecdbd262da116493b3bb9",
+        "actual": "bd22f1877bc99acc88192f441c5b9beb331a6eff30fecdbd262da116493b3bb9",
+        "matched": true
+      },
+      {
+        "file": "freeze.mjs",
+        "expected": "981f6a0c8d09deb998dcda515b6967e1a43809b902d4321e45d0d7800446f0b0",
+        "actual": "981f6a0c8d09deb998dcda515b6967e1a43809b902d4321e45d0d7800446f0b0",
+        "matched": true
+      }
+    ],
+    "accepted_evidence_checks": {
+      "dkrP8": true,
+      "dkrP10A": true,
+      "dkrP10B": true,
+      "dkrP11B": true,
+      "dkrP12": true,
+      "dkrP13": true,
+      "p9Workloads": true
+    }
+  },
+  "observed_at": "2026-07-16T09:10:51.156Z",
+  "recorded_at": "2026-07-16T09:10:51.156Z",
+  "max_age": "PT24H",
+  "freshness_status": "fresh",
+  "raw_hashes": {
+    "observation_count": 96,
+    "manifest_sha256": "a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704",
+    "every_hash_matched": true,
+    "files": [
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-baseline-measure.json",
+        "expected": "e8fc5eb979f733095cddc410fa2502ba51ca83fa8b69d63738423c73e26eca89",
+        "actual": "e8fc5eb979f733095cddc410fa2502ba51ca83fa8b69d63738423c73e26eca89",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-baseline-zero.json",
+        "expected": "d156efc9a541a4812bd97c1d62a258b374a06ee6e40c0ff82c226b3bece4a19e",
+        "actual": "d156efc9a541a4812bd97c1d62a258b374a06ee6e40c0ff82c226b3bece4a19e",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-candidate-measure.json",
+        "expected": "0955f82866e56f60f2d1b81be87610e918db85c3e8f3a9318bcbf28e9c07bd4a",
+        "actual": "0955f82866e56f60f2d1b81be87610e918db85c3e8f3a9318bcbf28e9c07bd4a",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-candidate-zero.json",
+        "expected": "ffa8814ef5e67b851091b166fe6f89ae7a8f38a9a092ef7e1aafe3c832dd5e83",
+        "actual": "ffa8814ef5e67b851091b166fe6f89ae7a8f38a9a092ef7e1aafe3c832dd5e83",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-baseline-measure.json",
+        "expected": "2806d7d6778aae74ff39a0b134a42e39bdc1a23eda1da40e3ab1c2063e40b722",
+        "actual": "2806d7d6778aae74ff39a0b134a42e39bdc1a23eda1da40e3ab1c2063e40b722",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-baseline-zero.json",
+        "expected": "22e3e4aabaed5f00ea97bbc848091c5b359e76b5de7a63a644769082b089df30",
+        "actual": "22e3e4aabaed5f00ea97bbc848091c5b359e76b5de7a63a644769082b089df30",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-candidate-measure.json",
+        "expected": "97886e997d9018b95099f4ea2149ae410989df8d54e703892ccf3aef16d3de6f",
+        "actual": "97886e997d9018b95099f4ea2149ae410989df8d54e703892ccf3aef16d3de6f",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-candidate-zero.json",
+        "expected": "376eea4bb0e6293a44b80a3c2369112dce0de4bb5ceb12ddee38b7f68770beb9",
+        "actual": "376eea4bb0e6293a44b80a3c2369112dce0de4bb5ceb12ddee38b7f68770beb9",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-baseline-measure.json",
+        "expected": "b99a3dd137d53a04147e7012297e46a212384468be4a32ff4c061c6af385fbad",
+        "actual": "b99a3dd137d53a04147e7012297e46a212384468be4a32ff4c061c6af385fbad",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-baseline-zero.json",
+        "expected": "b1ac9ac3b4618010266190a43fb8ea910d819d63bc2cb87e96869738ef6f99e7",
+        "actual": "b1ac9ac3b4618010266190a43fb8ea910d819d63bc2cb87e96869738ef6f99e7",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-candidate-measure.json",
+        "expected": "3d4b567702952a683f07d1efb1d84100acb7a8e78d1775a14c2c8cb48f1ef923",
+        "actual": "3d4b567702952a683f07d1efb1d84100acb7a8e78d1775a14c2c8cb48f1ef923",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-candidate-zero.json",
+        "expected": "9e703d64e67354c1f0c3d9a6b2ac63fe82f099920eea48431bedace554367890",
+        "actual": "9e703d64e67354c1f0c3d9a6b2ac63fe82f099920eea48431bedace554367890",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-baseline-measure.json",
+        "expected": "1a14f338af4cb28c2849806dc9b6fbf261de759efba710132eec7405d31fa0e2",
+        "actual": "1a14f338af4cb28c2849806dc9b6fbf261de759efba710132eec7405d31fa0e2",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-baseline-zero.json",
+        "expected": "7d30a7e6a961bd99a4126a58a980e99a7e1a2d011436431f393718f93f157e7e",
+        "actual": "7d30a7e6a961bd99a4126a58a980e99a7e1a2d011436431f393718f93f157e7e",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-candidate-measure.json",
+        "expected": "2b800b5d4daf7ecf044539826d2054c87748199248d5c26c04df4ba759779968",
+        "actual": "2b800b5d4daf7ecf044539826d2054c87748199248d5c26c04df4ba759779968",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-candidate-zero.json",
+        "expected": "1a13d41f1af2bf86f07f52671ef84978d6f58a9fb0541f2edbe3316865f25183",
+        "actual": "1a13d41f1af2bf86f07f52671ef84978d6f58a9fb0541f2edbe3316865f25183",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-baseline-measure.json",
+        "expected": "0fae738d08ab03b569f3a06bac31c9fb9a84100dea471809b3013c24757664d0",
+        "actual": "0fae738d08ab03b569f3a06bac31c9fb9a84100dea471809b3013c24757664d0",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-baseline-zero.json",
+        "expected": "a52450f03f29fa8c38cbf39a858d72c93778fac57caac6e34891d7b0af2803ae",
+        "actual": "a52450f03f29fa8c38cbf39a858d72c93778fac57caac6e34891d7b0af2803ae",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-candidate-measure.json",
+        "expected": "6d65190d88d7a41d79da15c608db6d7b543aadb230ad9c95def30938a389543d",
+        "actual": "6d65190d88d7a41d79da15c608db6d7b543aadb230ad9c95def30938a389543d",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-candidate-zero.json",
+        "expected": "6bf4ae8d8af5e14f6c3b605cd2b9d9ffbe0efcca8e4cdaa530b5146d4da735f3",
+        "actual": "6bf4ae8d8af5e14f6c3b605cd2b9d9ffbe0efcca8e4cdaa530b5146d4da735f3",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-baseline-measure.json",
+        "expected": "81e9332f4dd135a71fc9af8e5f25eb6c343e3c55d79010826e339ab01ae48c15",
+        "actual": "81e9332f4dd135a71fc9af8e5f25eb6c343e3c55d79010826e339ab01ae48c15",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-baseline-zero.json",
+        "expected": "820551b81c39039ea729c24eaa46155c2c05c0992053521bef9b7aacb8e6a930",
+        "actual": "820551b81c39039ea729c24eaa46155c2c05c0992053521bef9b7aacb8e6a930",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-candidate-measure.json",
+        "expected": "bc68ec1f9cbedb75e0c4e66ca22bfa35c1d9f70ad881b86ddab4d66da8609402",
+        "actual": "bc68ec1f9cbedb75e0c4e66ca22bfa35c1d9f70ad881b86ddab4d66da8609402",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-candidate-zero.json",
+        "expected": "f3535b0cae0e9b9dcb353b52b062ef4ebe0a94e25179accecd47cfcd9d2ca762",
+        "actual": "f3535b0cae0e9b9dcb353b52b062ef4ebe0a94e25179accecd47cfcd9d2ca762",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-baseline-measure.json",
+        "expected": "8fdefb77ded2b60c6812c71c4d52f44453aa0c150d0a6f948f095183cba7bf67",
+        "actual": "8fdefb77ded2b60c6812c71c4d52f44453aa0c150d0a6f948f095183cba7bf67",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-baseline-zero.json",
+        "expected": "41deddabc99e012f0c562746fd171def672929c546f27893954e3b0c6a8d41c7",
+        "actual": "41deddabc99e012f0c562746fd171def672929c546f27893954e3b0c6a8d41c7",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-candidate-measure.json",
+        "expected": "fd68c7644ef11073c3e98187f9e53da85212e7f6f587565febb535d83cd0ee5f",
+        "actual": "fd68c7644ef11073c3e98187f9e53da85212e7f6f587565febb535d83cd0ee5f",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-candidate-zero.json",
+        "expected": "a0900dd0af2b60c44ef1d20d79eab44a4ca4ec8e2d35c52f7e7826e7810b656b",
+        "actual": "a0900dd0af2b60c44ef1d20d79eab44a4ca4ec8e2d35c52f7e7826e7810b656b",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-baseline-measure.json",
+        "expected": "5bd7511572bd7ea36f97cf5e44ea47e3eb4b21f5aedb4f472b62a5a949120ba3",
+        "actual": "5bd7511572bd7ea36f97cf5e44ea47e3eb4b21f5aedb4f472b62a5a949120ba3",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-baseline-zero.json",
+        "expected": "cd41b927fb88c69ebc7c31bca2a2ab67825f2beda28007acc94113dcbcf12322",
+        "actual": "cd41b927fb88c69ebc7c31bca2a2ab67825f2beda28007acc94113dcbcf12322",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-candidate-measure.json",
+        "expected": "8f9f1fa2ce579f8a60d36868462cc360572587b1a3cd84821a2b959347f10393",
+        "actual": "8f9f1fa2ce579f8a60d36868462cc360572587b1a3cd84821a2b959347f10393",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-candidate-zero.json",
+        "expected": "ee79080a74e610635223a3f6ae39c0f0aec87e343ba26c8b80fd0ffc27b55bc6",
+        "actual": "ee79080a74e610635223a3f6ae39c0f0aec87e343ba26c8b80fd0ffc27b55bc6",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-baseline-measure.json",
+        "expected": "2abfb65ada24098fba9030f563235e23cc2285a67908537e3edf8bd2d80555e6",
+        "actual": "2abfb65ada24098fba9030f563235e23cc2285a67908537e3edf8bd2d80555e6",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-baseline-zero.json",
+        "expected": "bca2ed967c586cc0bd63367db0fbab3a1a19e0fdabc7cf873a6d1aac8fdb3100",
+        "actual": "bca2ed967c586cc0bd63367db0fbab3a1a19e0fdabc7cf873a6d1aac8fdb3100",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-candidate-measure.json",
+        "expected": "261f82cccb2c5b97805e0cf695676c4ee9283000611ee5b8b816b7cb0f59f3b9",
+        "actual": "261f82cccb2c5b97805e0cf695676c4ee9283000611ee5b8b816b7cb0f59f3b9",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-candidate-zero.json",
+        "expected": "d8dd9e58365285b3ff514769ad8cfe01757b8d83e0588d49016fecd84f3b97af",
+        "actual": "d8dd9e58365285b3ff514769ad8cfe01757b8d83e0588d49016fecd84f3b97af",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-1-baseline.json",
+        "expected": "885f430a54bff3ef8f75621248406a49eefbf1f0b898ee2065f84f4a491ab6a9",
+        "actual": "885f430a54bff3ef8f75621248406a49eefbf1f0b898ee2065f84f4a491ab6a9",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-1-candidate.json",
+        "expected": "bd2ee7d40a8bff3f9faaa50a88c702d470c40f04abd79f3c0bab9e8ec4865519",
+        "actual": "bd2ee7d40a8bff3f9faaa50a88c702d470c40f04abd79f3c0bab9e8ec4865519",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-2-baseline.json",
+        "expected": "e79f35d747b73530efe4fb9b674bdcdc755155687581752b8bb56dea518ce22e",
+        "actual": "e79f35d747b73530efe4fb9b674bdcdc755155687581752b8bb56dea518ce22e",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-2-candidate.json",
+        "expected": "7ce16dd8ee853a565f7100797169d43b6c9b702dd0e45cb238d337002f409f8f",
+        "actual": "7ce16dd8ee853a565f7100797169d43b6c9b702dd0e45cb238d337002f409f8f",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-3-baseline.json",
+        "expected": "ebc4f723b11c47e12a93f6e8abc766f7faf897f84a77273750debbdad232459b",
+        "actual": "ebc4f723b11c47e12a93f6e8abc766f7faf897f84a77273750debbdad232459b",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-3-candidate.json",
+        "expected": "fb70d6c813e86faf7b7a5cd5ce4c7c161bfbb01c7c53aca14207478458a787ea",
+        "actual": "fb70d6c813e86faf7b7a5cd5ce4c7c161bfbb01c7c53aca14207478458a787ea",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-1-baseline.json",
+        "expected": "ca125d962bda1ce584504a49b6a3cb7cc4e6eed5e48ca4e5bf8f3f4ec9a7a4c6",
+        "actual": "ca125d962bda1ce584504a49b6a3cb7cc4e6eed5e48ca4e5bf8f3f4ec9a7a4c6",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-1-candidate.json",
+        "expected": "3170ef9c4b67b9e24941c28bbf5656d2ad97d5c10c97543ce7c2d2515f4bc583",
+        "actual": "3170ef9c4b67b9e24941c28bbf5656d2ad97d5c10c97543ce7c2d2515f4bc583",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-2-baseline.json",
+        "expected": "e17ec674dfacbcefa2bbff32342e1ac000eb7b1798d0492d4b079440f601d54a",
+        "actual": "e17ec674dfacbcefa2bbff32342e1ac000eb7b1798d0492d4b079440f601d54a",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-2-candidate.json",
+        "expected": "cd51e7818f609d79a884e9d6e9f0c4e5b7e0b36dd3ee66545093c12ee0f8a69c",
+        "actual": "cd51e7818f609d79a884e9d6e9f0c4e5b7e0b36dd3ee66545093c12ee0f8a69c",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-3-baseline.json",
+        "expected": "23f25deee078b2a498e80e1126dd39faffcac50c325ad3108f252d61ccbcecb4",
+        "actual": "23f25deee078b2a498e80e1126dd39faffcac50c325ad3108f252d61ccbcecb4",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-3-candidate.json",
+        "expected": "5a68474d73bd6bfbd097ec2b34ea6d2d8e3cc1238f9dcf541e3e40c53786efa9",
+        "actual": "5a68474d73bd6bfbd097ec2b34ea6d2d8e3cc1238f9dcf541e3e40c53786efa9",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-1-baseline.json",
+        "expected": "37eb45e6cc0cef228972eb1adc8cf51dea7574ef48015787c7a5ba1e94a77998",
+        "actual": "37eb45e6cc0cef228972eb1adc8cf51dea7574ef48015787c7a5ba1e94a77998",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-1-candidate.json",
+        "expected": "b8cf22fbe6a400d8648d5b72005a2e7417a016d2a18af787227b2cdb2a57431f",
+        "actual": "b8cf22fbe6a400d8648d5b72005a2e7417a016d2a18af787227b2cdb2a57431f",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-2-baseline.json",
+        "expected": "5bef476397f610fbb2349beeebd6b9831070314f8608c546bb47ac64d1819989",
+        "actual": "5bef476397f610fbb2349beeebd6b9831070314f8608c546bb47ac64d1819989",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-2-candidate.json",
+        "expected": "c45499b4a37de3c837e58bfdd6508913d634e6a9106648b2190e8bdf62204475",
+        "actual": "c45499b4a37de3c837e58bfdd6508913d634e6a9106648b2190e8bdf62204475",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-3-baseline.json",
+        "expected": "b6f2e5b2536c97e76f011eed0c0a14b48249544baf0801030b69649895589004",
+        "actual": "b6f2e5b2536c97e76f011eed0c0a14b48249544baf0801030b69649895589004",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-3-candidate.json",
+        "expected": "a14c61e6abb5c5473de2de591c67160cb8df8532e7ff0191ed9a107e2eeeef41",
+        "actual": "a14c61e6abb5c5473de2de591c67160cb8df8532e7ff0191ed9a107e2eeeef41",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-01-baseline.json",
+        "expected": "dbeecf19483b6c53a278a56488da5caf8a6844de7d0eccf1d02a900f0084a477",
+        "actual": "dbeecf19483b6c53a278a56488da5caf8a6844de7d0eccf1d02a900f0084a477",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-02-candidate.json",
+        "expected": "e3168abeddbb5ff710df510e06bed2ea9e41322d8922410cd1e74c338175098d",
+        "actual": "e3168abeddbb5ff710df510e06bed2ea9e41322d8922410cd1e74c338175098d",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-03-candidate.json",
+        "expected": "e27890fc69be68392166ebab9f698777cd89386e6686ebcc2eed6f6ed32191d3",
+        "actual": "e27890fc69be68392166ebab9f698777cd89386e6686ebcc2eed6f6ed32191d3",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-04-baseline.json",
+        "expected": "255b69cbf1374e7308b92d7913ca950e3bdf8ff461a6419949de5a285df83027",
+        "actual": "255b69cbf1374e7308b92d7913ca950e3bdf8ff461a6419949de5a285df83027",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-05-baseline.json",
+        "expected": "57b94b8b7d5c42f79f55626b608de4cdb1e14a6406bb29cfad3a95afc10f0702",
+        "actual": "57b94b8b7d5c42f79f55626b608de4cdb1e14a6406bb29cfad3a95afc10f0702",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-06-candidate.json",
+        "expected": "e94c739c121b1ca20f62492e91580b1f79ca12aef75561e23b281c0685a2f551",
+        "actual": "e94c739c121b1ca20f62492e91580b1f79ca12aef75561e23b281c0685a2f551",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-07-baseline.json",
+        "expected": "1165c56567672f469c1b5bdfe8d1548f9db1c441b97cb7efd58a8f108f9607fa",
+        "actual": "1165c56567672f469c1b5bdfe8d1548f9db1c441b97cb7efd58a8f108f9607fa",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-08-candidate.json",
+        "expected": "139990b13e0076aca3d970ae87e7c9eab93a88b602e6a9b46d6ca0ecff424b9c",
+        "actual": "139990b13e0076aca3d970ae87e7c9eab93a88b602e6a9b46d6ca0ecff424b9c",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-09-candidate.json",
+        "expected": "b180776ae5a91f58294d8bb41079fed7f9df9ae0ce118ec8e7ebe80c80275700",
+        "actual": "b180776ae5a91f58294d8bb41079fed7f9df9ae0ce118ec8e7ebe80c80275700",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-10-baseline.json",
+        "expected": "e83e30b2c16ff027579fb03a5e1dfd48ab2ad8d49a9820143f262955a97a33f3",
+        "actual": "e83e30b2c16ff027579fb03a5e1dfd48ab2ad8d49a9820143f262955a97a33f3",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-11-baseline.json",
+        "expected": "3671a9af020f367a75150245a576a98525cf2c6621b6f4ddc66c584e0c7fbb2a",
+        "actual": "3671a9af020f367a75150245a576a98525cf2c6621b6f4ddc66c584e0c7fbb2a",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-12-candidate.json",
+        "expected": "d54f89712ff16e019a3d1db9eeb6795e5c96911333570b8941a40065fd5be36d",
+        "actual": "d54f89712ff16e019a3d1db9eeb6795e5c96911333570b8941a40065fd5be36d",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-13-candidate.json",
+        "expected": "051e6f0c261b410c64229e96f5af38f28b3e5a0cc12d4f1001863b0bc0444760",
+        "actual": "051e6f0c261b410c64229e96f5af38f28b3e5a0cc12d4f1001863b0bc0444760",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-14-baseline.json",
+        "expected": "a520c25e4472bf5f9fa9214f4d7848b31624b9fe638cc0e085fd1d29ff5970c6",
+        "actual": "a520c25e4472bf5f9fa9214f4d7848b31624b9fe638cc0e085fd1d29ff5970c6",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-01-baseline.json",
+        "expected": "b064e50c7be35bb8c123a4029aac5f31de1e2ed457f14f99669285b574d6df19",
+        "actual": "b064e50c7be35bb8c123a4029aac5f31de1e2ed457f14f99669285b574d6df19",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-02-candidate.json",
+        "expected": "d4127cbb51116b4c7d526a17601bff47a2b9e38c41b02c18a74da564ef416aa6",
+        "actual": "d4127cbb51116b4c7d526a17601bff47a2b9e38c41b02c18a74da564ef416aa6",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-03-candidate.json",
+        "expected": "4d3e49be514402abd8daf6df674df7e16acf7aec774786a85fa387b9ce6e1212",
+        "actual": "4d3e49be514402abd8daf6df674df7e16acf7aec774786a85fa387b9ce6e1212",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-04-baseline.json",
+        "expected": "33e001e35b5f8b45b1eee139d1a1476ee65f5594e7a10ddc718d0197b4b39d58",
+        "actual": "33e001e35b5f8b45b1eee139d1a1476ee65f5594e7a10ddc718d0197b4b39d58",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-05-baseline.json",
+        "expected": "3bad611a0462fed2cce8ac4642100de4097980d5a83fcca9d750e35ed78fb847",
+        "actual": "3bad611a0462fed2cce8ac4642100de4097980d5a83fcca9d750e35ed78fb847",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-06-candidate.json",
+        "expected": "cfe7a2f40c16c5d953e9ba2db12cf73dc2235331d3b2ac3d9fbc920d2a52b972",
+        "actual": "cfe7a2f40c16c5d953e9ba2db12cf73dc2235331d3b2ac3d9fbc920d2a52b972",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-07-baseline.json",
+        "expected": "6fa6608d7ca95fc58e7412fa59c87f5cc5e609793cb496ffef99d083ed182acd",
+        "actual": "6fa6608d7ca95fc58e7412fa59c87f5cc5e609793cb496ffef99d083ed182acd",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-08-candidate.json",
+        "expected": "53313c7f5f07194a2928371c8b2a222c4f0afa1c793cb8ca2be53bbd9f53bb5f",
+        "actual": "53313c7f5f07194a2928371c8b2a222c4f0afa1c793cb8ca2be53bbd9f53bb5f",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-09-candidate.json",
+        "expected": "44b8867ddbfea6e7e563c6075b7e75314621f26acabb4a0a274e1be2f31fa746",
+        "actual": "44b8867ddbfea6e7e563c6075b7e75314621f26acabb4a0a274e1be2f31fa746",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-10-baseline.json",
+        "expected": "d993df4d7d75d8a6fe49903891fea2006aac4a2b32c77ef882c79a5f2a3e6006",
+        "actual": "d993df4d7d75d8a6fe49903891fea2006aac4a2b32c77ef882c79a5f2a3e6006",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-11-baseline.json",
+        "expected": "2fb0d5cc7d2590dc0dd6c53f97107bb55f32bc64d9b7b66e96b1a1d8c4bc8ffb",
+        "actual": "2fb0d5cc7d2590dc0dd6c53f97107bb55f32bc64d9b7b66e96b1a1d8c4bc8ffb",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-12-candidate.json",
+        "expected": "893d7cb092edfd9850ad859c50e804c262c94fc9778de17692b120cef8d7353f",
+        "actual": "893d7cb092edfd9850ad859c50e804c262c94fc9778de17692b120cef8d7353f",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-13-candidate.json",
+        "expected": "5425b79cce40344c0f55f3444e54874fb22fd15c30c5026e9d16b3813cc44a74",
+        "actual": "5425b79cce40344c0f55f3444e54874fb22fd15c30c5026e9d16b3813cc44a74",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-14-baseline.json",
+        "expected": "fb0e406c5cc85a996822a92f15d65af537dba8feb6b8426d51f01b53de24a69d",
+        "actual": "fb0e406c5cc85a996822a92f15d65af537dba8feb6b8426d51f01b53de24a69d",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-01-baseline.json",
+        "expected": "8ae421d05181c9a140002d97a6b47eaa160bd24714acce12a73d44200eff7250",
+        "actual": "8ae421d05181c9a140002d97a6b47eaa160bd24714acce12a73d44200eff7250",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-02-candidate.json",
+        "expected": "beaf381edf0f6890509214637d1a6ca6437d26ceafc5e7b226390ce27b016b4e",
+        "actual": "beaf381edf0f6890509214637d1a6ca6437d26ceafc5e7b226390ce27b016b4e",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-03-candidate.json",
+        "expected": "30321ec3de9d8809003b03077ac77b02dcc765a98cfd6730837fa15d08528812",
+        "actual": "30321ec3de9d8809003b03077ac77b02dcc765a98cfd6730837fa15d08528812",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-04-baseline.json",
+        "expected": "3d13339289aecf4af87e1a8b7dc580567195342b8652a4787e970862f427b3f9",
+        "actual": "3d13339289aecf4af87e1a8b7dc580567195342b8652a4787e970862f427b3f9",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-05-baseline.json",
+        "expected": "363fca49b06b610bb8bc24d7a7039f360c1036abbbddaddb32a6e4de5ed578b4",
+        "actual": "363fca49b06b610bb8bc24d7a7039f360c1036abbbddaddb32a6e4de5ed578b4",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-06-candidate.json",
+        "expected": "6cb6e3438be770ba8b0cb8fb077aefc79fe57165dd41f3135d4817c999335f25",
+        "actual": "6cb6e3438be770ba8b0cb8fb077aefc79fe57165dd41f3135d4817c999335f25",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-07-baseline.json",
+        "expected": "54d463e1860383965f0d0cb7d0b5f5bdf0509c231313b60cf0c778cfe0eb6912",
+        "actual": "54d463e1860383965f0d0cb7d0b5f5bdf0509c231313b60cf0c778cfe0eb6912",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-08-candidate.json",
+        "expected": "c0a1bd7a3656da84ab7437df14d2730674699127733edf6e237b6ba8deb607b6",
+        "actual": "c0a1bd7a3656da84ab7437df14d2730674699127733edf6e237b6ba8deb607b6",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-09-candidate.json",
+        "expected": "eb8bda06da8526340f95287b0dfd033820c7221dc4a4ae1d2978dc882e8e7158",
+        "actual": "eb8bda06da8526340f95287b0dfd033820c7221dc4a4ae1d2978dc882e8e7158",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-10-baseline.json",
+        "expected": "ac8ee3d03e7d2e1182bcd9355b326a3aec1eb8ed35a3140f2c93fba29fc7a073",
+        "actual": "ac8ee3d03e7d2e1182bcd9355b326a3aec1eb8ed35a3140f2c93fba29fc7a073",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-11-baseline.json",
+        "expected": "7aa1ab7eb07f7e34461ada364d97e910ac39fc4117f6117c3d715bb069de938d",
+        "actual": "7aa1ab7eb07f7e34461ada364d97e910ac39fc4117f6117c3d715bb069de938d",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-12-candidate.json",
+        "expected": "6bf435f21951a7021bd854506426a019a7c17b8039634a00fccae1482e40a125",
+        "actual": "6bf435f21951a7021bd854506426a019a7c17b8039634a00fccae1482e40a125",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-13-candidate.json",
+        "expected": "9804a75511a472042b701991d49b3d366fa5f03b505fe895262da2be14abce87",
+        "actual": "9804a75511a472042b701991d49b3d366fa5f03b505fe895262da2be14abce87",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-14-baseline.json",
+        "expected": "ba4e31d39397e661272cbf004a62708c83f8ecd186ac15000fa12b1abbc2fdff",
+        "actual": "ba4e31d39397e661272cbf004a62708c83f8ecd186ac15000fa12b1abbc2fdff",
+        "matched": true
+      }
+    ]
+  },
+  "throughput_rows": {
+    "scope_run": {
+      "variants": {
+        "baseline": {
+          "processOperationsPerSecond": [
+            12946.499425096128,
+            14960.63479230117,
+            13425.825861567551,
+            13756.753157165966,
+            13386.72264732293,
+            13113.311290163032,
+            14728.238844844785
+          ],
+          "medianOperationsPerSecond": 13425.825861567551,
+          "processStationarity": [
+            1.0231683841709724,
+            1.106403030509963,
+            1.0043067647302253,
+            0.9157971186206039,
+            0.9806733737769819,
+            0.9940952653207783,
+            0.9796524765510298
+          ],
+          "medianStationarityRatio": 0.9940952653207783,
+          "stationarityAccepted": true
+        },
+        "candidate": {
+          "processOperationsPerSecond": [
+            18483.939745289215,
+            18869.93702488742,
+            20153.985789444774,
+            19404.21178765764,
+            19694.59997406812,
+            21216.3527011565,
+            19571.02827423682
+          ],
+          "medianOperationsPerSecond": 19571.02827423682,
+          "processStationarity": [
+            1.1259524535653316,
+            0.9728634144750862,
+            1.016888106536113,
+            0.9824695349063303,
+            1.0361065663494133,
+            0.9511473866025744,
+            0.8396732743462294
+          ],
+          "medianStationarityRatio": 0.9824695349063303,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioCandidateToBaseline": 1.4577150393601022,
+      "stationarityAccepted": true
+    },
+    "managed_ctx_exec": {
+      "variants": {
+        "baseline": {
+          "processOperationsPerSecond": [
+            9911.291414461262,
+            9947.31253390956,
+            9916.71850548626,
+            9943.342470016622,
+            9492.347995210883,
+            10157.666847715229,
+            10533.040267170425
+          ],
+          "medianOperationsPerSecond": 9943.342470016622,
+          "processStationarity": [
+            0.9834374103141762,
+            0.9430815931250018,
+            0.8977471902370969,
+            1.0455809079378802,
+            1.1021171321423506,
+            0.9039948513718049,
+            0.9826430809851983
+          ],
+          "medianStationarityRatio": 0.9826430809851983,
+          "stationarityAccepted": true
+        },
+        "candidate": {
+          "processOperationsPerSecond": [
+            16108.73431747863,
+            14433.280506444184,
+            14501.700489339217,
+            16671.56068666404,
+            14541.619153743784,
+            14810.360982721584,
+            15306.724292197745
+          ],
+          "medianOperationsPerSecond": 14810.360982721584,
+          "processStationarity": [
+            1.3471014682912266,
+            1.210165443122801,
+            1.139704913418915,
+            1.0090208527091733,
+            1.1127417360429643,
+            1.1816037429007238,
+            1.0888257954642486
+          ],
+          "medianStationarityRatio": 1.139704913418915,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioCandidateToBaseline": 1.48947509626477,
+      "stationarityAccepted": true
+    },
+    "sdk_session_run": {
+      "variants": {
+        "baseline": {
+          "processOperationsPerSecond": [
+            1541.9460548438026,
+            1482.7759283916794,
+            1827.8622163602925,
+            1813.662142444738,
+            1740.417459873527,
+            1541.292302580671,
+            1745.8314947254435
+          ],
+          "medianOperationsPerSecond": 1740.417459873527,
+          "processStationarity": [
+            1.0579979551675138,
+            1.0161504715347145,
+            1.302443047101923,
+            1.0512401474157482,
+            0.9168098543831333,
+            1.098197717011254,
+            0.9448542065930967
+          ],
+          "medianStationarityRatio": 1.0512401474157482,
+          "stationarityAccepted": true
+        },
+        "candidate": {
+          "processOperationsPerSecond": [
+            1757.3613565080746,
+            1492.3667381420794,
+            1755.0621842137455,
+            1866.7703197109254,
+            1785.2041763723457,
+            1762.9026310286945,
+            2090.3746114178684
+          ],
+          "medianOperationsPerSecond": 1762.9026310286945,
+          "processStationarity": [
+            1.1926138892049385,
+            1.0257015959554687,
+            1.018436485969495,
+            1.0791008585015351,
+            0.9862707335834533,
+            1.0507862853929402,
+            1.2404471694886976
+          ],
+          "medianStationarityRatio": 1.0507862853929402,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioCandidateToBaseline": 1.0129194125395649,
+      "stationarityAccepted": true
+    }
+  },
+  "throughput_geometric_mean": {
+    "value": 1.3004497985686605,
+    "target_minimum": 1.1,
+    "decision": "pass"
+  },
+  "allocation_rows": {
+    "scope_run": {
+      "trials": {
+        "baseline": [
+          {
+            "trial": 1,
+            "zeroBytes": 15400,
+            "measuredBytes": 44439664,
+            "correctedBytes": 44424264,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8884.8528,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 14472,
+            "measuredBytes": 44659328,
+            "correctedBytes": 44644856,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8928.9712,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 15576,
+            "measuredBytes": 44476128,
+            "correctedBytes": 44460552,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8892.1104,
+            "signalAccepted": true
+          }
+        ],
+        "candidate": [
+          {
+            "trial": 1,
+            "zeroBytes": 14328,
+            "measuredBytes": 20838888,
+            "correctedBytes": 20824560,
+            "completedOperations": 5000,
+            "bytesPerOperation": 4164.912,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 12376,
+            "measuredBytes": 20910664,
+            "correctedBytes": 20898288,
+            "completedOperations": 5000,
+            "bytesPerOperation": 4179.6576,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 10104,
+            "measuredBytes": 20493232,
+            "correctedBytes": 20483128,
+            "completedOperations": 5000,
+            "bytesPerOperation": 4096.6256,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "baseline": 8892.1104,
+        "candidate": 4164.912
+      },
+      "ratioCandidateToBaseline": 0.4683828486879786,
+      "everySignalAccepted": true,
+      "perRowCeilingAccepted": true
+    },
+    "managed_ctx_exec": {
+      "trials": {
+        "baseline": [
+          {
+            "trial": 1,
+            "zeroBytes": 3296,
+            "measuredBytes": 8174504,
+            "correctedBytes": 8171208,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4085.604,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 16720,
+            "measuredBytes": 9166472,
+            "correctedBytes": 9149752,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4574.876,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 15544,
+            "measuredBytes": 7905528,
+            "correctedBytes": 7889984,
+            "completedOperations": 2000,
+            "bytesPerOperation": 3944.992,
+            "signalAccepted": true
+          }
+        ],
+        "candidate": [
+          {
+            "trial": 1,
+            "zeroBytes": 15456,
+            "measuredBytes": 5420976,
+            "correctedBytes": 5405520,
+            "completedOperations": 2000,
+            "bytesPerOperation": 2702.76,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 12248,
+            "measuredBytes": 5838656,
+            "correctedBytes": 5826408,
+            "completedOperations": 2000,
+            "bytesPerOperation": 2913.204,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 30136,
+            "measuredBytes": 11460944,
+            "correctedBytes": 11430808,
+            "completedOperations": 2000,
+            "bytesPerOperation": 5715.404,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "baseline": 4085.604,
+        "candidate": 2913.204
+      },
+      "ratioCandidateToBaseline": 0.7130412051681956,
+      "everySignalAccepted": true,
+      "perRowCeilingAccepted": true
+    },
+    "sdk_session_run": {
+      "trials": {
+        "baseline": [
+          {
+            "trial": 1,
+            "zeroBytes": 14272,
+            "measuredBytes": 5275048,
+            "correctedBytes": 5260776,
+            "completedOperations": 150,
+            "bytesPerOperation": 35071.84,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 13600,
+            "measuredBytes": 5267024,
+            "correctedBytes": 5253424,
+            "completedOperations": 150,
+            "bytesPerOperation": 35022.82666666667,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 14312,
+            "measuredBytes": 5309344,
+            "correctedBytes": 5295032,
+            "completedOperations": 150,
+            "bytesPerOperation": 35300.21333333333,
+            "signalAccepted": true
+          }
+        ],
+        "candidate": [
+          {
+            "trial": 1,
+            "zeroBytes": 16648,
+            "measuredBytes": 6501200,
+            "correctedBytes": 6484552,
+            "completedOperations": 150,
+            "bytesPerOperation": 43230.346666666665,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 16480,
+            "measuredBytes": 4779216,
+            "correctedBytes": 4762736,
+            "completedOperations": 150,
+            "bytesPerOperation": 31751.573333333334,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 31216,
+            "measuredBytes": 6352704,
+            "correctedBytes": 6321488,
+            "completedOperations": 150,
+            "bytesPerOperation": 42143.253333333334,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "baseline": 35071.84,
+        "candidate": 42143.253333333334
+      },
+      "ratioCandidateToBaseline": 1.2016265281015577,
+      "everySignalAccepted": true,
+      "perRowCeilingAccepted": false
+    }
+  },
+  "allocation_geometric_mean": {
+    "value": 0.7376126783723866,
+    "target_maximum": 0.9,
+    "decision": "pass"
+  },
+  "retained_controls": {
+    "scope_run": {
+      "baseline": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      },
+      "candidate": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      }
+    },
+    "managed_ctx_exec": {
+      "baseline": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      },
+      "candidate": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      }
+    },
+    "sdk_session_run": {
+      "baseline": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      },
+      "candidate": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      }
+    }
+  },
+  "cleanup_walls": {
+    "invalidLifecycleSummaryCount": 0,
+    "postCloseLiveResourceCount": 0,
+    "crossOwnerLeakCount": 0,
+    "cleanupBusinessStateMutationCount": 0,
+    "sdkCompletedOperationCount": 115506,
+    "sdkPostCloseMutationRejectedCount": 115506,
+    "sdkPostCloseMutationMismatchCount": 0,
+    "cleanupWallCount": 0
+  },
+  "target_decisions": {
+    "throughputStationarity": true,
+    "throughputGeometricMean": true,
+    "allocationSignal": true,
+    "allocationGeometricMean": true,
+    "allocationPerRowCeiling": false,
+    "retainedControls": true,
+    "cleanupWalls": true,
+    "integratedTarget": false
+  },
+  "replay_command_or_checker": "cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check",
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-ALLOCATION-REGRESSION",
+    "AG-RETAINED-MEMORY",
+    "AG-CLEANUP-EFFECT",
+    "AG-SESSION-ISOLATION",
+    "AG-BENCHMARK-BRANCH",
+    "AG-PRESERVATION",
+    "AG-AUTHORITY"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "metric_id": "AG-INTEGRITY",
+      "source_of_truth": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/frozen.json, provenance.json, and raw.sha256",
+      "read_method": "Replay all frozen, prior-evidence, provenance, chronology, and raw hashes.",
+      "observed_at": "2026-07-16T09:10:51.156Z",
+      "recorded_at": "2026-07-16T09:10:51.156Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704",
+      "replay_command_or_checker": "cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PERF-COMPARISON",
+      "source_of_truth": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/protocol.json and raw observations",
+      "read_method": "Replay the accepted balanced schedule, stationarity bands, allocation aggregate, matched zeros, and minimum signals.",
+      "observed_at": "2026-07-16T09:10:51.156Z",
+      "recorded_at": "2026-07-16T09:10:51.156Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704",
+      "replay_command_or_checker": "cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PERF-CLAIM",
+      "source_of_truth": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/checkpoint.v1.json",
+      "read_method": "Require pending independent validation and no release-readiness claim.",
+      "observed_at": "2026-07-16T09:10:51.156Z",
+      "recorded_at": "2026-07-16T09:10:51.156Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704",
+      "replay_command_or_checker": "cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-ALLOCATION-REGRESSION",
+      "source_of_truth": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/raw/allocation",
+      "read_method": "Check every candidate-to-baseline row ratio against 1.05.",
+      "observed_at": "2026-07-16T09:10:51.156Z",
+      "recorded_at": "2026-07-16T09:10:51.156Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 1,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704",
+      "replay_command_or_checker": "cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-RETAINED-MEMORY",
+      "source_of_truth": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/raw/retained",
+      "read_method": "Require 0/0/1 in every event-loop-turn retained-control observation.",
+      "observed_at": "2026-07-16T09:10:51.156Z",
+      "recorded_at": "2026-07-16T09:10:51.156Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704",
+      "replay_command_or_checker": "cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-CLEANUP-EFFECT",
+      "source_of_truth": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/raw",
+      "read_method": "Aggregate lifecycle ownership, cleanup, business-state, and post-close rejection counters.",
+      "observed_at": "2026-07-16T09:10:51.156Z",
+      "recorded_at": "2026-07-16T09:10:51.156Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704",
+      "replay_command_or_checker": "cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-SESSION-ISOLATION",
+      "source_of_truth": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/raw",
+      "read_method": "Replay every lifecycle owner and session post-close assertion.",
+      "observed_at": "2026-07-16T09:10:51.156Z",
+      "recorded_at": "2026-07-16T09:10:51.156Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704",
+      "replay_command_or_checker": "cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-BENCHMARK-BRANCH",
+      "source_of_truth": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/chronology.json and raw.sha256",
+      "read_method": "Confirm this unit contains only the three lifecycle rows and no 47-row benchmark output.",
+      "observed_at": "2026-07-16T09:10:51.156Z",
+      "recorded_at": "2026-07-16T09:10:51.156Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704",
+      "replay_command_or_checker": "cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PRESERVATION",
+      "source_of_truth": "git:293dcdf2d6d0b274418bcca8461f7eb122e10c52, /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/variant.patch, and /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/variant-exclusion.json",
+      "read_method": "Require the exact baseline plus only the frozen V1+V2+V3 caller-signal hybrid in scope.ts, with V4, SDK changes, public API changes, and P13 direct caller wiring excluded.",
+      "observed_at": "2026-07-16T09:10:51.156Z",
+      "recorded_at": "2026-07-16T09:10:51.156Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704",
+      "replay_command_or_checker": "cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-AUTHORITY",
+      "source_of_truth": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/protocol.json",
+      "read_method": "Stop after one observation without commit, push, merge, release, publish, deploy, or production contact.",
+      "observed_at": "2026-07-16T09:10:51.156Z",
+      "recorded_at": "2026-07-16T09:10:51.156Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:a79721be61caab16bc02fffdf17cb153808d025437e6c386676efa4c4ed80704",
+      "replay_command_or_checker": "cd /tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "pending_independent_validation",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-16T09:10:51.156Z"
+  },
+  "claim_boundary": "Worker evidence remains pending independent validation. No product improvement, release-readiness, cancellation-equivalence acceptance, or release claim follows from this checkpoint.",
+  "workspace_effect": {
+    "scratch": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z",
+    "product_edits": 0,
+    "established_row_benchmarks": 0,
+    "commits": 0,
+    "pushes": 0,
+    "merges": 0,
+    "releases": 0
+  },
+  "result": {
+    "decision": "caller_signal_hybrid_misses_integrated_target_pending_independent_validation",
+    "release_readiness_claim": "not_made",
+    "existing_47_row_benchmark": "not_run",
+    "worker_evidence_is_acceptance": false,
+    "favorable_reruns_refused": true
+  },
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

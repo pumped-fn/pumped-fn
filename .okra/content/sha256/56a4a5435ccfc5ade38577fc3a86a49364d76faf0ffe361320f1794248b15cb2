@@ -1,0 +1,3389 @@
+{
+  "schema": "pumped-fn.okra.discovery-checkpoint.v1",
+  "checkpoint_id": "DKR-P15.inherited-baseline-mode.2026-07-16T09:41:30.259Z",
+  "conclusion_id": "DKR-P15-INHERITED-BASELINE-MODE",
+  "unit_id": "DKR-P15",
+  "decision_target": "Determine whether the replayably proven V1+V2+V3 inherited baseline-mode candidate meets the frozen lifecycle performance target.",
+  "source_of_truth": [
+    "git:293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/protocol.json",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/frozen.json",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/provenance.json",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/semantic-evidence-manifest.json",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/raw.sha256"
+  ],
+  "candidate_provenance": {
+    "exact_head": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "baseline_archive_sha256": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0",
+    "candidate_patch_sha256": "63d75555af4d0d4defeaf80a62aa7c53e367beb0d74b352dacf4e60e1e582125",
+    "changed_sources": [
+      "pkg/core/lite/src/scope.ts"
+    ],
+    "candidate_scope_sha256": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611",
+    "checks": {
+      "exactHead": true,
+      "baselineArchive": true,
+      "baselineSourceMatchesAcceptedBuild": true,
+      "baselineLockfileMatchesAcceptedBuild": true,
+      "baselineManifestsMatchAcceptedBuild": true,
+      "baselineDistMatchesAcceptedBuild": true,
+      "baselineDeclarationsMatchAcceptedBuild": true,
+      "patchHash": true,
+      "changedSources": true,
+      "candidateScopeMatchesFrozenVariant": true,
+      "variantExclusionHeld": true,
+      "variantExclusionPatchMatches": true,
+      "variantExclusionScopeMatches": true,
+      "semanticTestsFrozen": true,
+      "semanticTestsPatchFrozen": true,
+      "semanticBoundaryHeld": true,
+      "semanticEvidenceHeld": true,
+      "lockfileUnchanged": true,
+      "manifestsUnchanged": true,
+      "declarationsUnchanged": true,
+      "allRecordedChecks": true,
+      "createdBeforeObservation": true,
+      "provenanceFrozen": true,
+      "baselineArchiveFrozen": true,
+      "candidatePatchStillFrozen": true,
+      "candidateScopeStillFrozen": true,
+      "variantPatchFrozen": true,
+      "semanticEvidenceFrozen": true,
+      "variantExclusionFrozen": true
+    }
+  },
+  "variant_patch_sha256": "63d75555af4d0d4defeaf80a62aa7c53e367beb0d74b352dacf4e60e1e582125",
+  "variant_boundary_checks": {
+    "held": true,
+    "field_checks": {
+      "private cleanups:": {
+        "baseline": "  private cleanups: CloseCleanup[] = []",
+        "candidate": "  private cleanups: CloseCleanup[] = []",
+        "matched": true
+      },
+      "private descendants": {
+        "baseline": "  private descendants = new Set<Promise<unknown>>()",
+        "candidate": "  private descendants = new Set<Promise<unknown>>()",
+        "matched": true
+      },
+      "private activeIterators": {
+        "baseline": "  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()",
+        "candidate": "  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()",
+        "matched": true
+      },
+      "private children": {
+        "baseline": "  private children = new Set<ExecutionContextImpl>()",
+        "candidate": "  private children = new Set<ExecutionContextImpl>()",
+        "matched": true
+      }
+    },
+    "semantic_model": {
+      "baselineModeSelector": "options.signal exists or parent baselineMode",
+      "baselineModeInheritance": "every descendant",
+      "baselineCancellation": "eager local controller, exact local-parent-caller composition, local-only abort",
+      "lazyModeBoundary": "only wholly explicit-signal-free subtrees",
+      "lazyCancellation": "first abort recorded and propagated only to lazy children",
+      "lazyToBaselineBoundary": "parent.signal through native combineAbortSignals",
+      "boundListenerBridge": false
+    },
+    "v123_checks": {
+      "private resources: Map<Lite.Resource<unknown>, ResourceEntry<unknown>> | undefined": true,
+      "private resourceListeners: Map<Lite.Resource<unknown>, ResourceListeners> | undefined": true,
+      "private resourceControllers: Map<Lite.Resource<unknown>, ResourceControllerImpl<unknown>> | undefined": true,
+      "this.resources ??= new Map()": true,
+      "this.resourceControllers ??= new Map()": true,
+      "this.resourceListeners ??= new Map()": true,
+      "if (!flowTags?.length) return": true,
+      "const blocked = new Set<symbol>()": true,
+      "this.resources?.values()": true,
+      "this.resources?.keys()": true
+    },
+    "mode_checks": {
+      "private readonly baselineMode: boolean": true,
+      "this.baselineMode = options?.signal !== undefined || (this.parent?.baselineMode ?? false)": true,
+      "if (this.baselineMode) {": true,
+      "if (!this.baselineMode && this.parent.abortReason !== pendingAbort) {": true,
+      "if (!child.baselineMode) child.captureAbort(reason)": true
+    },
+    "baseline_composer_checks": {
+      "this.abortController = new AbortController()": true,
+      "const signals = [this.abortController.signal]": true,
+      "if (this.parent) signals.push(this.parent.signal)": true,
+      "if (options?.signal) signals.push(options.signal)": true,
+      "this.signalOverride = signals.length === 1 ? signals[0]! : combineAbortSignals(signals)": true
+    },
+    "lazy_checks": {
+      "private abortController: AbortController | undefined": true,
+      "private abortReason: unknown = pendingAbort": true,
+      "private signalOverride: AbortSignal | undefined": true,
+      "if (!this.abortController) {": true,
+      "if (this.abortReason !== pendingAbort) this.abortController.abort(this.abortReason)": true,
+      "if (this.abortReason !== pendingAbort) return": true
+    },
+    "baseline_source_order": {
+      "tokens": [
+        "this.abortController = new AbortController()",
+        "const signals = [this.abortController.signal]",
+        "if (this.parent) signals.push(this.parent.signal)",
+        "if (options?.signal) signals.push(options.signal)",
+        "this.signalOverride = signals.length === 1 ? signals[0]! : combineAbortSignals(signals)"
+      ],
+      "indexes": [
+        642,
+        693,
+        745,
+        801,
+        857
+      ],
+      "held": true
+    },
+    "baseline_composer_matches_after_storage_rename": true,
+    "baseline_abort_matches": true,
+    "combine_abort_signals_matches_baseline": true,
+    "sdk_source_manifest": {
+      "baseline": "416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099",
+      "candidate": "416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099"
+    },
+    "forbidden_checks": {
+      "private cleanups: CloseCleanup[] | undefined": true,
+      "private descendants: Set<Promise<unknown>> | undefined": true,
+      "private activeIterators: Set<AsyncIterator<unknown, unknown, unknown>> | undefined": true,
+      "private children: Set<ExecutionContextImpl> | undefined": true,
+      "this.parent.children ??=": true,
+      "activeIterators ??=": true,
+      "activeIterators?.": true,
+      "const cleanups = this.cleanups ??=": true,
+      "this.children ??": true,
+      "children?.": true,
+      "const descendants = this.descendants ??=": true,
+      "this.descendants ??": true,
+      "this.cleanups?.": true,
+      "this.cleanups!": true,
+      "callerSignal": true,
+      "handleEvent(event: Event)": true,
+      "captureComposedAbort": true,
+      "signalOverride.addEventListener": true,
+      "options.signal.addEventListener": true,
+      ".bind(this)": true,
+      "for (const child of this.children) child.captureAbort(reason)": true
+    },
+    "semantic_case_checks": {
+      "keeps a wholly signal-free subtree lazy until signal access": true,
+      "eagerly inherits baseline mode through descendants without caller signals": true,
+      "replays the first lazy abort through descendants before signal access": true,
+      "crosses from a lazy parent into baseline mode through native parent signal composition": true,
+      "keeps one signal identity and propagates caller cancellation": true,
+      "propagates cancellation from an observed parent signal": true,
+      "observes an already-aborted caller with its original reason": true,
+      "keeps caller precedence when cancellation happens before the first signal read": true,
+      "keeps parent-source precedence before the child first reads its signal": true,
+      "keeps already-aborted construction precedence through close and first read": true,
+      "detaches an unobserved caller source when local close wins": true,
+      "settles abort listeners once when a context closes": true,
+      "materializes the closed signal with the close reason after close": true,
+      "classifies caller cancellation as an aborted close": true,
+      "cancels a streaming child when the consumer returns": true,
+      "cancels a boundary child before parent cleanup settles": true,
+      "keeps explicit-signal identity stable before and after caller cancellation": true,
+      "keeps parent before caller in already-aborted explicit source order": true,
+      "keeps caller reason when it is the only already-aborted explicit source": true,
+      "keeps the first live explicit source when caller aborts before parent": true,
+      "keeps the first live explicit source when parent aborts before caller": true,
+      "keeps local close ahead of a later explicit caller abort": true,
+      "propagates an explicit parent caller to a child without its own signal": true
+    }
+  },
+  "semantic_test_matrix": {
+    "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/semantic-tests/pkg/core/lite/tests/inherited-baseline-mode.test.ts",
+    "sha256": "132f76211b1bfdce329d454ef3e22fca7813493d97244bf482a64ac586b92b3e",
+    "patch": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/semantic-tests.patch",
+    "patchSha256": "c49a367cf3719e223c24deb7249bef8364c600e7f5ce75b5c952634bfebcb800",
+    "focusedPassed": 23,
+    "focusedTotal": 23,
+    "inheritedModePassed": 4,
+    "inheritedModeTotal": 4,
+    "priorHybridCasesPassed": 19,
+    "priorHybridCasesTotal": 19,
+    "existingCancellationPassed": 42,
+    "existingCancellationTotal": 42,
+    "liteNonDocsPassed": 256,
+    "liteNonDocsTotal": 256,
+    "sdkPassed": 59,
+    "sdkTotal": 59,
+    "typechecks": "Lite full and SDK passed",
+    "builds": "Lite and SDK dependency closure passed"
+  },
+  "semantic_commands": [
+    {
+      "label": "v2-install",
+      "command": [
+        "pnpm",
+        "install",
+        "--frozen-lockfile",
+        "--offline"
+      ],
+      "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate"
+    },
+    {
+      "label": "v2-lite-build",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@pumped-fn/lite",
+        "build"
+      ],
+      "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate"
+    },
+    {
+      "label": "v2-sdk-build-closure",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@pumped-fn/sdk...",
+        "build"
+      ],
+      "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate"
+    },
+    {
+      "label": "v2-focused-inherited-mode",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@pumped-fn/lite",
+        "exec",
+        "vitest",
+        "run",
+        "tests/inherited-baseline-mode.test.ts"
+      ],
+      "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate"
+    },
+    {
+      "label": "v2-existing-lifetime-stream",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@pumped-fn/lite",
+        "exec",
+        "vitest",
+        "run",
+        "tests/structured-lifetime.test.ts",
+        "tests/exec-stream.test.ts"
+      ],
+      "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate"
+    },
+    {
+      "label": "v2-lite-non-docs",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@pumped-fn/lite",
+        "exec",
+        "vitest",
+        "run",
+        "tests/inherited-baseline-mode.test.ts",
+        "tests/changes.test.ts",
+        "tests/exec-stream.test.ts",
+        "tests/flow-fault.test.ts",
+        "tests/resolve-stream.test.ts",
+        "tests/role-tags.test.ts",
+        "tests/scope.test.ts",
+        "tests/structured-lifetime.test.ts"
+      ],
+      "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate"
+    },
+    {
+      "label": "v2-sdk-tests",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@pumped-fn/sdk",
+        "exec",
+        "vitest",
+        "run"
+      ],
+      "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate"
+    },
+    {
+      "label": "v2-lite-typecheck-full",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@pumped-fn/lite",
+        "typecheck:full"
+      ],
+      "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate"
+    },
+    {
+      "label": "v2-sdk-typecheck",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@pumped-fn/sdk",
+        "typecheck"
+      ],
+      "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate"
+    },
+    {
+      "label": "semantic-replay",
+      "command": [
+        "bash",
+        "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/replay-semantics.sh",
+        "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z"
+      ],
+      "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z"
+    },
+    {
+      "label": "tool-versions",
+      "command": [
+        "bash",
+        "-lc",
+        "node --version; pnpm --version; git --version; taskset --version | head -1; pnpm --filter @pumped-fn/lite exec vitest --version; pnpm --filter @pumped-fn/lite exec tsgo --version; pnpm --filter @pumped-fn/lite exec tsdown --version; uname -a"
+      ],
+      "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate"
+    }
+  ],
+  "semantic_logs": [
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-install.log",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-build.log",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-build-closure.log",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-focused-inherited-mode.log",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-existing-lifetime-stream.log",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-non-docs.log",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-tests.log",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-typecheck-full.log",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-typecheck.log",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/semantic-replay.log",
+    "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/tool-versions.log"
+  ],
+  "semantic_exit_codes": {
+    "v2-install": 0,
+    "v2-lite-build": 0,
+    "v2-sdk-build-closure": 0,
+    "v2-focused-inherited-mode": 0,
+    "v2-existing-lifetime-stream": 0,
+    "v2-lite-non-docs": 0,
+    "v2-sdk-tests": 0,
+    "v2-lite-typecheck-full": 0,
+    "v2-sdk-typecheck": 0,
+    "semantic-replay": 0,
+    "tool-versions": 0
+  },
+  "semantic_log_hashes": {
+    "v2-install": "bb641aff19fbebbcd0dd53fb377f1c65ab5025ce46138b48cc03a3d6436f463e",
+    "v2-lite-build": "c7f5f23763da16cb8828b146ea0d6270c6b09e3304b96a673f6a7e0504c9418a",
+    "v2-sdk-build-closure": "842e6637ce06c13d2c46fd3eccd5ecf4cd2a3790fce4c3f97d99206085dd96cd",
+    "v2-focused-inherited-mode": "ea9dbd61b5fcb9933701c7714f486d416591d95e20598d690f8f786943f24cac",
+    "v2-existing-lifetime-stream": "a75b628da4131bee71046584ebc679aaba5b70fd47b481debdd69c90412e2ead",
+    "v2-lite-non-docs": "41b4c27b5b6b22869f610e612043c3def2447ed7b23f48f8ba5544002cd67604",
+    "v2-sdk-tests": "125c95142c0aa872030b56abee8ab8cc8bfdfceebe593f0167ee899c379c874d",
+    "v2-lite-typecheck-full": "1ab5655991a85e347527bc0c25da74a0b6a56345bdd4107064fc01416e80a281",
+    "v2-sdk-typecheck": "21eafe0c3c36dd8a631798f66c5912a0bfeac719853a147462a4e1fe29046731",
+    "semantic-replay": "34a11ba4ad820598688bb89f4c12e05f0129e0b6837c6156917219c07fe320b4",
+    "tool-versions": "86a0cee1ba83bcc4aad4465851f25e20a4f17affc0d0850ec5e098b6ad32609a"
+  },
+  "semantic_evidence": {
+    "schema": "pumped-fn.dkr-p15.semantic-evidence.v1",
+    "createdAt": "2026-07-16T09:34:47.555Z",
+    "observationCount": 0,
+    "exactHead": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "modeState": {
+      "baseline": {
+        "selectedWhen": "options.signal exists or parent is baseline mode",
+        "controller": "eager local",
+        "composer": [
+          "local",
+          "parent",
+          "caller"
+        ],
+        "singleSignalFastPath": true,
+        "abort": "local only",
+        "descendants": "inherit baseline mode"
+      },
+      "lazy": {
+        "selectedWhen": "context and every ancestor are signal-free",
+        "controller": "materialized on first signal read",
+        "abort": "first reason stored",
+        "propagation": "lazy children only"
+      },
+      "boundary": "A lazy parent enters a baseline child only through parent.signal in native signal composition.",
+      "boundListenerBridge": false
+    },
+    "semanticCounts": {
+      "focusedInheritedMode": [
+        23,
+        23
+      ],
+      "inheritedModeNewCases": [
+        4,
+        4
+      ],
+      "priorHybridCases": [
+        19,
+        19
+      ],
+      "existingLifetimeAndStream": [
+        42,
+        42
+      ],
+      "liteNonDocs": [
+        256,
+        256
+      ],
+      "sdk": [
+        59,
+        59
+      ],
+      "typechecks": [
+        2,
+        2
+      ],
+      "builds": [
+        2,
+        2
+      ]
+    },
+    "commands": [
+      {
+        "label": "v2-install",
+        "command": [
+          "pnpm",
+          "install",
+          "--frozen-lockfile",
+          "--offline"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+        "startedAt": "2026-07-16T09:30:25.346Z",
+        "finishedAt": "2026-07-16T09:30:29.089Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-install.json",
+        "metadataSha256": "d29ebac71b9e2d90111516adf03d3601b69530a9fc410fdccfc1440251e8b71e",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-install.log",
+        "logSha256": "bb641aff19fbebbcd0dd53fb377f1c65ab5025ce46138b48cc03a3d6436f463e",
+        "logSize": 137
+      },
+      {
+        "label": "v2-lite-build",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@pumped-fn/lite",
+          "build"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+        "startedAt": "2026-07-16T09:30:29.127Z",
+        "finishedAt": "2026-07-16T09:30:33.802Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-build.json",
+        "metadataSha256": "a6b68896df21129472bf0376ff6a3dd6e54b58af45545a3eeea1f352961e98dd",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-build.log",
+        "logSha256": "c7f5f23763da16cb8828b146ea0d6270c6b09e3304b96a673f6a7e0504c9418a",
+        "logSize": 805
+      },
+      {
+        "label": "v2-sdk-build-closure",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@pumped-fn/sdk...",
+          "build"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+        "startedAt": "2026-07-16T09:30:33.854Z",
+        "finishedAt": "2026-07-16T09:30:44.151Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-build-closure.json",
+        "metadataSha256": "2198b0afc308184d9743bb822976645dba2ea083fa1470e98cc6bcceca635711",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-build-closure.log",
+        "logSha256": "842e6637ce06c13d2c46fd3eccd5ecf4cd2a3790fce4c3f97d99206085dd96cd",
+        "logSize": 5548
+      },
+      {
+        "label": "v2-focused-inherited-mode",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@pumped-fn/lite",
+          "exec",
+          "vitest",
+          "run",
+          "tests/inherited-baseline-mode.test.ts"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+        "startedAt": "2026-07-16T09:30:44.200Z",
+        "finishedAt": "2026-07-16T09:30:47.389Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-focused-inherited-mode.json",
+        "metadataSha256": "eb12516969b6f176941294d01fa98b15ea980c8c38b124ee220d05f7ec5733f5",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-focused-inherited-mode.log",
+        "logSha256": "ea9dbd61b5fcb9933701c7714f486d416591d95e20598d690f8f786943f24cac",
+        "logSize": 277
+      },
+      {
+        "label": "v2-existing-lifetime-stream",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@pumped-fn/lite",
+          "exec",
+          "vitest",
+          "run",
+          "tests/structured-lifetime.test.ts",
+          "tests/exec-stream.test.ts"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+        "startedAt": "2026-07-16T09:30:47.448Z",
+        "finishedAt": "2026-07-16T09:30:50.191Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-existing-lifetime-stream.json",
+        "metadataSha256": "87fc878d139cfc4bcbe4b5268a0278bc861bf29139c7db13d7000a7ef78a9d5b",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-existing-lifetime-stream.log",
+        "logSha256": "a75b628da4131bee71046584ebc679aaba5b70fd47b481debdd69c90412e2ead",
+        "logSize": 277
+      },
+      {
+        "label": "v2-lite-non-docs",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@pumped-fn/lite",
+          "exec",
+          "vitest",
+          "run",
+          "tests/inherited-baseline-mode.test.ts",
+          "tests/changes.test.ts",
+          "tests/exec-stream.test.ts",
+          "tests/flow-fault.test.ts",
+          "tests/resolve-stream.test.ts",
+          "tests/role-tags.test.ts",
+          "tests/scope.test.ts",
+          "tests/structured-lifetime.test.ts"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+        "startedAt": "2026-07-16T09:30:50.253Z",
+        "finishedAt": "2026-07-16T09:30:57.549Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-non-docs.json",
+        "metadataSha256": "0db5ed0fca4df40d2fbbb4ec815db079a18e995f8b4ef6736028568c7be11817",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-non-docs.log",
+        "logSha256": "41b4c27b5b6b22869f610e612043c3def2447ed7b23f48f8ba5544002cd67604",
+        "logSize": 280
+      },
+      {
+        "label": "v2-sdk-tests",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@pumped-fn/sdk",
+          "exec",
+          "vitest",
+          "run"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+        "startedAt": "2026-07-16T09:30:57.601Z",
+        "finishedAt": "2026-07-16T09:31:39.979Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-tests.json",
+        "metadataSha256": "6e2cb0a91be42fd195c9dd4583bcb97387b202ea5b1844826129fb69a916b993",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-tests.log",
+        "logSha256": "125c95142c0aa872030b56abee8ab8cc8bfdfceebe593f0167ee899c379c874d",
+        "logSize": 279
+      },
+      {
+        "label": "v2-lite-typecheck-full",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@pumped-fn/lite",
+          "typecheck:full"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+        "startedAt": "2026-07-16T09:31:40.033Z",
+        "finishedAt": "2026-07-16T09:31:42.682Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-typecheck-full.json",
+        "metadataSha256": "e443b368beb84eb01dfbd161cd682cf3289180d1f24e73248da3791bce2368b9",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-typecheck-full.log",
+        "logSha256": "1ab5655991a85e347527bc0c25da74a0b6a56345bdd4107064fc01416e80a281",
+        "logSize": 172
+      },
+      {
+        "label": "v2-sdk-typecheck",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@pumped-fn/sdk",
+          "typecheck"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+        "startedAt": "2026-07-16T09:31:42.733Z",
+        "finishedAt": "2026-07-16T09:31:44.911Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-typecheck.json",
+        "metadataSha256": "0b17ca03aababd8c1f29cfc98060124aa8417d13e2cd8a9a9bf74cd6cd1a6c88",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-typecheck.log",
+        "logSha256": "21eafe0c3c36dd8a631798f66c5912a0bfeac719853a147462a4e1fe29046731",
+        "logSize": 143
+      },
+      {
+        "label": "semantic-replay",
+        "command": [
+          "bash",
+          "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/replay-semantics.sh",
+          "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z",
+        "startedAt": "2026-07-16T09:32:23.796Z",
+        "finishedAt": "2026-07-16T09:33:21.398Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/semantic-replay.json",
+        "metadataSha256": "a25a389a9f178c1adeec1604b3fd44c3a0c1e02bd6011a3ccec7ca4a1a6e23f9",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/semantic-replay.log",
+        "logSha256": "34a11ba4ad820598688bb89f4c12e05f0129e0b6837c6156917219c07fe320b4",
+        "logSize": 8391
+      },
+      {
+        "label": "tool-versions",
+        "command": [
+          "bash",
+          "-lc",
+          "node --version; pnpm --version; git --version; taskset --version | head -1; pnpm --filter @pumped-fn/lite exec vitest --version; pnpm --filter @pumped-fn/lite exec tsgo --version; pnpm --filter @pumped-fn/lite exec tsdown --version; uname -a"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+        "startedAt": "2026-07-16T09:33:29.200Z",
+        "finishedAt": "2026-07-16T09:33:54.479Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/tool-versions.json",
+        "metadataSha256": "a4ef060b4735bbfa228751ff21c69af7efc7704ddda28b6def1b699cea142524",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/tool-versions.log",
+        "logSha256": "86a0cee1ba83bcc4aad4465851f25e20a4f17affc0d0850ec5e098b6ad32609a",
+        "logSize": 268
+      }
+    ],
+    "checks": {
+      "allFinalCommandsExitedZero": true,
+      "focusedCount": true,
+      "lifetimeStreamCount": true,
+      "liteNonDocsCount": true,
+      "sdkCount": true,
+      "liteTypecheck": true,
+      "sdkTypecheck": true,
+      "replayPassed": true,
+      "variantScopeFrozen": true,
+      "variantPatchFrozen": true,
+      "semanticSourceFrozen": true,
+      "semanticPatchFrozen": true,
+      "variantBoundaryHeld": true
+    },
+    "replay": {
+      "script": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/replay-semantics.sh",
+      "scriptSha256": "0fc1c5d6ac0a164bd59188aa3f11944dbabb5903be0dcb8755406271ac245b6a",
+      "command": [
+        "bash",
+        "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/replay-semantics.sh",
+        "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z"
+      ],
+      "recordedCommand": {
+        "label": "semantic-replay",
+        "command": [
+          "bash",
+          "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/replay-semantics.sh",
+          "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z",
+        "startedAt": "2026-07-16T09:32:23.796Z",
+        "finishedAt": "2026-07-16T09:33:21.398Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/semantic-replay.json",
+        "metadataSha256": "a25a389a9f178c1adeec1604b3fd44c3a0c1e02bd6011a3ccec7ca4a1a6e23f9",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/semantic-replay.log",
+        "logSha256": "34a11ba4ad820598688bb89f4c12e05f0129e0b6837c6156917219c07fe320b4",
+        "logSize": 8391
+      }
+    },
+    "versions": {
+      "command": {
+        "label": "tool-versions",
+        "command": [
+          "bash",
+          "-lc",
+          "node --version; pnpm --version; git --version; taskset --version | head -1; pnpm --filter @pumped-fn/lite exec vitest --version; pnpm --filter @pumped-fn/lite exec tsgo --version; pnpm --filter @pumped-fn/lite exec tsdown --version; uname -a"
+        ],
+        "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+        "startedAt": "2026-07-16T09:33:29.200Z",
+        "finishedAt": "2026-07-16T09:33:54.479Z",
+        "exitCode": 0,
+        "signal": null,
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/tool-versions.json",
+        "metadataSha256": "a4ef060b4735bbfa228751ff21c69af7efc7704ddda28b6def1b699cea142524",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/tool-versions.log",
+        "logSha256": "86a0cee1ba83bcc4aad4465851f25e20a4f17affc0d0850ec5e098b6ad32609a",
+        "logSize": 268
+      },
+      "log": [
+        "v26.4.0",
+        "10.33.4",
+        "git version 2.47.3",
+        "taskset from util-linux 2.41",
+        "vitest/4.1.8 linux-x64 node-v26.4.0",
+        "Version 7.0.0-dev.20260526.1",
+        "tsdown/0.22.0 linux-x64 node-v26.4.0",
+        "Linux forge 6.12.95+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.95-1 (2026-07-04) x86_64 GNU/Linux"
+      ]
+    },
+    "sourceEvidence": {
+      "protocol": {
+        "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/protocol.json",
+        "sha256": "77b85af8834e3ae9ea5f3390fc9a2050da08ae139790df8d8d3c4221e92f0032"
+      },
+      "variantScope": {
+        "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/variant-source/pkg/core/lite/src/scope.ts",
+        "sha256": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611"
+      },
+      "variantPatch": {
+        "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/variant.patch",
+        "sha256": "63d75555af4d0d4defeaf80a62aa7c53e367beb0d74b352dacf4e60e1e582125"
+      },
+      "semanticSource": {
+        "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/semantic-tests/pkg/core/lite/tests/inherited-baseline-mode.test.ts",
+        "sha256": "132f76211b1bfdce329d454ef3e22fca7813493d97244bf482a64ac586b92b3e"
+      },
+      "semanticPatch": {
+        "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/semantic-tests.patch",
+        "sha256": "c49a367cf3719e223c24deb7249bef8364c600e7f5ce75b5c952634bfebcb800"
+      },
+      "variantBoundary": {
+        "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/variant-exclusion.json",
+        "sha256": "608571543872cbc6382fa754fb2a598a3dd479a4dd402f53e445fa25804fde9d"
+      }
+    },
+    "failedAttempt": {
+      "launcher": {
+        "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/failed-semantic-attempt-1/launcher-failure.json",
+        "sha256": "529f94a7e2a72c01c656ae0a008947e38f9c9a38281877b26d75ac287ca7a5d4"
+      },
+      "semanticPatch": {
+        "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/failed-semantic-attempt-1/semantic-tests.patch",
+        "sha256": "301d7a90fb8035fc69008005f588761c133e1f7e00c8247f680d8093ff8b7327"
+      },
+      "typecheck": {
+        "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/failed-semantic-attempt-1/commands/lite-typecheck-full.json",
+        "metadataSha256": "9c7ffc5312ca0d1df1ee3cbcba7c2e9a2a3ff58fb2bfce84a7951b5156b643fb",
+        "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/failed-semantic-attempt-1/commands/lite-typecheck-full.log",
+        "logSha256": "53b438997e791464924538e2be96582386b3386707001f260d6c75ac64d3fdfe",
+        "exitCode": 2
+      },
+      "observationCount": 0,
+      "resolution": "The tests were rewritten through public close lifecycle APIs and the complete final matrix was rerun under immutable v2 labels."
+    },
+    "held": true,
+    "claimBoundary": "Semantic evidence proves only the frozen scratch candidate boundary. It is not a product, performance, release-readiness, or release claim.",
+    "requiredSentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  },
+  "provenance": {
+    "schema": "pumped-fn.dkr-p15.provenance.v1",
+    "exactHead": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "createdBeforeObservation": true,
+    "baselineArchive": {
+      "path": "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/archives/head-a.tar",
+      "sha256": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0"
+    },
+    "candidatePatch": {
+      "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/variant.patch",
+      "sha256": "63d75555af4d0d4defeaf80a62aa7c53e367beb0d74b352dacf4e60e1e582125",
+      "changedSources": [
+        "pkg/core/lite/src/scope.ts"
+      ],
+      "candidateScopeSha256": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611"
+    },
+    "variantExclusion": {
+      "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/variant-exclusion.json",
+      "sha256": "608571543872cbc6382fa754fb2a598a3dd479a4dd402f53e445fa25804fde9d",
+      "held": true,
+      "fieldChecks": {
+        "private cleanups:": {
+          "baseline": "  private cleanups: CloseCleanup[] = []",
+          "candidate": "  private cleanups: CloseCleanup[] = []",
+          "matched": true
+        },
+        "private descendants": {
+          "baseline": "  private descendants = new Set<Promise<unknown>>()",
+          "candidate": "  private descendants = new Set<Promise<unknown>>()",
+          "matched": true
+        },
+        "private activeIterators": {
+          "baseline": "  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()",
+          "candidate": "  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()",
+          "matched": true
+        },
+        "private children": {
+          "baseline": "  private children = new Set<ExecutionContextImpl>()",
+          "candidate": "  private children = new Set<ExecutionContextImpl>()",
+          "matched": true
+        }
+      },
+      "semanticModel": {
+        "baselineModeSelector": "options.signal exists or parent baselineMode",
+        "baselineModeInheritance": "every descendant",
+        "baselineCancellation": "eager local controller, exact local-parent-caller composition, local-only abort",
+        "lazyModeBoundary": "only wholly explicit-signal-free subtrees",
+        "lazyCancellation": "first abort recorded and propagated only to lazy children",
+        "lazyToBaselineBoundary": "parent.signal through native combineAbortSignals",
+        "boundListenerBridge": false
+      },
+      "v123Checks": {
+        "private resources: Map<Lite.Resource<unknown>, ResourceEntry<unknown>> | undefined": true,
+        "private resourceListeners: Map<Lite.Resource<unknown>, ResourceListeners> | undefined": true,
+        "private resourceControllers: Map<Lite.Resource<unknown>, ResourceControllerImpl<unknown>> | undefined": true,
+        "this.resources ??= new Map()": true,
+        "this.resourceControllers ??= new Map()": true,
+        "this.resourceListeners ??= new Map()": true,
+        "if (!flowTags?.length) return": true,
+        "const blocked = new Set<symbol>()": true,
+        "this.resources?.values()": true,
+        "this.resources?.keys()": true
+      },
+      "combineAbortSignalsMatchesBaseline": true,
+      "sdkSourceManifest": {
+        "baseline": "416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099",
+        "candidate": "416b165cdae75a969245c434affc187c426c8a537955d7757c7ff9ec3570d099"
+      },
+      "semanticCaseChecks": {
+        "keeps a wholly signal-free subtree lazy until signal access": true,
+        "eagerly inherits baseline mode through descendants without caller signals": true,
+        "replays the first lazy abort through descendants before signal access": true,
+        "crosses from a lazy parent into baseline mode through native parent signal composition": true,
+        "keeps one signal identity and propagates caller cancellation": true,
+        "propagates cancellation from an observed parent signal": true,
+        "observes an already-aborted caller with its original reason": true,
+        "keeps caller precedence when cancellation happens before the first signal read": true,
+        "keeps parent-source precedence before the child first reads its signal": true,
+        "keeps already-aborted construction precedence through close and first read": true,
+        "detaches an unobserved caller source when local close wins": true,
+        "settles abort listeners once when a context closes": true,
+        "materializes the closed signal with the close reason after close": true,
+        "classifies caller cancellation as an aborted close": true,
+        "cancels a streaming child when the consumer returns": true,
+        "cancels a boundary child before parent cleanup settles": true,
+        "keeps explicit-signal identity stable before and after caller cancellation": true,
+        "keeps parent before caller in already-aborted explicit source order": true,
+        "keeps caller reason when it is the only already-aborted explicit source": true,
+        "keeps the first live explicit source when caller aborts before parent": true,
+        "keeps the first live explicit source when parent aborts before caller": true,
+        "keeps local close ahead of a later explicit caller abort": true,
+        "propagates an explicit parent caller to a child without its own signal": true
+      },
+      "forbiddenChecks": {
+        "private cleanups: CloseCleanup[] | undefined": true,
+        "private descendants: Set<Promise<unknown>> | undefined": true,
+        "private activeIterators: Set<AsyncIterator<unknown, unknown, unknown>> | undefined": true,
+        "private children: Set<ExecutionContextImpl> | undefined": true,
+        "this.parent.children ??=": true,
+        "activeIterators ??=": true,
+        "activeIterators?.": true,
+        "const cleanups = this.cleanups ??=": true,
+        "this.children ??": true,
+        "children?.": true,
+        "const descendants = this.descendants ??=": true,
+        "this.descendants ??": true,
+        "this.cleanups?.": true,
+        "this.cleanups!": true,
+        "callerSignal": true,
+        "handleEvent(event: Event)": true,
+        "captureComposedAbort": true,
+        "signalOverride.addEventListener": true,
+        "options.signal.addEventListener": true,
+        ".bind(this)": true,
+        "for (const child of this.children) child.captureAbort(reason)": true
+      },
+      "semanticTests": {
+        "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/semantic-tests/pkg/core/lite/tests/inherited-baseline-mode.test.ts",
+        "sha256": "132f76211b1bfdce329d454ef3e22fca7813493d97244bf482a64ac586b92b3e",
+        "patch": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/semantic-tests.patch",
+        "patchSha256": "c49a367cf3719e223c24deb7249bef8364c600e7f5ce75b5c952634bfebcb800",
+        "results": {
+          "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/semantic-tests/pkg/core/lite/tests/inherited-baseline-mode.test.ts",
+          "sha256": "132f76211b1bfdce329d454ef3e22fca7813493d97244bf482a64ac586b92b3e",
+          "patch": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/semantic-tests.patch",
+          "patchSha256": "c49a367cf3719e223c24deb7249bef8364c600e7f5ce75b5c952634bfebcb800",
+          "focusedPassed": 23,
+          "focusedTotal": 23,
+          "inheritedModePassed": 4,
+          "inheritedModeTotal": 4,
+          "priorHybridCasesPassed": 19,
+          "priorHybridCasesTotal": 19,
+          "existingCancellationPassed": 42,
+          "existingCancellationTotal": 42,
+          "liteNonDocsPassed": 256,
+          "liteNonDocsTotal": 256,
+          "sdkPassed": 59,
+          "sdkTotal": 59,
+          "typechecks": "Lite full and SDK passed",
+          "builds": "Lite and SDK dependency closure passed"
+        }
+      },
+      "semanticEvidence": {
+        "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/semantic-evidence-manifest.json",
+        "sha256": "25a8d3af48d045ef2bbbf3dacc45c6f59f41c0faff251e376a7c6d51090bb6a8",
+        "checks": {
+          "allFinalCommandsExitedZero": true,
+          "focusedCount": true,
+          "lifetimeStreamCount": true,
+          "liteNonDocsCount": true,
+          "sdkCount": true,
+          "liteTypecheck": true,
+          "sdkTypecheck": true,
+          "replayPassed": true,
+          "variantScopeFrozen": true,
+          "variantPatchFrozen": true,
+          "semanticSourceFrozen": true,
+          "semanticPatchFrozen": true,
+          "variantBoundaryHeld": true
+        },
+        "commands": [
+          {
+            "label": "v2-install",
+            "command": [
+              "pnpm",
+              "install",
+              "--frozen-lockfile",
+              "--offline"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+            "startedAt": "2026-07-16T09:30:25.346Z",
+            "finishedAt": "2026-07-16T09:30:29.089Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-install.json",
+            "metadataSha256": "d29ebac71b9e2d90111516adf03d3601b69530a9fc410fdccfc1440251e8b71e",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-install.log",
+            "logSha256": "bb641aff19fbebbcd0dd53fb377f1c65ab5025ce46138b48cc03a3d6436f463e",
+            "logSize": 137
+          },
+          {
+            "label": "v2-lite-build",
+            "command": [
+              "pnpm",
+              "--filter",
+              "@pumped-fn/lite",
+              "build"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+            "startedAt": "2026-07-16T09:30:29.127Z",
+            "finishedAt": "2026-07-16T09:30:33.802Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-build.json",
+            "metadataSha256": "a6b68896df21129472bf0376ff6a3dd6e54b58af45545a3eeea1f352961e98dd",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-build.log",
+            "logSha256": "c7f5f23763da16cb8828b146ea0d6270c6b09e3304b96a673f6a7e0504c9418a",
+            "logSize": 805
+          },
+          {
+            "label": "v2-sdk-build-closure",
+            "command": [
+              "pnpm",
+              "--filter",
+              "@pumped-fn/sdk...",
+              "build"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+            "startedAt": "2026-07-16T09:30:33.854Z",
+            "finishedAt": "2026-07-16T09:30:44.151Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-build-closure.json",
+            "metadataSha256": "2198b0afc308184d9743bb822976645dba2ea083fa1470e98cc6bcceca635711",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-build-closure.log",
+            "logSha256": "842e6637ce06c13d2c46fd3eccd5ecf4cd2a3790fce4c3f97d99206085dd96cd",
+            "logSize": 5548
+          },
+          {
+            "label": "v2-focused-inherited-mode",
+            "command": [
+              "pnpm",
+              "--filter",
+              "@pumped-fn/lite",
+              "exec",
+              "vitest",
+              "run",
+              "tests/inherited-baseline-mode.test.ts"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+            "startedAt": "2026-07-16T09:30:44.200Z",
+            "finishedAt": "2026-07-16T09:30:47.389Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-focused-inherited-mode.json",
+            "metadataSha256": "eb12516969b6f176941294d01fa98b15ea980c8c38b124ee220d05f7ec5733f5",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-focused-inherited-mode.log",
+            "logSha256": "ea9dbd61b5fcb9933701c7714f486d416591d95e20598d690f8f786943f24cac",
+            "logSize": 277
+          },
+          {
+            "label": "v2-existing-lifetime-stream",
+            "command": [
+              "pnpm",
+              "--filter",
+              "@pumped-fn/lite",
+              "exec",
+              "vitest",
+              "run",
+              "tests/structured-lifetime.test.ts",
+              "tests/exec-stream.test.ts"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+            "startedAt": "2026-07-16T09:30:47.448Z",
+            "finishedAt": "2026-07-16T09:30:50.191Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-existing-lifetime-stream.json",
+            "metadataSha256": "87fc878d139cfc4bcbe4b5268a0278bc861bf29139c7db13d7000a7ef78a9d5b",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-existing-lifetime-stream.log",
+            "logSha256": "a75b628da4131bee71046584ebc679aaba5b70fd47b481debdd69c90412e2ead",
+            "logSize": 277
+          },
+          {
+            "label": "v2-lite-non-docs",
+            "command": [
+              "pnpm",
+              "--filter",
+              "@pumped-fn/lite",
+              "exec",
+              "vitest",
+              "run",
+              "tests/inherited-baseline-mode.test.ts",
+              "tests/changes.test.ts",
+              "tests/exec-stream.test.ts",
+              "tests/flow-fault.test.ts",
+              "tests/resolve-stream.test.ts",
+              "tests/role-tags.test.ts",
+              "tests/scope.test.ts",
+              "tests/structured-lifetime.test.ts"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+            "startedAt": "2026-07-16T09:30:50.253Z",
+            "finishedAt": "2026-07-16T09:30:57.549Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-non-docs.json",
+            "metadataSha256": "0db5ed0fca4df40d2fbbb4ec815db079a18e995f8b4ef6736028568c7be11817",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-non-docs.log",
+            "logSha256": "41b4c27b5b6b22869f610e612043c3def2447ed7b23f48f8ba5544002cd67604",
+            "logSize": 280
+          },
+          {
+            "label": "v2-sdk-tests",
+            "command": [
+              "pnpm",
+              "--filter",
+              "@pumped-fn/sdk",
+              "exec",
+              "vitest",
+              "run"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+            "startedAt": "2026-07-16T09:30:57.601Z",
+            "finishedAt": "2026-07-16T09:31:39.979Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-tests.json",
+            "metadataSha256": "6e2cb0a91be42fd195c9dd4583bcb97387b202ea5b1844826129fb69a916b993",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-tests.log",
+            "logSha256": "125c95142c0aa872030b56abee8ab8cc8bfdfceebe593f0167ee899c379c874d",
+            "logSize": 279
+          },
+          {
+            "label": "v2-lite-typecheck-full",
+            "command": [
+              "pnpm",
+              "--filter",
+              "@pumped-fn/lite",
+              "typecheck:full"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+            "startedAt": "2026-07-16T09:31:40.033Z",
+            "finishedAt": "2026-07-16T09:31:42.682Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-typecheck-full.json",
+            "metadataSha256": "e443b368beb84eb01dfbd161cd682cf3289180d1f24e73248da3791bce2368b9",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-lite-typecheck-full.log",
+            "logSha256": "1ab5655991a85e347527bc0c25da74a0b6a56345bdd4107064fc01416e80a281",
+            "logSize": 172
+          },
+          {
+            "label": "v2-sdk-typecheck",
+            "command": [
+              "pnpm",
+              "--filter",
+              "@pumped-fn/sdk",
+              "typecheck"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+            "startedAt": "2026-07-16T09:31:42.733Z",
+            "finishedAt": "2026-07-16T09:31:44.911Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-typecheck.json",
+            "metadataSha256": "0b17ca03aababd8c1f29cfc98060124aa8417d13e2cd8a9a9bf74cd6cd1a6c88",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/v2-sdk-typecheck.log",
+            "logSha256": "21eafe0c3c36dd8a631798f66c5912a0bfeac719853a147462a4e1fe29046731",
+            "logSize": 143
+          },
+          {
+            "label": "semantic-replay",
+            "command": [
+              "bash",
+              "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/replay-semantics.sh",
+              "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z",
+            "startedAt": "2026-07-16T09:32:23.796Z",
+            "finishedAt": "2026-07-16T09:33:21.398Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/semantic-replay.json",
+            "metadataSha256": "a25a389a9f178c1adeec1604b3fd44c3a0c1e02bd6011a3ccec7ca4a1a6e23f9",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/semantic-replay.log",
+            "logSha256": "34a11ba4ad820598688bb89f4c12e05f0129e0b6837c6156917219c07fe320b4",
+            "logSize": 8391
+          },
+          {
+            "label": "tool-versions",
+            "command": [
+              "bash",
+              "-lc",
+              "node --version; pnpm --version; git --version; taskset --version | head -1; pnpm --filter @pumped-fn/lite exec vitest --version; pnpm --filter @pumped-fn/lite exec tsgo --version; pnpm --filter @pumped-fn/lite exec tsdown --version; uname -a"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+            "startedAt": "2026-07-16T09:33:29.200Z",
+            "finishedAt": "2026-07-16T09:33:54.479Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/tool-versions.json",
+            "metadataSha256": "a4ef060b4735bbfa228751ff21c69af7efc7704ddda28b6def1b699cea142524",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/tool-versions.log",
+            "logSha256": "86a0cee1ba83bcc4aad4465851f25e20a4f17affc0d0850ec5e098b6ad32609a",
+            "logSize": 268
+          }
+        ],
+        "failedAttempt": {
+          "launcher": {
+            "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/failed-semantic-attempt-1/launcher-failure.json",
+            "sha256": "529f94a7e2a72c01c656ae0a008947e38f9c9a38281877b26d75ac287ca7a5d4"
+          },
+          "semanticPatch": {
+            "path": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/failed-semantic-attempt-1/semantic-tests.patch",
+            "sha256": "301d7a90fb8035fc69008005f588761c133e1f7e00c8247f680d8093ff8b7327"
+          },
+          "typecheck": {
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/failed-semantic-attempt-1/commands/lite-typecheck-full.json",
+            "metadataSha256": "9c7ffc5312ca0d1df1ee3cbcba7c2e9a2a3ff58fb2bfce84a7951b5156b643fb",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/failed-semantic-attempt-1/commands/lite-typecheck-full.log",
+            "logSha256": "53b438997e791464924538e2be96582386b3386707001f260d6c75ac64d3fdfe",
+            "exitCode": 2
+          },
+          "observationCount": 0,
+          "resolution": "The tests were rewritten through public close lifecycle APIs and the complete final matrix was rerun under immutable v2 labels."
+        },
+        "replay": {
+          "script": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/replay-semantics.sh",
+          "scriptSha256": "0fc1c5d6ac0a164bd59188aa3f11944dbabb5903be0dcb8755406271ac245b6a",
+          "command": [
+            "bash",
+            "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/replay-semantics.sh",
+            "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z"
+          ],
+          "recordedCommand": {
+            "label": "semantic-replay",
+            "command": [
+              "bash",
+              "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/replay-semantics.sh",
+              "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z",
+            "startedAt": "2026-07-16T09:32:23.796Z",
+            "finishedAt": "2026-07-16T09:33:21.398Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/semantic-replay.json",
+            "metadataSha256": "a25a389a9f178c1adeec1604b3fd44c3a0c1e02bd6011a3ccec7ca4a1a6e23f9",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/semantic-replay.log",
+            "logSha256": "34a11ba4ad820598688bb89f4c12e05f0129e0b6837c6156917219c07fe320b4",
+            "logSize": 8391
+          }
+        },
+        "versions": {
+          "command": {
+            "label": "tool-versions",
+            "command": [
+              "bash",
+              "-lc",
+              "node --version; pnpm --version; git --version; taskset --version | head -1; pnpm --filter @pumped-fn/lite exec vitest --version; pnpm --filter @pumped-fn/lite exec tsgo --version; pnpm --filter @pumped-fn/lite exec tsdown --version; uname -a"
+            ],
+            "cwd": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/build-candidate",
+            "startedAt": "2026-07-16T09:33:29.200Z",
+            "finishedAt": "2026-07-16T09:33:54.479Z",
+            "exitCode": 0,
+            "signal": null,
+            "metadataPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/tool-versions.json",
+            "metadataSha256": "a4ef060b4735bbfa228751ff21c69af7efc7704ddda28b6def1b699cea142524",
+            "logPath": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/logs/commands/tool-versions.log",
+            "logSha256": "86a0cee1ba83bcc4aad4465851f25e20a4f17affc0d0850ec5e098b6ad32609a",
+            "logSize": 268
+          },
+          "log": [
+            "v26.4.0",
+            "10.33.4",
+            "git version 2.47.3",
+            "taskset from util-linux 2.41",
+            "vitest/4.1.8 linux-x64 node-v26.4.0",
+            "Version 7.0.0-dev.20260526.1",
+            "tsdown/0.22.0 linux-x64 node-v26.4.0",
+            "Linux forge 6.12.95+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.95-1 (2026-07-04) x86_64 GNU/Linux"
+          ]
+        }
+      }
+    },
+    "builds": {
+      "baseline": {
+        "sources": {
+          "files": [
+            {
+              "path": "pkg/core/lite/src/atom.ts",
+              "size": 7588,
+              "sha256": "b79ed37b0fce76cad3e287e9a35c6a8ae368e27a677d39f4e93b88af645cdaca"
+            },
+            {
+              "path": "pkg/core/lite/src/deps-graph.ts",
+              "size": 1855,
+              "sha256": "d12c9b6101e6da6546bad9ed6840f27349ac0b7c7e1a6be16f9f60383104f3f1"
+            },
+            {
+              "path": "pkg/core/lite/src/flow.ts",
+              "size": 8699,
+              "sha256": "2c544313b24ad18dcb40953724eff08a560c1a7168be22decb045dc042f065bf"
+            },
+            {
+              "path": "pkg/core/lite/src/index.ts",
+              "size": 801,
+              "sha256": "c7dea3a0529247b9d67051a7c91a3832c3546c175e017cf426333c5f2fefb298"
+            },
+            {
+              "path": "pkg/core/lite/src/latest.ts",
+              "size": 2550,
+              "sha256": "45738b1ef457f87fc11ea585deb0877c77108797bfea1da878bc4f4b019ede11"
+            },
+            {
+              "path": "pkg/core/lite/src/preset.ts",
+              "size": 3029,
+              "sha256": "93a7afe4a91e36fb3b707981357ab1a08b6cdedfb582dab2b6982517be55eb8d"
+            },
+            {
+              "path": "pkg/core/lite/src/resource.ts",
+              "size": 2307,
+              "sha256": "8f4fedfe27e44221d389dde4c814d1f3adc39fa9548f97b2cab457e0e2d7fc27"
+            },
+            {
+              "path": "pkg/core/lite/src/scope.ts",
+              "size": 99830,
+              "sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e"
+            },
+            {
+              "path": "pkg/core/lite/src/streaming.ts",
+              "size": 3234,
+              "sha256": "a8332fb9fb6fbe652fbbed12a2696fc493425b204445c1fc8b53b73a280333ba"
+            },
+            {
+              "path": "pkg/core/lite/src/tag.ts",
+              "size": 9153,
+              "sha256": "29952e51943419c1cd193ddbf1b54b50ce6caff1ae0018c8cd68fb150c5b8f59"
+            },
+            {
+              "path": "pkg/core/lite/src/tracker.ts",
+              "size": 880,
+              "sha256": "677839ad60b2d97b2e83c3b05e14d998ce8ef049c27384131e33ffbd600295a5"
+            },
+            {
+              "path": "pkg/core/lite/src/types.ts",
+              "size": 25632,
+              "sha256": "03545f324721e87752c2d7748a6c4fac7d07a0165539ad81767d19744e3182b3"
+            },
+            {
+              "path": "pkg/sdk/core/src/agent.ts",
+              "size": 26199,
+              "sha256": "2bd1146e69bc62112f5209a4947343a6c303785c66902e614b5b87ffb483369d"
+            },
+            {
+              "path": "pkg/sdk/core/src/index.ts",
+              "size": 31931,
+              "sha256": "095a4860c9209946ecd8b64c042a7c40971580320d4249474e400021ddfb473e"
+            },
+            {
+              "path": "pkg/sdk/core/src/internal/digest.ts",
+              "size": 3111,
+              "sha256": "9ea3117d5b09b2c16e720d9afbb48e1a63869db61479f994a801dc7778cd4cf9"
+            },
+            {
+              "path": "pkg/sdk/core/src/model.ts",
+              "size": 137,
+              "sha256": "039239eabf9417e1c3481bf11fb3db0b0ed4234cf3910990ce857fd7ec952adc"
+            },
+            {
+              "path": "pkg/sdk/core/src/sandbox.ts",
+              "size": 5193,
+              "sha256": "c2e3b94896ac42237c2693a768212ce93abdbdb173cf8f95215ef8630dbee170"
+            },
+            {
+              "path": "pkg/sdk/core/src/session.ts",
+              "size": 63554,
+              "sha256": "f03273e76923655460a42a1e748ca470bd6ee906d541029ec1040d5733d01ad3"
+            },
+            {
+              "path": "pkg/sdk/core/src/validation.ts",
+              "size": 3166,
+              "sha256": "e0c50ec76537be19f24b39ff37f552d9064477d4d0a58c5d62360d146bb87fcd"
+            }
+          ],
+          "sha256": "1393894a23decd6be1a5853e08f051468c35b2725a910d5e77c9b364fe510c15"
+        },
+        "lockfile": {
+          "files": [
+            {
+              "path": "pnpm-lock.yaml",
+              "size": 301142,
+              "sha256": "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120"
+            }
+          ],
+          "sha256": "10f648b1520528a2ab60e4deac76268cd3314b8f2f7a6f03bb27a676e5372dcf"
+        },
+        "manifests": {
+          "files": [
+            {
+              "path": "package.json",
+              "size": 2686,
+              "sha256": "d01d6911abf560cd32dc1d39d84b7a5617f037bffffbd7e94aa987dcd490cdcb"
+            },
+            {
+              "path": "pkg/core/lite/package.json",
+              "size": 1440,
+              "sha256": "d7fb756b7688a355a0ba6e7604a19c1269728527dc040b75f07f87c486b0efb4"
+            },
+            {
+              "path": "pkg/core/lite/tsconfig.json",
+              "size": 233,
+              "sha256": "3cc8918a46ad0d4795b5340f51eee4642b84a2da5cb9708dd6fd576d122aa0bd"
+            },
+            {
+              "path": "pkg/sdk/core/package.json",
+              "size": 2449,
+              "sha256": "c11f17b6ecd8746faa837ab92bf4489170dceede5add3062686ba8162e65e6c3"
+            },
+            {
+              "path": "pkg/sdk/core/tsconfig.json",
+              "size": 309,
+              "sha256": "db8490ca9d3340f8d2b07db80f6a5cbfcc21b866a4ca61641ed2350c5802e966"
+            },
+            {
+              "path": "pnpm-workspace.yaml",
+              "size": 5813,
+              "sha256": "603341c9b78a2d0fe71767c77f2a0146be2babc49cc744e8b66b6fd732cdaed6"
+            }
+          ],
+          "sha256": "75bcb1b36e9a941d120db03e2f3b80475e67962ffc0153662df9ebc01712724b"
+        },
+        "distModules": {
+          "files": [
+            {
+              "path": "pkg/core/lite/dist/index.cjs",
+              "size": 92042,
+              "sha256": "b8977289be908729ff2f96dd79ee9e2c53b6d0b158cd1d86542c9b52aa963cad"
+            },
+            {
+              "path": "pkg/core/lite/dist/index.mjs",
+              "size": 91116,
+              "sha256": "f57fd25f992f1e70a4997b46d1f10ad912eac3bb26caddf7daa389652285e705"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.cjs",
+              "size": 18665,
+              "sha256": "bb01bc2f787c6fcc1fbe68b323f7ac8a37922839d6a671d2931eaecae2ce078a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.mjs",
+              "size": 17696,
+              "sha256": "13250c39d47359a1686d3d0b813822b20657be99a40007b6f4e22093d852fea8"
+            },
+            {
+              "path": "pkg/sdk/core/dist/digest-B-CJeRAR.cjs",
+              "size": 3062,
+              "sha256": "c23603720410152087e8fb23172be4692460a21faaca845f13478d14dae3362c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/digest-DHsSofmQ.mjs",
+              "size": 2981,
+              "sha256": "abf728ccce0d8bd0223d15c573c300c406d7ae9e77189a299ba6c8a6f02d0d86"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.cjs",
+              "size": 21817,
+              "sha256": "97c979c6c67be34669458df3ae483a202518dc114baa7f183912ae78c99b16cc"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.mjs",
+              "size": 20719,
+              "sha256": "5875f89c68808625656fe8060e6f280a9883d94bb929454a15c9b7880f304885"
+            },
+            {
+              "path": "pkg/sdk/core/dist/model-CrBY1TBn.cjs",
+              "size": 216,
+              "sha256": "bbcba2fb0796810c7632bedab348367aeb4a316d44037eb40ff34782365e226a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/model-KPdR5sdU.mjs",
+              "size": 143,
+              "sha256": "e1686873c958865dc79c4292ed95743dd4a3186a7787b56bfb9315440d6c3e50"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.cjs",
+              "size": 4210,
+              "sha256": "062fa7fc1d9d4a9ece19f33979c48a1ede27dd29b0a595c62f17e81ca7d41c7f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.mjs",
+              "size": 3606,
+              "sha256": "6aa65bcdbf3c2093123a85bb2704d19fbfb672304234d0ec04687ce74e35e635"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.cjs",
+              "size": 45940,
+              "sha256": "8a0a7f6f45e8bd98ac777739b87367bcc1ff62c509180356a004b8ad9cd4424f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.mjs",
+              "size": 43574,
+              "sha256": "b9b99e680699ec18b8ae2d63b66ec279bcf46e8cd2c7dfb74bc0cfdff2929135"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.cjs",
+              "size": 1988,
+              "sha256": "1d5be33c174d58eff6b94177fadf0558b50b9c272dd1842922bf610dc0cc8a1e"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.mjs",
+              "size": 1781,
+              "sha256": "5e48118d1cfc4bbb71558f7df611609f1286c3a0e6142af2311c95e805667a1e"
+            }
+          ],
+          "sha256": "850a7112f2298addd28e7e41fe30aa219996a67697dcb240aed15f982cfbd6f9"
+        },
+        "declarations": {
+          "files": [
+            {
+              "path": "pkg/core/lite/dist/index.d.cts",
+              "size": 47268,
+              "sha256": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713"
+            },
+            {
+              "path": "pkg/core/lite/dist/index.d.mts",
+              "size": 47268,
+              "sha256": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent-BqBU9EIv.d.mts",
+              "size": 15681,
+              "sha256": "83ede6fae6f92119761410fd47d72f3322c7aae7fb0de9941e97bcd7ede7d3cb"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent-DRCH3dW3.d.cts",
+              "size": 15677,
+              "sha256": "d7afdd17d2b661383eb270413e301c34453c73bdd27d76f39b5200ffdeeb5771"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.d.cts",
+              "size": 735,
+              "sha256": "bffc46cb95c03da8808cfa5a0c753bbb4c4a157e0947c744ea5a1057d8019012"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.d.mts",
+              "size": 735,
+              "sha256": "3931fc9ff268a859395ccf26a77d057543f730e2e4057b45ee74c02dd36aff16"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.d.cts",
+              "size": 2062,
+              "sha256": "4871f2ac669eaad30b5c7f9a47f2f863245f7c4ef8b006059d1f6f3025d5dac9"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.d.mts",
+              "size": 2062,
+              "sha256": "986e6d093ed78e8da4e25f3fd5072be38cb0e4c6b8b764704b89693a81667049"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.d.cts",
+              "size": 1741,
+              "sha256": "0de634451807e69b9619efb5a5b064e669968dd245031bb6217b7232ad00512c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.d.mts",
+              "size": 1741,
+              "sha256": "0de634451807e69b9619efb5a5b064e669968dd245031bb6217b7232ad00512c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session-CS_mRWkC.d.cts",
+              "size": 19685,
+              "sha256": "3c43bec659df00d3aeb221c95cf4aba33c705f2d6c83993f78882a5c10d4778f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session-CS_mRWkC.d.mts",
+              "size": 19685,
+              "sha256": "3c43bec659df00d3aeb221c95cf4aba33c705f2d6c83993f78882a5c10d4778f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.d.cts",
+              "size": 2972,
+              "sha256": "e733e06b8953d2436d32f42ce5e61cb2c9686cc90dcd93bba67758bc6e40918c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.d.mts",
+              "size": 2972,
+              "sha256": "1c61ab34af2908afe187a8a5eba8c1e12db16238c66a432028242708d8632aec"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation-Du4wlGIT.d.cts",
+              "size": 1465,
+              "sha256": "791e4bf7904684b13cb5bf58e7cdb123e03d3fbe18563d0be5b7f53b23dc4ecf"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation-Du4wlGIT.d.mts",
+              "size": 1465,
+              "sha256": "791e4bf7904684b13cb5bf58e7cdb123e03d3fbe18563d0be5b7f53b23dc4ecf"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.d.cts",
+              "size": 249,
+              "sha256": "7f0405fa07ce5e90faf4ea1e3a669a8e1d92b1c2f4795a0613007628065b332c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.d.mts",
+              "size": 249,
+              "sha256": "1bd36d1dd86e454bd14e49ac03b4ecc341a06902c8b0378421f5ba68eab8642f"
+            }
+          ],
+          "sha256": "a62902af2abdc320fb2c205406d91422ba1626a48e94397846fa0b29a2801d59"
+        }
+      },
+      "candidate": {
+        "sources": {
+          "files": [
+            {
+              "path": "pkg/core/lite/src/atom.ts",
+              "size": 7588,
+              "sha256": "b79ed37b0fce76cad3e287e9a35c6a8ae368e27a677d39f4e93b88af645cdaca"
+            },
+            {
+              "path": "pkg/core/lite/src/deps-graph.ts",
+              "size": 1855,
+              "sha256": "d12c9b6101e6da6546bad9ed6840f27349ac0b7c7e1a6be16f9f60383104f3f1"
+            },
+            {
+              "path": "pkg/core/lite/src/flow.ts",
+              "size": 8699,
+              "sha256": "2c544313b24ad18dcb40953724eff08a560c1a7168be22decb045dc042f065bf"
+            },
+            {
+              "path": "pkg/core/lite/src/index.ts",
+              "size": 801,
+              "sha256": "c7dea3a0529247b9d67051a7c91a3832c3546c175e017cf426333c5f2fefb298"
+            },
+            {
+              "path": "pkg/core/lite/src/latest.ts",
+              "size": 2550,
+              "sha256": "45738b1ef457f87fc11ea585deb0877c77108797bfea1da878bc4f4b019ede11"
+            },
+            {
+              "path": "pkg/core/lite/src/preset.ts",
+              "size": 3029,
+              "sha256": "93a7afe4a91e36fb3b707981357ab1a08b6cdedfb582dab2b6982517be55eb8d"
+            },
+            {
+              "path": "pkg/core/lite/src/resource.ts",
+              "size": 2307,
+              "sha256": "8f4fedfe27e44221d389dde4c814d1f3adc39fa9548f97b2cab457e0e2d7fc27"
+            },
+            {
+              "path": "pkg/core/lite/src/scope.ts",
+              "size": 101536,
+              "sha256": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611"
+            },
+            {
+              "path": "pkg/core/lite/src/streaming.ts",
+              "size": 3234,
+              "sha256": "a8332fb9fb6fbe652fbbed12a2696fc493425b204445c1fc8b53b73a280333ba"
+            },
+            {
+              "path": "pkg/core/lite/src/tag.ts",
+              "size": 9153,
+              "sha256": "29952e51943419c1cd193ddbf1b54b50ce6caff1ae0018c8cd68fb150c5b8f59"
+            },
+            {
+              "path": "pkg/core/lite/src/tracker.ts",
+              "size": 880,
+              "sha256": "677839ad60b2d97b2e83c3b05e14d998ce8ef049c27384131e33ffbd600295a5"
+            },
+            {
+              "path": "pkg/core/lite/src/types.ts",
+              "size": 25632,
+              "sha256": "03545f324721e87752c2d7748a6c4fac7d07a0165539ad81767d19744e3182b3"
+            },
+            {
+              "path": "pkg/sdk/core/src/agent.ts",
+              "size": 26199,
+              "sha256": "2bd1146e69bc62112f5209a4947343a6c303785c66902e614b5b87ffb483369d"
+            },
+            {
+              "path": "pkg/sdk/core/src/index.ts",
+              "size": 31931,
+              "sha256": "095a4860c9209946ecd8b64c042a7c40971580320d4249474e400021ddfb473e"
+            },
+            {
+              "path": "pkg/sdk/core/src/internal/digest.ts",
+              "size": 3111,
+              "sha256": "9ea3117d5b09b2c16e720d9afbb48e1a63869db61479f994a801dc7778cd4cf9"
+            },
+            {
+              "path": "pkg/sdk/core/src/model.ts",
+              "size": 137,
+              "sha256": "039239eabf9417e1c3481bf11fb3db0b0ed4234cf3910990ce857fd7ec952adc"
+            },
+            {
+              "path": "pkg/sdk/core/src/sandbox.ts",
+              "size": 5193,
+              "sha256": "c2e3b94896ac42237c2693a768212ce93abdbdb173cf8f95215ef8630dbee170"
+            },
+            {
+              "path": "pkg/sdk/core/src/session.ts",
+              "size": 63554,
+              "sha256": "f03273e76923655460a42a1e748ca470bd6ee906d541029ec1040d5733d01ad3"
+            },
+            {
+              "path": "pkg/sdk/core/src/validation.ts",
+              "size": 3166,
+              "sha256": "e0c50ec76537be19f24b39ff37f552d9064477d4d0a58c5d62360d146bb87fcd"
+            }
+          ],
+          "sha256": "c2eda476e91ad141d4aa8b76b599f6583670561fab90bbb16abcf8123bf0131d"
+        },
+        "lockfile": {
+          "files": [
+            {
+              "path": "pnpm-lock.yaml",
+              "size": 301142,
+              "sha256": "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120"
+            }
+          ],
+          "sha256": "10f648b1520528a2ab60e4deac76268cd3314b8f2f7a6f03bb27a676e5372dcf"
+        },
+        "manifests": {
+          "files": [
+            {
+              "path": "package.json",
+              "size": 2686,
+              "sha256": "d01d6911abf560cd32dc1d39d84b7a5617f037bffffbd7e94aa987dcd490cdcb"
+            },
+            {
+              "path": "pkg/core/lite/package.json",
+              "size": 1440,
+              "sha256": "d7fb756b7688a355a0ba6e7604a19c1269728527dc040b75f07f87c486b0efb4"
+            },
+            {
+              "path": "pkg/core/lite/tsconfig.json",
+              "size": 233,
+              "sha256": "3cc8918a46ad0d4795b5340f51eee4642b84a2da5cb9708dd6fd576d122aa0bd"
+            },
+            {
+              "path": "pkg/sdk/core/package.json",
+              "size": 2449,
+              "sha256": "c11f17b6ecd8746faa837ab92bf4489170dceede5add3062686ba8162e65e6c3"
+            },
+            {
+              "path": "pkg/sdk/core/tsconfig.json",
+              "size": 309,
+              "sha256": "db8490ca9d3340f8d2b07db80f6a5cbfcc21b866a4ca61641ed2350c5802e966"
+            },
+            {
+              "path": "pnpm-workspace.yaml",
+              "size": 5813,
+              "sha256": "603341c9b78a2d0fe71767c77f2a0146be2babc49cc744e8b66b6fd732cdaed6"
+            }
+          ],
+          "sha256": "75bcb1b36e9a941d120db03e2f3b80475e67962ffc0153662df9ebc01712724b"
+        },
+        "distModules": {
+          "files": [
+            {
+              "path": "pkg/core/lite/dist/index.cjs",
+              "size": 93418,
+              "sha256": "fb0e4bc4edbe4b0065c4bf336ec3d05f6d43eaef913c34c523d529ef21e34c41"
+            },
+            {
+              "path": "pkg/core/lite/dist/index.mjs",
+              "size": 92492,
+              "sha256": "8d381568a2a4fd85c9b4cf90352ac99daacf3e23a6f1b5ea9cf62462f1cfd3af"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.cjs",
+              "size": 18665,
+              "sha256": "bb01bc2f787c6fcc1fbe68b323f7ac8a37922839d6a671d2931eaecae2ce078a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.mjs",
+              "size": 17696,
+              "sha256": "13250c39d47359a1686d3d0b813822b20657be99a40007b6f4e22093d852fea8"
+            },
+            {
+              "path": "pkg/sdk/core/dist/digest-B-CJeRAR.cjs",
+              "size": 3062,
+              "sha256": "c23603720410152087e8fb23172be4692460a21faaca845f13478d14dae3362c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/digest-DHsSofmQ.mjs",
+              "size": 2981,
+              "sha256": "abf728ccce0d8bd0223d15c573c300c406d7ae9e77189a299ba6c8a6f02d0d86"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.cjs",
+              "size": 21817,
+              "sha256": "97c979c6c67be34669458df3ae483a202518dc114baa7f183912ae78c99b16cc"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.mjs",
+              "size": 20719,
+              "sha256": "5875f89c68808625656fe8060e6f280a9883d94bb929454a15c9b7880f304885"
+            },
+            {
+              "path": "pkg/sdk/core/dist/model-CrBY1TBn.cjs",
+              "size": 216,
+              "sha256": "bbcba2fb0796810c7632bedab348367aeb4a316d44037eb40ff34782365e226a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/model-KPdR5sdU.mjs",
+              "size": 143,
+              "sha256": "e1686873c958865dc79c4292ed95743dd4a3186a7787b56bfb9315440d6c3e50"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.cjs",
+              "size": 4210,
+              "sha256": "062fa7fc1d9d4a9ece19f33979c48a1ede27dd29b0a595c62f17e81ca7d41c7f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.mjs",
+              "size": 3606,
+              "sha256": "6aa65bcdbf3c2093123a85bb2704d19fbfb672304234d0ec04687ce74e35e635"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.cjs",
+              "size": 45940,
+              "sha256": "8a0a7f6f45e8bd98ac777739b87367bcc1ff62c509180356a004b8ad9cd4424f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.mjs",
+              "size": 43574,
+              "sha256": "b9b99e680699ec18b8ae2d63b66ec279bcf46e8cd2c7dfb74bc0cfdff2929135"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.cjs",
+              "size": 1988,
+              "sha256": "1d5be33c174d58eff6b94177fadf0558b50b9c272dd1842922bf610dc0cc8a1e"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.mjs",
+              "size": 1781,
+              "sha256": "5e48118d1cfc4bbb71558f7df611609f1286c3a0e6142af2311c95e805667a1e"
+            }
+          ],
+          "sha256": "510838825879e497ffa88a40f32a80278201499a03f173d10e798a9e31506dcf"
+        },
+        "declarations": {
+          "files": [
+            {
+              "path": "pkg/core/lite/dist/index.d.cts",
+              "size": 47268,
+              "sha256": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713"
+            },
+            {
+              "path": "pkg/core/lite/dist/index.d.mts",
+              "size": 47268,
+              "sha256": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent-BqBU9EIv.d.mts",
+              "size": 15681,
+              "sha256": "83ede6fae6f92119761410fd47d72f3322c7aae7fb0de9941e97bcd7ede7d3cb"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent-DRCH3dW3.d.cts",
+              "size": 15677,
+              "sha256": "d7afdd17d2b661383eb270413e301c34453c73bdd27d76f39b5200ffdeeb5771"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.d.cts",
+              "size": 735,
+              "sha256": "bffc46cb95c03da8808cfa5a0c753bbb4c4a157e0947c744ea5a1057d8019012"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.d.mts",
+              "size": 735,
+              "sha256": "3931fc9ff268a859395ccf26a77d057543f730e2e4057b45ee74c02dd36aff16"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.d.cts",
+              "size": 2062,
+              "sha256": "4871f2ac669eaad30b5c7f9a47f2f863245f7c4ef8b006059d1f6f3025d5dac9"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.d.mts",
+              "size": 2062,
+              "sha256": "986e6d093ed78e8da4e25f3fd5072be38cb0e4c6b8b764704b89693a81667049"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.d.cts",
+              "size": 1741,
+              "sha256": "0de634451807e69b9619efb5a5b064e669968dd245031bb6217b7232ad00512c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.d.mts",
+              "size": 1741,
+              "sha256": "0de634451807e69b9619efb5a5b064e669968dd245031bb6217b7232ad00512c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session-CS_mRWkC.d.cts",
+              "size": 19685,
+              "sha256": "3c43bec659df00d3aeb221c95cf4aba33c705f2d6c83993f78882a5c10d4778f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session-CS_mRWkC.d.mts",
+              "size": 19685,
+              "sha256": "3c43bec659df00d3aeb221c95cf4aba33c705f2d6c83993f78882a5c10d4778f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.d.cts",
+              "size": 2972,
+              "sha256": "e733e06b8953d2436d32f42ce5e61cb2c9686cc90dcd93bba67758bc6e40918c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.d.mts",
+              "size": 2972,
+              "sha256": "1c61ab34af2908afe187a8a5eba8c1e12db16238c66a432028242708d8632aec"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation-Du4wlGIT.d.cts",
+              "size": 1465,
+              "sha256": "791e4bf7904684b13cb5bf58e7cdb123e03d3fbe18563d0be5b7f53b23dc4ecf"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation-Du4wlGIT.d.mts",
+              "size": 1465,
+              "sha256": "791e4bf7904684b13cb5bf58e7cdb123e03d3fbe18563d0be5b7f53b23dc4ecf"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.d.cts",
+              "size": 249,
+              "sha256": "7f0405fa07ce5e90faf4ea1e3a669a8e1d92b1c2f4795a0613007628065b332c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.d.mts",
+              "size": 249,
+              "sha256": "1bd36d1dd86e454bd14e49ac03b4ecc341a06902c8b0378421f5ba68eab8642f"
+            }
+          ],
+          "sha256": "a62902af2abdc320fb2c205406d91422ba1626a48e94397846fa0b29a2801d59"
+        }
+      }
+    },
+    "checks": {
+      "exactHead": true,
+      "baselineArchive": true,
+      "baselineSourceMatchesAcceptedBuild": true,
+      "baselineLockfileMatchesAcceptedBuild": true,
+      "baselineManifestsMatchAcceptedBuild": true,
+      "baselineDistMatchesAcceptedBuild": true,
+      "baselineDeclarationsMatchAcceptedBuild": true,
+      "patchHash": true,
+      "changedSources": true,
+      "candidateScopeMatchesFrozenVariant": true,
+      "variantExclusionHeld": true,
+      "variantExclusionPatchMatches": true,
+      "variantExclusionScopeMatches": true,
+      "semanticTestsFrozen": true,
+      "semanticTestsPatchFrozen": true,
+      "semanticBoundaryHeld": true,
+      "semanticEvidenceHeld": true,
+      "lockfileUnchanged": true,
+      "manifestsUnchanged": true,
+      "declarationsUnchanged": true
+    },
+    "environment": {
+      "node": "v26.4.0",
+      "v8": "14.6.202.34-node.21",
+      "platform": "linux",
+      "release": "6.12.95+deb13-amd64",
+      "cpu": "Intel(R) Xeon(R) CPU E3-1245 v5 @ 3.50GHz",
+      "logicalCpuCount": 8,
+      "totalMemoryBytes": 33432829952
+    },
+    "environmentSha256": "f44942f8a245e8fb5079ed7efca243d5041388f760888eaf39378dca95369b09"
+  },
+  "frozen_protocol": {
+    "frozen_at": "2026-07-16T09:36:53.367Z",
+    "first_observation_at": "2026-07-16T09:37:06.618Z",
+    "chronology_held": true,
+    "frozen_checks": [
+      {
+        "file": "protocol.json",
+        "expected": "77b85af8834e3ae9ea5f3390fc9a2050da08ae139790df8d8d3c4221e92f0032",
+        "actual": "77b85af8834e3ae9ea5f3390fc9a2050da08ae139790df8d8d3c4221e92f0032",
+        "matched": true
+      },
+      {
+        "file": "variant.patch",
+        "expected": "63d75555af4d0d4defeaf80a62aa7c53e367beb0d74b352dacf4e60e1e582125",
+        "actual": "63d75555af4d0d4defeaf80a62aa7c53e367beb0d74b352dacf4e60e1e582125",
+        "matched": true
+      },
+      {
+        "file": "semantic-tests.patch",
+        "expected": "c49a367cf3719e223c24deb7249bef8364c600e7f5ce75b5c952634bfebcb800",
+        "actual": "c49a367cf3719e223c24deb7249bef8364c600e7f5ce75b5c952634bfebcb800",
+        "matched": true
+      },
+      {
+        "file": "variant-exclusion.json",
+        "expected": "608571543872cbc6382fa754fb2a598a3dd479a4dd402f53e445fa25804fde9d",
+        "actual": "608571543872cbc6382fa754fb2a598a3dd479a4dd402f53e445fa25804fde9d",
+        "matched": true
+      },
+      {
+        "file": "verify-variant.mjs",
+        "expected": "fd712c70ff241985722d828e6e2577cf3dbaac580eb8d0df050c1f66e9fc9fea",
+        "actual": "fd712c70ff241985722d828e6e2577cf3dbaac580eb8d0df050c1f66e9fc9fea",
+        "matched": true
+      },
+      {
+        "file": "record-command.mjs",
+        "expected": "97e7b5197093d1c422a617797c247445d07d27757c0d2f05ae8abfe382e45a44",
+        "actual": "97e7b5197093d1c422a617797c247445d07d27757c0d2f05ae8abfe382e45a44",
+        "matched": true
+      },
+      {
+        "file": "run-semantics.sh",
+        "expected": "b1090c78acd9f203a3332e1ea18c27ed05fa4cc3a4fa92e24c833328562e1dbd",
+        "actual": "b1090c78acd9f203a3332e1ea18c27ed05fa4cc3a4fa92e24c833328562e1dbd",
+        "matched": true
+      },
+      {
+        "file": "replay-semantics.sh",
+        "expected": "0fc1c5d6ac0a164bd59188aa3f11944dbabb5903be0dcb8755406271ac245b6a",
+        "actual": "0fc1c5d6ac0a164bd59188aa3f11944dbabb5903be0dcb8755406271ac245b6a",
+        "matched": true
+      },
+      {
+        "file": "collect-semantic-evidence.mjs",
+        "expected": "c0cea558ec0297b6e8d4d794926216a9fb39bdaed7f1ad79f915b976b59459eb",
+        "actual": "c0cea558ec0297b6e8d4d794926216a9fb39bdaed7f1ad79f915b976b59459eb",
+        "matched": true
+      },
+      {
+        "file": "semantic-evidence-manifest.json",
+        "expected": "25a8d3af48d045ef2bbbf3dacc45c6f59f41c0faff251e376a7c6d51090bb6a8",
+        "actual": "25a8d3af48d045ef2bbbf3dacc45c6f59f41c0faff251e376a7c6d51090bb6a8",
+        "matched": true
+      },
+      {
+        "file": "workloads.mjs",
+        "expected": "cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a",
+        "actual": "cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a",
+        "matched": true
+      },
+      {
+        "file": "observe-throughput.mjs",
+        "expected": "e6965f81d506eaa4c17fbaa4184317b14b06ae6ff27ff0d2771110ac836103b5",
+        "actual": "e6965f81d506eaa4c17fbaa4184317b14b06ae6ff27ff0d2771110ac836103b5",
+        "matched": true
+      },
+      {
+        "file": "observe-allocation.mjs",
+        "expected": "d121e126b4901312a615e05f479412f67609f87d79c1357fa699cb7b56890d98",
+        "actual": "d121e126b4901312a615e05f479412f67609f87d79c1357fa699cb7b56890d98",
+        "matched": true
+      },
+      {
+        "file": "observe-retained.mjs",
+        "expected": "8ff0a15fdefeec7408e1412760219462f6b1546fd8d79b662c69ed4f9f88e254",
+        "actual": "8ff0a15fdefeec7408e1412760219462f6b1546fd8d79b662c69ed4f9f88e254",
+        "matched": true
+      },
+      {
+        "file": "prepare-candidate.sh",
+        "expected": "d7053c0d6ebbbb4cc9a3cd689b9bf8bb816876125a3272ad055b54546b6e7e90",
+        "actual": "d7053c0d6ebbbb4cc9a3cd689b9bf8bb816876125a3272ad055b54546b6e7e90",
+        "matched": true
+      },
+      {
+        "file": "collect-provenance.mjs",
+        "expected": "69b6d6d37b656a8f66246d8fc998226daf120e1833141b8dce4f0b2ef389d8ff",
+        "actual": "69b6d6d37b656a8f66246d8fc998226daf120e1833141b8dce4f0b2ef389d8ff",
+        "matched": true
+      },
+      {
+        "file": "verify.mjs",
+        "expected": "21faed09e3e88bfe8bf7a5fa40e18a8a5d1d20a6ff7ac642f36a05086f63449a",
+        "actual": "21faed09e3e88bfe8bf7a5fa40e18a8a5d1d20a6ff7ac642f36a05086f63449a",
+        "matched": true
+      },
+      {
+        "file": "run-once.sh",
+        "expected": "54f15884f38aa1608c4e394258e02cf222bde84383fa1d6a82c3617f68ed720e",
+        "actual": "54f15884f38aa1608c4e394258e02cf222bde84383fa1d6a82c3617f68ed720e",
+        "matched": true
+      },
+      {
+        "file": "freeze.mjs",
+        "expected": "a0c0edab9d1b7c433974b949add8cffe0e195ddebb32797018cde0ac98d4f2fa",
+        "actual": "a0c0edab9d1b7c433974b949add8cffe0e195ddebb32797018cde0ac98d4f2fa",
+        "matched": true
+      }
+    ],
+    "accepted_evidence_checks": {
+      "dkrP8": true,
+      "dkrP10A": true,
+      "dkrP10B": true,
+      "dkrP11B": true,
+      "dkrP12": true,
+      "dkrP13": true,
+      "p9Workloads": true
+    }
+  },
+  "observed_at": "2026-07-16T09:41:30.259Z",
+  "recorded_at": "2026-07-16T09:41:30.259Z",
+  "max_age": "PT24H",
+  "freshness_status": "fresh",
+  "raw_hashes": {
+    "observation_count": 96,
+    "manifest_sha256": "8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02",
+    "every_hash_matched": true,
+    "files": [
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-baseline-measure.json",
+        "expected": "abe9c0a7b348c48940382b68073308f302b5611fa10f8b2131daafc0c2655023",
+        "actual": "abe9c0a7b348c48940382b68073308f302b5611fa10f8b2131daafc0c2655023",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-baseline-zero.json",
+        "expected": "2b36b422628950e371fa7f59d33a4857dca375e98150baf49f192f47dd5f7b7b",
+        "actual": "2b36b422628950e371fa7f59d33a4857dca375e98150baf49f192f47dd5f7b7b",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-candidate-measure.json",
+        "expected": "64953d68fe3f384a91a190bfff6d3985ee22ee4aeb76c8ae14e6f9c5a4f4c1a6",
+        "actual": "64953d68fe3f384a91a190bfff6d3985ee22ee4aeb76c8ae14e6f9c5a4f4c1a6",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-candidate-zero.json",
+        "expected": "835c1fb289468a39a7ad5b5df9dcc2f5df99bc217fdf14eab3ed7bd82990ded1",
+        "actual": "835c1fb289468a39a7ad5b5df9dcc2f5df99bc217fdf14eab3ed7bd82990ded1",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-baseline-measure.json",
+        "expected": "c6b9c009feba26ba41442f96c1f616dcb435d54ea75311304931b420557463ef",
+        "actual": "c6b9c009feba26ba41442f96c1f616dcb435d54ea75311304931b420557463ef",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-baseline-zero.json",
+        "expected": "bfeca9db619a3b70116e5db74c7dd55eef5cb722f01ef30eec4dd9ebb3f52f8f",
+        "actual": "bfeca9db619a3b70116e5db74c7dd55eef5cb722f01ef30eec4dd9ebb3f52f8f",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-candidate-measure.json",
+        "expected": "2c28c22aa2101442184e6f3865fcbfb80b5b90aac1ed697177ccc2bd850ba61f",
+        "actual": "2c28c22aa2101442184e6f3865fcbfb80b5b90aac1ed697177ccc2bd850ba61f",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-candidate-zero.json",
+        "expected": "ff431dc8cd4a15367e96366a5e7eaa8a74a4705f95f892f1c255cc2ed70ab4bd",
+        "actual": "ff431dc8cd4a15367e96366a5e7eaa8a74a4705f95f892f1c255cc2ed70ab4bd",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-baseline-measure.json",
+        "expected": "ec1d54da0bf3570d357a4a1083995331fcd0117222509955dc92d98e552e0fdb",
+        "actual": "ec1d54da0bf3570d357a4a1083995331fcd0117222509955dc92d98e552e0fdb",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-baseline-zero.json",
+        "expected": "a7dff3586eada72263a5ddf703b02fee3bcef0726b319883810a6660284e5fd7",
+        "actual": "a7dff3586eada72263a5ddf703b02fee3bcef0726b319883810a6660284e5fd7",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-candidate-measure.json",
+        "expected": "b6b60624c7a0ed3f757b7a034a47b34db804bb5882c3cc2bdc229d68fd6ed554",
+        "actual": "b6b60624c7a0ed3f757b7a034a47b34db804bb5882c3cc2bdc229d68fd6ed554",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-candidate-zero.json",
+        "expected": "cc71892eea77347c905fd03040e45a98442acf82258cc0b043db21805a754523",
+        "actual": "cc71892eea77347c905fd03040e45a98442acf82258cc0b043db21805a754523",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-baseline-measure.json",
+        "expected": "f83f6e3f936e7c4374b7f40ad59ca6d4f139aaade6240ec3f6a1fe731e776e56",
+        "actual": "f83f6e3f936e7c4374b7f40ad59ca6d4f139aaade6240ec3f6a1fe731e776e56",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-baseline-zero.json",
+        "expected": "d1962b4cce917038aa17afecc91eec17a6978e81c8f22823c21bdc9d8ef1131c",
+        "actual": "d1962b4cce917038aa17afecc91eec17a6978e81c8f22823c21bdc9d8ef1131c",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-candidate-measure.json",
+        "expected": "716ef8394e6d57e04ecdd856697fe26421fcf576e9edd5a2d6b464fa9a2afdd8",
+        "actual": "716ef8394e6d57e04ecdd856697fe26421fcf576e9edd5a2d6b464fa9a2afdd8",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-candidate-zero.json",
+        "expected": "3c1562da606dabc052fa610117fbd59e484ad5dad1bde15533394f8ec3c87141",
+        "actual": "3c1562da606dabc052fa610117fbd59e484ad5dad1bde15533394f8ec3c87141",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-baseline-measure.json",
+        "expected": "d5d8b8648f25a84ce10756b485958ca2b92ff50cdbc2b21f8b6a53c0085768cd",
+        "actual": "d5d8b8648f25a84ce10756b485958ca2b92ff50cdbc2b21f8b6a53c0085768cd",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-baseline-zero.json",
+        "expected": "4e295639d72440c35b325b885ae883feab4811ac2d284d96c254afebeaf0830e",
+        "actual": "4e295639d72440c35b325b885ae883feab4811ac2d284d96c254afebeaf0830e",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-candidate-measure.json",
+        "expected": "6509e45ce6a41774c18ab2e47272b1a7bfa5d62b9accc8a0234c6c619bb7fe47",
+        "actual": "6509e45ce6a41774c18ab2e47272b1a7bfa5d62b9accc8a0234c6c619bb7fe47",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-candidate-zero.json",
+        "expected": "e5bd51c101b90a43c964e43d2f97e66fbdedad5eb1a8e31f1eb1afb0be0aa987",
+        "actual": "e5bd51c101b90a43c964e43d2f97e66fbdedad5eb1a8e31f1eb1afb0be0aa987",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-baseline-measure.json",
+        "expected": "109c08436e2e7e4eca63180107be94ce1378622404c279f6293605d525b5d3b8",
+        "actual": "109c08436e2e7e4eca63180107be94ce1378622404c279f6293605d525b5d3b8",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-baseline-zero.json",
+        "expected": "b2a17b1dced7771dea91408d54eaf1c44d815c34c09feddc3d9279ae3c224fd7",
+        "actual": "b2a17b1dced7771dea91408d54eaf1c44d815c34c09feddc3d9279ae3c224fd7",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-candidate-measure.json",
+        "expected": "6488567d72b4ba33c88722b5a8cfd3017918ec6bf3b5741fa27e29210e2394e0",
+        "actual": "6488567d72b4ba33c88722b5a8cfd3017918ec6bf3b5741fa27e29210e2394e0",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-candidate-zero.json",
+        "expected": "066f2e5045212e89b593dafa699c885b78574656f667f9a1c831311c2b0b8555",
+        "actual": "066f2e5045212e89b593dafa699c885b78574656f667f9a1c831311c2b0b8555",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-baseline-measure.json",
+        "expected": "a09178a15735bed9fa1785b88abdb413f807504662e844bc93cf39c29c511e3c",
+        "actual": "a09178a15735bed9fa1785b88abdb413f807504662e844bc93cf39c29c511e3c",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-baseline-zero.json",
+        "expected": "b061284d73c76fcf5bd961f9d766eb16a5b539b4c78ba4fa0ef62d964712bfe0",
+        "actual": "b061284d73c76fcf5bd961f9d766eb16a5b539b4c78ba4fa0ef62d964712bfe0",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-candidate-measure.json",
+        "expected": "4463bd9b716936b32bd717fadf5f3352c9f65ca562c94c64426b5f59d89b8664",
+        "actual": "4463bd9b716936b32bd717fadf5f3352c9f65ca562c94c64426b5f59d89b8664",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-candidate-zero.json",
+        "expected": "667e64b3595818e31b59c03a1c79915c71fcdb2701ca1ec9d26e46b420b345df",
+        "actual": "667e64b3595818e31b59c03a1c79915c71fcdb2701ca1ec9d26e46b420b345df",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-baseline-measure.json",
+        "expected": "1b05812ab5a6e3697b3440f92676abce4a7c6c04a701ad41c89a81afe5e83adf",
+        "actual": "1b05812ab5a6e3697b3440f92676abce4a7c6c04a701ad41c89a81afe5e83adf",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-baseline-zero.json",
+        "expected": "39f126bec97a0be5135770646d1b81993cfa01d7b58412393c1ff81f1e279564",
+        "actual": "39f126bec97a0be5135770646d1b81993cfa01d7b58412393c1ff81f1e279564",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-candidate-measure.json",
+        "expected": "c1ad86f83d328ed05930225f3f066511004c38d6ef807bb9044d43b0f67c78e9",
+        "actual": "c1ad86f83d328ed05930225f3f066511004c38d6ef807bb9044d43b0f67c78e9",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-candidate-zero.json",
+        "expected": "48b1b3b940cc465bdb807641d8ed6ce5e0890e312dbcdf41343d953bc0ba308f",
+        "actual": "48b1b3b940cc465bdb807641d8ed6ce5e0890e312dbcdf41343d953bc0ba308f",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-baseline-measure.json",
+        "expected": "f775b1dfa5f4d1b2177e555b078756308dc5c3c702d0cfdf2b6b56614c97ea79",
+        "actual": "f775b1dfa5f4d1b2177e555b078756308dc5c3c702d0cfdf2b6b56614c97ea79",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-baseline-zero.json",
+        "expected": "e2ff88c13aa670170ef18f9ee814c9218a7ddf6d510dbb44e7f7940357e54786",
+        "actual": "e2ff88c13aa670170ef18f9ee814c9218a7ddf6d510dbb44e7f7940357e54786",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-candidate-measure.json",
+        "expected": "3a3e02820cb28c553fce579b36f767374877350c4e408e4246fc2f8b8d7f334c",
+        "actual": "3a3e02820cb28c553fce579b36f767374877350c4e408e4246fc2f8b8d7f334c",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-candidate-zero.json",
+        "expected": "14836a033271523487f0d7fcdd0cf210b1beef5ef911e6d9852582426774534c",
+        "actual": "14836a033271523487f0d7fcdd0cf210b1beef5ef911e6d9852582426774534c",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-1-baseline.json",
+        "expected": "7f7e2b095009873182554d587f640e296a53f253cd0150ef8f26f12fcc80c751",
+        "actual": "7f7e2b095009873182554d587f640e296a53f253cd0150ef8f26f12fcc80c751",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-1-candidate.json",
+        "expected": "91cf3ccfd539915cfd54edfd36d150f73320cd6377e13e5f2b7a4cae6d12cae5",
+        "actual": "91cf3ccfd539915cfd54edfd36d150f73320cd6377e13e5f2b7a4cae6d12cae5",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-2-baseline.json",
+        "expected": "a70565ca9e3c81b142432f36bf1de1768cb8166074eeb2eee360531354d89960",
+        "actual": "a70565ca9e3c81b142432f36bf1de1768cb8166074eeb2eee360531354d89960",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-2-candidate.json",
+        "expected": "70552108c68f04dfd4bf21ae62ab62f5679252ebd52d1bdf5d8d57c79cc80e94",
+        "actual": "70552108c68f04dfd4bf21ae62ab62f5679252ebd52d1bdf5d8d57c79cc80e94",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-3-baseline.json",
+        "expected": "bdaeaa856c0e2181cc76848ec88d909426cf3f179f821fe66107ad90c9ed91c8",
+        "actual": "bdaeaa856c0e2181cc76848ec88d909426cf3f179f821fe66107ad90c9ed91c8",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-3-candidate.json",
+        "expected": "fcca2f40d48c32b864df5b9736e2d7c0d27d6d4b9eb9523d9cb3ee7cdcbc84c1",
+        "actual": "fcca2f40d48c32b864df5b9736e2d7c0d27d6d4b9eb9523d9cb3ee7cdcbc84c1",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-1-baseline.json",
+        "expected": "cb8f8a4189417e5f131fd85a6d86a43f05a26f0bc8bb2797dc28b54eee96a006",
+        "actual": "cb8f8a4189417e5f131fd85a6d86a43f05a26f0bc8bb2797dc28b54eee96a006",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-1-candidate.json",
+        "expected": "2cb5245c0e84b111bf4172c7604693f5a276449821f73ee4005027ccd87192bf",
+        "actual": "2cb5245c0e84b111bf4172c7604693f5a276449821f73ee4005027ccd87192bf",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-2-baseline.json",
+        "expected": "93e686bd5103b6fde5ebdf5a9031164cc777a35000c06ef7963cfe671d538ef6",
+        "actual": "93e686bd5103b6fde5ebdf5a9031164cc777a35000c06ef7963cfe671d538ef6",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-2-candidate.json",
+        "expected": "d473e2a88bdc3c314c92c16d1912c7df856adbe57a867d1ad61d1f0d955962c7",
+        "actual": "d473e2a88bdc3c314c92c16d1912c7df856adbe57a867d1ad61d1f0d955962c7",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-3-baseline.json",
+        "expected": "8766b58f020f928f6f9dc35043013ae12da1d5840e0764702970c4b670fe9b18",
+        "actual": "8766b58f020f928f6f9dc35043013ae12da1d5840e0764702970c4b670fe9b18",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-3-candidate.json",
+        "expected": "483eb5319f9a2ffcd065a3364630739a560eb1e9dea3083d407aab0a5542a7b9",
+        "actual": "483eb5319f9a2ffcd065a3364630739a560eb1e9dea3083d407aab0a5542a7b9",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-1-baseline.json",
+        "expected": "cd4fb5ef0a96ac724312cd6f52d217b4c1bf3c955eeaa6972fdbc9f424a980a6",
+        "actual": "cd4fb5ef0a96ac724312cd6f52d217b4c1bf3c955eeaa6972fdbc9f424a980a6",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-1-candidate.json",
+        "expected": "dbf56421f7eea9a676854d302316e5566da615eed68ecb5b1a8404e1171e552f",
+        "actual": "dbf56421f7eea9a676854d302316e5566da615eed68ecb5b1a8404e1171e552f",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-2-baseline.json",
+        "expected": "6ff533e9c557a4e2cd8b62a1f2990971f6c62bb39f7e7d78280f8aef8b92d0b6",
+        "actual": "6ff533e9c557a4e2cd8b62a1f2990971f6c62bb39f7e7d78280f8aef8b92d0b6",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-2-candidate.json",
+        "expected": "16f34538888d7fee67a864f4dfe79cdc8c5802a750f54e9bde65666db6e4db77",
+        "actual": "16f34538888d7fee67a864f4dfe79cdc8c5802a750f54e9bde65666db6e4db77",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-3-baseline.json",
+        "expected": "8a76d5ef4e4a44256731b24db53d4a8cc8c43e4f6f238466cecc52d09969fa55",
+        "actual": "8a76d5ef4e4a44256731b24db53d4a8cc8c43e4f6f238466cecc52d09969fa55",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-3-candidate.json",
+        "expected": "04890060a1521f06ae11a3a7d3f534a860eb14f59bd47fea6170a735ed34e2b3",
+        "actual": "04890060a1521f06ae11a3a7d3f534a860eb14f59bd47fea6170a735ed34e2b3",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-01-baseline.json",
+        "expected": "25e72b94263b1c6b3a419824ade71d128e323f3ae2f5110bd88324125489c683",
+        "actual": "25e72b94263b1c6b3a419824ade71d128e323f3ae2f5110bd88324125489c683",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-02-candidate.json",
+        "expected": "afafe0353bcea257cbd32383d3bf417de59caac2bf5823a1c6257e37ac8971e4",
+        "actual": "afafe0353bcea257cbd32383d3bf417de59caac2bf5823a1c6257e37ac8971e4",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-03-candidate.json",
+        "expected": "b7f4218dc4ca724163b7e955e7399e5b8763762a36839cc3a910db90acb74972",
+        "actual": "b7f4218dc4ca724163b7e955e7399e5b8763762a36839cc3a910db90acb74972",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-04-baseline.json",
+        "expected": "79aa92b3d61f4ce8967c898d6f8f607ecfea2366869b5135e381f0e375435085",
+        "actual": "79aa92b3d61f4ce8967c898d6f8f607ecfea2366869b5135e381f0e375435085",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-05-baseline.json",
+        "expected": "17802cc9e43fcb09f233f6845aef951d34b715e0d7f51643d483deaea8ac2b97",
+        "actual": "17802cc9e43fcb09f233f6845aef951d34b715e0d7f51643d483deaea8ac2b97",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-06-candidate.json",
+        "expected": "e8a367fc44327f8878e2d97c67b8ea3aee564cbba79630e9297e62340630e95e",
+        "actual": "e8a367fc44327f8878e2d97c67b8ea3aee564cbba79630e9297e62340630e95e",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-07-baseline.json",
+        "expected": "72cd3dc38341aa9d9f84354e4f5cbc2dc7b70e26f541658d8d146f1a1a858b42",
+        "actual": "72cd3dc38341aa9d9f84354e4f5cbc2dc7b70e26f541658d8d146f1a1a858b42",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-08-candidate.json",
+        "expected": "c6ff1a3a8c79dd5011ee7d8fc5ae9cff59ff7ba96368370951ce5fd031e93a60",
+        "actual": "c6ff1a3a8c79dd5011ee7d8fc5ae9cff59ff7ba96368370951ce5fd031e93a60",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-09-candidate.json",
+        "expected": "52978e909a86ea3c79cf35feb3768d3b571035f7d0cd25fd87cdd145763baa68",
+        "actual": "52978e909a86ea3c79cf35feb3768d3b571035f7d0cd25fd87cdd145763baa68",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-10-baseline.json",
+        "expected": "3b2b6442aa97641c94e22833b6ebb400ef5822b748287bbd00ada3970fad2e0a",
+        "actual": "3b2b6442aa97641c94e22833b6ebb400ef5822b748287bbd00ada3970fad2e0a",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-11-baseline.json",
+        "expected": "664ea3e30d5bfdee6325a665f4d815c704a5ff28babfc8bf20e6d4974d2cbe06",
+        "actual": "664ea3e30d5bfdee6325a665f4d815c704a5ff28babfc8bf20e6d4974d2cbe06",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-12-candidate.json",
+        "expected": "7cd7a3166fa614fc0f5681dbf5b2b6ababfbc0fd58baacd8554eda5d35277f78",
+        "actual": "7cd7a3166fa614fc0f5681dbf5b2b6ababfbc0fd58baacd8554eda5d35277f78",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-13-candidate.json",
+        "expected": "3eb8236bfffbb755d7f7596e704cfbc41d0cbe27a4054d9c1b1fc06933b2ab1b",
+        "actual": "3eb8236bfffbb755d7f7596e704cfbc41d0cbe27a4054d9c1b1fc06933b2ab1b",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-14-baseline.json",
+        "expected": "576ea8e054585c9afdf9b08dd1463a13baf055183f12185d3b25d71b54ca10b1",
+        "actual": "576ea8e054585c9afdf9b08dd1463a13baf055183f12185d3b25d71b54ca10b1",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-01-baseline.json",
+        "expected": "919da08f37506c6c0c2e2c4bba144a1ac27a6d2930c414c84a77d997413eeb8a",
+        "actual": "919da08f37506c6c0c2e2c4bba144a1ac27a6d2930c414c84a77d997413eeb8a",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-02-candidate.json",
+        "expected": "15fe4f9a59e23f6a8201f85f8b2a84bd2cb97465037735e2ef3def8523046779",
+        "actual": "15fe4f9a59e23f6a8201f85f8b2a84bd2cb97465037735e2ef3def8523046779",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-03-candidate.json",
+        "expected": "953c548bdeaaf41550eaf0bbd81272815f703ff356168d6e40ee374917a1e348",
+        "actual": "953c548bdeaaf41550eaf0bbd81272815f703ff356168d6e40ee374917a1e348",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-04-baseline.json",
+        "expected": "7cc001e033ea3a3d978e14521f62f178cf93cfd317f7177349a1eccb3f16e705",
+        "actual": "7cc001e033ea3a3d978e14521f62f178cf93cfd317f7177349a1eccb3f16e705",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-05-baseline.json",
+        "expected": "b3730d9519cab669920f0eb58972603102e816d8427be57d1aa6d4d9d8a6b371",
+        "actual": "b3730d9519cab669920f0eb58972603102e816d8427be57d1aa6d4d9d8a6b371",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-06-candidate.json",
+        "expected": "6a7541dbe04f4f5949ce8e95f334e1182cf0836629ac13a53c036c8e7a630cb4",
+        "actual": "6a7541dbe04f4f5949ce8e95f334e1182cf0836629ac13a53c036c8e7a630cb4",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-07-baseline.json",
+        "expected": "351408ffc38c793f6c6af045d7068026107a5ee953a4956237b9c905a5ee092a",
+        "actual": "351408ffc38c793f6c6af045d7068026107a5ee953a4956237b9c905a5ee092a",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-08-candidate.json",
+        "expected": "38a3499440deef81ea2f4361b21313b8b0d709b8b6354cddb48d89ea6c06eca1",
+        "actual": "38a3499440deef81ea2f4361b21313b8b0d709b8b6354cddb48d89ea6c06eca1",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-09-candidate.json",
+        "expected": "f936516d9cdfc312114944d402a1928fa0b19f3d467403a18f46e8efb2e73b40",
+        "actual": "f936516d9cdfc312114944d402a1928fa0b19f3d467403a18f46e8efb2e73b40",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-10-baseline.json",
+        "expected": "ff7050d31fbaf920fcda793d16628e6c889ffd42782a0e28865522d2a9223632",
+        "actual": "ff7050d31fbaf920fcda793d16628e6c889ffd42782a0e28865522d2a9223632",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-11-baseline.json",
+        "expected": "b31a32bc8c8d54baa0bd8e6dbbadd481a2e418e14e22269f3aeaafd6edaf2ce3",
+        "actual": "b31a32bc8c8d54baa0bd8e6dbbadd481a2e418e14e22269f3aeaafd6edaf2ce3",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-12-candidate.json",
+        "expected": "ef29e34e6818f2328f30d0917761d9cbee3faaefb707f8ab5c84bb2555b65421",
+        "actual": "ef29e34e6818f2328f30d0917761d9cbee3faaefb707f8ab5c84bb2555b65421",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-13-candidate.json",
+        "expected": "ac9976f801cf9f26284725ca30a74c0b781b39298f42b5b49ab3356fc86e1e7b",
+        "actual": "ac9976f801cf9f26284725ca30a74c0b781b39298f42b5b49ab3356fc86e1e7b",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-14-baseline.json",
+        "expected": "5ac53ebf63b0747a3a530f80107d6eedb405a80066d177318ebb3afe60cc2422",
+        "actual": "5ac53ebf63b0747a3a530f80107d6eedb405a80066d177318ebb3afe60cc2422",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-01-baseline.json",
+        "expected": "a2869efe9b45bbc34b21b6691e1c87f161d6c38b502bacbe1e6bc957ddbb2b8f",
+        "actual": "a2869efe9b45bbc34b21b6691e1c87f161d6c38b502bacbe1e6bc957ddbb2b8f",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-02-candidate.json",
+        "expected": "6a73db36c36cbb4f37f381ecfe4431aa3a93e613ee1751d5cc319a9e995e324e",
+        "actual": "6a73db36c36cbb4f37f381ecfe4431aa3a93e613ee1751d5cc319a9e995e324e",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-03-candidate.json",
+        "expected": "aa1d189cdaf05566d75f8ccf0c5f34e7eff1304674be88eb2e72de9391e933d2",
+        "actual": "aa1d189cdaf05566d75f8ccf0c5f34e7eff1304674be88eb2e72de9391e933d2",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-04-baseline.json",
+        "expected": "54d053cbd8afef24b6a76139b360363e620ace775945aafd030fa16b4b592ef7",
+        "actual": "54d053cbd8afef24b6a76139b360363e620ace775945aafd030fa16b4b592ef7",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-05-baseline.json",
+        "expected": "9f04ad5002b4acb4d87542707e81672209075f11f6757fdc853f937eae357f7d",
+        "actual": "9f04ad5002b4acb4d87542707e81672209075f11f6757fdc853f937eae357f7d",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-06-candidate.json",
+        "expected": "c92a0d102719908fcc7f03fcf9e6c772da0bd62aa306703eecace2d867622437",
+        "actual": "c92a0d102719908fcc7f03fcf9e6c772da0bd62aa306703eecace2d867622437",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-07-baseline.json",
+        "expected": "a67fae69c4eda518d7b205ca1fd164ec77b3f17238c3fd19375d7dc611827ed8",
+        "actual": "a67fae69c4eda518d7b205ca1fd164ec77b3f17238c3fd19375d7dc611827ed8",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-08-candidate.json",
+        "expected": "19bab216b7a23575d0d3a384efc3ff54aa28384974e9b44edec95ace9c8e6a8d",
+        "actual": "19bab216b7a23575d0d3a384efc3ff54aa28384974e9b44edec95ace9c8e6a8d",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-09-candidate.json",
+        "expected": "d681bd955c0b73e7d2492ecbf19b18942febef1ef8418a4fb9ec3cc75dc05c6f",
+        "actual": "d681bd955c0b73e7d2492ecbf19b18942febef1ef8418a4fb9ec3cc75dc05c6f",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-10-baseline.json",
+        "expected": "2886307aacc671f05116e1acededba5ec6aca0dba0fdf4c859c5adc2cdc20d07",
+        "actual": "2886307aacc671f05116e1acededba5ec6aca0dba0fdf4c859c5adc2cdc20d07",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-11-baseline.json",
+        "expected": "bf8a7a48c77a165fd57fc117223d8593b9bbdce11641ef5cec0a2dc06fb3ca9b",
+        "actual": "bf8a7a48c77a165fd57fc117223d8593b9bbdce11641ef5cec0a2dc06fb3ca9b",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-12-candidate.json",
+        "expected": "7c749d1224071b2247e13dc6dada7332f82f2fb58e68be7db7419c1016852a90",
+        "actual": "7c749d1224071b2247e13dc6dada7332f82f2fb58e68be7db7419c1016852a90",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-13-candidate.json",
+        "expected": "de803ffdc82896659c54ec2592c736aab89aaa53915c1a08748684a55dce53a6",
+        "actual": "de803ffdc82896659c54ec2592c736aab89aaa53915c1a08748684a55dce53a6",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-14-baseline.json",
+        "expected": "a409fb582d7c3c4128afa4fb1f3b9f20599f7f2a0c27acf615774a3a8f07c447",
+        "actual": "a409fb582d7c3c4128afa4fb1f3b9f20599f7f2a0c27acf615774a3a8f07c447",
+        "matched": true
+      }
+    ]
+  },
+  "throughput_rows": {
+    "scope_run": {
+      "variants": {
+        "baseline": {
+          "processOperationsPerSecond": [
+            15068.402504611098,
+            14865.670733210125,
+            14540.96436615992,
+            15419.176559537535,
+            14652.06086236045,
+            15241.392081843043,
+            15155.233790464903
+          ],
+          "medianOperationsPerSecond": 15068.402504611098,
+          "processStationarity": [
+            1.0841104958115095,
+            1.0280400168505912,
+            1.1479836263381724,
+            1.2914055429862978,
+            0.7144514268068313,
+            0.9793469016484616,
+            1.0530542108539163
+          ],
+          "medianStationarityRatio": 1.0530542108539163,
+          "stationarityAccepted": true
+        },
+        "candidate": {
+          "processOperationsPerSecond": [
+            18872.957079460724,
+            18287.992056866682,
+            21972.194547594707,
+            23611.690914764797,
+            18367.38920251291,
+            20519.95974004419,
+            20396.191741375962
+          ],
+          "medianOperationsPerSecond": 20396.191741375962,
+          "processStationarity": [
+            1.145434022660022,
+            1.013443454193024,
+            0.822763903253192,
+            0.8386424816298137,
+            1.082974467039585,
+            0.9671370707577837,
+            1.1319552921835354
+          ],
+          "medianStationarityRatio": 1.013443454193024,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioCandidateToBaseline": 1.3535735944891638,
+      "stationarityAccepted": true
+    },
+    "managed_ctx_exec": {
+      "variants": {
+        "baseline": {
+          "processOperationsPerSecond": [
+            11188.430730005854,
+            12370.634897383527,
+            12681.983993354641,
+            7606.193615453115,
+            11934.85659287167,
+            13016.000549952056,
+            10179.290282780275
+          ],
+          "medianOperationsPerSecond": 11934.85659287167,
+          "processStationarity": [
+            0.9862800484460469,
+            0.9591527247989502,
+            0.9007912519674414,
+            0.9177304409483503,
+            0.9268246810894749,
+            0.998266686865764,
+            1.1370816496342273
+          ],
+          "medianStationarityRatio": 0.9591527247989502,
+          "stationarityAccepted": true
+        },
+        "candidate": {
+          "processOperationsPerSecond": [
+            19750.37996422863,
+            17394.789507348163,
+            10555.23797483299,
+            11708.851332509726,
+            15410.762499351134,
+            15923.25113967386,
+            18117.73985362406
+          ],
+          "medianOperationsPerSecond": 15923.25113967386,
+          "processStationarity": [
+            1.0839946214685963,
+            0.9887247757178896,
+            0.8130854416966522,
+            1.3136113526104616,
+            1.1150152794792019,
+            0.6656154173073857,
+            1.145489459574544
+          ],
+          "medianStationarityRatio": 1.0839946214685963,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioCandidateToBaseline": 1.3341803494467068,
+      "stationarityAccepted": true
+    },
+    "sdk_session_run": {
+      "variants": {
+        "baseline": {
+          "processOperationsPerSecond": [
+            2168.6702556340124,
+            2130.891967564905,
+            1785.2861645279988,
+            1666.0333796118532,
+            1878.5841142339798,
+            2176.5532419911083,
+            1726.9561209531607
+          ],
+          "medianOperationsPerSecond": 1878.5841142339798,
+          "processStationarity": [
+            1.0739061843363913,
+            0.8960489739520964,
+            1.0495614865717393,
+            1.0242223625620708,
+            1.1873473113226343,
+            0.9898305700943971,
+            0.93929631302063
+          ],
+          "medianStationarityRatio": 1.0242223625620708,
+          "stationarityAccepted": true
+        },
+        "candidate": {
+          "processOperationsPerSecond": [
+            2190.7811894685447,
+            2329.026377423173,
+            1853.0658433282642,
+            1774.8000356315954,
+            1992.1234506630897,
+            2362.924099906534,
+            1691.2742045988998
+          ],
+          "medianOperationsPerSecond": 1992.1234506630897,
+          "processStationarity": [
+            1.0855535682415218,
+            1.023760954978271,
+            0.9458141068725853,
+            1.0625354156096651,
+            1.1635031667340623,
+            1.033489146707638,
+            0.8887248108393423
+          ],
+          "medianStationarityRatio": 1.033489146707638,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioCandidateToBaseline": 1.0604387823621129,
+      "stationarityAccepted": true
+    }
+  },
+  "throughput_geometric_mean": {
+    "value": 1.241825781342104,
+    "target_minimum": 1.1,
+    "decision": "pass"
+  },
+  "allocation_rows": {
+    "scope_run": {
+      "trials": {
+        "baseline": [
+          {
+            "trial": 1,
+            "zeroBytes": 29120,
+            "measuredBytes": 44428880,
+            "correctedBytes": 44399760,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8879.952,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 14344,
+            "measuredBytes": 44753384,
+            "correctedBytes": 44739040,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8947.808,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 13376,
+            "measuredBytes": 44566272,
+            "correctedBytes": 44552896,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8910.5792,
+            "signalAccepted": true
+          }
+        ],
+        "candidate": [
+          {
+            "trial": 1,
+            "zeroBytes": 10096,
+            "measuredBytes": 21231888,
+            "correctedBytes": 21221792,
+            "completedOperations": 5000,
+            "bytesPerOperation": 4244.3584,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 18816,
+            "measuredBytes": 20769872,
+            "correctedBytes": 20751056,
+            "completedOperations": 5000,
+            "bytesPerOperation": 4150.2112,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 13392,
+            "measuredBytes": 21157280,
+            "correctedBytes": 21143888,
+            "completedOperations": 5000,
+            "bytesPerOperation": 4228.7776,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "baseline": 8910.5792,
+        "candidate": 4228.7776
+      },
+      "ratioCandidateToBaseline": 0.47457943025746296,
+      "everySignalAccepted": true,
+      "perRowCeilingAccepted": true
+    },
+    "managed_ctx_exec": {
+      "trials": {
+        "baseline": [
+          {
+            "trial": 1,
+            "zeroBytes": 29024,
+            "measuredBytes": 9108024,
+            "correctedBytes": 9079000,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4539.5,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 13616,
+            "measuredBytes": 8993048,
+            "correctedBytes": 8979432,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4489.716,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 1152,
+            "measuredBytes": 9456072,
+            "correctedBytes": 9454920,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4727.46,
+            "signalAccepted": true
+          }
+        ],
+        "candidate": [
+          {
+            "trial": 1,
+            "zeroBytes": 14320,
+            "measuredBytes": 6266864,
+            "correctedBytes": 6252544,
+            "completedOperations": 2000,
+            "bytesPerOperation": 3126.272,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 12272,
+            "measuredBytes": 6043664,
+            "correctedBytes": 6031392,
+            "completedOperations": 2000,
+            "bytesPerOperation": 3015.696,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 16536,
+            "measuredBytes": 5885472,
+            "correctedBytes": 5868936,
+            "completedOperations": 2000,
+            "bytesPerOperation": 2934.468,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "baseline": 4539.5,
+        "candidate": 3015.696
+      },
+      "ratioCandidateToBaseline": 0.6643233836325586,
+      "everySignalAccepted": true,
+      "perRowCeilingAccepted": true
+    },
+    "sdk_session_run": {
+      "trials": {
+        "baseline": [
+          {
+            "trial": 1,
+            "zeroBytes": 13240,
+            "measuredBytes": 5233664,
+            "correctedBytes": 5220424,
+            "completedOperations": 150,
+            "bytesPerOperation": 34802.82666666667,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 16712,
+            "measuredBytes": 5303792,
+            "correctedBytes": 5287080,
+            "completedOperations": 150,
+            "bytesPerOperation": 35247.2,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 0,
+            "measuredBytes": 5391072,
+            "correctedBytes": 5391072,
+            "completedOperations": 150,
+            "bytesPerOperation": 35940.48,
+            "signalAccepted": true
+          }
+        ],
+        "candidate": [
+          {
+            "trial": 1,
+            "zeroBytes": 12200,
+            "measuredBytes": 5353816,
+            "correctedBytes": 5341616,
+            "completedOperations": 150,
+            "bytesPerOperation": 35610.77333333333,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 12272,
+            "measuredBytes": 5280248,
+            "correctedBytes": 5267976,
+            "completedOperations": 150,
+            "bytesPerOperation": 35119.84,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 12160,
+            "measuredBytes": 5234232,
+            "correctedBytes": 5222072,
+            "completedOperations": 150,
+            "bytesPerOperation": 34813.81333333333,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "baseline": 35247.2,
+        "candidate": 35119.84
+      },
+      "ratioCandidateToBaseline": 0.996386663337797,
+      "everySignalAccepted": true,
+      "perRowCeilingAccepted": true
+    }
+  },
+  "allocation_geometric_mean": {
+    "value": 0.6797858473843519,
+    "target_maximum": 0.9,
+    "decision": "pass"
+  },
+  "retained_controls": {
+    "scope_run": {
+      "baseline": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      },
+      "candidate": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      }
+    },
+    "managed_ctx_exec": {
+      "baseline": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      },
+      "candidate": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      }
+    },
+    "sdk_session_run": {
+      "baseline": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      },
+      "candidate": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      }
+    }
+  },
+  "cleanup_walls": {
+    "invalidLifecycleSummaryCount": 0,
+    "postCloseLiveResourceCount": 0,
+    "crossOwnerLeakCount": 0,
+    "cleanupBusinessStateMutationCount": 0,
+    "sdkCompletedOperationCount": 130306,
+    "sdkPostCloseMutationRejectedCount": 130306,
+    "sdkPostCloseMutationMismatchCount": 0,
+    "cleanupWallCount": 0
+  },
+  "target_decisions": {
+    "throughputStationarity": true,
+    "throughputGeometricMean": true,
+    "allocationSignal": true,
+    "allocationGeometricMean": true,
+    "allocationPerRowCeiling": true,
+    "retainedControls": true,
+    "cleanupWalls": true,
+    "integratedTarget": true
+  },
+  "replay_command_or_checker": "cd /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z && node verify.mjs . --check",
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-ALLOCATION-REGRESSION",
+    "AG-RETAINED-MEMORY",
+    "AG-CLEANUP-EFFECT",
+    "AG-SESSION-ISOLATION",
+    "AG-BENCHMARK-BRANCH",
+    "AG-PRESERVATION",
+    "AG-AUTHORITY"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "metric_id": "AG-INTEGRITY",
+      "source_of_truth": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/frozen.json, provenance.json, and raw.sha256",
+      "read_method": "Replay all frozen, prior-evidence, provenance, chronology, and raw hashes.",
+      "observed_at": "2026-07-16T09:41:30.259Z",
+      "recorded_at": "2026-07-16T09:41:30.259Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02",
+      "replay_command_or_checker": "cd /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PERF-COMPARISON",
+      "source_of_truth": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/protocol.json and raw observations",
+      "read_method": "Replay the accepted balanced schedule, stationarity bands, allocation aggregate, matched zeros, and minimum signals.",
+      "observed_at": "2026-07-16T09:41:30.259Z",
+      "recorded_at": "2026-07-16T09:41:30.259Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02",
+      "replay_command_or_checker": "cd /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PERF-CLAIM",
+      "source_of_truth": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/checkpoint.v1.json",
+      "read_method": "Require pending independent validation and no release-readiness claim.",
+      "observed_at": "2026-07-16T09:41:30.259Z",
+      "recorded_at": "2026-07-16T09:41:30.259Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02",
+      "replay_command_or_checker": "cd /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-ALLOCATION-REGRESSION",
+      "source_of_truth": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/raw/allocation",
+      "read_method": "Check every candidate-to-baseline row ratio against 1.05.",
+      "observed_at": "2026-07-16T09:41:30.259Z",
+      "recorded_at": "2026-07-16T09:41:30.259Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02",
+      "replay_command_or_checker": "cd /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-RETAINED-MEMORY",
+      "source_of_truth": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/raw/retained",
+      "read_method": "Require 0/0/1 in every event-loop-turn retained-control observation.",
+      "observed_at": "2026-07-16T09:41:30.259Z",
+      "recorded_at": "2026-07-16T09:41:30.259Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02",
+      "replay_command_or_checker": "cd /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-CLEANUP-EFFECT",
+      "source_of_truth": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/raw",
+      "read_method": "Aggregate lifecycle ownership, cleanup, business-state, and post-close rejection counters.",
+      "observed_at": "2026-07-16T09:41:30.259Z",
+      "recorded_at": "2026-07-16T09:41:30.259Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02",
+      "replay_command_or_checker": "cd /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-SESSION-ISOLATION",
+      "source_of_truth": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/raw",
+      "read_method": "Replay every lifecycle owner and session post-close assertion.",
+      "observed_at": "2026-07-16T09:41:30.259Z",
+      "recorded_at": "2026-07-16T09:41:30.259Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02",
+      "replay_command_or_checker": "cd /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-BENCHMARK-BRANCH",
+      "source_of_truth": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/chronology.json and raw.sha256",
+      "read_method": "Confirm this unit contains only the three lifecycle rows and no 47-row benchmark output.",
+      "observed_at": "2026-07-16T09:41:30.259Z",
+      "recorded_at": "2026-07-16T09:41:30.259Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02",
+      "replay_command_or_checker": "cd /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PRESERVATION",
+      "source_of_truth": "git:293dcdf2d6d0b274418bcca8461f7eb122e10c52, /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/variant.patch, and /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/variant-exclusion.json",
+      "read_method": "Require the exact baseline plus only the frozen V1+V2+V3 inherited baseline-mode candidate in scope.ts, with V4, bound listener bridges, SDK changes, and public API changes excluded.",
+      "observed_at": "2026-07-16T09:41:30.259Z",
+      "recorded_at": "2026-07-16T09:41:30.259Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02",
+      "replay_command_or_checker": "cd /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-AUTHORITY",
+      "source_of_truth": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z/protocol.json",
+      "read_method": "Stop after one observation without commit, push, merge, release, publish, deploy, or production contact.",
+      "observed_at": "2026-07-16T09:41:30.259Z",
+      "recorded_at": "2026-07-16T09:41:30.259Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:8e6f658c12de423e50175f4a253b3308d4ef7373984510618a8175569f8f4b02",
+      "replay_command_or_checker": "cd /tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "pending_independent_validation",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-16T09:41:30.259Z"
+  },
+  "claim_boundary": "Worker evidence remains pending independent validation. No product improvement, release-readiness, cancellation-equivalence acceptance, or release claim follows from this checkpoint.",
+  "workspace_effect": {
+    "scratch": "/tmp/dkr-p15-inherited-baseline-mode-293dcdf2-20260716T092056Z",
+    "product_edits": 0,
+    "established_row_benchmarks": 0,
+    "commits": 0,
+    "pushes": 0,
+    "merges": 0,
+    "releases": 0
+  },
+  "result": {
+    "decision": "inherited_baseline_mode_meets_integrated_target_pending_independent_validation",
+    "release_readiness_claim": "not_made",
+    "existing_47_row_benchmark": "not_run",
+    "worker_evidence_is_acceptance": false,
+    "favorable_reruns_refused": true
+  },
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

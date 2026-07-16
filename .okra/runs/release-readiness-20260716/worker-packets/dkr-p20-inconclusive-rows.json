@@ -1,0 +1,24 @@
+{
+  "worker_id": "dkr-p20-inconclusive-rows",
+  "worker_kind": "discovery",
+  "unit_id": "DKR-P20",
+  "objective": "Determine the smallest defensible next step after PKR-P19 exhausted its frozen pair schedule with zero confirmed regressions and 39 inconclusive rows.",
+  "inputs": {
+    "checkpoint_sha256": "15bb621e522a956158a2f01fa4436ef6aec63ebdbd62484e5831279159600449",
+    "comparison_sha256": "9337838c8a72d2ddcf13c24991c8b947bf1dda565ea91a974b7b3f3b72c82f41",
+    "manifest_sha256": "a0ee7dcfab501da969b7708ad71f0c04e2d675f3d7786292733a42b16dafeb9e"
+  },
+  "method": [
+    "Inspect the frozen schedule and comparator pair limits.",
+    "Classify evidence gaps as missing data, identity drift, confirmed regression, or directional disagreement.",
+    "Choose the smallest progression that preserves the fixed-look and no-favorable-repeat walls."
+  ],
+  "anti_goals": [
+    "Do not edit product, benchmark, tests, docs, configuration, PR, or prior evidence.",
+    "Do not rerun benchmark captures or comparators.",
+    "Do not extend the pair schedule after seeing the result.",
+    "Do not claim that regressions are absent.",
+    "Do not merge, release, publish, or deploy."
+  ],
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

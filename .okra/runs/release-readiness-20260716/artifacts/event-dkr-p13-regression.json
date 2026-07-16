@@ -1,0 +1,15 @@
+{
+  "type": "event",
+  "event_type": "regression_event",
+  "unit_id": "DKR-P13",
+  "observed_at": "2026-07-16T08:46:25Z",
+  "cause": "The scratch candidate exceeded the frozen per-row allocation ceiling in the SDK session lifecycle row.",
+  "evidence_refs_or_hashes": [
+    "workers/dkr-p13-lazy-cancellation-counterfactual/checkpoint.v1.json#sha256=9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e",
+    "workers/validator-dkr-p13/verification.v1.txt#sha256=7adb777038c9b8988ea87943b536fc339870dd5bc6001af85ccf017762acee6b"
+  ],
+  "metric_reads": {
+    "ceiling": 1.05,
+    "sdk_allocation_ratio": 1.101987679622239
+  }
+}

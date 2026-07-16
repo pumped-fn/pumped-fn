@@ -1,0 +1,8 @@
+{
+  "type": "estimation_record",
+  "phase": "estimate",
+  "unit_id": "PKR-P1-ROLLBACK",
+  "estimate": {"time_min": 10, "turns": 1, "tokens": null},
+  "observed_at": "2026-07-16T08:05:00Z",
+  "dispatch_ref": "worker-packets/pkr-p1-rollback-dead-candidate.json"
+}

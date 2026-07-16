@@ -1,0 +1,302 @@
+{
+  "schema": "pumped-fn.okra.independent-validation.v1",
+  "unit_id": "DKR-P16",
+  "validated_checkpoint": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/checkpoint.v1.json",
+  "verdict": "accepted_timeout_budget_classification_and_candidate_semantic_matrix",
+  "summary": "The frozen checkpoint replayed once and matched exactly. Four unique predeclared commands exited zero. The unchanged package-export test passed 4/4 with a 60000 ms CLI timeout and reported 13.54 seconds in its test phase; the remaining SDK tests passed 55/55, so the candidate SDK matrix is 59/59, and both typechecks passed. This supports classifying P15's 5000 ms failure as a timeout-budget fault. It does not establish product causality, authorize product progression, rerun performance, validate the 47-row benchmark, or claim release readiness.",
+  "observed_at": "2026-07-16T09:59:37Z",
+  "inputs": {
+    "checkpoint": {
+      "expected_sha256": "25e8fe4937d20d775c04247c37ae2b546f7100027522c90ae64c908b3fc7a67a",
+      "actual_sha256": "25e8fe4937d20d775c04247c37ae2b546f7100027522c90ae64c908b3fc7a67a",
+      "matched": true
+    },
+    "p15_validation": {
+      "expected_sha256": "91c8aab0d1b517d3924f3d7529df4cdd7484eee7b4f65c6fb749766cc325c2f1",
+      "actual_sha256": "91c8aab0d1b517d3924f3d7529df4cdd7484eee7b4f65c6fb749766cc325c2f1",
+      "matched": true
+    }
+  },
+  "frozen_replay": {
+    "command": "cd /tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z && node verify.mjs . --check",
+    "executions": 1,
+    "exit_code": 0,
+    "stdout": {
+      "replay": "passed",
+      "decision": "timeout_budget_fault_supported_pending_independent_acceptance",
+      "commandsPassed": true,
+      "candidatePreserved": true,
+      "productPreserved": true,
+      "integrityHeld": true
+    },
+    "verify_mjs_sha256": "a77c89044fa5d61122ce184954e35a724aa812ceaa016a9011dd21db304d2a72",
+    "checkpoint_matched_recomputed_output": true
+  },
+  "command_recomputation": {
+    "protocol_command_count": 4,
+    "metadata_file_count": 4,
+    "unique_label_count": 4,
+    "each_label_recorded_once": true,
+    "all_commands_matched_protocol": true,
+    "all_exit_codes_zero": true,
+    "all_stdout_hashes_matched": true,
+    "all_stderr_hashes_matched": true,
+    "all_stderr_empty": true,
+    "duration_recomputation_method": "Subtract metadata finishedAt from startedAt. ISO timestamps have millisecond precision, so they agree with monotonic recorded durations within 2 ms.",
+    "commands": [
+      {
+        "label": "package-export-timeout-60000",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@pumped-fn/sdk",
+          "exec",
+          "vitest",
+          "run",
+          "tests/package-exports.test.ts",
+          "--testTimeout=60000"
+        ],
+        "occurrences": 1,
+        "exit_code": 0,
+        "recorded_duration_milliseconds": 15416.615278,
+        "timestamp_duration_milliseconds": 15416,
+        "duration_delta_milliseconds": 0.615278,
+        "test_files_passed": 1,
+        "test_files_total": 1,
+        "tests_passed": 4,
+        "tests_total": 4,
+        "vitest_total_duration_seconds": 13.78,
+        "vitest_test_phase_seconds": 13.54,
+        "metadata_sha256": "cdda2b97de9a24e949b37c6c4bb7060cc0c4edb659bb5077f266e04fc391721f",
+        "stdout_sha256": "c9748ce41b84dc3dfe9727068414965a1c5b63309f7a312972d64c1e9e296de2",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "remaining-sdk-tests",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@pumped-fn/sdk",
+          "exec",
+          "vitest",
+          "run",
+          "tests",
+          "--exclude",
+          "tests/package-exports.test.ts"
+        ],
+        "occurrences": 1,
+        "exit_code": 0,
+        "recorded_duration_milliseconds": 2799.450621,
+        "timestamp_duration_milliseconds": 2798,
+        "duration_delta_milliseconds": 1.450621,
+        "test_files_passed": 7,
+        "test_files_total": 7,
+        "tests_passed": 55,
+        "tests_total": 55,
+        "vitest_total_duration_seconds": 1.12,
+        "vitest_test_phase_milliseconds": 358,
+        "metadata_sha256": "77320f54ed8da557e7099099cd6ba671f5ed3834849764ad51a76edc1cd20d89",
+        "stdout_sha256": "0897b9ca170badd8e4f973ac691706494c577faef2cefe1650af735f7b1b358e",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "lite-typecheck-full",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@pumped-fn/lite",
+          "typecheck:full"
+        ],
+        "occurrences": 1,
+        "exit_code": 0,
+        "recorded_duration_milliseconds": 2025.01118,
+        "timestamp_duration_milliseconds": 2025,
+        "duration_delta_milliseconds": 0.01118,
+        "command_passed": 1,
+        "command_total": 1,
+        "metadata_sha256": "2bf9d1e1a811fd4bb6d5770576262040b0136e8de38ffc162a1acef42158d2b8",
+        "stdout_sha256": "5ab830d38ad142e3cdfc8957423c75bbbaff41bbf30899bbebbb9561c23174ee",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "sdk-typecheck",
+        "command": [
+          "pnpm",
+          "--filter",
+          "@pumped-fn/sdk",
+          "typecheck"
+        ],
+        "occurrences": 1,
+        "exit_code": 0,
+        "recorded_duration_milliseconds": 1653.832364,
+        "timestamp_duration_milliseconds": 1653,
+        "duration_delta_milliseconds": 0.832364,
+        "command_passed": 1,
+        "command_total": 1,
+        "metadata_sha256": "2699c82ac0842d58a4ea754ff4a8b8ab26723ff23ce3353603531a58e1a03987",
+        "stdout_sha256": "53efdc71086afb5799178ff1220f7b549386cefe6bf042d5b5a7c8b900f31cd5",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "timeout_classification": {
+    "prior_p15_result": {
+      "sdk_tests_passed": 58,
+      "sdk_tests_total": 59,
+      "failed_test": "resolves packed ESM and CJS declarations under strict NodeNext",
+      "failure": "Test timed out in 5000ms.",
+      "test_source_sha256": "1670af50c3d86e89340fb109881f00cc49aa5c1e2eada5a35b9ed98fe2360458"
+    },
+    "p16_result": {
+      "timeout_budget_milliseconds": 60000,
+      "package_export_tests_passed": 4,
+      "package_export_tests_total": 4,
+      "package_export_test_phase_seconds": 13.54,
+      "remaining_sdk_tests_passed": 55,
+      "remaining_sdk_tests_total": 55,
+      "combined_sdk_tests_passed": 59,
+      "combined_sdk_tests_total": 59
+    },
+    "assertions_unchanged": {
+      "before_sha256": "1670af50c3d86e89340fb109881f00cc49aa5c1e2eada5a35b9ed98fe2360458",
+      "after_sha256": "1670af50c3d86e89340fb109881f00cc49aa5c1e2eada5a35b9ed98fe2360458",
+      "p15_validation_sha256": "1670af50c3d86e89340fb109881f00cc49aa5c1e2eada5a35b9ed98fe2360458",
+      "exact_head_sha256": "1670af50c3d86e89340fb109881f00cc49aa5c1e2eada5a35b9ed98fe2360458",
+      "matched": true
+    },
+    "only_command_budget_change": {
+      "source_or_assertion_edits": 0,
+      "test_or_config_edits": 0,
+      "cli_timeout_argument": "--testTimeout=60000",
+      "held": true
+    },
+    "decision": "accepted",
+    "reason": "The unchanged package-export assertions passed under a 60000 ms command-local budget, and the file's test phase took 13.54 seconds, which exceeds the prior 5000 ms budget. This supports a timeout-budget classification for the prior failure.",
+    "product_causality_claim": "not_made",
+    "default_timeout_change_recommendation": "not_decided"
+  },
+  "preservation_recomputation": {
+    "candidate_before_after_hashes_matched": {
+      "scope": true,
+      "semantic_test": true,
+      "package_export_test": true,
+      "lite_source_manifest": true,
+      "sdk_source_manifest": true,
+      "lite_test_manifest": true,
+      "sdk_test_manifest": true,
+      "lockfile": true,
+      "lite_package": true,
+      "sdk_package": true
+    },
+    "product_scope_before_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "product_scope_after_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "exact_head_scope_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "product_source_diff_before_exit_code": 0,
+    "product_source_diff_after_exit_code": 0,
+    "tracked_product_test_config_status_current": "clean",
+    "local_git_reflog_entries_during_dkr_window": 0,
+    "pr_346_updated_at": "2026-07-15T13:40:13Z",
+    "dkr_window": {
+      "started_at": "2026-07-16T09:53:26.253Z",
+      "finished_at": "2026-07-16T09:54:04.003Z"
+    },
+    "pr_updated_during_dkr_window": false,
+    "product_test_config_git_or_pr_edit_count": 0,
+    "decision": "accepted"
+  },
+  "performance_and_authority_boundary": {
+    "frozen_command_labels": [
+      "package-export-timeout-60000",
+      "remaining-sdk-tests",
+      "lite-typecheck-full",
+      "sdk-typecheck"
+    ],
+    "performance_commands_in_frozen_set": 0,
+    "benchmark_commands_in_frozen_set": 0,
+    "performance_rerun_claim": "none",
+    "established_47_row_benchmark_claim": "not_run",
+    "product_progression": "not_authorized",
+    "git_or_pr_write": "none_detected",
+    "merge_release_publish_or_deploy": "not_authorized_and_not_claimed",
+    "release_readiness": "not_claimed"
+  },
+  "audit_traces": [
+    {
+      "claim_id": "P16-CHECKPOINT-INTEGRITY",
+      "check": "The supplied checkpoint and prior P15 validation match their expected hashes, and the frozen checker reproduces the checkpoint.",
+      "threshold": "all input hashes match and verify.mjs --check exits 0 on its only replay",
+      "value": "2/2 input hashes matched; replay 1/1 exited 0",
+      "source_of_truth": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/checkpoint.v1.json, /tmp/validator-dkr-p15-inherited-baseline-mode-20260716T095000Z/verification.v1.json, and verify.mjs",
+      "replay_command": "cd /tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z && node verify.mjs . --check",
+      "exit_code": 0,
+      "sha256": [
+        "25e8fe4937d20d775c04247c37ae2b546f7100027522c90ae64c908b3fc7a67a",
+        "91c8aab0d1b517d3924f3d7529df4cdd7484eee7b4f65c6fb749766cc325c2f1",
+        "a77c89044fa5d61122ce184954e35a724aa812ceaa016a9011dd21db304d2a72"
+      ],
+      "observed_at": "2026-07-16T09:59:37Z",
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "P16-COMMAND-MATRIX",
+      "check": "Every predeclared command appears once, matches the protocol, exits zero, has consistent duration, and reports the claimed pass count.",
+      "threshold": "4/4 unique commands, 4/4 zero exits, 59/59 SDK tests, 2/2 typechecks",
+      "value": "4/4 unique commands; 4/4 zero exits; 59/59 SDK tests; 2/2 typechecks; every duration within 2 ms of timestamp subtraction",
+      "source_of_truth": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/protocol.json and commands",
+      "replay_command": "read-only recomputation from protocol.json, commands/*.json, and commands/*.stdout.log",
+      "exit_code": 0,
+      "sha256": [
+        "54ef8707e73552cda3b207f1095326db857fd2c7b59a5f18e8e9027c04fb368a",
+        "cdda2b97de9a24e949b37c6c4bb7060cc0c4edb659bb5077f266e04fc391721f",
+        "77320f54ed8da557e7099099cd6ba671f5ed3834849764ad51a76edc1cd20d89",
+        "2bf9d1e1a811fd4bb6d5770576262040b0136e8de38ffc162a1acef42158d2b8",
+        "2699c82ac0842d58a4ea754ff4a8b8ab26723ff23ce3353603531a58e1a03987"
+      ],
+      "observed_at": "2026-07-16T09:59:37Z",
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "P16-TIMEOUT-BUDGET-CLASSIFICATION",
+      "check": "The package-export assertions remained unchanged, the command-local timeout budget was the only test change, and the 13.54-second result supports classifying the prior 5000 ms failure without claiming product causality.",
+      "threshold": "test source hash unchanged; 4/4 pass under 60000 ms; observed test phase greater than 5 seconds; no product-causality claim",
+      "value": "source hash unchanged at 1670af50c3d86e89340fb109881f00cc49aa5c1e2eada5a35b9ed98fe2360458; 4/4 passed; test phase 13.54 seconds; product causality not claimed",
+      "source_of_truth": "P15 validation, before.snapshot.json, after.snapshot.json, exact-head test source, package-export command metadata, and stdout",
+      "replay_command": "read-only hash and command comparison; no semantic rerun",
+      "exit_code": 0,
+      "sha256": [
+        "1670af50c3d86e89340fb109881f00cc49aa5c1e2eada5a35b9ed98fe2360458",
+        "cdda2b97de9a24e949b37c6c4bb7060cc0c4edb659bb5077f266e04fc391721f",
+        "c9748ce41b84dc3dfe9727068414965a1c5b63309f7a312972d64c1e9e296de2"
+      ],
+      "observed_at": "2026-07-16T09:59:37Z",
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "P16-PRESERVATION-AND-AUTHORITY",
+      "check": "Candidate, product, tests, configuration, local Git refs, and PR state were not edited during the bounded DKR window, and no performance or benchmark command was in the frozen command set.",
+      "threshold": "all before/after hashes match; product source diffs zero; tracked product/test/config clean; zero reflog entries in window; PR update predates window; zero performance or benchmark commands",
+      "value": "10/10 candidate hash groups matched; product scope and exact-head hashes matched; source diff exits 0/0; tracked product/test/config clean; local reflog entries 0; PR updated 2026-07-15T13:40:13Z before DKR; performance/benchmark commands 0",
+      "source_of_truth": "before.snapshot.json, after.snapshot.json, protocol.json, local git status/reflog, and read-only gh pr view 346",
+      "replay_command": "read-only evidence inspection; no product, Git, PR, performance, or benchmark write",
+      "exit_code": 0,
+      "sha256": [
+        "091ddfb0df9ebf1a424abe01b99ff9486ecdec3ad11de7b0ac27f16607187670",
+        "6b34b7e99f4d2fbfd077072a6511b9069040333d642873c5ef164b662061fc3c",
+        "54ef8707e73552cda3b207f1095326db857fd2c7b59a5f18e8e9027c04fb368a"
+      ],
+      "observed_at": "2026-07-16T09:59:37Z",
+      "decision": "accepted"
+    }
+  ],
+  "claim_boundary": {
+    "timeout_budget_fault": "independently_supported",
+    "candidate_semantic_matrix": "independently_accepted",
+    "candidate_performance": "not_replayed_in_p16",
+    "product_causality": "not_established",
+    "product_progression": "not_authorized",
+    "existing_47_row_benchmark": "not_run",
+    "release_readiness": "not_claimed",
+    "downstream_advance": "orchestrator_decision"
+  },
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

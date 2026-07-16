@@ -1,0 +1,77 @@
+{
+  "type": "challenger_progress",
+  "unit_id": "CHALLENGER-P14-INHERITED-MODE",
+  "status": "finished",
+  "observed_at": "2026-07-16T09:14:51Z",
+  "objective_from_frame": "Reduce release_readiness_gap_count to 0 on the exact PR head by meeting the frozen lifecycle throughput and allocation targets while every active anti-goal holds.",
+  "hypothesis": {
+    "id": "H5",
+    "statement": "Inherited baseline-composition mode is the smallest defensible next route: a context with options.signal, or whose parent is already baseline-composed, uses exact baseline local and parent signal composition; only subtrees with no explicit signal anywhere use lazy registry propagation.",
+    "verdict": "intact",
+    "narrowing_toward_wrong_tip": "no",
+    "evidence_refs": [
+      "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/checkpoint.v1.json#sha256=3e4d95607d093fd7bd76d4ca2a2d98551c879bee0dd31f03ca8ee2265b83d4de",
+      "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/variant.patch#sha256=7822cdd1e7a88d9b8e492345d611d6a0b348d2d5563135032b3dd85ea653b38f",
+      "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/checkpoint.v1.json#sha256=e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950"
+    ],
+    "verdict_evidence": [
+      "P14 passes the aggregate throughput and allocation targets but fails the SDK allocation ceiling at 1.2016265281015577.",
+      "P14 explicit contexts use baseline combineAbortSignals, but then add signalOverride.addEventListener with captureComposedAbort.bind(this) to copy native composition into lazy registry descendants.",
+      "That bound listener and mixed-mode bridge do not exist in the baseline.",
+      "Session.run introduces an explicit signal at dispatch.prepare. Descendants below that point can inherit baseline mode, so native parent-signal composition can carry cancellation without captureComposedAbort.",
+      "P12's V123 candidate held SDK allocation at 0.8324672299325336 while retaining baseline cancellation. This is directional evidence only, but supports keeping the SDK cancellation subtree baseline rather than adding another bridge."
+    ],
+    "claim_boundary": "The verdict selects the next reducing probe. It does not prove the bridge caused the full P14 breach or that inherited mode will meet the frozen target."
+  },
+  "exact_boundary": {
+    "name": "inherited baseline-composition mode",
+    "mode_rule": [
+      "A context enters baseline-composed mode when options.signal is present.",
+      "A context also enters baseline-composed mode when its parent is baseline-composed, even if the child has no options.signal.",
+      "A context enters lazy-registry mode only when options.signal is absent and its parent is absent or lazy-registry."
+    ],
+    "baseline_composed_mode": [
+      "Create the local AbortController eagerly.",
+      "Build signals in exact baseline order: local, then parent.signal when present, then options.signal when present.",
+      "Use the baseline fast path for one signal and baseline combineAbortSignals for multiple signals.",
+      "Expose the resulting signal with stable identity.",
+      "abort(reason) aborts only the local controller, matching baseline behavior.",
+      "Do not record composed aborts into abortReason.",
+      "Do not propagate aborts through the children registry."
+    ],
+    "lazy_registry_mode": [
+      "Keep the local AbortController lazy.",
+      "Record the first abort reason.",
+      "Propagate the first abort only to children that are also in lazy-registry mode.",
+      "When a baseline-composed child exists, parent.signal is materialized by that child's baseline composition and native signal propagation crosses the mode boundary."
+    ],
+    "remove": [
+      "captureComposedAbort",
+      "captureComposedAbort.bind(this)",
+      "signalOverride.addEventListener used to bridge into registry propagation",
+      "Any direct registry propagation from a lazy parent into a baseline-composed child"
+    ],
+    "retain": [
+      "V123 seedTags fast paths",
+      "V123 lazy resources, resourceListeners, and resourceControllers",
+      "Lazy cancellation only for wholly no-explicit-signal subtrees",
+      "Exact baseline cancellation composition for the entire subtree rooted at the first explicit signal"
+    ],
+    "exclude": [
+      "V4 lazy cleanups, descendants, activeIterators, or children",
+      "SDK source changes",
+      "Public API or declaration changes",
+      "Cancellation ordering or close semantic changes",
+      "Workload, threshold, sample-count, weighting, or harness changes",
+      "Favorable reruns and the established 47-row benchmark"
+    ]
+  },
+  "semantic_stop_rule": [
+    "Stop before performance if the mode invariant is not structurally proven for every child construction path.",
+    "Stop before performance unless the P13 and P14 focused cases, existing cancellation and stream cases, Lite suite, SDK suite, typechecks, and builds pass.",
+    "Add explicit cases proving that an explicit-signal parent with a no-signal child uses baseline composition without captureComposedAbort, and that a lazy parent with a baseline-composed child receives parent cancellation through parent.signal only."
+  ],
+  "performance_stop_rule": "If semantics hold, freeze the unchanged harness and run one integrated comparison. Stop pass or fail. Progression remains blocked unless throughput geometric mean is at least 1.10, allocation geometric mean is at most 0.90, every allocation row is at most 1.05, stationarity holds, retained controls are 0/0/1, and cleanup wall count is 0.",
+  "summary": "1 intact, 0 drifted, 0 dead.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

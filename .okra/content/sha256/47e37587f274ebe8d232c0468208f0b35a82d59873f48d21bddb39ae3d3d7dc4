@@ -1,0 +1,144 @@
+{
+  "schema": "pumped-fn.okra.validator-report.v1",
+  "unit_id": "PKR-P19",
+  "worker_id": "validator-pkr-p19-established-benchmark",
+  "validated_at": "2026-07-16T11:10:16Z",
+  "verdict": "ACCEPT",
+  "checkpoint": {
+    "path": "/tmp/pkr-p19-established-benchmark-be78c8be-20260716T102614Z/checkpoint.v1.json",
+    "sha256": "15bb621e522a956158a2f01fa4436ef6aec63ebdbd62484e5831279159600449"
+  },
+  "integrity": {
+    "freeze_sha256": "c33977ed57ad1b78cc79e44fc11781aeb036623be6dea601579d04f3cb21991b",
+    "manifest_sha256": "a0ee7dcfab501da969b7708ad71f0c04e2d675f3d7786292733a42b16dafeb9e",
+    "manifest_entries": 184,
+    "manifest_unique_entries": 184,
+    "manifest_coverage": "exact_except_manifest_and_checkpoint",
+    "manifest_replay": "184/184 OK",
+    "observation_content_hashes": "36/36 valid",
+    "raw_output_hashes": "144/144 valid",
+    "comparison_content_hashes": "2/2 valid"
+  },
+  "identity": {
+    "baseline_product_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "baseline_overlay_commit": "6e7645457885c5257fb8586d0cc0e415393bab1c",
+    "baseline_overlay_parent": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "baseline_overlay_changed_paths": [
+      "benchmarks/lite-perf/README.md",
+      "benchmarks/lite-perf/scripts/harness.mjs",
+      "benchmarks/lite-perf/scripts/harness.test.mjs"
+    ],
+    "baseline_product_diff_exit": 0,
+    "baseline_lite_tree": "e4e1d4f819f79426c71014587172fbfff17a04ce",
+    "baseline_lite_react_tree": "548a27e4b6118b3d9fd7ca505ece8f24925f1f07",
+    "baseline_scope_sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "candidate_commit": "be78c8be197232a17fa6b90e8a3116f874eef4f0",
+    "candidate_non_okra_tracked_diff_exit": 0,
+    "candidate_non_okra_untracked_count": 0,
+    "candidate_scope_sha256": "847d54559e7d15abe460bd5e391c984689ce6f08432f7aa77af3827da9c49611",
+    "benchmark_control_hashes_match_freeze_and_both_roots": true,
+    "built_artifacts_match_observation_identities": true
+  },
+  "semantic_environment": {
+    "validated_observations": 36,
+    "all_process_exit_codes_zero": true,
+    "shared_fingerprint": "e24e6bda92528398ceda83b914f42169168ce937c81f05d3a461c150691b5347",
+    "lite_fingerprint": "5bd1ad8f085c2f6932e405e75ca4dec74c6fdf96fdcaaf1326b8e8d27375dbf2",
+    "lite_react_fingerprint": "d17b6de3896df24122c16b64a2ef801e8fd9093f533e510cadd0bc31bc3153f2",
+    "lite_rows_per_observation": 39,
+    "lite_react_rows_per_observation": 8,
+    "observation_schema_validation": "36/36 valid"
+  },
+  "capture_protocol": {
+    "schedule": "exact",
+    "pair_order": [
+      "baseline-candidate",
+      "candidate-baseline",
+      "baseline-candidate",
+      "candidate-baseline",
+      "baseline-candidate",
+      "candidate-baseline",
+      "baseline-candidate",
+      "candidate-baseline",
+      "baseline-candidate"
+    ],
+    "lane_order_within_each_pair": [
+      "position-1-lite",
+      "position-2-lite",
+      "position-1-lite-react",
+      "position-2-lite-react"
+    ],
+    "observations": 36,
+    "lite_baseline": 9,
+    "lite_candidate": 9,
+    "lite_react_baseline": 9,
+    "lite_react_candidate": 9,
+    "favorable_repeats": 0,
+    "setup_failure_created_observation": false,
+    "setup_failure_started_benchmark": false,
+    "setup_failure_changed_schedule": false
+  },
+  "comparison_boundaries": {
+    "comparison_artifact_count": 2,
+    "five_pair_after_last_pair_5_observation": true,
+    "five_pair_before_first_pair_6_observation": true,
+    "intermediate_pair_6_7_8_comparison_artifact_count": 0,
+    "nine_pair_after_last_pair_9_observation": true,
+    "basis": "The complete evidence directory contains only the five-pair and nine-pair comparison artifacts, its manifest covers every evidence file, and artifact mtimes place them at the declared boundaries."
+  },
+  "five_pair_result": {
+    "file_sha256": "dab047fd6f5e28e1ccd7dbfb9ecbb05086451c0afd21427071798243038b8ebd",
+    "comparison_sha256": "58932b4293c5bec21a6651c1a43d7cd9dddf13ec85d5b7efccf055e95e29e5dc",
+    "arithmetic_replay": "exact",
+    "decision": "evidence_inconclusive",
+    "row_count": 47,
+    "confirmed_regression_count": 0,
+    "performance_evidence_gap_count": 40,
+    "representative_lane_ratio": 1.137687
+  },
+  "nine_pair_result": {
+    "file_sha256": "686088b9b5641c2555412763d4c1ee4ff6626472e13b2308334d722ef2ae6a16",
+    "comparison_sha256": "9337838c8a72d2ddcf13c24991c8b947bf1dda565ea91a974b7b3f3b72c82f41",
+    "arithmetic_replay": "exact",
+    "decision": "evidence_inconclusive",
+    "row_count": 47,
+    "confirmed_regression_count": 0,
+    "performance_evidence_gap_count": 39,
+    "classification_counts": {
+      "lite": {
+        "no_regression": 8,
+        "inconclusive": 31,
+        "confirmed_regression": 0
+      },
+      "lite_react": {
+        "no_regression": 0,
+        "inconclusive": 8,
+        "confirmed_regression": 0
+      }
+    },
+    "representative": {
+      "lite": {
+        "median_ratio": 1.146058,
+        "mad": 0.049393,
+        "agreement_at_0_95": 9,
+        "agreement_at_1_10": 7,
+        "classification": "no_regression",
+        "improvement_supported": false
+      },
+      "lite_react": {
+        "median_ratio": 1.126562,
+        "mad": 0.272346,
+        "agreement_at_0_95": 6,
+        "agreement_at_1_10": 5,
+        "classification": "inconclusive",
+        "improvement_supported": false
+      }
+    }
+  },
+  "claim_boundary": {
+    "confirmed_regression_rows_zero": true,
+    "no_regression_claim_allowed": false,
+    "accepted_claim": "The protocol found zero confirmed regression rows, but 39 rows remain inconclusive. It does not establish that regressions are absent."
+  },
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

@@ -1,0 +1,8 @@
+{
+  "type": "estimation_record",
+  "phase": "estimate",
+  "unit_id": "DKR-P11B",
+  "estimate": {"time_min": 20, "turns": 1, "tokens": null},
+  "observed_at": "2026-07-16T07:49:00Z",
+  "dispatch_ref": "worker-packets/dkr-p11b-component-lifecycle-map.json"
+}

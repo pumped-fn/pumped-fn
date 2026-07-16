@@ -1,0 +1,408 @@
+{
+  "schema": "pumped-fn.okra.discovery-checkpoint.v1",
+  "checkpoint_id": "DKR-P10B.retained-control.2026-07-16T07:11:17.982Z",
+  "conclusion_id": "dkr-p10b-same-turn-async-continuation-isolated",
+  "unit_id": "DKR-P10B",
+  "decision_target": "Isolate the SDK retained-control 0/1/2 result and freeze a corrected retained-control method without product edits.",
+  "source_of_truth": [
+    "git:293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/protocol.json",
+    "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/frozen.json",
+    "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/raw.sha256",
+    "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/checkpoint.v1.json",
+    "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/workloads.mjs"
+  ],
+  "read_method": "Replay identical SDK lifecycle rows in separate Node processes while changing only the post-GC await boundary from Promise.resolve to setImmediate, then compare queryObjects baseline, closed, and positive counts.",
+  "observed_at": "2026-07-16T07:11:17.912Z",
+  "recorded_at": "2026-07-16T07:11:17.982Z",
+  "max_age": "30m",
+  "freshness_status": "fresh",
+  "confidence": 0.99,
+  "checks": {
+    "frozenHarness": true,
+    "rawHashes": true,
+    "productHead": true,
+    "p9Checkpoint": true,
+    "workload": true,
+    "lifecycleHeld": true,
+    "sameMicrotaskChainReproduced": true,
+    "eventLoopTurnCorrected": true
+  },
+  "frozen_checks": [
+    {
+      "file": "protocol.json",
+      "expected": "106986a35d5ba9833f2d15240b1732acb6f92d9c29f0e269d45f400c56587b03",
+      "actual": "106986a35d5ba9833f2d15240b1732acb6f92d9c29f0e269d45f400c56587b03",
+      "matched": true
+    },
+    {
+      "file": "observe.mjs",
+      "expected": "cde6b0c0f8d520463ba5cb6b3e7a5dfbff46c5670f7f28f21173ebd15d021097",
+      "actual": "cde6b0c0f8d520463ba5cb6b3e7a5dfbff46c5670f7f28f21173ebd15d021097",
+      "matched": true
+    },
+    {
+      "file": "verify.mjs",
+      "expected": "789232771de733225434036332476608c1e38cffd1ba2a3642a8cdc7dd050ded",
+      "actual": "789232771de733225434036332476608c1e38cffd1ba2a3642a8cdc7dd050ded",
+      "matched": true
+    },
+    {
+      "file": "run-once.sh",
+      "expected": "62f576c34f165632bf67f8cc75c31fbe52f7dec231d0ae020741982543e2e2f4",
+      "actual": "62f576c34f165632bf67f8cc75c31fbe52f7dec231d0ae020741982543e2e2f4",
+      "matched": true
+    },
+    {
+      "file": "freeze.mjs",
+      "expected": "87a541ff78766cc3180f785e6533cb4002d6082591cf720184d54dc42856fa59",
+      "actual": "87a541ff78766cc3180f785e6533cb4002d6082591cf720184d54dc42856fa59",
+      "matched": true
+    }
+  ],
+  "raw_hash_checks": [
+    {
+      "path": "raw/A-event_loop_turn-1.json",
+      "expected": "8d489be8100e701a07ebe7a4996c8063d112d67f974fc47bf6c050dea95c91f9",
+      "actual": "8d489be8100e701a07ebe7a4996c8063d112d67f974fc47bf6c050dea95c91f9",
+      "matched": true
+    },
+    {
+      "path": "raw/A-event_loop_turn-2.json",
+      "expected": "eeb31a4d49e17f26854859a9887b5d571a443b96609b7f3c4eedc8680588401d",
+      "actual": "eeb31a4d49e17f26854859a9887b5d571a443b96609b7f3c4eedc8680588401d",
+      "matched": true
+    },
+    {
+      "path": "raw/A-event_loop_turn-3.json",
+      "expected": "4c6337ba6f9fa7bdcd82d880861486dc6d3498e208ee644ddbaef5560161749e",
+      "actual": "4c6337ba6f9fa7bdcd82d880861486dc6d3498e208ee644ddbaef5560161749e",
+      "matched": true
+    },
+    {
+      "path": "raw/A-same_microtask_chain-1.json",
+      "expected": "3e05a765aab5336fb2553a0cd8333bb63cf7c1c3513aaf3adafac493a9f38c21",
+      "actual": "3e05a765aab5336fb2553a0cd8333bb63cf7c1c3513aaf3adafac493a9f38c21",
+      "matched": true
+    },
+    {
+      "path": "raw/A-same_microtask_chain-2.json",
+      "expected": "64c4665f7bd65cb845baa5805426aad5742db652c6e385fd6c491a911010e2f9",
+      "actual": "64c4665f7bd65cb845baa5805426aad5742db652c6e385fd6c491a911010e2f9",
+      "matched": true
+    },
+    {
+      "path": "raw/A-same_microtask_chain-3.json",
+      "expected": "e9c2d0e29b2ddfc4b257414f96a9ace26644e92b931a3f67130c90c4a3ef15e6",
+      "actual": "e9c2d0e29b2ddfc4b257414f96a9ace26644e92b931a3f67130c90c4a3ef15e6",
+      "matched": true
+    },
+    {
+      "path": "raw/B-event_loop_turn-1.json",
+      "expected": "c6dbba017c1460ad42dabbaf2772aea57a69df33754a377ee31f89106a815fd0",
+      "actual": "c6dbba017c1460ad42dabbaf2772aea57a69df33754a377ee31f89106a815fd0",
+      "matched": true
+    },
+    {
+      "path": "raw/B-event_loop_turn-2.json",
+      "expected": "1bc554373f1acd6d28f7f885afb80e41e0d7e11c4e86fd530e9d44fe754df4df",
+      "actual": "1bc554373f1acd6d28f7f885afb80e41e0d7e11c4e86fd530e9d44fe754df4df",
+      "matched": true
+    },
+    {
+      "path": "raw/B-event_loop_turn-3.json",
+      "expected": "99445d624b3790edfab2ddce3c3c164f49483fb38cfc41b4fc734d589c3c147a",
+      "actual": "99445d624b3790edfab2ddce3c3c164f49483fb38cfc41b4fc734d589c3c147a",
+      "matched": true
+    },
+    {
+      "path": "raw/B-same_microtask_chain-1.json",
+      "expected": "1608c8626dd927928c9bb7e6cb981c5c1fb6f5e680d77a3a4748ce8494f5ca4b",
+      "actual": "1608c8626dd927928c9bb7e6cb981c5c1fb6f5e680d77a3a4748ce8494f5ca4b",
+      "matched": true
+    },
+    {
+      "path": "raw/B-same_microtask_chain-2.json",
+      "expected": "e5ff013a660de78e1ae68bbdbf68667be7e6574cc83ef0d238f4887b357a6110",
+      "actual": "e5ff013a660de78e1ae68bbdbf68667be7e6574cc83ef0d238f4887b357a6110",
+      "matched": true
+    },
+    {
+      "path": "raw/B-same_microtask_chain-3.json",
+      "expected": "2661a9e16d79a74b3652818820609ca344aa931439cce7546d58731a0945745b",
+      "actual": "2661a9e16d79a74b3652818820609ca344aa931439cce7546d58731a0945745b",
+      "matched": true
+    }
+  ],
+  "mode_reads": {
+    "same_microtask_chain": {
+      "count": 6,
+      "archives": [
+        "A",
+        "B"
+      ],
+      "counts": [
+        {
+          "baseline": 0,
+          "closed": 1,
+          "positive": 2
+        },
+        {
+          "baseline": 0,
+          "closed": 1,
+          "positive": 2
+        },
+        {
+          "baseline": 0,
+          "closed": 1,
+          "positive": 2
+        },
+        {
+          "baseline": 0,
+          "closed": 1,
+          "positive": 2
+        },
+        {
+          "baseline": 0,
+          "closed": 1,
+          "positive": 2
+        },
+        {
+          "baseline": 0,
+          "closed": 1,
+          "positive": 2
+        }
+      ],
+      "closedSummaries": [
+        [
+          "WorkloadOwnedRetainedProbe {}"
+        ],
+        [
+          "WorkloadOwnedRetainedProbe {}"
+        ],
+        [
+          "WorkloadOwnedRetainedProbe {}"
+        ],
+        [
+          "WorkloadOwnedRetainedProbe {}"
+        ],
+        [
+          "WorkloadOwnedRetainedProbe {}"
+        ],
+        [
+          "WorkloadOwnedRetainedProbe {}"
+        ]
+      ],
+      "matched": true
+    },
+    "event_loop_turn": {
+      "count": 6,
+      "archives": [
+        "A",
+        "B"
+      ],
+      "counts": [
+        {
+          "baseline": 0,
+          "closed": 0,
+          "positive": 1
+        },
+        {
+          "baseline": 0,
+          "closed": 0,
+          "positive": 1
+        },
+        {
+          "baseline": 0,
+          "closed": 0,
+          "positive": 1
+        },
+        {
+          "baseline": 0,
+          "closed": 0,
+          "positive": 1
+        },
+        {
+          "baseline": 0,
+          "closed": 0,
+          "positive": 1
+        },
+        {
+          "baseline": 0,
+          "closed": 0,
+          "positive": 1
+        }
+      ],
+      "closedSummaries": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "matched": true
+    }
+  },
+  "retaining_cause": {
+    "classification": "harness_timing",
+    "reference_path": "same event-loop turn -> SDK async continuation state -> completed session owner returned by the turn -> workload-owned symbol property -> WorkloadOwnedRetainedProbe",
+    "isolation": "The unchanged exact-head lifecycle row and product archives report 0/1/2 under Promise.resolve-only collection and 0/0/1 after setImmediate. Crossing the event-loop turn removes the reference before the next queryObjects full-GC read.",
+    "product_owned_retained_path_established": false
+  },
+  "corrected_method": "After the unchanged lifecycle row fully closes, cross an event-loop turn after each explicit GC before queryObjects reads the closed count.",
+  "evidence_refs_or_hashes": [
+    "sha256:106986a35d5ba9833f2d15240b1732acb6f92d9c29f0e269d45f400c56587b03",
+    "sha256:9e72d92b600387fd31c1d03d2c6179b962cae988bdb256acf1a50e1e2b9d2182",
+    "sha256:e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499",
+    "sha256:4b31dfc058e6f0627edba61a2a4e3c83818eb132f6374cec8864c75eccbb77f4",
+    "sha256:cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a"
+  ],
+  "replay_command_or_checker": "cd /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z && node verify.mjs .",
+  "questions_answered": [
+    "The SDK closed-count object is reachable only through same-turn async continuation state during the P9 read.",
+    "The unchanged exact-head lifecycle row reaches baseline zero, closed zero, and deliberate positive one after an event-loop-turn boundary on both identical archives.",
+    "No product edit is needed to correct the retained-control method."
+  ],
+  "questions_unanswered": [
+    "Independent validation has not yet accepted this checkpoint.",
+    "No baseline-candidate product comparison or optimization result is measured here."
+  ],
+  "decision": "candidate_learning_pending_independent_validation",
+  "flag_if_missing_or_stale": "blocking",
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-RETAINED-MEMORY",
+    "AG-PRESERVATION",
+    "AG-STORAGE-WRITE",
+    "AG-AUTHORITY"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "source_of_truth": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/frozen.json and /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/raw.sha256",
+      "read_method": "Replay frozen and raw hashes.",
+      "observed_at": "2026-07-16T07:11:17.912Z",
+      "recorded_at": "2026-07-16T07:11:17.982Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499",
+      "replay_command_or_checker": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/verify.mjs",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "uncontrolled_comparison_variable_count",
+      "source_of_truth": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/protocol.json and raw observations",
+      "read_method": "Compare lifecycle records and confirm only the await boundary differs.",
+      "observed_at": "2026-07-16T07:11:17.912Z",
+      "recorded_at": "2026-07-16T07:11:17.982Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499",
+      "replay_command_or_checker": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/verify.mjs",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "unsupported_product_leak_claim_count",
+      "source_of_truth": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/checkpoint.v1.json",
+      "read_method": "Read product_owned_retained_path_established and the claim boundary.",
+      "observed_at": "2026-07-16T07:11:17.912Z",
+      "recorded_at": "2026-07-16T07:11:17.982Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499",
+      "replay_command_or_checker": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/verify.mjs",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "corrected_closed_retained_probe_count",
+      "source_of_truth": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/raw/*.json",
+      "read_method": "Replay event_loop_turn observations.",
+      "observed_at": "2026-07-16T07:11:17.912Z",
+      "recorded_at": "2026-07-16T07:11:17.982Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499",
+      "replay_command_or_checker": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/verify.mjs",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "product_or_prior_evidence_edit_count",
+      "source_of_truth": "git:293dcdf2d6d0b274418bcca8461f7eb122e10c52 and scratch manifest",
+      "read_method": "Verify all generated evidence stays under the DKR scratch root.",
+      "observed_at": "2026-07-16T07:11:17.912Z",
+      "recorded_at": "2026-07-16T07:11:17.982Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499",
+      "replay_command_or_checker": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/verify.mjs",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "out_of_envelope_write_count",
+      "source_of_truth": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/raw.sha256 and worker progress path",
+      "read_method": "List DKR writes and compare them with the packet envelope.",
+      "observed_at": "2026-07-16T07:11:17.912Z",
+      "recorded_at": "2026-07-16T07:11:17.982Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499",
+      "replay_command_or_checker": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/verify.mjs",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "forbidden_action_count",
+      "source_of_truth": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/checkpoint.v1.json",
+      "read_method": "Inspect workspace_effect and action record.",
+      "observed_at": "2026-07-16T07:11:17.912Z",
+      "recorded_at": "2026-07-16T07:11:17.982Z",
+      "max_age": "30m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499",
+      "replay_command_or_checker": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/verify.mjs",
+      "verification_record_ref": "pending:independent-validator"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "pending_independent_validation",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-16T07:11:17.982Z"
+  },
+  "candidate_next_dkr_or_pkr": {
+    "type": "DKR",
+    "recommendation": "Use the frozen event-loop-turn retained-control method in the next exact-head A/A harness only after independent validation."
+  },
+  "workspace_effect": "Product and prior evidence remained read-only. New evidence exists only under /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z; the designated worker progress file is the only run-store write.",
+  "worker_evidence_is_acceptance": false,
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

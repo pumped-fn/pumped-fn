@@ -1,0 +1,113 @@
+claim_id: validator_input_checkpoint
+check: The validator packet names the checkpoint that was replayed.
+replay: cd /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z && node verify.mjs .
+exit_code: 0
+value: 070d5bc9d674060c56f0a3a74ffe60bad2a21736af9e13718dbcf0ca29da3d9e vs threshold: packet checkpoint_sha256 exact match
+source_of_truth: /tmp/session-kernel-publish-20260715-0746/.okra/runs/release-readiness-20260716/worker-packets/validator-dkr-p10b-retained-control.json and /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/checkpoint.v1.json
+sha256: 070d5bc9d674060c56f0a3a74ffe60bad2a21736af9e13718dbcf0ca29da3d9e
+observed_at: 2026-07-16T07:14:08Z
+decision: accepted
+evidence: checkpoint_sha256: "070d5bc9d674060c56f0a3a74ffe60bad2a21736af9e13718dbcf0ca29da3d9e"
+
+claim_id: frozen_and_raw_integrity
+check: Frozen harness files and all twelve raw observations match their manifests.
+replay: cd /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z && node verify.mjs .
+exit_code: 0
+value: frozenHarness=true and rawHashes=true vs threshold: both true
+source_of_truth: /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/frozen.json, raw.sha256, and verify.mjs
+sha256: protocol=106986a35d5ba9833f2d15240b1732acb6f92d9c29f0e269d45f400c56587b03; frozen=9e72d92b600387fd31c1d03d2c6179b962cae988bdb256acf1a50e1e2b9d2182; raw_manifest=e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499; verifier=789232771de733225434036332476608c1e38cffd1ba2a3642a8cdc7dd050ded
+observed_at: 2026-07-16T07:14:08Z
+decision: accepted
+evidence: "frozenHarness": true, "rawHashes": true
+
+claim_id: exact_product_and_workload_provenance
+check: The frozen protocol points to the exact product head, P9 checkpoint, and SDK workload hashes.
+replay: cd /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z && node verify.mjs .
+exit_code: 0
+value: productHead=true, p9Checkpoint=true, workload=true vs threshold: all true
+source_of_truth: /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/protocol.json and verify.mjs
+sha256: product_head=293dcdf2d6d0b274418bcca8461f7eb122e10c52; p9_checkpoint=4b31dfc058e6f0627edba61a2a4e3c83818eb132f6374cec8864c75eccbb77f4; workload=cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a
+observed_at: 2026-07-16T07:14:08Z
+decision: accepted
+evidence: "productHead": true, "p9Checkpoint": true, "workload": true
+
+claim_id: same_microtask_control_reproduction
+check: Both identical archives reproduce baseline, closed, and positive counts of 0/1/2 for every same-microtask trial.
+replay: cd /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z && node verify.mjs .
+exit_code: 0
+value: 6 of 6 observations equal 0/1/2 vs threshold: 6 of 6
+source_of_truth: /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/raw/*.json and verify.mjs
+sha256: raw_manifest=e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499
+observed_at: 2026-07-16T07:14:08Z
+decision: accepted
+evidence: "count": 6, "archives": ["A", "B"], "matched": true; each count is {"baseline":0,"closed":1,"positive":2}
+
+claim_id: event_loop_turn_control_correction
+check: Both identical archives produce baseline, closed, and positive counts of 0/0/1 for every event-loop-turn trial.
+replay: cd /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z && node verify.mjs .
+exit_code: 0
+value: 6 of 6 observations equal 0/0/1 vs threshold: 6 of 6
+source_of_truth: /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/raw/*.json and verify.mjs
+sha256: raw_manifest=e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499
+observed_at: 2026-07-16T07:14:08Z
+decision: accepted
+evidence: "count": 6, "archives": ["A", "B"], "matched": true; each count is {"baseline":0,"closed":0,"positive":1}
+
+claim_id: lifecycle_walls_unchanged
+check: All twelve observations hold the frozen lifecycle counters and post-close rejection wall.
+replay: cd /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z && node verify.mjs .
+exit_code: 0
+value: lifecycleHeld=true across 12 observations vs threshold: true across 12
+source_of_truth: /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/raw/*.json and verify.mjs
+sha256: raw_manifest=e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499
+observed_at: 2026-07-16T07:14:08Z
+decision: accepted
+evidence: "lifecycleHeld": true
+
+claim_id: narrow_harness_timing_effect
+check: Under the frozen two-mode control, crossing an event-loop turn changes the closed retained count from one to zero while the lifecycle wall remains held.
+replay: cd /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z && node verify.mjs .
+exit_code: 0
+value: same_microtask_chain=6/6 at 0/1/2; event_loop_turn=6/6 at 0/0/1; lifecycleHeld=true vs threshold: both modes reproduce in 6/6 and lifecycleHeld=true
+source_of_truth: /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/protocol.json, raw/*.json, and verify.mjs
+sha256: protocol=106986a35d5ba9833f2d15240b1732acb6f92d9c29f0e269d45f400c56587b03; raw_manifest=e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499
+observed_at: 2026-07-16T07:14:08Z
+decision: accepted
+evidence: "sameMicrotaskChainReproduced": true, "eventLoopTurnCorrected": true, "lifecycleHeld": true
+
+claim_id: retaining_reference_path
+check: The exact path is same event-loop turn -> SDK async continuation state -> completed session owner -> workload-owned symbol property -> WorkloadOwnedRetainedProbe.
+replay: cd /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z && node verify.mjs .
+exit_code: 0
+value: hard-coded reference_path narrative with no replayed retaining-path extraction vs threshold: deterministic retaining-path proof
+source_of_truth: /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/verify.mjs
+sha256: verifier=789232771de733225434036332476608c1e38cffd1ba2a3642a8cdc7dd050ded
+observed_at: 2026-07-16T07:14:08Z
+decision: rejected (non-replayable unsupported claim)
+evidence: The verifier emits "reference_path" as a fixed string and has no retaining-path extraction or reference-chain assertion. A deterministic heap-reference-path checker is required.
+
+claim_id: product_leak_claim_boundary
+check: The checkpoint does not claim that a product-owned retained path or production leak was established.
+replay: cd /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z && node verify.mjs .
+exit_code: 0
+value: product_owned_retained_path_established=false vs threshold: false
+source_of_truth: /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/verify.mjs replay output
+sha256: verifier=789232771de733225434036332476608c1e38cffd1ba2a3642a8cdc7dd050ded
+observed_at: 2026-07-16T07:14:08Z
+decision: accepted
+evidence: "product_owned_retained_path_established": false
+
+claim_id: dkr_p10b_checkpoint_acceptance
+check: The DKR-P10B checkpoint is fully replayable and contains no unsupported conclusion.
+replay: cd /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z && node verify.mjs .
+exit_code: 0
+value: one unsupported exact retaining-reference-path claim vs threshold: zero unsupported claims
+source_of_truth: /tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/checkpoint.v1.json and verify.mjs
+sha256: checkpoint=070d5bc9d674060c56f0a3a74ffe60bad2a21736af9e13718dbcf0ca29da3d9e; verifier=789232771de733225434036332476608c1e38cffd1ba2a3642a8cdc7dd050ded
+observed_at: 2026-07-16T07:14:08Z
+decision: rejected (unsupported claim)
+evidence: The count transition and lifecycle walls replayed, but the checkpoint's exact retaining reference path did not.
+
+DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.
+
+8 accepted, 2 rejected: retaining_reference_path, dkr_p10b_checkpoint_acceptance

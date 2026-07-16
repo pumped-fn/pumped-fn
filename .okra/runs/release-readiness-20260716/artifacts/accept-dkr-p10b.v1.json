@@ -1,0 +1,21 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P10B",
+  "accepted_at": "2026-07-16T07:16:00Z",
+  "accepted_scope": "The event-loop-turn retained-control method is accepted. The exact retaining reference-path narrative is rejected as non-replayable.",
+  "method_decision": "accepted_with_rejected_cause_claim",
+  "checkpoint_ref": "workers/dkr-p10b-retained-control/checkpoint.v1.json",
+  "checkpoint_sha256": "070d5bc9d674060c56f0a3a74ffe60bad2a21736af9e13718dbcf0ca29da3d9e",
+  "verification_ref": "workers/validator-dkr-p10b/verification.v1.txt",
+  "verification_sha256": "f39cff05a5cd76a3c36ddfed15d3d980e4b09781f22a45107d28402e8361b178",
+  "accepted_reads": {
+    "same_microtask_chain": "6/6 baseline/closed/positive reads were 0/1/2",
+    "event_loop_turn": "6/6 baseline/closed/positive reads were 0/0/1",
+    "lifecycle_walls": "held across all 12 observations"
+  },
+  "rejected_claims": [
+    "The exact internal retaining reference path is unknown because no deterministic reference-path extractor was provided.",
+    "No product-owned retained path or production leak is established."
+  ],
+  "downstream_authority": "Use the event-loop-turn boundary after explicit GC in the next retained-control comparison. Do not repeat or imply the rejected exact-cause narrative."
+}

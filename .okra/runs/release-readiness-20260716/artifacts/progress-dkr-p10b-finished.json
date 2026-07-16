@@ -1,0 +1,22 @@
+{
+  "unit_id": "DKR-P10B",
+  "worker_id": "dkr-p10b-retained-control",
+  "worker_kind": "discovery",
+  "status": "finished",
+  "event": "worker_finish",
+  "checkpoint_ref": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/checkpoint.v1.json",
+  "checkpoint_sha256": "070d5bc9d674060c56f0a3a74ffe60bad2a21736af9e13718dbcf0ca29da3d9e",
+  "raw_manifest_sha256": "e99237aaf7dbdeea2ae1f0dd66921aa64cdfcbfd97197250793387d166272499",
+  "replay_ref": "/tmp/dkr-p10b-retained-control-293dcdf2-20260716T071500Z/replay.json",
+  "replay_sha256": "cf5a3755889056cade45758c963a67f9b15c9de563d3a9652d7b6be8c132a6c0",
+  "result": "The unchanged exact-head SDK lifecycle row reproduced 0/1/2 in six same-microtask observations and produced 0/0/1 in six event-loop-turn observations. The exact retaining reference path remains unknown; no product-owned retained path was established.",
+  "corrected_method": "Cross an event-loop turn after each explicit GC before the closed queryObjects read.",
+  "wall_gate": {
+    "verdict": "pending_independent_validation",
+    "downstream_advance": "blocked"
+  },
+  "worker_evidence_is_acceptance": false,
+  "observed_at": "2026-07-16T07:12:14Z",
+  "next_check_at": "orchestrator_dispatch",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

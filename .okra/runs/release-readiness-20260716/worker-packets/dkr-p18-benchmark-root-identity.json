@@ -1,0 +1,27 @@
+{
+  "worker_id": "dkr-p18-benchmark-root-identity",
+  "worker_kind": "discovery",
+  "unit_id": "DKR-P18",
+  "objective": "Define the smallest deterministic harness amendment that makes identical dependency installations root-independent while still rejecting version, manifest-byte, tool, browser, lockfile, config, writer, row, runtime, platform, and CPU drift.",
+  "inputs": {
+    "harness": "benchmarks/lite-perf/scripts/harness.mjs",
+    "tests": "benchmarks/lite-perf/scripts/harness.test.mjs",
+    "readme": "benchmarks/lite-perf/README.md",
+    "blocked_unit": "PKR-P17",
+    "capture_count": 0
+  },
+  "questions": [
+    "Which absolute fields cause false environment drift across exact roots?",
+    "What is the minimum root-independent identity that retains dependency integrity?",
+    "What deterministic valid and invalid fixtures prove the correction?",
+    "How must the exact same amended harness be used in both roots without changing baseline product source?"
+  ],
+  "anti_goals": [
+    "Do not edit product, benchmark, tests, docs, Git, PR, or prior evidence.",
+    "Do not run captures or comparisons.",
+    "Do not weaken manifest bytes, versions, browser binary bytes, lockfile, config, writer, row, runtime, platform, or CPU checks.",
+    "Do not propose symlink, NODE_PATH, source-tree import, or result-rewriting workarounds.",
+    "Do not claim benchmark or release readiness."
+  ],
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

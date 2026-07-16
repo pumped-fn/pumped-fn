@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "unit_id": "DKR-P9",
+  "worker_kind": "DKR",
+  "decision_target": "Freeze and validate one exact-product-head A/A harness for throughput, sampled allocation, retained objects, provenance, and cleanup across the three accepted lifecycle rows.",
+  "workspace": "/tmp/session-kernel-publish-20260715-0746",
+  "baseline_product_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+  "scratch_only": true,
+  "rows": {
+    "scope_run": "One scope.run operation owns one current resource, executes once, cleans once, and leaves zero live resources.",
+    "managed_ctx_exec": "One managed context executes twice against one shared default-boundary resource, cleans once on close, and leaves zero live resources.",
+    "sdk_session_run": "One bound SDK session runs one drained trivial turn, closes, rejects post-close mutation, and leaves zero live resources."
+  },
+  "frozen_protocol": {
+    "provenance": "Create two independent clean archives of the exact product commit, install from the frozen lockfile, build Lite and SDK, and hash sources, lockfile, manifests, dist modules, declarations, harness, environment, and archives.",
+    "throughput": {
+      "schedule": ["A", "B", "B", "A", "A", "B", "B", "A", "A", "B"],
+      "processes_per_archive_and_row": 5,
+      "aggregation": "median operations per second",
+      "aa_band": [0.8, 1.25]
+    },
+    "allocation": {
+      "aggregate": "sum HeapProfiler.SamplingHeapProfile.samples[].size",
+      "sampling_interval_bytes": 1024,
+      "stack_depth": 64,
+      "trials_per_archive_and_row": 3,
+      "controls": "Matched warmup and zero-operation profile per archive, trial, and row; subtract zero from measured bytes.",
+      "aggregation": "median corrected sampled bytes per completed operation",
+      "minimum_corrected_signal_bytes": 1048576,
+      "aa_band": [0.8, 1.25]
+    },
+    "retained": {
+      "runtime": "Node 26 v8.queryObjects with a unique workload-owned constructor",
+      "sequence": "Warm up, run and fully close the row, clear references, complete three fixed GC and microtask cycles, then query.",
+      "controls": ["baseline zero", "closed negative zero", "deliberately leaked positive one"],
+      "acceptance": "Both archives report zero product retained objects for every row and the positive control reports one."
+    },
+    "representative_aggregation": "Equal-weight geometric mean across the three lifecycle rows because no production weighting evidence exists.",
+    "cleanup_walls": ["post_close_live_resource_count=0", "cross_owner_leak_count=0", "cleanup_business_state_mutation_count=0", "SDK post-close mutation rejected"],
+    "chronology": "Freeze harness, verifier, batch sizes, and acceptance before the first observation. Preserve all raw outputs and hashes. Refuse favorable reruns."
+  },
+  "acceptance": [
+    "Every artifact and raw observation hash replays.",
+    "Every throughput A/A row ratio is within 0.80 to 1.25.",
+    "Every allocation A/A row ratio is within 0.80 to 1.25 and each corrected signal exceeds 1 MiB.",
+    "Every retained product count is zero and every positive control is one.",
+    "Every cleanup wall is zero.",
+    "No product or .okra file is edited by the worker."
+  ],
+  "stop_rule": "Accept or reject the frozen exact-head A/A harness once. Do not optimize, measure a candidate, or claim CKR performance."
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "unit_id": "CHALLENGER-P13-NEXT",
+  "worker_kind": "challenger",
+  "objective": "Select the smallest defensible reducing route after P13 passed aggregate targets but breached the SDK allocation ceiling.",
+  "evidence": {
+    "p12": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/checkpoint.v1.json#sha256=e5749843a397b6f72223c3bb209e283f4395046d4ce9ebb892bff22aac566950",
+    "p13": "/tmp/dkr-p13-lazy-cancellation-293dcdf2-20260716T082637Z/checkpoint.v1.json#sha256=9f313f7cda4c74556100abcbba089c7d0dbc7de03aa895c112f8b3ca788af23e"
+  },
+  "hypotheses": [
+    "H1: P13's SDK allocation ceiling breach is measurement noise.",
+    "H2: V123 plus lazy cancellation should progress despite the breach.",
+    "H3: Lazy cancellation without V123 is the smallest next counterfactual.",
+    "H4: Another source boundary is smaller or more defensible."
+  ],
+  "action_envelope": {
+    "allowed": [
+      "Read and recompute frozen evidence, inspect baseline and scratch source, inspect the fixed workloads, and propose one bounded next DKR."
+    ],
+    "forbidden": [
+      "Edit product, rerun performance, change targets, waive the per-row ceiling, commit, push, merge, release, publish, or deploy."
+    ]
+  },
+  "output": {
+    "progress": ".okra/runs/release-readiness-20260716/workers/challenger-p13-next/progress.jsonl",
+    "required": [
+      "hypothesis verdicts",
+      "evidence",
+      "one exact next variant boundary",
+      "stop rule",
+      "claim boundary"
+    ],
+    "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  }
+}

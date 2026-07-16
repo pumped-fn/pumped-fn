@@ -1,0 +1,27 @@
+{
+  "worker_id": "validator-dkr-p16-semantic-timeout-classification",
+  "worker_kind": "validator",
+  "unit_id": "DKR-P16",
+  "objective": "Independently validate whether the frozen P16 checkpoint supports classifying P15's SDK failure as a 5-second timeout-budget fault and accepting the candidate semantic matrix.",
+  "inputs": {
+    "checkpoint": "/tmp/dkr-p16-semantic-timeout-classification-293dcdf2-20260716T095119Z/checkpoint.v1.json",
+    "checkpoint_sha256": "25e8fe4937d20d775c04247c37ae2b546f7100027522c90ae64c908b3fc7a67a",
+    "p15_validation": "/tmp/validator-dkr-p15-inherited-baseline-mode-20260716T095000Z/verification.v1.json",
+    "p15_validation_sha256": "91c8aab0d1b517d3924f3d7529df4cdd7484eee7b4f65c6fb749766cc325c2f1"
+  },
+  "required_checks": [
+    "Replay verify.mjs once without changing the checkpoint.",
+    "Recompute every command count, exit code, duration, pass count, and before/after hash decision.",
+    "Confirm the package-export command kept assertions unchanged and changed only the test timeout budget.",
+    "Confirm the 13.54-second package-export result explains the prior 5-second timeout without claiming product causality.",
+    "Confirm no performance rerun and no product, Git, PR, test, config, or benchmark edit occurred.",
+    "Return accept or reject with an exact hashed report."
+  ],
+  "anti_goals": [
+    "Do not rerun semantic commands, performance, or benchmarks.",
+    "Do not edit product, evidence, Git, PR, tests, or configuration.",
+    "Do not accept by narrative alone.",
+    "Do not claim release readiness."
+  ],
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

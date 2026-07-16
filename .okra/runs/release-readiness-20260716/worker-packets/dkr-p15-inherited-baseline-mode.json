@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "unit_id": "DKR-P15",
+  "worker_kind": "DKR",
+  "frame": {
+    "objective": {
+      "metric_id": "release_readiness_gap_count",
+      "target": 0,
+      "performance_targets": {
+        "throughput_gm_min": 1.10,
+        "allocation_gm_max": 0.90,
+        "allocation_row_max": 1.05,
+        "retained_closed": 0,
+        "cleanup_walls": 0
+      }
+    },
+    "anti_goals": {
+      "full_set_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals"
+    },
+    "action_envelope": {
+      "allowed": [
+        "Create one scratch-only inherited-mode candidate from exact commit 293dcdf2 with V123.",
+        "Use exact baseline cancellation for any context with options.signal or a baseline-mode parent; use lazy registry cancellation only in wholly signal-free subtrees.",
+        "Preserve replayable semantic commands, logs, exit codes, runner versions, and hashes before one frozen integrated comparison."
+      ],
+      "forbidden": [
+        "Edit product source, change SDK source, include V4, add bound listener bridges, change public API or semantics, change workloads or thresholds, rerun favorably, run the 47-row benchmark, commit, push, merge, release, publish, or deploy."
+      ],
+      "permission_owner": "User and runtime"
+    },
+    "human_confirmation_boundary": "Only the human changes targets or authority."
+  },
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-ALLOCATION-REGRESSION",
+    "AG-RETAINED-MEMORY",
+    "AG-CLEANUP-EFFECT",
+    "AG-SESSION-ISOLATION",
+    "AG-BENCHMARK-BRANCH",
+    "AG-PRESERVATION",
+    "AG-AUTHORITY"
+  ],
+  "current_state": {
+    "baseline_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "baseline_build": "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/build-a",
+    "p14_checkpoint": "/tmp/dkr-p14-caller-signal-hybrid-293dcdf2-20260716T085502Z/checkpoint.v1.json#sha256=3e4d95607d093fd7bd76d4ca2a2d98551c879bee0dd31f03ca8ee2265b83d4de",
+    "p14_validator": "workers/validator-dkr-p14/verification.v1.txt#sha256=1e731fcdc85973d6b33899f1ea5268131cf8292f4e0a6d3f89db7bf1331c056a",
+    "challenger": ".okra/runs/release-readiness-20260716/workers/challenger-p14-inherited-mode/progress.jsonl#seq=1",
+    "variant": {
+      "include": [
+        "V1 seedTags fast paths",
+        "V2 lazy resourceListeners and resourceControllers",
+        "V3 lazy resources",
+        "baseline cancellation mode inherited by every descendant once options.signal appears",
+        "lazy cancellation only when neither the context nor any ancestor has options.signal"
+      ],
+      "exclude": [
+        "captureComposedAbort",
+        "bind(this) abort listener",
+        "signalOverride listener bridge",
+        "registry propagation into baseline-mode children",
+        "V4 lazy collections",
+        "SDK or public API changes"
+      ]
+    }
+  },
+  "assignment": "Implement the exact two-mode invariant. Baseline mode is selected when options.signal exists or the parent is baseline mode. It eagerly creates the local controller and uses the exact baseline local-parent-caller signal order, single-signal fast path, combineAbortSignals, and local-only abort. Every descendant inherits baseline mode. Lazy mode is allowed only in wholly explicit-signal-free subtrees; it records the first abort and propagates only to lazy children, materializing one controller on first signal read. A lazy parent crossing into a baseline child does so only through parent.signal in native composition. Prove mode inheritance, source order, stable identity, already-aborted cases, parent/caller precedence, close classification, streams, boundary children, and post-close access. Preserve exact semantic commands and full logs with exit codes and hashes so an independent validator can replay them. Freeze all evidence before observations, then run the accepted 96-observation protocol once.",
+  "budget_and_stop_rule": {
+    "wall_clock": "70m",
+    "route_cap": 1,
+    "stop": "Stop after one replayably proven inherited-mode candidate and one frozen full comparison, pass or fail."
+  },
+  "hand_back_rule": "Hand back before measurement if the mode invariant, baseline byte identity, semantic replay, or source boundary fails."
+  ,
+  "worker_progress": ".okra/runs/release-readiness-20260716/workers/dkr-p15-inherited-baseline-mode/progress.jsonl",
+  "worker_progress_command": "/home/lagz0ne/dev/okr/skills/reverse-tornado-okr/scripts/okra-store.sh worker-report dkr-p15-inherited-baseline-mode <payload.json> .okra/runs/release-readiness-20260716",
+  "heartbeat_cadence_and_next_check_at": "10m; next check at 2026-07-16T09:26:00Z",
+  "output_schema": {
+    "record_first": true,
+    "required": [
+      "checkpoint_id",
+      "variant_patch_sha256",
+      "variant_boundary_checks",
+      "semantic_commands",
+      "semantic_logs",
+      "semantic_exit_codes",
+      "semantic_log_hashes",
+      "frozen_protocol",
+      "provenance",
+      "raw_hashes",
+      "throughput_rows",
+      "throughput_geometric_mean",
+      "allocation_rows",
+      "allocation_geometric_mean",
+      "retained_controls",
+      "cleanup_walls",
+      "target_decisions",
+      "replay",
+      "claim_boundary",
+      "workspace_effect"
+    ],
+    "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  }
+}

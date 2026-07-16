@@ -1,0 +1,227 @@
+{
+  "ckrs": [
+    {
+      "id": "CKR-CONTRACT",
+      "metrics": [
+        {
+          "metric_id": "public_contract_gap_count",
+          "status": "accepted_exact_product_head",
+          "target": 0,
+          "value": 0
+        },
+        {
+          "metric_id": "public_api_tsdoc_gap_count",
+          "status": "accepted_exact_product_head",
+          "target": 0,
+          "value": 0
+        },
+        {
+          "metric_id": "documentation_example_failure_count",
+          "status": "accepted_exact_product_head",
+          "target": 0,
+          "value": 0
+        },
+        {
+          "metric_id": "current_guidance_exec_gap_count",
+          "status": "accepted_exact_product_head",
+          "target": 0,
+          "value": 0
+        }
+      ],
+      "source_dkrs": [
+        "DKR-C",
+        "DKR-A"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "CKR-PERFORMANCE",
+      "metrics": [
+        {
+          "metric_id": "lifecycle_representative_throughput_ratio",
+          "status": "accepted",
+          "target": 1.1,
+          "value": 1.241825781342104
+        },
+        {
+          "metric_id": "lifecycle_representative_allocation_ratio",
+          "status": "accepted",
+          "target": 0.9,
+          "value": 0.6797858473843519
+        },
+        {
+          "metric_id": "maximum_lifecycle_allocation_ratio",
+          "status": "accepted",
+          "target": 1.05,
+          "value": 0.996386663337797
+        },
+        {
+          "metric_id": "existing_row_confirmed_regression_count",
+          "status": "accepted_with_claim_boundary",
+          "target": 0,
+          "value": 0
+        },
+        {
+          "metric_id": "performance_evidence_gap_count",
+          "status": "retained_inconclusive",
+          "value": 39
+        }
+      ],
+      "source_dkrs": [
+        "DKR-P",
+        "DKR-P2",
+        "DKR-P3",
+        "DKR-P4",
+        "DKR-P5",
+        "DKR-P6",
+        "DKR-P7",
+        "DKR-P8",
+        "DKR-P9",
+        "DKR-P10A",
+        "DKR-P10B",
+        "DKR-P11A",
+        "DKR-P11B",
+        "DKR-P12",
+        "DKR-P13",
+        "DKR-P14",
+        "DKR-P15",
+        "DKR-P16",
+        "DKR-P18",
+        "DKR-P20"
+      ],
+      "status": "accepted_lifecycle_targets_broader_claim_bounded"
+    }
+  ],
+  "dkrs": [
+    {
+      "acceptance_ref": "artifacts/accept-dkr-c.v1.json",
+      "id": "DKR-C",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-a.v1.json",
+      "id": "DKR-A",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p8.v1.json",
+      "id": "DKR-P8",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p9.v1.json",
+      "id": "DKR-P9",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p10a.v1.json",
+      "id": "DKR-P10A",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p10b.v1.json",
+      "id": "DKR-P10B",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p11a.v1.json",
+      "id": "DKR-P11A",
+      "status": "accepted_empty_result"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p11b.v1.json",
+      "id": "DKR-P11B",
+      "status": "accepted"
+    },
+    {
+      "decision_ref": "artifacts/reject-dkr-p12.v1.json",
+      "id": "DKR-P12",
+      "status": "rejected"
+    },
+    {
+      "decision_ref": "artifacts/reject-dkr-p13.v1.json",
+      "id": "DKR-P13",
+      "status": "rejected"
+    },
+    {
+      "decision_ref": "artifacts/reject-dkr-p14.v1.json",
+      "id": "DKR-P14",
+      "status": "rejected"
+    },
+    {
+      "decision_ref": "artifacts/reject-dkr-p15.v1.json",
+      "id": "DKR-P15",
+      "status": "rejected_with_accepted_metric_reads"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p16.v1.json",
+      "id": "DKR-P16",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p18.v1.json",
+      "id": "DKR-P18",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p20.v1.json",
+      "id": "DKR-P20",
+      "status": "accepted_protocol_exhausted"
+    }
+  ],
+  "frame_version": 1,
+  "graph": {
+    "edges": [],
+    "nodes": []
+  },
+  "orchestrator": {
+    "owner": "Codex /root",
+    "responsibilities": [
+      "objective checks",
+      "check-ins",
+      "OKR board",
+      "subagent steering",
+      "independent review reconciliation"
+    ],
+    "terminal_condition": "Continue until release_readiness_gap_count equals zero with every active wall held, the human changes or stops the frame, or a blocking flag requires human resolution."
+  },
+  "pkrs": [
+    {
+      "acceptance_ref": "artifacts/accept-pkr-c1.v2.json",
+      "id": "PKR-C1",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-pkr-a1.v3.json",
+      "id": "PKR-A1",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-pkr-c2.v1.json",
+      "id": "PKR-C2",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-pkr-c3.v1.json",
+      "id": "PKR-C3",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-pkr-c4.v1.json",
+      "id": "PKR-C4",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-pkr-p19.v1.json",
+      "id": "PKR-P19",
+      "status": "accepted_with_inconclusive_rows"
+    }
+  ],
+  "release_gates": {
+    "exact_product_head": "1f0b4ee5987ac1822e7c33169f4e3510c4a6c9a2",
+    "github_ci": "pending",
+    "independent_claude_review": "GO, no blockers",
+    "local": "passed"
+  },
+  "tree_version": 7
+}

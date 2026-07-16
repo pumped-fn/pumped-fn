@@ -1,0 +1,25 @@
+{
+  "type": "claim_acceptance",
+  "unit_id": "DKR-P18",
+  "accepted_at": "2026-07-16T10:17:30Z",
+  "accepted_scope": "Two independent reads accept a root-independent semantic environment identity. Absolute dependency, Node, and Chromium locations leave the fingerprint; their versions and bytes remain. The same amended benchmark controls must run in both roots, and baseline product paths must remain byte-identical to 293dcdf2.",
+  "decision": "accepted_root_independent_semantic_environment_identity",
+  "reads": {
+    "capture_count": 0,
+    "comparison_count": 0,
+    "independent_reads": 2,
+    "false_drift_fields": [
+      "tool.vitest.path",
+      "tool.browser_provider.path",
+      "runtime.executable",
+      "browser.executable_path"
+    ],
+    "retained_identity_classes": 10
+  },
+  "wall_gate": {
+    "verdict": "held",
+    "downstream_advance": "authorized_for_harness_patch_and_tests",
+    "decided_at": "2026-07-16T10:17:30Z"
+  },
+  "claim_boundary": "This accepts only the harness identity amendment and deterministic tests. It does not accept any benchmark result or release-readiness claim."
+}

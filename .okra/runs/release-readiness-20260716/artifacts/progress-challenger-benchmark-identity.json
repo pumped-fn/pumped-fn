@@ -1,0 +1,16 @@
+{
+  "worker_id": "challenge-benchmark-identity",
+  "event": "worker_finish",
+  "observed_at": "2026-07-16T10:17:30Z",
+  "verdict": "converged",
+  "finding": "Physical install and executable locations are provenance, not environment identity. Fingerprint package name, version, and manifest bytes; Node version and binary bytes; browser provider version, manifest bytes, and browser binary bytes. Keep lockfile, config, harness, writer, rows, platform, kernel, architecture, CPU, and product artifact bytes unchanged.",
+  "required_tests": [
+    "Identical package manifests at different roots produce identical identities.",
+    "Version or manifest-byte drift changes package identity.",
+    "Location-only process, command, cwd, and raw-output drift does not change comparison identity.",
+    "Every retained semantic identity independently fails comparison when changed.",
+    "Product package-manifest drift fails artifact identity."
+  ],
+  "baseline_boundary": "Apply byte-identical amended benchmark-control files to both roots while baseline product paths remain exact 293dcdf2.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

@@ -1,0 +1,12 @@
+{
+  "type": "event",
+  "event_type": "handback_event",
+  "unit_id": "DKR-P14",
+  "observed_at": "2026-07-16T09:16:00Z",
+  "cause": "P14 failed the SDK allocation ceiling and added a non-baseline bound-listener bridge. The challenger accepted inherited baseline-composition mode as the smallest reducing route.",
+  "evidence_refs_or_hashes": [
+    "artifacts/reject-dkr-p14.v1.json",
+    "workers/challenger-p14-inherited-mode/progress.jsonl#seq=1#record_hash=a5cd8ac9b4ae4f6ad73c79c7b415c73966c89aa56895132d68c99c391e6b8a3e"
+  ],
+  "handed_back_to": "DKR-P15 inherited baseline mode"
+}

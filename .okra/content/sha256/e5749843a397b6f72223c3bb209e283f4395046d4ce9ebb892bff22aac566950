@@ -1,0 +1,2273 @@
+{
+  "schema": "pumped-fn.okra.discovery-checkpoint.v1",
+  "checkpoint_id": "DKR-P12.v123-counterfactual.2026-07-16T08:21:42.604Z",
+  "conclusion_id": "DKR-P12-V123-COUNTERFACTUAL",
+  "unit_id": "DKR-P12",
+  "decision_target": "Determine whether V1+V2+V3 meets the frozen lifecycle performance target while excluding V4 and AbortController changes.",
+  "source_of_truth": [
+    "git:293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/protocol.json",
+    "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/frozen.json",
+    "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/provenance.json",
+    "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/raw.sha256"
+  ],
+  "candidate_provenance": {
+    "exact_head": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "baseline_archive_sha256": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0",
+    "candidate_patch_sha256": "c4d93b8eca26644f5a1fd286227a3380e76328bedbab91967953b3d10b6352f1",
+    "changed_sources": [
+      "pkg/core/lite/src/scope.ts"
+    ],
+    "candidate_scope_sha256": "daaa9c86817e4b3a8dfcd12ebf2f2fdf291befd093acbdd63923456b270bb2f4",
+    "checks": {
+      "exactHead": true,
+      "baselineArchive": true,
+      "baselineSourceMatchesAcceptedBuild": true,
+      "baselineLockfileMatchesAcceptedBuild": true,
+      "baselineManifestsMatchAcceptedBuild": true,
+      "baselineDistMatchesAcceptedBuild": true,
+      "baselineDeclarationsMatchAcceptedBuild": true,
+      "patchHash": true,
+      "changedSources": true,
+      "candidateScopeMatchesFrozenVariant": true,
+      "variantExclusionHeld": true,
+      "variantExclusionPatchMatches": true,
+      "variantExclusionScopeMatches": true,
+      "lockfileUnchanged": true,
+      "manifestsUnchanged": true,
+      "declarationsUnchanged": true,
+      "allRecordedChecks": true,
+      "createdBeforeObservation": true,
+      "provenanceFrozen": true,
+      "baselineArchiveFrozen": true,
+      "candidatePatchStillFrozen": true,
+      "candidateScopeStillFrozen": true,
+      "variantPatchFrozen": true,
+      "variantExclusionFrozen": true
+    }
+  },
+  "variant_patch_sha256": "c4d93b8eca26644f5a1fd286227a3380e76328bedbab91967953b3d10b6352f1",
+  "variant_exclusion_checks": {
+    "held": true,
+    "field_checks": {
+      "private cleanups:": {
+        "baseline": "  private cleanups: CloseCleanup[] = []",
+        "candidate": "  private cleanups: CloseCleanup[] = []",
+        "matched": true
+      },
+      "private descendants": {
+        "baseline": "  private descendants = new Set<Promise<unknown>>()",
+        "candidate": "  private descendants = new Set<Promise<unknown>>()",
+        "matched": true
+      },
+      "private activeIterators": {
+        "baseline": "  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()",
+        "candidate": "  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()",
+        "matched": true
+      },
+      "private children": {
+        "baseline": "  private children = new Set<ExecutionContextImpl>()",
+        "candidate": "  private children = new Set<ExecutionContextImpl>()",
+        "matched": true
+      }
+    },
+    "abort_controller": {
+      "baseline": "  private readonly abortController = new AbortController()",
+      "candidate": "  private readonly abortController = new AbortController()",
+      "matched": true
+    },
+    "forbidden_checks": {
+      "private cleanups: CloseCleanup[] | undefined": true,
+      "private descendants: Set<Promise<unknown>> | undefined": true,
+      "private activeIterators: Set<AsyncIterator<unknown, unknown, unknown>> | undefined": true,
+      "private children: Set<ExecutionContextImpl> | undefined": true,
+      "this.parent.children ??=": true,
+      "activeIterators ??=": true,
+      "activeIterators?.": true,
+      "const cleanups = this.cleanups ??=": true,
+      "this.children ??": true,
+      "children?.": true,
+      "const descendants = this.descendants ??=": true,
+      "this.descendants ??": true,
+      "this.cleanups?.": true,
+      "this.cleanups!": true,
+      "abortController": true
+    },
+    "required_checks": {
+      "private resources: Map<Lite.Resource<unknown>, ResourceEntry<unknown>> | undefined": true,
+      "private resourceListeners: Map<Lite.Resource<unknown>, ResourceListeners> | undefined": true,
+      "private resourceControllers: Map<Lite.Resource<unknown>, ResourceControllerImpl<unknown>> | undefined": true,
+      "this.resources ??= new Map()": true,
+      "this.resourceControllers ??= new Map()": true,
+      "this.resourceListeners ??= new Map()": true,
+      "if (!flowTags?.length) return": true,
+      "const blocked = new Set<symbol>()": true,
+      "this.resources?.values()": true,
+      "this.resources?.keys()": true
+    }
+  },
+  "provenance": {
+    "schema": "pumped-fn.dkr-p12.provenance.v1",
+    "exactHead": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "createdBeforeObservation": true,
+    "baselineArchive": {
+      "path": "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/archives/head-a.tar",
+      "sha256": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0"
+    },
+    "candidatePatch": {
+      "path": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/variant.patch",
+      "sha256": "c4d93b8eca26644f5a1fd286227a3380e76328bedbab91967953b3d10b6352f1",
+      "changedSources": [
+        "pkg/core/lite/src/scope.ts"
+      ],
+      "candidateScopeSha256": "daaa9c86817e4b3a8dfcd12ebf2f2fdf291befd093acbdd63923456b270bb2f4"
+    },
+    "variantExclusion": {
+      "path": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/variant-exclusion.json",
+      "sha256": "d953c68483c29e2f1f4c755e9b2c6a11040e53546dd912ad209b2e14ef7a06f5",
+      "held": true,
+      "fieldChecks": {
+        "private cleanups:": {
+          "baseline": "  private cleanups: CloseCleanup[] = []",
+          "candidate": "  private cleanups: CloseCleanup[] = []",
+          "matched": true
+        },
+        "private descendants": {
+          "baseline": "  private descendants = new Set<Promise<unknown>>()",
+          "candidate": "  private descendants = new Set<Promise<unknown>>()",
+          "matched": true
+        },
+        "private activeIterators": {
+          "baseline": "  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()",
+          "candidate": "  private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()",
+          "matched": true
+        },
+        "private children": {
+          "baseline": "  private children = new Set<ExecutionContextImpl>()",
+          "candidate": "  private children = new Set<ExecutionContextImpl>()",
+          "matched": true
+        }
+      },
+      "abortController": {
+        "baseline": "  private readonly abortController = new AbortController()",
+        "candidate": "  private readonly abortController = new AbortController()",
+        "matched": true
+      },
+      "forbiddenChecks": {
+        "private cleanups: CloseCleanup[] | undefined": true,
+        "private descendants: Set<Promise<unknown>> | undefined": true,
+        "private activeIterators: Set<AsyncIterator<unknown, unknown, unknown>> | undefined": true,
+        "private children: Set<ExecutionContextImpl> | undefined": true,
+        "this.parent.children ??=": true,
+        "activeIterators ??=": true,
+        "activeIterators?.": true,
+        "const cleanups = this.cleanups ??=": true,
+        "this.children ??": true,
+        "children?.": true,
+        "const descendants = this.descendants ??=": true,
+        "this.descendants ??": true,
+        "this.cleanups?.": true,
+        "this.cleanups!": true,
+        "abortController": true
+      },
+      "requiredChecks": {
+        "private resources: Map<Lite.Resource<unknown>, ResourceEntry<unknown>> | undefined": true,
+        "private resourceListeners: Map<Lite.Resource<unknown>, ResourceListeners> | undefined": true,
+        "private resourceControllers: Map<Lite.Resource<unknown>, ResourceControllerImpl<unknown>> | undefined": true,
+        "this.resources ??= new Map()": true,
+        "this.resourceControllers ??= new Map()": true,
+        "this.resourceListeners ??= new Map()": true,
+        "if (!flowTags?.length) return": true,
+        "const blocked = new Set<symbol>()": true,
+        "this.resources?.values()": true,
+        "this.resources?.keys()": true
+      }
+    },
+    "builds": {
+      "baseline": {
+        "sources": {
+          "files": [
+            {
+              "path": "pkg/core/lite/src/atom.ts",
+              "size": 7588,
+              "sha256": "b79ed37b0fce76cad3e287e9a35c6a8ae368e27a677d39f4e93b88af645cdaca"
+            },
+            {
+              "path": "pkg/core/lite/src/deps-graph.ts",
+              "size": 1855,
+              "sha256": "d12c9b6101e6da6546bad9ed6840f27349ac0b7c7e1a6be16f9f60383104f3f1"
+            },
+            {
+              "path": "pkg/core/lite/src/flow.ts",
+              "size": 8699,
+              "sha256": "2c544313b24ad18dcb40953724eff08a560c1a7168be22decb045dc042f065bf"
+            },
+            {
+              "path": "pkg/core/lite/src/index.ts",
+              "size": 801,
+              "sha256": "c7dea3a0529247b9d67051a7c91a3832c3546c175e017cf426333c5f2fefb298"
+            },
+            {
+              "path": "pkg/core/lite/src/latest.ts",
+              "size": 2550,
+              "sha256": "45738b1ef457f87fc11ea585deb0877c77108797bfea1da878bc4f4b019ede11"
+            },
+            {
+              "path": "pkg/core/lite/src/preset.ts",
+              "size": 3029,
+              "sha256": "93a7afe4a91e36fb3b707981357ab1a08b6cdedfb582dab2b6982517be55eb8d"
+            },
+            {
+              "path": "pkg/core/lite/src/resource.ts",
+              "size": 2307,
+              "sha256": "8f4fedfe27e44221d389dde4c814d1f3adc39fa9548f97b2cab457e0e2d7fc27"
+            },
+            {
+              "path": "pkg/core/lite/src/scope.ts",
+              "size": 99830,
+              "sha256": "0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e"
+            },
+            {
+              "path": "pkg/core/lite/src/streaming.ts",
+              "size": 3234,
+              "sha256": "a8332fb9fb6fbe652fbbed12a2696fc493425b204445c1fc8b53b73a280333ba"
+            },
+            {
+              "path": "pkg/core/lite/src/tag.ts",
+              "size": 9153,
+              "sha256": "29952e51943419c1cd193ddbf1b54b50ce6caff1ae0018c8cd68fb150c5b8f59"
+            },
+            {
+              "path": "pkg/core/lite/src/tracker.ts",
+              "size": 880,
+              "sha256": "677839ad60b2d97b2e83c3b05e14d998ce8ef049c27384131e33ffbd600295a5"
+            },
+            {
+              "path": "pkg/core/lite/src/types.ts",
+              "size": 25632,
+              "sha256": "03545f324721e87752c2d7748a6c4fac7d07a0165539ad81767d19744e3182b3"
+            },
+            {
+              "path": "pkg/sdk/core/src/agent.ts",
+              "size": 26199,
+              "sha256": "2bd1146e69bc62112f5209a4947343a6c303785c66902e614b5b87ffb483369d"
+            },
+            {
+              "path": "pkg/sdk/core/src/index.ts",
+              "size": 31931,
+              "sha256": "095a4860c9209946ecd8b64c042a7c40971580320d4249474e400021ddfb473e"
+            },
+            {
+              "path": "pkg/sdk/core/src/internal/digest.ts",
+              "size": 3111,
+              "sha256": "9ea3117d5b09b2c16e720d9afbb48e1a63869db61479f994a801dc7778cd4cf9"
+            },
+            {
+              "path": "pkg/sdk/core/src/model.ts",
+              "size": 137,
+              "sha256": "039239eabf9417e1c3481bf11fb3db0b0ed4234cf3910990ce857fd7ec952adc"
+            },
+            {
+              "path": "pkg/sdk/core/src/sandbox.ts",
+              "size": 5193,
+              "sha256": "c2e3b94896ac42237c2693a768212ce93abdbdb173cf8f95215ef8630dbee170"
+            },
+            {
+              "path": "pkg/sdk/core/src/session.ts",
+              "size": 63554,
+              "sha256": "f03273e76923655460a42a1e748ca470bd6ee906d541029ec1040d5733d01ad3"
+            },
+            {
+              "path": "pkg/sdk/core/src/validation.ts",
+              "size": 3166,
+              "sha256": "e0c50ec76537be19f24b39ff37f552d9064477d4d0a58c5d62360d146bb87fcd"
+            }
+          ],
+          "sha256": "1393894a23decd6be1a5853e08f051468c35b2725a910d5e77c9b364fe510c15"
+        },
+        "lockfile": {
+          "files": [
+            {
+              "path": "pnpm-lock.yaml",
+              "size": 301142,
+              "sha256": "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120"
+            }
+          ],
+          "sha256": "10f648b1520528a2ab60e4deac76268cd3314b8f2f7a6f03bb27a676e5372dcf"
+        },
+        "manifests": {
+          "files": [
+            {
+              "path": "package.json",
+              "size": 2686,
+              "sha256": "d01d6911abf560cd32dc1d39d84b7a5617f037bffffbd7e94aa987dcd490cdcb"
+            },
+            {
+              "path": "pkg/core/lite/package.json",
+              "size": 1440,
+              "sha256": "d7fb756b7688a355a0ba6e7604a19c1269728527dc040b75f07f87c486b0efb4"
+            },
+            {
+              "path": "pkg/core/lite/tsconfig.json",
+              "size": 233,
+              "sha256": "3cc8918a46ad0d4795b5340f51eee4642b84a2da5cb9708dd6fd576d122aa0bd"
+            },
+            {
+              "path": "pkg/sdk/core/package.json",
+              "size": 2449,
+              "sha256": "c11f17b6ecd8746faa837ab92bf4489170dceede5add3062686ba8162e65e6c3"
+            },
+            {
+              "path": "pkg/sdk/core/tsconfig.json",
+              "size": 309,
+              "sha256": "db8490ca9d3340f8d2b07db80f6a5cbfcc21b866a4ca61641ed2350c5802e966"
+            },
+            {
+              "path": "pnpm-workspace.yaml",
+              "size": 5813,
+              "sha256": "603341c9b78a2d0fe71767c77f2a0146be2babc49cc744e8b66b6fd732cdaed6"
+            }
+          ],
+          "sha256": "75bcb1b36e9a941d120db03e2f3b80475e67962ffc0153662df9ebc01712724b"
+        },
+        "distModules": {
+          "files": [
+            {
+              "path": "pkg/core/lite/dist/index.cjs",
+              "size": 92042,
+              "sha256": "b8977289be908729ff2f96dd79ee9e2c53b6d0b158cd1d86542c9b52aa963cad"
+            },
+            {
+              "path": "pkg/core/lite/dist/index.mjs",
+              "size": 91116,
+              "sha256": "f57fd25f992f1e70a4997b46d1f10ad912eac3bb26caddf7daa389652285e705"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.cjs",
+              "size": 18665,
+              "sha256": "bb01bc2f787c6fcc1fbe68b323f7ac8a37922839d6a671d2931eaecae2ce078a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.mjs",
+              "size": 17696,
+              "sha256": "13250c39d47359a1686d3d0b813822b20657be99a40007b6f4e22093d852fea8"
+            },
+            {
+              "path": "pkg/sdk/core/dist/digest-B-CJeRAR.cjs",
+              "size": 3062,
+              "sha256": "c23603720410152087e8fb23172be4692460a21faaca845f13478d14dae3362c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/digest-DHsSofmQ.mjs",
+              "size": 2981,
+              "sha256": "abf728ccce0d8bd0223d15c573c300c406d7ae9e77189a299ba6c8a6f02d0d86"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.cjs",
+              "size": 21817,
+              "sha256": "97c979c6c67be34669458df3ae483a202518dc114baa7f183912ae78c99b16cc"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.mjs",
+              "size": 20719,
+              "sha256": "5875f89c68808625656fe8060e6f280a9883d94bb929454a15c9b7880f304885"
+            },
+            {
+              "path": "pkg/sdk/core/dist/model-CrBY1TBn.cjs",
+              "size": 216,
+              "sha256": "bbcba2fb0796810c7632bedab348367aeb4a316d44037eb40ff34782365e226a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/model-KPdR5sdU.mjs",
+              "size": 143,
+              "sha256": "e1686873c958865dc79c4292ed95743dd4a3186a7787b56bfb9315440d6c3e50"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.cjs",
+              "size": 4210,
+              "sha256": "062fa7fc1d9d4a9ece19f33979c48a1ede27dd29b0a595c62f17e81ca7d41c7f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.mjs",
+              "size": 3606,
+              "sha256": "6aa65bcdbf3c2093123a85bb2704d19fbfb672304234d0ec04687ce74e35e635"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.cjs",
+              "size": 45940,
+              "sha256": "8a0a7f6f45e8bd98ac777739b87367bcc1ff62c509180356a004b8ad9cd4424f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.mjs",
+              "size": 43574,
+              "sha256": "b9b99e680699ec18b8ae2d63b66ec279bcf46e8cd2c7dfb74bc0cfdff2929135"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.cjs",
+              "size": 1988,
+              "sha256": "1d5be33c174d58eff6b94177fadf0558b50b9c272dd1842922bf610dc0cc8a1e"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.mjs",
+              "size": 1781,
+              "sha256": "5e48118d1cfc4bbb71558f7df611609f1286c3a0e6142af2311c95e805667a1e"
+            }
+          ],
+          "sha256": "850a7112f2298addd28e7e41fe30aa219996a67697dcb240aed15f982cfbd6f9"
+        },
+        "declarations": {
+          "files": [
+            {
+              "path": "pkg/core/lite/dist/index.d.cts",
+              "size": 47268,
+              "sha256": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713"
+            },
+            {
+              "path": "pkg/core/lite/dist/index.d.mts",
+              "size": 47268,
+              "sha256": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent-BqBU9EIv.d.mts",
+              "size": 15681,
+              "sha256": "83ede6fae6f92119761410fd47d72f3322c7aae7fb0de9941e97bcd7ede7d3cb"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent-DRCH3dW3.d.cts",
+              "size": 15677,
+              "sha256": "d7afdd17d2b661383eb270413e301c34453c73bdd27d76f39b5200ffdeeb5771"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.d.cts",
+              "size": 735,
+              "sha256": "bffc46cb95c03da8808cfa5a0c753bbb4c4a157e0947c744ea5a1057d8019012"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.d.mts",
+              "size": 735,
+              "sha256": "3931fc9ff268a859395ccf26a77d057543f730e2e4057b45ee74c02dd36aff16"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.d.cts",
+              "size": 2062,
+              "sha256": "4871f2ac669eaad30b5c7f9a47f2f863245f7c4ef8b006059d1f6f3025d5dac9"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.d.mts",
+              "size": 2062,
+              "sha256": "986e6d093ed78e8da4e25f3fd5072be38cb0e4c6b8b764704b89693a81667049"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.d.cts",
+              "size": 1741,
+              "sha256": "0de634451807e69b9619efb5a5b064e669968dd245031bb6217b7232ad00512c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.d.mts",
+              "size": 1741,
+              "sha256": "0de634451807e69b9619efb5a5b064e669968dd245031bb6217b7232ad00512c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session-CS_mRWkC.d.cts",
+              "size": 19685,
+              "sha256": "3c43bec659df00d3aeb221c95cf4aba33c705f2d6c83993f78882a5c10d4778f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session-CS_mRWkC.d.mts",
+              "size": 19685,
+              "sha256": "3c43bec659df00d3aeb221c95cf4aba33c705f2d6c83993f78882a5c10d4778f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.d.cts",
+              "size": 2972,
+              "sha256": "e733e06b8953d2436d32f42ce5e61cb2c9686cc90dcd93bba67758bc6e40918c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.d.mts",
+              "size": 2972,
+              "sha256": "1c61ab34af2908afe187a8a5eba8c1e12db16238c66a432028242708d8632aec"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation-Du4wlGIT.d.cts",
+              "size": 1465,
+              "sha256": "791e4bf7904684b13cb5bf58e7cdb123e03d3fbe18563d0be5b7f53b23dc4ecf"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation-Du4wlGIT.d.mts",
+              "size": 1465,
+              "sha256": "791e4bf7904684b13cb5bf58e7cdb123e03d3fbe18563d0be5b7f53b23dc4ecf"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.d.cts",
+              "size": 249,
+              "sha256": "7f0405fa07ce5e90faf4ea1e3a669a8e1d92b1c2f4795a0613007628065b332c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.d.mts",
+              "size": 249,
+              "sha256": "1bd36d1dd86e454bd14e49ac03b4ecc341a06902c8b0378421f5ba68eab8642f"
+            }
+          ],
+          "sha256": "a62902af2abdc320fb2c205406d91422ba1626a48e94397846fa0b29a2801d59"
+        }
+      },
+      "candidate": {
+        "sources": {
+          "files": [
+            {
+              "path": "pkg/core/lite/src/atom.ts",
+              "size": 7588,
+              "sha256": "b79ed37b0fce76cad3e287e9a35c6a8ae368e27a677d39f4e93b88af645cdaca"
+            },
+            {
+              "path": "pkg/core/lite/src/deps-graph.ts",
+              "size": 1855,
+              "sha256": "d12c9b6101e6da6546bad9ed6840f27349ac0b7c7e1a6be16f9f60383104f3f1"
+            },
+            {
+              "path": "pkg/core/lite/src/flow.ts",
+              "size": 8699,
+              "sha256": "2c544313b24ad18dcb40953724eff08a560c1a7168be22decb045dc042f065bf"
+            },
+            {
+              "path": "pkg/core/lite/src/index.ts",
+              "size": 801,
+              "sha256": "c7dea3a0529247b9d67051a7c91a3832c3546c175e017cf426333c5f2fefb298"
+            },
+            {
+              "path": "pkg/core/lite/src/latest.ts",
+              "size": 2550,
+              "sha256": "45738b1ef457f87fc11ea585deb0877c77108797bfea1da878bc4f4b019ede11"
+            },
+            {
+              "path": "pkg/core/lite/src/preset.ts",
+              "size": 3029,
+              "sha256": "93a7afe4a91e36fb3b707981357ab1a08b6cdedfb582dab2b6982517be55eb8d"
+            },
+            {
+              "path": "pkg/core/lite/src/resource.ts",
+              "size": 2307,
+              "sha256": "8f4fedfe27e44221d389dde4c814d1f3adc39fa9548f97b2cab457e0e2d7fc27"
+            },
+            {
+              "path": "pkg/core/lite/src/scope.ts",
+              "size": 100387,
+              "sha256": "daaa9c86817e4b3a8dfcd12ebf2f2fdf291befd093acbdd63923456b270bb2f4"
+            },
+            {
+              "path": "pkg/core/lite/src/streaming.ts",
+              "size": 3234,
+              "sha256": "a8332fb9fb6fbe652fbbed12a2696fc493425b204445c1fc8b53b73a280333ba"
+            },
+            {
+              "path": "pkg/core/lite/src/tag.ts",
+              "size": 9153,
+              "sha256": "29952e51943419c1cd193ddbf1b54b50ce6caff1ae0018c8cd68fb150c5b8f59"
+            },
+            {
+              "path": "pkg/core/lite/src/tracker.ts",
+              "size": 880,
+              "sha256": "677839ad60b2d97b2e83c3b05e14d998ce8ef049c27384131e33ffbd600295a5"
+            },
+            {
+              "path": "pkg/core/lite/src/types.ts",
+              "size": 25632,
+              "sha256": "03545f324721e87752c2d7748a6c4fac7d07a0165539ad81767d19744e3182b3"
+            },
+            {
+              "path": "pkg/sdk/core/src/agent.ts",
+              "size": 26199,
+              "sha256": "2bd1146e69bc62112f5209a4947343a6c303785c66902e614b5b87ffb483369d"
+            },
+            {
+              "path": "pkg/sdk/core/src/index.ts",
+              "size": 31931,
+              "sha256": "095a4860c9209946ecd8b64c042a7c40971580320d4249474e400021ddfb473e"
+            },
+            {
+              "path": "pkg/sdk/core/src/internal/digest.ts",
+              "size": 3111,
+              "sha256": "9ea3117d5b09b2c16e720d9afbb48e1a63869db61479f994a801dc7778cd4cf9"
+            },
+            {
+              "path": "pkg/sdk/core/src/model.ts",
+              "size": 137,
+              "sha256": "039239eabf9417e1c3481bf11fb3db0b0ed4234cf3910990ce857fd7ec952adc"
+            },
+            {
+              "path": "pkg/sdk/core/src/sandbox.ts",
+              "size": 5193,
+              "sha256": "c2e3b94896ac42237c2693a768212ce93abdbdb173cf8f95215ef8630dbee170"
+            },
+            {
+              "path": "pkg/sdk/core/src/session.ts",
+              "size": 63554,
+              "sha256": "f03273e76923655460a42a1e748ca470bd6ee906d541029ec1040d5733d01ad3"
+            },
+            {
+              "path": "pkg/sdk/core/src/validation.ts",
+              "size": 3166,
+              "sha256": "e0c50ec76537be19f24b39ff37f552d9064477d4d0a58c5d62360d146bb87fcd"
+            }
+          ],
+          "sha256": "434b3e160f664241c7618bbec834d4d00cb2df8bd1dd9f0d18b5c7f5e75ea302"
+        },
+        "lockfile": {
+          "files": [
+            {
+              "path": "pnpm-lock.yaml",
+              "size": 301142,
+              "sha256": "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120"
+            }
+          ],
+          "sha256": "10f648b1520528a2ab60e4deac76268cd3314b8f2f7a6f03bb27a676e5372dcf"
+        },
+        "manifests": {
+          "files": [
+            {
+              "path": "package.json",
+              "size": 2686,
+              "sha256": "d01d6911abf560cd32dc1d39d84b7a5617f037bffffbd7e94aa987dcd490cdcb"
+            },
+            {
+              "path": "pkg/core/lite/package.json",
+              "size": 1440,
+              "sha256": "d7fb756b7688a355a0ba6e7604a19c1269728527dc040b75f07f87c486b0efb4"
+            },
+            {
+              "path": "pkg/core/lite/tsconfig.json",
+              "size": 233,
+              "sha256": "3cc8918a46ad0d4795b5340f51eee4642b84a2da5cb9708dd6fd576d122aa0bd"
+            },
+            {
+              "path": "pkg/sdk/core/package.json",
+              "size": 2449,
+              "sha256": "c11f17b6ecd8746faa837ab92bf4489170dceede5add3062686ba8162e65e6c3"
+            },
+            {
+              "path": "pkg/sdk/core/tsconfig.json",
+              "size": 309,
+              "sha256": "db8490ca9d3340f8d2b07db80f6a5cbfcc21b866a4ca61641ed2350c5802e966"
+            },
+            {
+              "path": "pnpm-workspace.yaml",
+              "size": 5813,
+              "sha256": "603341c9b78a2d0fe71767c77f2a0146be2babc49cc744e8b66b6fd732cdaed6"
+            }
+          ],
+          "sha256": "75bcb1b36e9a941d120db03e2f3b80475e67962ffc0153662df9ebc01712724b"
+        },
+        "distModules": {
+          "files": [
+            {
+              "path": "pkg/core/lite/dist/index.cjs",
+              "size": 92456,
+              "sha256": "2f7389581d01a90df017eae8ccf58b9d8f8cd28ab76676cdafae848c02d9cc55"
+            },
+            {
+              "path": "pkg/core/lite/dist/index.mjs",
+              "size": 91530,
+              "sha256": "7a9ce9c551c6a4fa10169ce2442e81698b12ebe0c50642f3514dcae569dbabae"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.cjs",
+              "size": 18665,
+              "sha256": "bb01bc2f787c6fcc1fbe68b323f7ac8a37922839d6a671d2931eaecae2ce078a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.mjs",
+              "size": 17696,
+              "sha256": "13250c39d47359a1686d3d0b813822b20657be99a40007b6f4e22093d852fea8"
+            },
+            {
+              "path": "pkg/sdk/core/dist/digest-B-CJeRAR.cjs",
+              "size": 3062,
+              "sha256": "c23603720410152087e8fb23172be4692460a21faaca845f13478d14dae3362c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/digest-DHsSofmQ.mjs",
+              "size": 2981,
+              "sha256": "abf728ccce0d8bd0223d15c573c300c406d7ae9e77189a299ba6c8a6f02d0d86"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.cjs",
+              "size": 21817,
+              "sha256": "97c979c6c67be34669458df3ae483a202518dc114baa7f183912ae78c99b16cc"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.mjs",
+              "size": 20719,
+              "sha256": "5875f89c68808625656fe8060e6f280a9883d94bb929454a15c9b7880f304885"
+            },
+            {
+              "path": "pkg/sdk/core/dist/model-CrBY1TBn.cjs",
+              "size": 216,
+              "sha256": "bbcba2fb0796810c7632bedab348367aeb4a316d44037eb40ff34782365e226a"
+            },
+            {
+              "path": "pkg/sdk/core/dist/model-KPdR5sdU.mjs",
+              "size": 143,
+              "sha256": "e1686873c958865dc79c4292ed95743dd4a3186a7787b56bfb9315440d6c3e50"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.cjs",
+              "size": 4210,
+              "sha256": "062fa7fc1d9d4a9ece19f33979c48a1ede27dd29b0a595c62f17e81ca7d41c7f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.mjs",
+              "size": 3606,
+              "sha256": "6aa65bcdbf3c2093123a85bb2704d19fbfb672304234d0ec04687ce74e35e635"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.cjs",
+              "size": 45940,
+              "sha256": "8a0a7f6f45e8bd98ac777739b87367bcc1ff62c509180356a004b8ad9cd4424f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.mjs",
+              "size": 43574,
+              "sha256": "b9b99e680699ec18b8ae2d63b66ec279bcf46e8cd2c7dfb74bc0cfdff2929135"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.cjs",
+              "size": 1988,
+              "sha256": "1d5be33c174d58eff6b94177fadf0558b50b9c272dd1842922bf610dc0cc8a1e"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.mjs",
+              "size": 1781,
+              "sha256": "5e48118d1cfc4bbb71558f7df611609f1286c3a0e6142af2311c95e805667a1e"
+            }
+          ],
+          "sha256": "1f4e34caba34e0ea9ad1ac4a3e10585ac0acc6b35723f75dec1ef912b61e38e5"
+        },
+        "declarations": {
+          "files": [
+            {
+              "path": "pkg/core/lite/dist/index.d.cts",
+              "size": 47268,
+              "sha256": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713"
+            },
+            {
+              "path": "pkg/core/lite/dist/index.d.mts",
+              "size": 47268,
+              "sha256": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent-BqBU9EIv.d.mts",
+              "size": 15681,
+              "sha256": "83ede6fae6f92119761410fd47d72f3322c7aae7fb0de9941e97bcd7ede7d3cb"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent-DRCH3dW3.d.cts",
+              "size": 15677,
+              "sha256": "d7afdd17d2b661383eb270413e301c34453c73bdd27d76f39b5200ffdeeb5771"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.d.cts",
+              "size": 735,
+              "sha256": "bffc46cb95c03da8808cfa5a0c753bbb4c4a157e0947c744ea5a1057d8019012"
+            },
+            {
+              "path": "pkg/sdk/core/dist/agent.d.mts",
+              "size": 735,
+              "sha256": "3931fc9ff268a859395ccf26a77d057543f730e2e4057b45ee74c02dd36aff16"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.d.cts",
+              "size": 2062,
+              "sha256": "4871f2ac669eaad30b5c7f9a47f2f863245f7c4ef8b006059d1f6f3025d5dac9"
+            },
+            {
+              "path": "pkg/sdk/core/dist/index.d.mts",
+              "size": 2062,
+              "sha256": "986e6d093ed78e8da4e25f3fd5072be38cb0e4c6b8b764704b89693a81667049"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.d.cts",
+              "size": 1741,
+              "sha256": "0de634451807e69b9619efb5a5b064e669968dd245031bb6217b7232ad00512c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/sandbox.d.mts",
+              "size": 1741,
+              "sha256": "0de634451807e69b9619efb5a5b064e669968dd245031bb6217b7232ad00512c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session-CS_mRWkC.d.cts",
+              "size": 19685,
+              "sha256": "3c43bec659df00d3aeb221c95cf4aba33c705f2d6c83993f78882a5c10d4778f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session-CS_mRWkC.d.mts",
+              "size": 19685,
+              "sha256": "3c43bec659df00d3aeb221c95cf4aba33c705f2d6c83993f78882a5c10d4778f"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.d.cts",
+              "size": 2972,
+              "sha256": "e733e06b8953d2436d32f42ce5e61cb2c9686cc90dcd93bba67758bc6e40918c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/session.d.mts",
+              "size": 2972,
+              "sha256": "1c61ab34af2908afe187a8a5eba8c1e12db16238c66a432028242708d8632aec"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation-Du4wlGIT.d.cts",
+              "size": 1465,
+              "sha256": "791e4bf7904684b13cb5bf58e7cdb123e03d3fbe18563d0be5b7f53b23dc4ecf"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation-Du4wlGIT.d.mts",
+              "size": 1465,
+              "sha256": "791e4bf7904684b13cb5bf58e7cdb123e03d3fbe18563d0be5b7f53b23dc4ecf"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.d.cts",
+              "size": 249,
+              "sha256": "7f0405fa07ce5e90faf4ea1e3a669a8e1d92b1c2f4795a0613007628065b332c"
+            },
+            {
+              "path": "pkg/sdk/core/dist/validation.d.mts",
+              "size": 249,
+              "sha256": "1bd36d1dd86e454bd14e49ac03b4ecc341a06902c8b0378421f5ba68eab8642f"
+            }
+          ],
+          "sha256": "a62902af2abdc320fb2c205406d91422ba1626a48e94397846fa0b29a2801d59"
+        }
+      }
+    },
+    "checks": {
+      "exactHead": true,
+      "baselineArchive": true,
+      "baselineSourceMatchesAcceptedBuild": true,
+      "baselineLockfileMatchesAcceptedBuild": true,
+      "baselineManifestsMatchAcceptedBuild": true,
+      "baselineDistMatchesAcceptedBuild": true,
+      "baselineDeclarationsMatchAcceptedBuild": true,
+      "patchHash": true,
+      "changedSources": true,
+      "candidateScopeMatchesFrozenVariant": true,
+      "variantExclusionHeld": true,
+      "variantExclusionPatchMatches": true,
+      "variantExclusionScopeMatches": true,
+      "lockfileUnchanged": true,
+      "manifestsUnchanged": true,
+      "declarationsUnchanged": true
+    },
+    "environment": {
+      "node": "v26.4.0",
+      "v8": "14.6.202.34-node.21",
+      "platform": "linux",
+      "release": "6.12.95+deb13-amd64",
+      "cpu": "Intel(R) Xeon(R) CPU E3-1245 v5 @ 3.50GHz",
+      "logicalCpuCount": 8,
+      "totalMemoryBytes": 33432829952
+    },
+    "environmentSha256": "f44942f8a245e8fb5079ed7efca243d5041388f760888eaf39378dca95369b09"
+  },
+  "frozen_protocol": {
+    "frozen_at": "2026-07-16T08:16:43.600Z",
+    "first_observation_at": "2026-07-16T08:17:12.095Z",
+    "chronology_held": true,
+    "frozen_checks": [
+      {
+        "file": "protocol.json",
+        "expected": "1ad184e88d999c16f3d74555f7eaf7c6a6fab7fab681c615502d28513716b4fc",
+        "actual": "1ad184e88d999c16f3d74555f7eaf7c6a6fab7fab681c615502d28513716b4fc",
+        "matched": true
+      },
+      {
+        "file": "variant.patch",
+        "expected": "c4d93b8eca26644f5a1fd286227a3380e76328bedbab91967953b3d10b6352f1",
+        "actual": "c4d93b8eca26644f5a1fd286227a3380e76328bedbab91967953b3d10b6352f1",
+        "matched": true
+      },
+      {
+        "file": "variant-exclusion.json",
+        "expected": "d953c68483c29e2f1f4c755e9b2c6a11040e53546dd912ad209b2e14ef7a06f5",
+        "actual": "d953c68483c29e2f1f4c755e9b2c6a11040e53546dd912ad209b2e14ef7a06f5",
+        "matched": true
+      },
+      {
+        "file": "verify-variant.mjs",
+        "expected": "22b0409540c05eeb67c360e40eb21fdcf27d655351c67505b949e4b95b2f14d4",
+        "actual": "22b0409540c05eeb67c360e40eb21fdcf27d655351c67505b949e4b95b2f14d4",
+        "matched": true
+      },
+      {
+        "file": "workloads.mjs",
+        "expected": "cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a",
+        "actual": "cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a",
+        "matched": true
+      },
+      {
+        "file": "observe-throughput.mjs",
+        "expected": "e6965f81d506eaa4c17fbaa4184317b14b06ae6ff27ff0d2771110ac836103b5",
+        "actual": "e6965f81d506eaa4c17fbaa4184317b14b06ae6ff27ff0d2771110ac836103b5",
+        "matched": true
+      },
+      {
+        "file": "observe-allocation.mjs",
+        "expected": "d121e126b4901312a615e05f479412f67609f87d79c1357fa699cb7b56890d98",
+        "actual": "d121e126b4901312a615e05f479412f67609f87d79c1357fa699cb7b56890d98",
+        "matched": true
+      },
+      {
+        "file": "observe-retained.mjs",
+        "expected": "8ff0a15fdefeec7408e1412760219462f6b1546fd8d79b662c69ed4f9f88e254",
+        "actual": "8ff0a15fdefeec7408e1412760219462f6b1546fd8d79b662c69ed4f9f88e254",
+        "matched": true
+      },
+      {
+        "file": "prepare-candidate.sh",
+        "expected": "0594be5c620ebc3d1846bb2a1fd8dab55f7b4845c57f198e4e2263e7dda7e42f",
+        "actual": "0594be5c620ebc3d1846bb2a1fd8dab55f7b4845c57f198e4e2263e7dda7e42f",
+        "matched": true
+      },
+      {
+        "file": "collect-provenance.mjs",
+        "expected": "1efa7a11d032d32e9a3d8116189c5d66a3872e87c8e3c937b59e30a285497914",
+        "actual": "1efa7a11d032d32e9a3d8116189c5d66a3872e87c8e3c937b59e30a285497914",
+        "matched": true
+      },
+      {
+        "file": "verify.mjs",
+        "expected": "f310fc5baeecd2b9ff0be4707da2ea15bd7af81b062f8896297854de5556fdba",
+        "actual": "f310fc5baeecd2b9ff0be4707da2ea15bd7af81b062f8896297854de5556fdba",
+        "matched": true
+      },
+      {
+        "file": "run-once.sh",
+        "expected": "bd22f1877bc99acc88192f441c5b9beb331a6eff30fecdbd262da116493b3bb9",
+        "actual": "bd22f1877bc99acc88192f441c5b9beb331a6eff30fecdbd262da116493b3bb9",
+        "matched": true
+      },
+      {
+        "file": "freeze.mjs",
+        "expected": "e1986ce6d11c03be7a69fcfb7fea32528c66e3a0e918d7f8c8e15130d33d8b81",
+        "actual": "e1986ce6d11c03be7a69fcfb7fea32528c66e3a0e918d7f8c8e15130d33d8b81",
+        "matched": true
+      }
+    ],
+    "accepted_evidence_checks": {
+      "dkrP8": true,
+      "dkrP10A": true,
+      "dkrP10B": true,
+      "dkrP11B": true,
+      "p9Workloads": true
+    }
+  },
+  "observed_at": "2026-07-16T08:21:42.604Z",
+  "recorded_at": "2026-07-16T08:21:42.604Z",
+  "max_age": "PT24H",
+  "freshness_status": "fresh",
+  "raw_hashes": {
+    "observation_count": 96,
+    "manifest_sha256": "81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4",
+    "every_hash_matched": true,
+    "files": [
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-baseline-measure.json",
+        "expected": "3f25474d655b3ab7e9a146690b27bc9f7e151bdb2425b3e42c07adada862e8bd",
+        "actual": "3f25474d655b3ab7e9a146690b27bc9f7e151bdb2425b3e42c07adada862e8bd",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-baseline-zero.json",
+        "expected": "9d551ca51ed3d7f6b55dbf681457f0fb07b56554fd21ece32bdee392e8748c90",
+        "actual": "9d551ca51ed3d7f6b55dbf681457f0fb07b56554fd21ece32bdee392e8748c90",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-candidate-measure.json",
+        "expected": "2f323801fd4bb386b94b10515357f4b75eefcb87e40e8c0a3527af1e80a348b9",
+        "actual": "2f323801fd4bb386b94b10515357f4b75eefcb87e40e8c0a3527af1e80a348b9",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-1-candidate-zero.json",
+        "expected": "3689c8e998ba8c4412ac8fe7c942d24ca78145a45b9e990e672fd0500cccface",
+        "actual": "3689c8e998ba8c4412ac8fe7c942d24ca78145a45b9e990e672fd0500cccface",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-baseline-measure.json",
+        "expected": "02d952e6d1c47fcf6c797a2de80a850a08aa7d29033e34a3df51cef0ffeb5bcf",
+        "actual": "02d952e6d1c47fcf6c797a2de80a850a08aa7d29033e34a3df51cef0ffeb5bcf",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-baseline-zero.json",
+        "expected": "735f15e356423ce63b145ea3420b6159a26415913e8cf10093f8455983cbd4cf",
+        "actual": "735f15e356423ce63b145ea3420b6159a26415913e8cf10093f8455983cbd4cf",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-candidate-measure.json",
+        "expected": "56a4904d679827e86569413248a80950a2d56f74dc7b1d778032c08c8951dbb0",
+        "actual": "56a4904d679827e86569413248a80950a2d56f74dc7b1d778032c08c8951dbb0",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-2-candidate-zero.json",
+        "expected": "049caf9219c4be2ea5c0d06e9d6b9776406748b223c424f463ce2198eb08441d",
+        "actual": "049caf9219c4be2ea5c0d06e9d6b9776406748b223c424f463ce2198eb08441d",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-baseline-measure.json",
+        "expected": "abbf04ce21234dbc83b9cc7d45f75ab761d6f78df7ce87b77cd35f1e3cf45d22",
+        "actual": "abbf04ce21234dbc83b9cc7d45f75ab761d6f78df7ce87b77cd35f1e3cf45d22",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-baseline-zero.json",
+        "expected": "cf97daa69db0278c99d5009a43f688b047814d8ad2c6d363617d832ad671955a",
+        "actual": "cf97daa69db0278c99d5009a43f688b047814d8ad2c6d363617d832ad671955a",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-candidate-measure.json",
+        "expected": "7a59fc7c477fefdabbf986dc36f5d258d01f510e00fb852a1a1523c4ac48140d",
+        "actual": "7a59fc7c477fefdabbf986dc36f5d258d01f510e00fb852a1a1523c4ac48140d",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/managed_ctx_exec-trial-3-candidate-zero.json",
+        "expected": "2588aa416629537602e4480f3670035ca71c59fff9b3f99639281f86d14bacf7",
+        "actual": "2588aa416629537602e4480f3670035ca71c59fff9b3f99639281f86d14bacf7",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-baseline-measure.json",
+        "expected": "249b603172f1d1f6ffa6713ca7c09fb8c55416a024ba61dc726d719c7253819a",
+        "actual": "249b603172f1d1f6ffa6713ca7c09fb8c55416a024ba61dc726d719c7253819a",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-baseline-zero.json",
+        "expected": "4ab52a9abc3c6cf029bdeed340b9efb8e048d0ed6bb7d1e0a320dc9c8d836f03",
+        "actual": "4ab52a9abc3c6cf029bdeed340b9efb8e048d0ed6bb7d1e0a320dc9c8d836f03",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-candidate-measure.json",
+        "expected": "09c92fa3093e8e9be655ed1f81bc9af8fa55e2d5567b1f2d09e934f2e7b25b3a",
+        "actual": "09c92fa3093e8e9be655ed1f81bc9af8fa55e2d5567b1f2d09e934f2e7b25b3a",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-1-candidate-zero.json",
+        "expected": "6a5e86e04ef9985c0c21032c81c1d5e8b929ab7b3048f0b2dddfaa90f77e1758",
+        "actual": "6a5e86e04ef9985c0c21032c81c1d5e8b929ab7b3048f0b2dddfaa90f77e1758",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-baseline-measure.json",
+        "expected": "049173bbc33029e24bcfc0894c1eab439f2fad6a1bcceed16037594de70b1347",
+        "actual": "049173bbc33029e24bcfc0894c1eab439f2fad6a1bcceed16037594de70b1347",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-baseline-zero.json",
+        "expected": "5c5f8bada6351c8087bddabbf0c742e96b3e4146c0f512246c9232f7018438a1",
+        "actual": "5c5f8bada6351c8087bddabbf0c742e96b3e4146c0f512246c9232f7018438a1",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-candidate-measure.json",
+        "expected": "1b30083dd88b611ea8ed97815d4632b99d3728309e7c92f9f08ace6cc02b2cae",
+        "actual": "1b30083dd88b611ea8ed97815d4632b99d3728309e7c92f9f08ace6cc02b2cae",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-2-candidate-zero.json",
+        "expected": "a4fa442971d5d60f22aaa3ad88c155fc046431d36ecfaafba4a95c21d75c6ea3",
+        "actual": "a4fa442971d5d60f22aaa3ad88c155fc046431d36ecfaafba4a95c21d75c6ea3",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-baseline-measure.json",
+        "expected": "c11d57a35e869f8b0518fd843088ec63e634e7f76d75e81d56a861c9ecb723ad",
+        "actual": "c11d57a35e869f8b0518fd843088ec63e634e7f76d75e81d56a861c9ecb723ad",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-baseline-zero.json",
+        "expected": "6d319a4116603d1683e740d123fd9df627bbed0249e1d9b1dd9fddac4c11df81",
+        "actual": "6d319a4116603d1683e740d123fd9df627bbed0249e1d9b1dd9fddac4c11df81",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-candidate-measure.json",
+        "expected": "def227fc057bb61d9e1d7ad0b196f5ace7b47da5ae91d1a8ac36a18834f60f48",
+        "actual": "def227fc057bb61d9e1d7ad0b196f5ace7b47da5ae91d1a8ac36a18834f60f48",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/scope_run-trial-3-candidate-zero.json",
+        "expected": "04501e9a1627b87b20eb8c74ef075e503990eafc0546aa914fb5f6cc657059bd",
+        "actual": "04501e9a1627b87b20eb8c74ef075e503990eafc0546aa914fb5f6cc657059bd",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-baseline-measure.json",
+        "expected": "57234240281b42a9123eefe76d68f13e2c666d7bfb00f68284da82af9fadc2a4",
+        "actual": "57234240281b42a9123eefe76d68f13e2c666d7bfb00f68284da82af9fadc2a4",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-baseline-zero.json",
+        "expected": "89c5c9009c2648a68bcf35a08a2ad2370c1254656bebf81b0e957e71ff92b3cd",
+        "actual": "89c5c9009c2648a68bcf35a08a2ad2370c1254656bebf81b0e957e71ff92b3cd",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-candidate-measure.json",
+        "expected": "48405c41521a97451c939cea07f1f4f86b1c400193319209d653689f1eb17e10",
+        "actual": "48405c41521a97451c939cea07f1f4f86b1c400193319209d653689f1eb17e10",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-1-candidate-zero.json",
+        "expected": "c64d3ef5619551cbe41cd5512f3b6bc208ae6a67415f811dff06c44571f987db",
+        "actual": "c64d3ef5619551cbe41cd5512f3b6bc208ae6a67415f811dff06c44571f987db",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-baseline-measure.json",
+        "expected": "3de7d1bdb96fcf6ce6088e40de647011e5410ad9b3f492c134aeb6ae11c4bdff",
+        "actual": "3de7d1bdb96fcf6ce6088e40de647011e5410ad9b3f492c134aeb6ae11c4bdff",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-baseline-zero.json",
+        "expected": "ee0fbb9976fa3b0e36efdb426c0912519bb1c0515f0bb583198b8f3a44a84d6e",
+        "actual": "ee0fbb9976fa3b0e36efdb426c0912519bb1c0515f0bb583198b8f3a44a84d6e",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-candidate-measure.json",
+        "expected": "e78783176cb3a56af6652ebe8b733605bde769aadc4caa38062beebb730c0128",
+        "actual": "e78783176cb3a56af6652ebe8b733605bde769aadc4caa38062beebb730c0128",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-2-candidate-zero.json",
+        "expected": "0f8e72b9560dd6f88d8b979f43eb25c2a614b3b037e70dee61227a4bda96ffc6",
+        "actual": "0f8e72b9560dd6f88d8b979f43eb25c2a614b3b037e70dee61227a4bda96ffc6",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-baseline-measure.json",
+        "expected": "af096364b00257d12c0ffbfa6fda11b40353867a1904108224a77e4400de7293",
+        "actual": "af096364b00257d12c0ffbfa6fda11b40353867a1904108224a77e4400de7293",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-baseline-zero.json",
+        "expected": "c8da57340afcdf3283475b954458b2feef8763fad416111efcbe1371227a2ab3",
+        "actual": "c8da57340afcdf3283475b954458b2feef8763fad416111efcbe1371227a2ab3",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-candidate-measure.json",
+        "expected": "3b7d5ad275a9a20140dce936ce85a9c9cc237c09ca313055f49d5c52d217973a",
+        "actual": "3b7d5ad275a9a20140dce936ce85a9c9cc237c09ca313055f49d5c52d217973a",
+        "matched": true
+      },
+      {
+        "path": "raw/allocation/sdk_session_run-trial-3-candidate-zero.json",
+        "expected": "52c60ec98b2ac1d8ca310892bcaf080292653c317e7299421ba52c5292c5a73f",
+        "actual": "52c60ec98b2ac1d8ca310892bcaf080292653c317e7299421ba52c5292c5a73f",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-1-baseline.json",
+        "expected": "da06a7e97444885b18648534a0641ff31f6fe4310419515e20acd052978fbd0f",
+        "actual": "da06a7e97444885b18648534a0641ff31f6fe4310419515e20acd052978fbd0f",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-1-candidate.json",
+        "expected": "468c4a84d5f9df02327ccde0714bda8dfc84339b8e3786a2d3d7d5f88af85328",
+        "actual": "468c4a84d5f9df02327ccde0714bda8dfc84339b8e3786a2d3d7d5f88af85328",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-2-baseline.json",
+        "expected": "178373313685f3d3e7e8dc5d0d08bcb086da3a42a192c25f836f1529fd44ffa6",
+        "actual": "178373313685f3d3e7e8dc5d0d08bcb086da3a42a192c25f836f1529fd44ffa6",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-2-candidate.json",
+        "expected": "d9baaf379a23bf9e42d12967f2ea5639646ff92357400471d191d8b885035e6a",
+        "actual": "d9baaf379a23bf9e42d12967f2ea5639646ff92357400471d191d8b885035e6a",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-3-baseline.json",
+        "expected": "b3c65e04a8ace147e6b8a386e39b3359d9114d554f307464751ec37f4e57d2db",
+        "actual": "b3c65e04a8ace147e6b8a386e39b3359d9114d554f307464751ec37f4e57d2db",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/managed_ctx_exec-trial-3-candidate.json",
+        "expected": "98b221e2cd7070e1e11b3fd511cfb85842703c95178e916378ee391feb106acd",
+        "actual": "98b221e2cd7070e1e11b3fd511cfb85842703c95178e916378ee391feb106acd",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-1-baseline.json",
+        "expected": "700650c06f84bc95529d0d93977e0ab131aa2522e5bcbdcffccad7c058c2b272",
+        "actual": "700650c06f84bc95529d0d93977e0ab131aa2522e5bcbdcffccad7c058c2b272",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-1-candidate.json",
+        "expected": "69f55b911edb515516f9f80967074904468633a984bb6bf2b58e3b50e25d50cc",
+        "actual": "69f55b911edb515516f9f80967074904468633a984bb6bf2b58e3b50e25d50cc",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-2-baseline.json",
+        "expected": "e9eb4e062bb7684338ae8fbb110d5835f98097701e82a5e7415a4c4a367349b8",
+        "actual": "e9eb4e062bb7684338ae8fbb110d5835f98097701e82a5e7415a4c4a367349b8",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-2-candidate.json",
+        "expected": "443094fcf61e7bddd03dde9dd2868eb255b0720d4d0d38a2c1dc78fac086e112",
+        "actual": "443094fcf61e7bddd03dde9dd2868eb255b0720d4d0d38a2c1dc78fac086e112",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-3-baseline.json",
+        "expected": "65d1d07a1be6f1f0b9bc6b50f6dae91149038130e6fe1bacd750038ff223f1d8",
+        "actual": "65d1d07a1be6f1f0b9bc6b50f6dae91149038130e6fe1bacd750038ff223f1d8",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/scope_run-trial-3-candidate.json",
+        "expected": "4c67094cd19aa75cd07fe11c7bc14b237410e5d4a1f43bc67bad5dc5530379f6",
+        "actual": "4c67094cd19aa75cd07fe11c7bc14b237410e5d4a1f43bc67bad5dc5530379f6",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-1-baseline.json",
+        "expected": "dda03a88d6a7a4e694f9476c7da009ad58261ceeee483e4daf0a7f3016be867e",
+        "actual": "dda03a88d6a7a4e694f9476c7da009ad58261ceeee483e4daf0a7f3016be867e",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-1-candidate.json",
+        "expected": "3331f90910840b2972b893ebe9e2286dc467af22f4435ef63a5140a21c118a8c",
+        "actual": "3331f90910840b2972b893ebe9e2286dc467af22f4435ef63a5140a21c118a8c",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-2-baseline.json",
+        "expected": "56a32e8e50ce2298a2762cdf3009bd1b39980795dcd7fdc0293f17d361d68dcf",
+        "actual": "56a32e8e50ce2298a2762cdf3009bd1b39980795dcd7fdc0293f17d361d68dcf",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-2-candidate.json",
+        "expected": "27b03cf4d57f941c23bdb553980b92a5ba02bc7882a91d67a1e119c2ba401cb0",
+        "actual": "27b03cf4d57f941c23bdb553980b92a5ba02bc7882a91d67a1e119c2ba401cb0",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-3-baseline.json",
+        "expected": "bb8823bf07f2ea980d26e5356c7610388517fe1ad37fe5887e83e66326046ffe",
+        "actual": "bb8823bf07f2ea980d26e5356c7610388517fe1ad37fe5887e83e66326046ffe",
+        "matched": true
+      },
+      {
+        "path": "raw/retained/sdk_session_run-trial-3-candidate.json",
+        "expected": "0d38ba5e020352bd9933a3d1073d694daded0a485eacbc6782604442554a5fe8",
+        "actual": "0d38ba5e020352bd9933a3d1073d694daded0a485eacbc6782604442554a5fe8",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-01-baseline.json",
+        "expected": "20b55caaf1908e6875c3d3542279924404c94c63c88c50e9aacaa5ba2fb7556f",
+        "actual": "20b55caaf1908e6875c3d3542279924404c94c63c88c50e9aacaa5ba2fb7556f",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-02-candidate.json",
+        "expected": "031823324f8220dc11037f1350b2467408b414533181c176801ffb18d688f7de",
+        "actual": "031823324f8220dc11037f1350b2467408b414533181c176801ffb18d688f7de",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-03-candidate.json",
+        "expected": "71d7055a77d0cd766b64603a2148fc26e89315921b97072da44c826cd2b5d54c",
+        "actual": "71d7055a77d0cd766b64603a2148fc26e89315921b97072da44c826cd2b5d54c",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-04-baseline.json",
+        "expected": "e5844315380bc97dc9a324ab013bff84e5cf0a104ccfaca38ab0a184b6ea6caf",
+        "actual": "e5844315380bc97dc9a324ab013bff84e5cf0a104ccfaca38ab0a184b6ea6caf",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-05-baseline.json",
+        "expected": "e6de234fc538577bd763dba79963ac6cc92dc6f6be8aabcbbe24a73929dbe713",
+        "actual": "e6de234fc538577bd763dba79963ac6cc92dc6f6be8aabcbbe24a73929dbe713",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-06-candidate.json",
+        "expected": "9c3f3faad1daef1f9bb179d11788ae24cc02a81245c23588a5294918dee63d37",
+        "actual": "9c3f3faad1daef1f9bb179d11788ae24cc02a81245c23588a5294918dee63d37",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-07-baseline.json",
+        "expected": "e02482148b964587438991ac6351a40e46d02684e3c26f98368a4965f34869b4",
+        "actual": "e02482148b964587438991ac6351a40e46d02684e3c26f98368a4965f34869b4",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-08-candidate.json",
+        "expected": "cea182e0b3befcd3071f5653801215ff40e102582f9dd8a6b26a0bb386baf527",
+        "actual": "cea182e0b3befcd3071f5653801215ff40e102582f9dd8a6b26a0bb386baf527",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-09-candidate.json",
+        "expected": "c606217a96de014a09051c4d3e1753ce058ce7cfb64828c919aaf163fabf0aa0",
+        "actual": "c606217a96de014a09051c4d3e1753ce058ce7cfb64828c919aaf163fabf0aa0",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-10-baseline.json",
+        "expected": "7dd52464657a186ab0ad9ff6bdd7657966dc5b6873fdfd0f6fab2d7bbe17e0b8",
+        "actual": "7dd52464657a186ab0ad9ff6bdd7657966dc5b6873fdfd0f6fab2d7bbe17e0b8",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-11-baseline.json",
+        "expected": "3e6c41fbe9e1a0c1d60dc86ab60aa7fe9dcf8d91fad2fe1f77f74871063bb258",
+        "actual": "3e6c41fbe9e1a0c1d60dc86ab60aa7fe9dcf8d91fad2fe1f77f74871063bb258",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-12-candidate.json",
+        "expected": "cd1c80d2851da02932567874cc4bfd05d5444ec652d9670d55ad06abc9e17915",
+        "actual": "cd1c80d2851da02932567874cc4bfd05d5444ec652d9670d55ad06abc9e17915",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-13-candidate.json",
+        "expected": "373f02e4648f2b18132de4e75fef4ce23b4b8aa82b2356a6761fa43f64773d2b",
+        "actual": "373f02e4648f2b18132de4e75fef4ce23b4b8aa82b2356a6761fa43f64773d2b",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/managed_ctx_exec-14-baseline.json",
+        "expected": "b61bc6d73b76cef1cb53555489ed564ca96923559e60dd6049ab8f0b011a2a52",
+        "actual": "b61bc6d73b76cef1cb53555489ed564ca96923559e60dd6049ab8f0b011a2a52",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-01-baseline.json",
+        "expected": "de10c9586dfcf63522c2becf724148af357efa85d9b33c1e5bf0bd16c745f8e8",
+        "actual": "de10c9586dfcf63522c2becf724148af357efa85d9b33c1e5bf0bd16c745f8e8",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-02-candidate.json",
+        "expected": "7ddb01b0298d126d077341424a33654f69c82001e4e45c7aa004f76f6d4594cd",
+        "actual": "7ddb01b0298d126d077341424a33654f69c82001e4e45c7aa004f76f6d4594cd",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-03-candidate.json",
+        "expected": "9d67582d15ce6289b618d8b42fcaf9e95cd0342d2216641eb4bedbd7edbcf51a",
+        "actual": "9d67582d15ce6289b618d8b42fcaf9e95cd0342d2216641eb4bedbd7edbcf51a",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-04-baseline.json",
+        "expected": "81cda8d941e6bd6975c53bbc9ead2cecbf57e06ba5096f06ece1f8b32fe67ee5",
+        "actual": "81cda8d941e6bd6975c53bbc9ead2cecbf57e06ba5096f06ece1f8b32fe67ee5",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-05-baseline.json",
+        "expected": "3a79adcda39d349e5ab3e6e7f70d221621bdc256c2a7304cdc4c301e5ec5fac5",
+        "actual": "3a79adcda39d349e5ab3e6e7f70d221621bdc256c2a7304cdc4c301e5ec5fac5",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-06-candidate.json",
+        "expected": "4cdb0b47a34a8e41b41bbbb23c6b0f93abbfaf6fb7a999bce33c5afcb74f2dfd",
+        "actual": "4cdb0b47a34a8e41b41bbbb23c6b0f93abbfaf6fb7a999bce33c5afcb74f2dfd",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-07-baseline.json",
+        "expected": "adadd0597961ff85c8c6b71fa463c2b572ebfbfc91b3093bb00c97b0f70bef80",
+        "actual": "adadd0597961ff85c8c6b71fa463c2b572ebfbfc91b3093bb00c97b0f70bef80",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-08-candidate.json",
+        "expected": "d99cbd608b894036e1462f591e3722ccddcadd945ac5634399a301fffbd7c848",
+        "actual": "d99cbd608b894036e1462f591e3722ccddcadd945ac5634399a301fffbd7c848",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-09-candidate.json",
+        "expected": "ef0fba6a173f48c5d60f4c0d6831d7d563867112b4e88c3c1810586b0645adcb",
+        "actual": "ef0fba6a173f48c5d60f4c0d6831d7d563867112b4e88c3c1810586b0645adcb",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-10-baseline.json",
+        "expected": "24ec21090895a2b404650bc50f2a4837fc9440f4275cea8e489664b7248b1642",
+        "actual": "24ec21090895a2b404650bc50f2a4837fc9440f4275cea8e489664b7248b1642",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-11-baseline.json",
+        "expected": "2a26693af018344d5d37c907650ebc195a1eba76768e3d5a31c52c9177fea95b",
+        "actual": "2a26693af018344d5d37c907650ebc195a1eba76768e3d5a31c52c9177fea95b",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-12-candidate.json",
+        "expected": "1f30d5c1a7c92e5deddb46d2bbbc9a596b2d1c5285a1827884b149b9dce47c94",
+        "actual": "1f30d5c1a7c92e5deddb46d2bbbc9a596b2d1c5285a1827884b149b9dce47c94",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-13-candidate.json",
+        "expected": "95aef24521179b03ba504a0119188f9d2454bfab51715965d1c03ce912b5021a",
+        "actual": "95aef24521179b03ba504a0119188f9d2454bfab51715965d1c03ce912b5021a",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/scope_run-14-baseline.json",
+        "expected": "fd7d5f757d01a170c18cd7183bfc2561e5205f2090c3d3209370d46356eaf33d",
+        "actual": "fd7d5f757d01a170c18cd7183bfc2561e5205f2090c3d3209370d46356eaf33d",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-01-baseline.json",
+        "expected": "b768c9dcc7dc7b97ba86b366d42b4a300f1cf5149dd235aa2e3da5a1419d2309",
+        "actual": "b768c9dcc7dc7b97ba86b366d42b4a300f1cf5149dd235aa2e3da5a1419d2309",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-02-candidate.json",
+        "expected": "c6fd22e71bf3fe2b88129bb57e026140d8dabdb5e706d77b5deb14a8d81479c0",
+        "actual": "c6fd22e71bf3fe2b88129bb57e026140d8dabdb5e706d77b5deb14a8d81479c0",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-03-candidate.json",
+        "expected": "d7ecdcbf440644739ae99e412fa2dc22d92d4243c7dbc5ea79b2c6cb77e8f523",
+        "actual": "d7ecdcbf440644739ae99e412fa2dc22d92d4243c7dbc5ea79b2c6cb77e8f523",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-04-baseline.json",
+        "expected": "8fa8fba434b083b5789e4709dbd20b29977b2f2f07626cbc1237e21c45cf7ae7",
+        "actual": "8fa8fba434b083b5789e4709dbd20b29977b2f2f07626cbc1237e21c45cf7ae7",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-05-baseline.json",
+        "expected": "a751a2a3c86d54b3ab759d8272ba6f9a383be330a07f2f515fee7ffb626179ec",
+        "actual": "a751a2a3c86d54b3ab759d8272ba6f9a383be330a07f2f515fee7ffb626179ec",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-06-candidate.json",
+        "expected": "7c8b30e40e89e7bcf41252aac02ed44659e071011a061944ad178aacf499e603",
+        "actual": "7c8b30e40e89e7bcf41252aac02ed44659e071011a061944ad178aacf499e603",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-07-baseline.json",
+        "expected": "f6bd375e946f4616b40d7d641c85ab9aa9959b5315150d6c41aa71afc6809bc5",
+        "actual": "f6bd375e946f4616b40d7d641c85ab9aa9959b5315150d6c41aa71afc6809bc5",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-08-candidate.json",
+        "expected": "4d6135508e9816ba19c420aa983719e47e8dabc0b776de996c393fbdcdad83e6",
+        "actual": "4d6135508e9816ba19c420aa983719e47e8dabc0b776de996c393fbdcdad83e6",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-09-candidate.json",
+        "expected": "76a3ea98e651f84469c6bae50f74f9572e91b058b6aaa2150b5d2452eb2722ed",
+        "actual": "76a3ea98e651f84469c6bae50f74f9572e91b058b6aaa2150b5d2452eb2722ed",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-10-baseline.json",
+        "expected": "8bebb8de9cc2f3609068023605c829b33f540baf6ce98523653273fae2005415",
+        "actual": "8bebb8de9cc2f3609068023605c829b33f540baf6ce98523653273fae2005415",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-11-baseline.json",
+        "expected": "a3b1938570a7c497fbfff38f500005551fdbe22a6b65ef8769cdcefb040dc2df",
+        "actual": "a3b1938570a7c497fbfff38f500005551fdbe22a6b65ef8769cdcefb040dc2df",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-12-candidate.json",
+        "expected": "615c128c1da5aa8c1dbae04acb84794e25f5d045ca4cc914b5cb2cdee99f8889",
+        "actual": "615c128c1da5aa8c1dbae04acb84794e25f5d045ca4cc914b5cb2cdee99f8889",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-13-candidate.json",
+        "expected": "e4cde30bf7eb4c0686dfaadea67b304cd795f264ba7e3fd6878abad2f5926b3b",
+        "actual": "e4cde30bf7eb4c0686dfaadea67b304cd795f264ba7e3fd6878abad2f5926b3b",
+        "matched": true
+      },
+      {
+        "path": "raw/throughput/sdk_session_run-14-baseline.json",
+        "expected": "cb6cecaad4d13f045755ea85a676a63ca8b87c024fc0d7d5c4b96e56640cd582",
+        "actual": "cb6cecaad4d13f045755ea85a676a63ca8b87c024fc0d7d5c4b96e56640cd582",
+        "matched": true
+      }
+    ]
+  },
+  "throughput_rows": {
+    "scope_run": {
+      "variants": {
+        "baseline": {
+          "processOperationsPerSecond": [
+            15550.8661256402,
+            16016.114196880222,
+            16945.92297975483,
+            14870.752011376402,
+            14271.575571715153,
+            17833.845485707992,
+            16161.190333296054
+          ],
+          "medianOperationsPerSecond": 16016.114196880222,
+          "processStationarity": [
+            0.8163817306921216,
+            0.828286082311316,
+            0.7218941868705226,
+            1.1626577879130113,
+            0.871992342492195,
+            0.9673724714193009,
+            1.1065657761407528
+          ],
+          "medianStationarityRatio": 0.871992342492195,
+          "stationarityAccepted": true
+        },
+        "candidate": {
+          "processOperationsPerSecond": [
+            16404.509391841366,
+            16485.297982641332,
+            17616.04453364244,
+            16717.242664347494,
+            17650.108087349832,
+            16239.937256136282,
+            14812.122702370374
+          ],
+          "medianOperationsPerSecond": 16485.297982641332,
+          "processStationarity": [
+            0.8508547528607346,
+            1.010478657111143,
+            0.9476595559006208,
+            1.1682481922480326,
+            1.0843737487679308,
+            1.3580198322242225,
+            0.7652894163226186
+          ],
+          "medianStationarityRatio": 1.010478657111143,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioCandidateToBaseline": 1.0292944830433652,
+      "stationarityAccepted": true
+    },
+    "managed_ctx_exec": {
+      "variants": {
+        "baseline": {
+          "processOperationsPerSecond": [
+            11158.651927724073,
+            10887.1667088747,
+            10468.964999280312,
+            10000.519443647436,
+            10549.384109197574,
+            11743.181367732954,
+            10121.182794011516
+          ],
+          "medianOperationsPerSecond": 10549.384109197574,
+          "processStationarity": [
+            1.0950433937656165,
+            0.8934247116905173,
+            1.0417965636114177,
+            1.0332474414986543,
+            1.0859299062840888,
+            0.964570868596925,
+            0.9501640980061576
+          ],
+          "medianStationarityRatio": 1.0332474414986543,
+          "stationarityAccepted": true
+        },
+        "candidate": {
+          "processOperationsPerSecond": [
+            11250.732007782963,
+            10294.770489424765,
+            9759.674219732224,
+            11193.107442632745,
+            11320.726479244517,
+            10396.96629277189,
+            10790.573411178975
+          ],
+          "medianOperationsPerSecond": 10790.573411178975,
+          "processStationarity": [
+            1.039365151913718,
+            0.9089744765484035,
+            0.9428426857959243,
+            0.8669521992728293,
+            1.0856619297262808,
+            1.3562921248456854,
+            0.672288730309704
+          ],
+          "medianStationarityRatio": 0.9428426857959243,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioCandidateToBaseline": 1.0228628799070003,
+      "stationarityAccepted": true
+    },
+    "sdk_session_run": {
+      "variants": {
+        "baseline": {
+          "processOperationsPerSecond": [
+            2103.8741764724227,
+            2244.6957964593803,
+            2197.796453744433,
+            1834.7084616972584,
+            1982.799102781027,
+            1938.1417522882616,
+            1999.1021152795347
+          ],
+          "medianOperationsPerSecond": 1999.1021152795347,
+          "processStationarity": [
+            1.0212126287186385,
+            1.0278167101077598,
+            0.949558850476728,
+            1.0365531278556608,
+            1.0065356061769344,
+            1.0606287797386071,
+            1.2174317407942046
+          ],
+          "medianStationarityRatio": 1.0278167101077598,
+          "stationarityAccepted": true
+        },
+        "candidate": {
+          "processOperationsPerSecond": [
+            2118.7165395731595,
+            2021.018167900716,
+            2272.965740411345,
+            1871.7964776522651,
+            1965.9063671234794,
+            1718.1330382918627,
+            1719.7686364297574
+          ],
+          "medianOperationsPerSecond": 1965.9063671234794,
+          "processStationarity": [
+            1.2505045344772057,
+            0.823111414844679,
+            0.9932291079728934,
+            0.8081090091622016,
+            1.21674450921495,
+            0.9186106926779455,
+            1.0091308467307538
+          ],
+          "medianStationarityRatio": 0.9932291079728934,
+          "stationarityAccepted": true
+        }
+      },
+      "ratioCandidateToBaseline": 0.9833946710864174,
+      "stationarityAccepted": true
+    }
+  },
+  "throughput_geometric_mean": {
+    "value": 1.011645384781946,
+    "target_minimum": 1.1,
+    "decision": "fail"
+  },
+  "allocation_rows": {
+    "scope_run": {
+      "trials": {
+        "baseline": [
+          {
+            "trial": 1,
+            "zeroBytes": 12152,
+            "measuredBytes": 45064080,
+            "correctedBytes": 45051928,
+            "completedOperations": 5000,
+            "bytesPerOperation": 9010.3856,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 12296,
+            "measuredBytes": 44719624,
+            "correctedBytes": 44707328,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8941.4656,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 15328,
+            "measuredBytes": 44481584,
+            "correctedBytes": 44466256,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8893.2512,
+            "signalAccepted": true
+          }
+        ],
+        "candidate": [
+          {
+            "trial": 1,
+            "zeroBytes": 13248,
+            "measuredBytes": 41623712,
+            "correctedBytes": 41610464,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8322.0928,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 13496,
+            "measuredBytes": 41243840,
+            "correctedBytes": 41230344,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8246.0688,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 0,
+            "measuredBytes": 41563568,
+            "correctedBytes": 41563568,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8312.7136,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "baseline": 8941.4656,
+        "candidate": 8312.7136
+      },
+      "ratioCandidateToBaseline": 0.9296813265154205,
+      "everySignalAccepted": true,
+      "perRowCeilingAccepted": true
+    },
+    "managed_ctx_exec": {
+      "trials": {
+        "baseline": [
+          {
+            "trial": 1,
+            "zeroBytes": 31136,
+            "measuredBytes": 9016600,
+            "correctedBytes": 8985464,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4492.732,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 12280,
+            "measuredBytes": 9066920,
+            "correctedBytes": 9054640,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4527.32,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 13296,
+            "measuredBytes": 9298744,
+            "correctedBytes": 9285448,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4642.724,
+            "signalAccepted": true
+          }
+        ],
+        "candidate": [
+          {
+            "trial": 1,
+            "zeroBytes": 31176,
+            "measuredBytes": 7770240,
+            "correctedBytes": 7739064,
+            "completedOperations": 2000,
+            "bytesPerOperation": 3869.532,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 1080,
+            "measuredBytes": 12621256,
+            "correctedBytes": 12620176,
+            "completedOperations": 2000,
+            "bytesPerOperation": 6310.088,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 17736,
+            "measuredBytes": 8928872,
+            "correctedBytes": 8911136,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4455.568,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "baseline": 4527.32,
+        "candidate": 4455.568
+      },
+      "ratioCandidateToBaseline": 0.9841513301467536,
+      "everySignalAccepted": true,
+      "perRowCeilingAccepted": true
+    },
+    "sdk_session_run": {
+      "trials": {
+        "baseline": [
+          {
+            "trial": 1,
+            "zeroBytes": 32496,
+            "measuredBytes": 5389824,
+            "correctedBytes": 5357328,
+            "completedOperations": 150,
+            "bytesPerOperation": 35715.52,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 15376,
+            "measuredBytes": 5200736,
+            "correctedBytes": 5185360,
+            "completedOperations": 150,
+            "bytesPerOperation": 34569.066666666666,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 12320,
+            "measuredBytes": 5397520,
+            "correctedBytes": 5385200,
+            "completedOperations": 150,
+            "bytesPerOperation": 35901.333333333336,
+            "signalAccepted": true
+          }
+        ],
+        "candidate": [
+          {
+            "trial": 1,
+            "zeroBytes": 29024,
+            "measuredBytes": 4530640,
+            "correctedBytes": 4501616,
+            "completedOperations": 150,
+            "bytesPerOperation": 30010.773333333334,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 13432,
+            "measuredBytes": 4473232,
+            "correctedBytes": 4459800,
+            "completedOperations": 150,
+            "bytesPerOperation": 29732,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 12272,
+            "measuredBytes": 4340088,
+            "correctedBytes": 4327816,
+            "completedOperations": 150,
+            "bytesPerOperation": 28852.106666666667,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "baseline": 35715.52,
+        "candidate": 29732
+      },
+      "ratioCandidateToBaseline": 0.8324672299325336,
+      "everySignalAccepted": true,
+      "perRowCeilingAccepted": true
+    }
+  },
+  "allocation_geometric_mean": {
+    "value": 0.91324586128266,
+    "target_maximum": 0.9,
+    "decision": "fail"
+  },
+  "retained_controls": {
+    "scope_run": {
+      "baseline": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      },
+      "candidate": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      }
+    },
+    "managed_ctx_exec": {
+      "baseline": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      },
+      "candidate": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      }
+    },
+    "sdk_session_run": {
+      "baseline": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      },
+      "candidate": {
+        "counts": [
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          },
+          {
+            "baseline": 0,
+            "closed": 0,
+            "positive": 1
+          }
+        ],
+        "matched": true
+      }
+    }
+  },
+  "cleanup_walls": {
+    "invalidLifecycleSummaryCount": 0,
+    "postCloseLiveResourceCount": 0,
+    "crossOwnerLeakCount": 0,
+    "cleanupBusinessStateMutationCount": 0,
+    "sdkCompletedOperationCount": 133706,
+    "sdkPostCloseMutationRejectedCount": 133706,
+    "sdkPostCloseMutationMismatchCount": 0,
+    "cleanupWallCount": 0
+  },
+  "target_decisions": {
+    "throughputStationarity": true,
+    "throughputGeometricMean": false,
+    "allocationSignal": true,
+    "allocationGeometricMean": false,
+    "allocationPerRowCeiling": true,
+    "retainedControls": true,
+    "cleanupWalls": true,
+    "integratedTarget": false
+  },
+  "replay_command_or_checker": "cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check",
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-ALLOCATION-REGRESSION",
+    "AG-RETAINED-MEMORY",
+    "AG-CLEANUP-EFFECT",
+    "AG-SESSION-ISOLATION",
+    "AG-BENCHMARK-BRANCH",
+    "AG-PRESERVATION",
+    "AG-AUTHORITY"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "metric_id": "AG-INTEGRITY",
+      "source_of_truth": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/frozen.json, provenance.json, and raw.sha256",
+      "read_method": "Replay all frozen, prior-evidence, provenance, chronology, and raw hashes.",
+      "observed_at": "2026-07-16T08:21:42.604Z",
+      "recorded_at": "2026-07-16T08:21:42.604Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4",
+      "replay_command_or_checker": "cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PERF-COMPARISON",
+      "source_of_truth": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/protocol.json and raw observations",
+      "read_method": "Replay the accepted balanced schedule, stationarity bands, allocation aggregate, matched zeros, and minimum signals.",
+      "observed_at": "2026-07-16T08:21:42.604Z",
+      "recorded_at": "2026-07-16T08:21:42.604Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4",
+      "replay_command_or_checker": "cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PERF-CLAIM",
+      "source_of_truth": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/checkpoint.v1.json",
+      "read_method": "Require pending independent validation and no release-readiness claim.",
+      "observed_at": "2026-07-16T08:21:42.604Z",
+      "recorded_at": "2026-07-16T08:21:42.604Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4",
+      "replay_command_or_checker": "cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-ALLOCATION-REGRESSION",
+      "source_of_truth": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/raw/allocation",
+      "read_method": "Check every candidate-to-baseline row ratio against 1.05.",
+      "observed_at": "2026-07-16T08:21:42.604Z",
+      "recorded_at": "2026-07-16T08:21:42.604Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4",
+      "replay_command_or_checker": "cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-RETAINED-MEMORY",
+      "source_of_truth": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/raw/retained",
+      "read_method": "Require 0/0/1 in every event-loop-turn retained-control observation.",
+      "observed_at": "2026-07-16T08:21:42.604Z",
+      "recorded_at": "2026-07-16T08:21:42.604Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4",
+      "replay_command_or_checker": "cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-CLEANUP-EFFECT",
+      "source_of_truth": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/raw",
+      "read_method": "Aggregate lifecycle ownership, cleanup, business-state, and post-close rejection counters.",
+      "observed_at": "2026-07-16T08:21:42.604Z",
+      "recorded_at": "2026-07-16T08:21:42.604Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4",
+      "replay_command_or_checker": "cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-SESSION-ISOLATION",
+      "source_of_truth": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/raw",
+      "read_method": "Replay every lifecycle owner and session post-close assertion.",
+      "observed_at": "2026-07-16T08:21:42.604Z",
+      "recorded_at": "2026-07-16T08:21:42.604Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4",
+      "replay_command_or_checker": "cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-BENCHMARK-BRANCH",
+      "source_of_truth": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/chronology.json and raw.sha256",
+      "read_method": "Confirm this unit contains only the three lifecycle rows and no 47-row benchmark output.",
+      "observed_at": "2026-07-16T08:21:42.604Z",
+      "recorded_at": "2026-07-16T08:21:42.604Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4",
+      "replay_command_or_checker": "cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-PRESERVATION",
+      "source_of_truth": "git:293dcdf2d6d0b274418bcca8461f7eb122e10c52, /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/variant.patch, and /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/variant-exclusion.json",
+      "read_method": "Require the exact baseline plus only the frozen V1+V2+V3 scope.ts patch, with V4 and AbortController excluded.",
+      "observed_at": "2026-07-16T08:21:42.604Z",
+      "recorded_at": "2026-07-16T08:21:42.604Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4",
+      "replay_command_or_checker": "cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    },
+    {
+      "metric_id": "AG-AUTHORITY",
+      "source_of_truth": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z/protocol.json",
+      "read_method": "Stop after one observation without commit, push, merge, release, publish, deploy, or production contact.",
+      "observed_at": "2026-07-16T08:21:42.604Z",
+      "recorded_at": "2026-07-16T08:21:42.604Z",
+      "max_age": "PT24H",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "<=",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "sha256:81df07471ee9a103f1ee5fedd811fcb501e641ddd0019d81cae7e38f0911b8a4",
+      "replay_command_or_checker": "cd /tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z && node verify.mjs . --check",
+      "verification_record_ref": "pending:independent-validator"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "pending_independent_validation",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-16T08:21:42.604Z"
+  },
+  "claim_boundary": "Worker evidence remains pending independent validation. No product improvement, release-readiness, or acceptance claim follows from this checkpoint.",
+  "workspace_effect": {
+    "scratch": "/tmp/dkr-p12-v123-counterfactual-293dcdf2-20260716T081108Z",
+    "product_edits": 0,
+    "established_row_benchmarks": 0,
+    "commits": 0,
+    "pushes": 0,
+    "merges": 0,
+    "releases": 0
+  },
+  "result": {
+    "decision": "v123_misses_integrated_target_pending_independent_validation",
+    "release_readiness_claim": "not_made",
+    "existing_47_row_benchmark": "not_run",
+    "worker_evidence_is_acceptance": false,
+    "favorable_reruns_refused": true
+  },
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

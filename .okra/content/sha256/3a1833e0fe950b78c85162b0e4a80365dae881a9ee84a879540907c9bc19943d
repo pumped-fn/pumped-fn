@@ -1,0 +1,25 @@
+{
+  "worker_id": "validator-pkr-p19-established-benchmark",
+  "worker_kind": "validator",
+  "unit_id": "VALIDATOR-PKR-P19",
+  "objective": "Independently validate the frozen PKR-P19 checkpoint, identities, hashes, schedule, arithmetic, and narrow established-row result without rerunning benchmark captures.",
+  "inputs": {
+    "checkpoint_sha256": "15bb621e522a956158a2f01fa4436ef6aec63ebdbd62484e5831279159600449",
+    "candidate_commit": "be78c8be197232a17fa6b90e8a3116f874eef4f0",
+    "baseline_product_commit": "293dcdf2d6d0b274418bcca8461f7eb122e10c52"
+  },
+  "acceptance": [
+    "All manifested files and observation references verify.",
+    "The fixed schedule and comparison boundaries match the packet.",
+    "The baseline product and candidate identities match.",
+    "Independent arithmetic reproduces zero confirmed regressions and 39 inconclusive rows.",
+    "The report preserves that no broad no-regression claim is allowed."
+  ],
+  "anti_goals": [
+    "Do not rerun benchmark captures.",
+    "Do not edit product, benchmark, OKRA, or PR state.",
+    "Do not broaden the accepted performance claim.",
+    "Do not merge, release, publish, or deploy."
+  ],
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "unitId": "DKR-P8",
+  "conclusionId": "dkr-p8-sampled-byte-aggregate",
+  "decisionTarget": "Establish the canonical Node/V8 sampled-allocation byte aggregate and warmup-separated stationarity calibration.",
+  "decision": "accept",
+  "canonicalAggregate": "sum profile.samples[].size",
+  "sourceOfTruth": [
+    {
+      "url": "https://nodejs.org/api/inspector.html",
+      "claim": "node:inspector Session dispatches messages to the V8 inspector backend and session.post posts protocol messages."
+    },
+    {
+      "url": "https://chromedevtools.github.io/devtools-protocol/v8/HeapProfiler/",
+      "claim": "HeapProfiler.startSampling accepts an average sampling interval in bytes; stopSampling returns a SamplingHeapProfile; SamplingHeapProfile.samples contains samples whose size is allocation bytes attributed to that sample."
+    }
+  ],
+  "runtime": {
+    "node": "v26.4.0",
+    "v8": "14.6.202.34-node.21"
+  },
+  "frozenSha256": "47f08bc129e597e1315410233dcf7a9a3eaaa5953fe8d74be7cb337865bf8a07",
+  "chronologySha256": "a17661022a6e9eba735569174a936244d5ede70d82c3fba42c01bfaa66b799d1",
+  "frozenFiles": [
+    {
+      "file": "protocol.json",
+      "sha256": "e95ff013edd33348d379f2736fcaafbd6187b72af4800e36a39b8e750e28def9",
+      "modifiedAt": "2026-07-16T06:36:42.221Z"
+    },
+    {
+      "file": "measure.mjs",
+      "sha256": "a3cda79ef55cebb206f03df8e3f60191744b88d220a0a04ddc3ff2420adc2c1e",
+      "modifiedAt": "2026-07-16T06:36:42.221Z"
+    },
+    {
+      "file": "collect.mjs",
+      "sha256": "97fe3a40763a48f14848605aacaefd604968351e02cffa05a41ac36ce818e8a2",
+      "modifiedAt": "2026-07-16T06:36:42.221Z"
+    },
+    {
+      "file": "verify.mjs",
+      "sha256": "fc524407a0b3ad28ad2cab0d2f14521202316491fb6cde495229e2c373218c70",
+      "modifiedAt": "2026-07-16T06:36:42.221Z"
+    },
+    {
+      "file": "freeze.mjs",
+      "sha256": "c4fae50a92027c16f9bc7249b04231710910382398de0866de7eeb461b1ca64d",
+      "modifiedAt": "2026-07-16T06:36:42.221Z"
+    }
+  ],
+  "observations": [
+    {
+      "id": "trial-1-zero",
+      "trial": 1,
+      "batches": 0,
+      "capturedAt": "2026-07-16T06:37:06.171Z",
+      "rawFile": "raw/trial-1-zero.json",
+      "rawSha256": "41644a883a861081aeff7e95dfc930cc2d717c37ef7cc7e9d2d51e62fcf084f4",
+      "sampleCount": 4,
+      "sampledBytes": 11728,
+      "informationalNodeSelfSizeBytes": 11728
+    },
+    {
+      "id": "trial-1-one",
+      "trial": 1,
+      "batches": 1,
+      "capturedAt": "2026-07-16T06:37:06.320Z",
+      "rawFile": "raw/trial-1-one.json",
+      "rawSha256": "a3cf668adebbf98453902e79826d5f0a2dee5d0b824fdaf9c8638fde648f0cb5",
+      "sampleCount": 17582,
+      "sampledBytes": 21269688,
+      "informationalNodeSelfSizeBytes": 20302344
+    },
+    {
+      "id": "trial-1-two",
+      "trial": 1,
+      "batches": 2,
+      "capturedAt": "2026-07-16T06:37:06.571Z",
+      "rawFile": "raw/trial-1-two.json",
+      "rawSha256": "206f57ced859be0e815c985971fc66bf1bb68e09c9a3d4cbcc94e45932ea76e0",
+      "sampleCount": 36439,
+      "sampledBytes": 43634672,
+      "informationalNodeSelfSizeBytes": 41832304
+    },
+    {
+      "id": "trial-2-zero",
+      "trial": 2,
+      "batches": 0,
+      "capturedAt": "2026-07-16T06:37:06.659Z",
+      "rawFile": "raw/trial-2-zero.json",
+      "rawSha256": "97907ed0f6a658df40b402cfbb2d61d3a3be4ac01a79c8d0c8a4b681f05947a5",
+      "sampleCount": 5,
+      "sampledBytes": 17128,
+      "informationalNodeSelfSizeBytes": 17128
+    },
+    {
+      "id": "trial-2-one",
+      "trial": 2,
+      "batches": 1,
+      "capturedAt": "2026-07-16T06:37:06.815Z",
+      "rawFile": "raw/trial-2-one.json",
+      "rawSha256": "4ebe2144c5e04cb1751f573276db0c829ac807e381b5b02c19880868abf0be44",
+      "sampleCount": 17623,
+      "sampledBytes": 21361656,
+      "informationalNodeSelfSizeBytes": 20360360
+    },
+    {
+      "id": "trial-2-two",
+      "trial": 2,
+      "batches": 2,
+      "capturedAt": "2026-07-16T06:37:07.040Z",
+      "rawFile": "raw/trial-2-two.json",
+      "rawSha256": "3d31e1626bea0ffca2548067fe9c6a2cb14a2e4494f1d9b40a176b4ed73ff39e",
+      "sampleCount": 35706,
+      "sampledBytes": 43122384,
+      "informationalNodeSelfSizeBytes": 41181168
+    },
+    {
+      "id": "trial-3-zero",
+      "trial": 3,
+      "batches": 0,
+      "capturedAt": "2026-07-16T06:37:07.135Z",
+      "rawFile": "raw/trial-3-zero.json",
+      "rawSha256": "2a28cd2cb3b21e6e132f7e1d4c1b405cdb5b61a40b751f78d77ce00e87e1cdbe",
+      "sampleCount": 5,
+      "sampledBytes": 13800,
+      "informationalNodeSelfSizeBytes": 13800
+    },
+    {
+      "id": "trial-3-one",
+      "trial": 3,
+      "batches": 1,
+      "capturedAt": "2026-07-16T06:37:07.290Z",
+      "rawFile": "raw/trial-3-one.json",
+      "rawSha256": "1293ff55912e31373dcbdd3d900bece3e834d9db3eb384d093b0a303f653ed46",
+      "sampleCount": 17878,
+      "sampledBytes": 21649496,
+      "informationalNodeSelfSizeBytes": 20636616
+    },
+    {
+      "id": "trial-3-two",
+      "trial": 3,
+      "batches": 2,
+      "capturedAt": "2026-07-16T06:37:07.542Z",
+      "rawFile": "raw/trial-3-two.json",
+      "rawSha256": "f024527782b008d2cd3ec48532d8496755b05ca8c2eb963838e67a6d18921bee",
+      "sampleCount": 35409,
+      "sampledBytes": 42786600,
+      "informationalNodeSelfSizeBytes": 40853928
+    }
+  ],
+  "trials": [
+    {
+      "trial": 1,
+      "zero": 11728,
+      "one": 21269688,
+      "two": 43634672,
+      "correctedOne": 21257960,
+      "correctedTwo": 43622944,
+      "twoToOneRatio": 2.052075740099238
+    },
+    {
+      "trial": 2,
+      "zero": 17128,
+      "one": 21361656,
+      "two": 43122384,
+      "correctedOne": 21344528,
+      "correctedTwo": 43105256,
+      "twoToOneRatio": 2.019499142824803
+    },
+    {
+      "trial": 3,
+      "zero": 13800,
+      "one": 21649496,
+      "two": 42786600,
+      "correctedOne": 21635696,
+      "correctedTwo": 42772800,
+      "twoToOneRatio": 1.9769551208336444
+    }
+  ],
+  "stationarity": [
+    {
+      "pair": [
+        1,
+        2
+      ],
+      "ratio": 0.9959442532531054
+    },
+    {
+      "pair": [
+        1,
+        3
+      ],
+      "ratio": 0.9825410747128265
+    },
+    {
+      "pair": [
+        2,
+        3
+      ],
+      "ratio": 0.986542240194168
+    }
+  ],
+  "gates": {
+    "rawProfileHashReplay": true,
+    "minimumCorrectedOneBatchSignal": true,
+    "twoToOneProportionality": true,
+    "oneBatchPairwiseStationarity": true,
+    "samplesSizeOnlyForDecision": true,
+    "nodeSelfSizeAcceptanceGate": false
+  },
+  "nonClaims": [
+    "This does not measure a pumped-fn lifecycle row.",
+    "This does not establish candidate-to-baseline allocation ratio.",
+    "This does not establish lifecycle throughput.",
+    "This does not claim CKR-PERFORMANCE reached target.",
+    "Node selfSize totals are informational and are not an acceptance gate."
+  ],
+  "replayCommand": "node /tmp/dkr-p8-sampled-byte-aggregate-20260716T063455Z/verify.mjs",
+  "failClosed": true
+}

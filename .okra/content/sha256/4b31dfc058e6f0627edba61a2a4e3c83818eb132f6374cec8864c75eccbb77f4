@@ -1,0 +1,614 @@
+{
+  "schema": "pumped-fn.okra.discovery-checkpoint.v1",
+  "checkpointId": "DKR-P9.exact-head-aa.2026-07-16T06:56:56.291Z",
+  "conclusionId": "dkr-p9-exact-head-aa-harness-rejected",
+  "unitId": "DKR-P9",
+  "workerId": "dkr-p9-exact-head-aa-harness",
+  "workerKind": "discovery",
+  "decisionTarget": "Freeze and validate one exact-product-head A/A harness for throughput, sampled allocation, retained objects, provenance, and cleanup across the three accepted lifecycle rows.",
+  "exactHead": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+  "sourceOfTruth": [
+    "git:293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+    "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/protocol.json",
+    "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/frozen.json",
+    "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/provenance.json",
+    "/tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z/raw.sha256"
+  ],
+  "readMethod": "Verify frozen harness hashes and chronology, verify exact-head archive/source/build provenance, verify every raw hash, then replay throughput medians, corrected sampled-byte medians, retained controls, and cleanup walls.",
+  "observedAt": "2026-07-16T06:56:56.291Z",
+  "recordedAt": "2026-07-16T06:56:56.291Z",
+  "maxAge": "30m",
+  "freshnessStatus": "fresh",
+  "confidence": 0.98,
+  "checks": {
+    "frozenHarness": true,
+    "rawHashes": true,
+    "chronology": true,
+    "provenance": true,
+    "throughput": false,
+    "allocation": true,
+    "retained": false,
+    "cleanup": true
+  },
+  "frozen": {
+    "frozenAt": "2026-07-16T06:51:44.674Z",
+    "firstRawObservedAt": "2026-07-16T06:56:33.111Z",
+    "chronologyHeld": true,
+    "frozenChecks": [
+      {
+        "file": "protocol.json",
+        "expected": "2587bfe897793c0c7a52756b63184a486689f5a02952381d158f8a2cc3017037",
+        "actual": "2587bfe897793c0c7a52756b63184a486689f5a02952381d158f8a2cc3017037",
+        "accepted": true
+      },
+      {
+        "file": "workloads.mjs",
+        "expected": "cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a",
+        "actual": "cbebffd38dc3372c11532a0f04c596ecbabfd4ca38ab40abfc84e3ba1d8cbf0a",
+        "accepted": true
+      },
+      {
+        "file": "observe-throughput.mjs",
+        "expected": "8ff87a4a52dfb0e6656829138523bf2dd1599da478fc09a9007e26c244de5a0b",
+        "actual": "8ff87a4a52dfb0e6656829138523bf2dd1599da478fc09a9007e26c244de5a0b",
+        "accepted": true
+      },
+      {
+        "file": "observe-allocation.mjs",
+        "expected": "2e92cc0ef575f1b8d806ce3332ca7c9f03bbcdc84acf0e4fd9941fc16fb62b0c",
+        "actual": "2e92cc0ef575f1b8d806ce3332ca7c9f03bbcdc84acf0e4fd9941fc16fb62b0c",
+        "accepted": true
+      },
+      {
+        "file": "observe-retained.mjs",
+        "expected": "6a7da5c4a18cb8a3143d939df2bc77d842e3e383a65199821373e64702ec5d8c",
+        "actual": "6a7da5c4a18cb8a3143d939df2bc77d842e3e383a65199821373e64702ec5d8c",
+        "accepted": true
+      },
+      {
+        "file": "collect-provenance.mjs",
+        "expected": "4724a76bf9531c8986e6304eb96ed7fd69050db4821f68317a3988a8bcdbdfc8",
+        "actual": "4724a76bf9531c8986e6304eb96ed7fd69050db4821f68317a3988a8bcdbdfc8",
+        "accepted": true
+      },
+      {
+        "file": "verify.mjs",
+        "expected": "4cfedb15a58480b45629a20e8badfc3651adfeb7dd9768b5a776724d27ee39e5",
+        "actual": "4cfedb15a58480b45629a20e8badfc3651adfeb7dd9768b5a776724d27ee39e5",
+        "accepted": true
+      },
+      {
+        "file": "run-once.sh",
+        "expected": "6949cc832409093f34ddaf0f30b3d37e97db5a4b04378daf5b6dca796361eafc",
+        "actual": "6949cc832409093f34ddaf0f30b3d37e97db5a4b04378daf5b6dca796361eafc",
+        "accepted": true
+      },
+      {
+        "file": "freeze.mjs",
+        "expected": "95b2c2eed3a14438145b8cf7f3980b67ce9361b87ba840aad0d4a09c21571389",
+        "actual": "95b2c2eed3a14438145b8cf7f3980b67ce9361b87ba840aad0d4a09c21571389",
+        "accepted": true
+      }
+    ]
+  },
+  "provenanceChecks": {
+    "exactHead": true,
+    "archivesIdentical": true,
+    "buildHashesIdentical": true,
+    "createdBeforeObservation": true,
+    "sourceHashMatch": true,
+    "lockfileHashMatch": true,
+    "manifestHashMatch": true,
+    "distModuleHashMatch": true,
+    "declarationHashMatch": true
+  },
+  "throughput": {
+    "scope_run": {
+      "operationsPerSecond": {
+        "A": [
+          17191.105109046875,
+          26314.27103637329,
+          25505.124365249987,
+          22594.748110641285,
+          20347.452281256647
+        ],
+        "B": [
+          18990.237242470186,
+          17546.731156284663,
+          19229.839357094934,
+          21128.63840831713,
+          22720.738836620807
+        ]
+      },
+      "medians": {
+        "A": 22594.748110641285,
+        "B": 19229.839357094934
+      },
+      "ratioBToA": 0.851075624429661,
+      "accepted": true
+    },
+    "managed_ctx_exec": {
+      "operationsPerSecond": {
+        "A": [
+          12818.066706116402,
+          17535.010313917715,
+          14163.058055203508,
+          12666.732757455951,
+          11578.537372412697
+        ],
+        "B": [
+          16548.929309097097,
+          17115.78823035732,
+          16261.108522207125,
+          17787.24549375477,
+          15991.626272751548
+        ]
+      },
+      "medians": {
+        "A": 12818.066706116402,
+        "B": 16548.929309097097
+      },
+      "ratioBToA": 1.2910628169223395,
+      "accepted": false
+    },
+    "sdk_session_run": {
+      "operationsPerSecond": {
+        "A": [
+          1457.8417566859046,
+          2350.618350725069,
+          1830.4373115170101,
+          1926.9924048846908,
+          1028.225689739705
+        ],
+        "B": [
+          2121.985768287069,
+          2204.942893246907,
+          2134.5834364692896,
+          2134.2085067929083,
+          2048.9016898347422
+        ]
+      },
+      "medians": {
+        "A": 1830.4373115170101,
+        "B": 2134.2085067929083
+      },
+      "ratioBToA": 1.1659555306071323,
+      "accepted": true
+    }
+  },
+  "allocation": {
+    "scope_run": {
+      "trials": {
+        "A": [
+          {
+            "trial": 1,
+            "zeroBytes": 13288,
+            "measuredBytes": 45075752,
+            "correctedBytes": 45062464,
+            "completedOperations": 5000,
+            "bytesPerOperation": 9012.4928,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 1080,
+            "measuredBytes": 44542408,
+            "correctedBytes": 44541328,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8908.2656,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 12168,
+            "measuredBytes": 44598224,
+            "correctedBytes": 44586056,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8917.2112,
+            "signalAccepted": true
+          }
+        ],
+        "B": [
+          {
+            "trial": 1,
+            "zeroBytes": 3240,
+            "measuredBytes": 44776304,
+            "correctedBytes": 44773064,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8954.6128,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 1040,
+            "measuredBytes": 45036776,
+            "correctedBytes": 45035736,
+            "completedOperations": 5000,
+            "bytesPerOperation": 9007.1472,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 27944,
+            "measuredBytes": 44962728,
+            "correctedBytes": 44934784,
+            "completedOperations": 5000,
+            "bytesPerOperation": 8986.9568,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "A": 8917.2112,
+        "B": 8986.9568
+      },
+      "ratioBToA": 1.007821458798688,
+      "everySignalAccepted": true,
+      "accepted": true
+    },
+    "managed_ctx_exec": {
+      "trials": {
+        "A": [
+          {
+            "trial": 1,
+            "zeroBytes": 12176,
+            "measuredBytes": 9296416,
+            "correctedBytes": 9284240,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4642.12,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 14416,
+            "measuredBytes": 9394560,
+            "correctedBytes": 9380144,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4690.072,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 31416,
+            "measuredBytes": 9588432,
+            "correctedBytes": 9557016,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4778.508,
+            "signalAccepted": true
+          }
+        ],
+        "B": [
+          {
+            "trial": 1,
+            "zeroBytes": 31264,
+            "measuredBytes": 8712592,
+            "correctedBytes": 8681328,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4340.664,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 13216,
+            "measuredBytes": 9437640,
+            "correctedBytes": 9424424,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4712.212,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 13504,
+            "measuredBytes": 9536128,
+            "correctedBytes": 9522624,
+            "completedOperations": 2000,
+            "bytesPerOperation": 4761.312,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "A": 4690.072,
+        "B": 4712.212
+      },
+      "ratioBToA": 1.0047206098328556,
+      "everySignalAccepted": true,
+      "accepted": true
+    },
+    "sdk_session_run": {
+      "trials": {
+        "A": [
+          {
+            "trial": 1,
+            "zeroBytes": 13296,
+            "measuredBytes": 5325936,
+            "correctedBytes": 5312640,
+            "completedOperations": 150,
+            "bytesPerOperation": 35417.6,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 29016,
+            "measuredBytes": 5349792,
+            "correctedBytes": 5320776,
+            "completedOperations": 150,
+            "bytesPerOperation": 35471.84,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 2264,
+            "measuredBytes": 5217776,
+            "correctedBytes": 5215512,
+            "completedOperations": 150,
+            "bytesPerOperation": 34770.08,
+            "signalAccepted": true
+          }
+        ],
+        "B": [
+          {
+            "trial": 1,
+            "zeroBytes": 14296,
+            "measuredBytes": 5263232,
+            "correctedBytes": 5248936,
+            "completedOperations": 150,
+            "bytesPerOperation": 34992.90666666667,
+            "signalAccepted": true
+          },
+          {
+            "trial": 2,
+            "zeroBytes": 14472,
+            "measuredBytes": 5282912,
+            "correctedBytes": 5268440,
+            "completedOperations": 150,
+            "bytesPerOperation": 35122.933333333334,
+            "signalAccepted": true
+          },
+          {
+            "trial": 3,
+            "zeroBytes": 14312,
+            "measuredBytes": 5244672,
+            "correctedBytes": 5230360,
+            "completedOperations": 150,
+            "bytesPerOperation": 34869.066666666666,
+            "signalAccepted": true
+          }
+        ]
+      },
+      "medians": {
+        "A": 35417.6,
+        "B": 34992.90666666667
+      },
+      "ratioBToA": 0.9880089748223106,
+      "everySignalAccepted": true,
+      "accepted": true
+    }
+  },
+  "retained": {
+    "scope_run": {
+      "A": {
+        "schema": "pumped-fn.dkr-p9.retained-observation.v1",
+        "exactHead": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+        "archiveId": "A",
+        "row": "scope_run",
+        "constructor": "WorkloadOwnedRetainedProbe",
+        "warmupOperations": 400,
+        "garbageCollectionCycles": 3,
+        "counts": {
+          "baseline": 0,
+          "closed": 0,
+          "positive": 1
+        },
+        "lifecycle": {
+          "operations": 1,
+          "created": 1,
+          "executed": 1,
+          "cleaned": 1,
+          "postCloseLive": 0,
+          "crossOwnerMismatchCount": 0,
+          "cleanupBusinessStateMutationCount": 0,
+          "postCloseMutationRejectedCount": 0,
+          "drainedResultCount": 1
+        },
+        "positiveControlKeptAlive": true,
+        "node": "v26.4.0",
+        "v8": "14.6.202.34-node.21",
+        "accepted": true
+      },
+      "B": {
+        "schema": "pumped-fn.dkr-p9.retained-observation.v1",
+        "exactHead": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+        "archiveId": "B",
+        "row": "scope_run",
+        "constructor": "WorkloadOwnedRetainedProbe",
+        "warmupOperations": 400,
+        "garbageCollectionCycles": 3,
+        "counts": {
+          "baseline": 0,
+          "closed": 0,
+          "positive": 1
+        },
+        "lifecycle": {
+          "operations": 1,
+          "created": 1,
+          "executed": 1,
+          "cleaned": 1,
+          "postCloseLive": 0,
+          "crossOwnerMismatchCount": 0,
+          "cleanupBusinessStateMutationCount": 0,
+          "postCloseMutationRejectedCount": 0,
+          "drainedResultCount": 1
+        },
+        "positiveControlKeptAlive": true,
+        "node": "v26.4.0",
+        "v8": "14.6.202.34-node.21",
+        "accepted": true
+      }
+    },
+    "managed_ctx_exec": {
+      "A": {
+        "schema": "pumped-fn.dkr-p9.retained-observation.v1",
+        "exactHead": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+        "archiveId": "A",
+        "row": "managed_ctx_exec",
+        "constructor": "WorkloadOwnedRetainedProbe",
+        "warmupOperations": 200,
+        "garbageCollectionCycles": 3,
+        "counts": {
+          "baseline": 0,
+          "closed": 0,
+          "positive": 1
+        },
+        "lifecycle": {
+          "operations": 1,
+          "created": 1,
+          "executed": 2,
+          "cleaned": 1,
+          "postCloseLive": 0,
+          "crossOwnerMismatchCount": 0,
+          "cleanupBusinessStateMutationCount": 0,
+          "postCloseMutationRejectedCount": 0,
+          "drainedResultCount": 2
+        },
+        "positiveControlKeptAlive": true,
+        "node": "v26.4.0",
+        "v8": "14.6.202.34-node.21",
+        "accepted": true
+      },
+      "B": {
+        "schema": "pumped-fn.dkr-p9.retained-observation.v1",
+        "exactHead": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+        "archiveId": "B",
+        "row": "managed_ctx_exec",
+        "constructor": "WorkloadOwnedRetainedProbe",
+        "warmupOperations": 200,
+        "garbageCollectionCycles": 3,
+        "counts": {
+          "baseline": 0,
+          "closed": 0,
+          "positive": 1
+        },
+        "lifecycle": {
+          "operations": 1,
+          "created": 1,
+          "executed": 2,
+          "cleaned": 1,
+          "postCloseLive": 0,
+          "crossOwnerMismatchCount": 0,
+          "cleanupBusinessStateMutationCount": 0,
+          "postCloseMutationRejectedCount": 0,
+          "drainedResultCount": 2
+        },
+        "positiveControlKeptAlive": true,
+        "node": "v26.4.0",
+        "v8": "14.6.202.34-node.21",
+        "accepted": true
+      }
+    },
+    "sdk_session_run": {
+      "A": {
+        "schema": "pumped-fn.dkr-p9.retained-observation.v1",
+        "exactHead": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+        "archiveId": "A",
+        "row": "sdk_session_run",
+        "constructor": "WorkloadOwnedRetainedProbe",
+        "warmupOperations": 20,
+        "garbageCollectionCycles": 3,
+        "counts": {
+          "baseline": 0,
+          "closed": 1,
+          "positive": 2
+        },
+        "lifecycle": {
+          "operations": 1,
+          "created": 1,
+          "executed": 1,
+          "cleaned": 1,
+          "postCloseLive": 0,
+          "crossOwnerMismatchCount": 0,
+          "cleanupBusinessStateMutationCount": 0,
+          "postCloseMutationRejectedCount": 1,
+          "drainedResultCount": 1
+        },
+        "positiveControlKeptAlive": true,
+        "node": "v26.4.0",
+        "v8": "14.6.202.34-node.21",
+        "accepted": false
+      },
+      "B": {
+        "schema": "pumped-fn.dkr-p9.retained-observation.v1",
+        "exactHead": "293dcdf2d6d0b274418bcca8461f7eb122e10c52",
+        "archiveId": "B",
+        "row": "sdk_session_run",
+        "constructor": "WorkloadOwnedRetainedProbe",
+        "warmupOperations": 20,
+        "garbageCollectionCycles": 3,
+        "counts": {
+          "baseline": 0,
+          "closed": 1,
+          "positive": 2
+        },
+        "lifecycle": {
+          "operations": 1,
+          "created": 1,
+          "executed": 1,
+          "cleaned": 1,
+          "postCloseLive": 0,
+          "crossOwnerMismatchCount": 0,
+          "cleanupBusinessStateMutationCount": 0,
+          "postCloseMutationRejectedCount": 1,
+          "drainedResultCount": 1
+        },
+        "positiveControlKeptAlive": true,
+        "node": "v26.4.0",
+        "v8": "14.6.202.34-node.21",
+        "accepted": false
+      }
+    }
+  },
+  "representative": {
+    "throughputGeometricMeanRatioBToA": 1.0860900561254323,
+    "allocationGeometricMeanRatioBToA": 1.0001456889454106
+  },
+  "cleanupWalls": {
+    "postCloseLiveResourceCount": 0,
+    "crossOwnerLeakCount": 0,
+    "cleanupBusinessStateMutationCount": 0,
+    "sdkCompletedOperationCount": 2902,
+    "sdkPostCloseMutationRejectedCount": 2902,
+    "sdkEveryPostCloseMutationRejected": true
+  },
+  "rawObservationCount": 72,
+  "evidenceHashes": {
+    "protocol": "2587bfe897793c0c7a52756b63184a486689f5a02952381d158f8a2cc3017037",
+    "frozen": "1b13afb797d1efabcb29b2bfbac555dc571dbd690ce83eeff1986c0ee0fe5611",
+    "chronology": "0f57a1ca6f24c93cd5c4c48c1d3d6ca1d61a29a7115a4cbdfe9d554112f96347",
+    "provenance": "3165e072a478e13edb7230b9b48bb8fed738a1d89c04d4b7bde79bc401df7e27",
+    "rawManifest": "da37fe159287ebbd0bbc6f136f621c98862c6899b0794c7d39eded0b50a5c272",
+    "archiveA": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0",
+    "archiveB": "bb0fa34be4c4d3b8b5e9b0b125efc96333f66e3d3f171fe64ade1be67de032f0"
+  },
+  "result": {
+    "decision": "reject_pending_independent_validation",
+    "harnessAccepted": false,
+    "productPerformanceClaim": "not_supported",
+    "baselineCandidateComparison": "not_run",
+    "ckrPerformanceClaim": "not_supported",
+    "optimizationAuthority": "not_granted"
+  },
+  "questionsAnswered": [
+    "Whether the exact-head A/A throughput rows stay inside the frozen noise band.",
+    "Whether matched zero-subtracted sampled allocation has at least 1 MiB signal and stays inside the frozen A/A band for every row.",
+    "Whether fully closed lifecycle rows retain zero workload-owned probe objects while the deliberate positive control reports one.",
+    "Whether all lifecycle cleanup, ownership, business-state, and SDK post-close walls hold across every observation."
+  ],
+  "questionsUnanswered": [
+    "No product improvement, baseline-candidate ratio, CKR performance target, or optimization result is measured by A/A."
+  ],
+  "replayCommand": "cd /tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z && node verify.mjs .",
+  "stopRuleObserved": "The frozen protocol ran once. Every raw outcome is preserved. No favorable rerun occurred.",
+  "workspaceEffect": "No product or .okra file was edited; every DKR-P9 artifact is under /tmp/dkr-p9-exact-head-aa-293dcdf2-20260716T064759Z.",
+  "requiredSentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "workerEvidenceIsAcceptance": false
+}

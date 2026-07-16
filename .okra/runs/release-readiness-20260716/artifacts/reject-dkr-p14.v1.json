@@ -1,0 +1,27 @@
+{
+  "type": "claim_acceptance",
+  "unit_id": "DKR-P14",
+  "accepted_at": "2026-07-16T09:14:17Z",
+  "accepted_scope": "The independently replayed hybrid comparison and its SDK allocation ceiling breach are accepted. Semantic pass counts are not accepted because P14 preserved neither test logs nor a semantic replay command. Product progression and integrated-target claims are rejected.",
+  "checkpoint_ref": "workers/dkr-p14-caller-signal-hybrid/checkpoint.v1.json",
+  "checkpoint_sha256": "3e4d95607d093fd7bd76d4ca2a2d98551c879bee0dd31f03ca8ee2265b83d4de",
+  "verification_ref": "workers/validator-dkr-p14/verification.v1.txt",
+  "verification_sha256": "1e731fcdc85973d6b33899f1ea5268131cf8292f4e0a6d3f89db7bf1331c056a",
+  "reads": {
+    "throughput_geometric_mean": 1.3004497985686605,
+    "allocation_geometric_mean": 0.7376126783723866,
+    "sdk_allocation_ratio": 1.2016265281015577,
+    "allocation_per_row_ceiling": 1.05,
+    "retained_controls_held": true,
+    "cleanup_wall_count": 0,
+    "semantic_pass_counts_supported": false,
+    "integrated_target": false
+  },
+  "decision": "rejected_sdk_allocation_and_semantic_evidence_gap",
+  "wall_gate": {
+    "verdict": "breached_candidate_performance_and_evidence_walls",
+    "downstream_advance": "blocked_for_product_progression",
+    "decided_at": "2026-07-16T09:14:17Z"
+  },
+  "downstream_authority": "Fund the challenger-selected inherited baseline-mode DKR with replayable semantic logs. Do not progress P14 or reuse its unsupported semantic counts."
+}

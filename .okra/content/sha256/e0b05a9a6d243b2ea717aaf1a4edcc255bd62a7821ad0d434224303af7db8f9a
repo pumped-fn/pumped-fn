@@ -1,0 +1,200 @@
+{
+  "schema": "pumped-fn.okra.dkr-checkpoint.v1",
+  "checkpoint_id": "DKR-P11A.allocation-stack-attribution.empty.c6b38422",
+  "conclusion_id": "P2_ALLOCATION_STACK_ATTRIBUTION_EMPTY",
+  "decision_target": "Choose the smallest causal allocation measurement before another optimization.",
+  "source_of_truth": [
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/checkpoint.v1.json#sha256=c6b3842247bdd5e7ec6a31e2b4d777adbb3b4bb2d3a9c0da2653b2f9a795a3a8",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw.sha256#sha256=486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/protocol.json#sha256=1f389599dc37106d9dac6654707a69773a0b4809091067a752ee5b4827f0d00d",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-1-baseline-measure.json#sha256=ec2bc1548d137395f37b48cd4db5675450e8b4999cf3e21457a8455347ce2040",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-1-baseline-zero.json#sha256=03ef868664cdd822122e64e19dd70277df2974768bff4a2ba1f8e55f059f222a",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-1-candidate-measure.json#sha256=3b4a85bc3cd7afa6953684efe3e2dae746d9af8823cc543301ef10bbddc89a93",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-1-candidate-zero.json#sha256=6e43592328d36097560372bf4f094fb6ee1c0ee7bbead96a5a7d7d4c5267d20c",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-2-baseline-measure.json#sha256=41d8db12a1ba9c309b6a14a2e5a471f174f7819d8120b3298197bbae5e6cfd0d",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-2-baseline-zero.json#sha256=fa49c178cca26efd8dc36d1cf2721db2155388f7e5deffc1cea2c0c965f8e28b",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-2-candidate-measure.json#sha256=a92723e46a7e20b9868367a853a74e678672539910fd7ef8785bb3298d0a851f",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-2-candidate-zero.json#sha256=9fcd850623c407e54630193ff7216aaaad45d367d2bbe181e5593b5211ea412c",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-3-baseline-measure.json#sha256=379a1bfa5866245d384c4bd88ec11c0ce449aa90e53f99ea1e525eb5153005ff",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-3-baseline-zero.json#sha256=2cc13b25c4523350b62b0ff0de243b15a01be91cc376f8526023597ab86c76fb",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-3-candidate-measure.json#sha256=2547fdc6f8e38b9bec13520dd0eff4f0cd4a1c01a270ed234afa18fd523bd9fe",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-3-candidate-zero.json#sha256=6521ee0d908ff2732cc2d1ab13f9ae02fae8eb8085f8850d40bb060d760d3252",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-1-baseline-measure.json#sha256=22ed0e52f1dc5dd05195b1375e0f8b3fb9c94155fda27b2abf4339b7461620f3",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-1-baseline-zero.json#sha256=facf26d5dc0236dcb3e87f613373bbd21be47d9910eae8f48817173af1bd98c8",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-1-candidate-measure.json#sha256=962e169dccb0bbecb55245cc47d22a14dbf1a83e50a311069b714df038f80850",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-1-candidate-zero.json#sha256=c742aeda1cb00f86c9e6200f3c8254755434cb2a5fa2e216adebd69f97379d9d",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-2-baseline-measure.json#sha256=789b35eb021d7f1552d30cb074fe923ffa106a0b6d28455182ec8d3fa8bf7951",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-2-baseline-zero.json#sha256=9e7eb578ab003a87304895c905d1a19d3f4b77c77a459c31705278efcbea9de4",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-2-candidate-measure.json#sha256=450539b9bd97fd6e0be13c23708e68e7a667f5b2ef06977aff482e591aafed62",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-2-candidate-zero.json#sha256=fb94ed5d98eca09f9cccdf117dff45d1025f6dbc99d67c45e4c977f2ba2936be",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-3-baseline-measure.json#sha256=dea8ec6d84a862b45554f233c4c5959a5fe39d6ce95d812bfc45832a096d0b97",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-3-baseline-zero.json#sha256=b81aa0cc60bf4c74c6d884c6e64649596e0be3544f592e28c94308aa1dff2aed",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-3-candidate-measure.json#sha256=5b8f58085ee12fe1682b6ac90dfdb48668e35e2ed33e5dbeaf6071d3a253d5ad",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-3-candidate-zero.json#sha256=5d7994dc9f0fa1668221e2eb78b6a98d1c15cc6a41cd2ff84fdb076e3f81ae8d",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-1-baseline-measure.json#sha256=f086b31b7596a3a1d432b58ebaabcb02f1acaf7d7e4aa68665d8ab8f52094c8d",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-1-baseline-zero.json#sha256=75afd28e30f38e57dba7ec3c314337ba9b33f120b2bfdf37009f40ff58ffd5b6",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-1-candidate-measure.json#sha256=2f6ebbd4e0dc6de3a0055bf7fdb093c6811cdc4caef59c2d8f8569ff4ff5bcff",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-1-candidate-zero.json#sha256=ee8403589095d4707136718ba5f51a754bd703eddb1e328dcd8ea9296f4df542",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-2-baseline-measure.json#sha256=ebc96c79d830b4fb579d818caec6f7b53cb09cafce2ad5fc010ff44e81dca1b2",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-2-baseline-zero.json#sha256=d650963f0c6bce4f198ee009a90f06ddf7f14200960ec702fd357f8e28da10c0",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-2-candidate-measure.json#sha256=fef38ee0b0d0e26ffb9ac77da98ec5e90dd9907dddc716a4a193c3317b6a0911",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-2-candidate-zero.json#sha256=2c02358c9d3c7f4f2a81230ced6e5ac8c6459ed1e8546f9db494cfd203cf20f3",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-3-baseline-measure.json#sha256=f76a42097a3e1e3417977b9b15d8d407249c728771467c459cca382b3746d582",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-3-baseline-zero.json#sha256=f66075f773b881182435814a4fd326dbeb99e7209334b209156c31e80ca7a869",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-3-candidate-measure.json#sha256=c03d0b4fb9ddfc83f615d48c1b9300adc72abb96c60c71b8e60abe2db9e418cc",
+    "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-3-candidate-zero.json#sha256=d295e29cb0928bbc535f71dd167ef4041877ccb47b3a6f1cf4ace1dd12d9bd99"
+  ],
+  "read_method": "Verify all frozen hashes, then require every samples[].nodeId in all 36 allocation observations to resolve to a node in profile.head before stack attribution.",
+  "freshness": {
+    "observed_at": "2026-07-16T07:40:19.361Z",
+    "recorded_at": "2026-07-16T07:40:19.361Z",
+    "max_age": "PT24H",
+    "freshness_status": "fresh_at_source_checkpoint"
+  },
+  "confidence": 1,
+  "source_hashes": {
+    "checkpoint_sha256": "c6b3842247bdd5e7ec6a31e2b4d777adbb3b4bb2d3a9c0da2653b2f9a795a3a8",
+    "raw_manifest_sha256": "486ccc4c9f5305d39dea43302e5f6fcef55a455c612b2cd76add3b4231224a18",
+    "protocol_sha256": "1f389599dc37106d9dac6654707a69773a0b4809091067a752ee5b4827f0d00d",
+    "allocation_observation_count": 36,
+    "every_allocation_hash_matched": true
+  },
+  "replay": {
+    "command": "node /tmp/dkr-p11a-allocation-stack-attribution-20260716T083000Z/analyze.mjs /tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z /tmp/dkr-p11a-replay.json && cmp /tmp/dkr-p11a-allocation-stack-attribution-20260716T083000Z/checkpoint.v1.json /tmp/dkr-p11a-replay.json",
+    "deterministic_output": true
+  },
+  "normalization_method": {
+    "intended_stack_identity": "Complete root-to-leaf sequence of functionName plus normalized URL.",
+    "result": "not_applied",
+    "reason": "At least one sampled nodeId does not exist in its profile tree, so a complete stack cannot be formed for every sample.",
+    "rejected_shortcuts": [
+      "Drop unresolved samples.",
+      "Assign unresolved samples to root, runtime, or an inferred nearby node.",
+      "Use profile selfSize as a substitute for samples[].size."
+    ]
+  },
+  "row_deltas": [],
+  "top_stacks": {},
+  "top_leaves": {},
+  "coverage": {
+    "attribution_status": "replayable_empty",
+    "affected_profile_count": 4,
+    "missing_sample_count": 36,
+    "missing_sampled_bytes": 283064,
+    "affected_profiles": [
+      {
+        "path": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-1-baseline-measure.json",
+        "sha256": "ec2bc1548d137395f37b48cd4db5675450e8b4999cf3e21457a8455347ce2040",
+        "profileNodeCount": 150,
+        "profileSampleCount": 6943,
+        "missing": [
+          {
+            "nodeId": 1155,
+            "sampleCount": 8,
+            "sampledBytes": 64864,
+            "minimumOrdinal": 67939,
+            "maximumOrdinal": 67946
+          }
+        ]
+      },
+      {
+        "path": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/managed_ctx_exec-trial-2-baseline-measure.json",
+        "sha256": "41d8db12a1ba9c309b6a14a2e5a471f174f7819d8120b3298197bbae5e6cfd0d",
+        "profileNodeCount": 199,
+        "profileSampleCount": 8054,
+        "missing": [
+          {
+            "nodeId": 1427,
+            "sampleCount": 8,
+            "sampledBytes": 66096,
+            "minimumOrdinal": 69027,
+            "maximumOrdinal": 69034
+          }
+        ]
+      },
+      {
+        "path": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/scope_run-trial-2-baseline-measure.json",
+        "sha256": "789b35eb021d7f1552d30cb074fe923ffa106a0b6d28455182ec8d3fa8bf7951",
+        "profileNodeCount": 182,
+        "profileSampleCount": 40394,
+        "missing": [
+          {
+            "nodeId": 768,
+            "sampleCount": 8,
+            "sampledBytes": 70680,
+            "minimumOrdinal": 116613,
+            "maximumOrdinal": 116620
+          }
+        ]
+      },
+      {
+        "path": "/tmp/pkr-p2-lifecycle-performance-comparison-293dcdf2-20260716T072838Z/raw/allocation/sdk_session_run-trial-1-baseline-measure.json",
+        "sha256": "f086b31b7596a3a1d432b58ebaabcb02f1acaf7d7e4aa68665d8ab8f52094c8d",
+        "profileNodeCount": 613,
+        "profileSampleCount": 4835,
+        "missing": [
+          {
+            "nodeId": 2899,
+            "sampleCount": 12,
+            "sampledBytes": 81424,
+            "minimumOrdinal": 20209,
+            "maximumOrdinal": 20220
+          }
+        ]
+      }
+    ],
+    "complete_sample_to_stack_mapping": false,
+    "percentage_of_samples_attributed": null,
+    "reason": "The packet requires every sample nodeId to map to a complete stack; partial coverage is not accepted."
+  },
+  "questions_answered": [
+    "All 36 immutable allocation observation hashes match the frozen raw manifest.",
+    "Four baseline measure profiles contain sampled nodeIds absent from profile.head.",
+    "The absent nodes cover 36 samples and 283064 sampled bytes."
+  ],
+  "questions_unanswered": [
+    "Which complete stacks own the unresolved sampled bytes.",
+    "Which stack deltas explain the managed_ctx_exec and sdk_session_run allocation regressions.",
+    "Whether the unresolved nodes are caused by the profiler's collected-object sampling behavior or serialization."
+  ],
+  "candidate_next_measurement": {
+    "measurement": "Collect one baseline-only diagnostic allocation profile with the same workload and accepted sampling settings, but validate sample-node closure before accepting the observation.",
+    "smallest_scope": [
+      "managed_ctx_exec baseline measure",
+      "sdk_session_run baseline measure"
+    ],
+    "acceptance_check": "Every samples[].nodeId exists in profile.head before any attribution; if closure fails again, change only the profiler capture method in a new reducing DKR.",
+    "current_turn_action": "none; new observation is outside this packet"
+  },
+  "claim_boundary": {
+    "conclusion": "The immutable profiles cannot support complete stack attribution under the packet's mapping rule.",
+    "allocation_location_claim": false,
+    "causal_claim": false,
+    "product_improvement_claim": false,
+    "downstream_advance": "blocked",
+    "reviewer_audit_status": "pending"
+  },
+  "active_anti_goals": [
+    "AG-INTEGRITY",
+    "AG-PERF-COMPARISON",
+    "AG-PERF-CLAIM",
+    "AG-ALLOCATION-REGRESSION",
+    "AG-PRESERVATION"
+  ],
+  "decision": "Hand back a replayable empty attribution; do not drop or infer unresolved stacks.",
+  "flag_if_missing_or_stale": true,
+  "candidate_ckrs": [],
+  "candidate_pkrs": [],
+  "risk_or_anti_goal_implications": "The allocation regression remains unexplained. Optimization from these profiles would turn correlation gaps into an unsupported performance claim.",
+  "workspace_effect": {
+    "product_edits": 0,
+    "prior_evidence_edits": 0,
+    "new_performance_observations": 0,
+    "scratch_files": [
+      "/tmp/dkr-p11a-allocation-stack-attribution-20260716T083000Z/analyze.mjs",
+      "/tmp/dkr-p11a-allocation-stack-attribution-20260716T083000Z/checkpoint.v1.json"
+    ],
+    "governed_progress_only_outside_scratch": true
+  },
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}
