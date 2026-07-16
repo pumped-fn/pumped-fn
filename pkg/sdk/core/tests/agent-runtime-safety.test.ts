@@ -184,8 +184,10 @@ describe("agent runtime safety", () => {
   })
 
   it("serializes cyclic arrays returned by tools", async () => {
-    const output: unknown[] = []
-    output.push(output)
+    const cycle: unknown[] = []
+    cycle.push(cycle)
+    const shared = ["shared"]
+    const output = { cycle, left: shared, right: shared }
     let calls = 0
     let toolMessage: string | undefined
     const inspect = flow({
@@ -223,7 +225,7 @@ describe("agent runtime safety", () => {
         input: { prompt: "Inspect." },
       },
     })).resolves.toMatchObject({ content: "done" })
-    expect(toolMessage).toBe('["[Circular]"]')
+    expect(toolMessage).toBe('{"cycle":["[Circular]"],"left":["shared"],"right":["shared"]}')
 
     await ctx.close()
     await scope.dispose()

@@ -110,16 +110,16 @@ export const sessionStoreCommit: session.Commit = flow({
 
 export function sessionStoreStub(records: readonly session.SessionRecord[] = []) {
   const values = new Map(records.map((record) => [record.id, record]))
-  return Object.freeze({
+  return {
     records: values as ReadonlyMap<session.SessionId, session.SessionRecord>,
     config: config.sessionStore(values),
     load: sessionStoreLoad,
     commit: sessionStoreCommit,
-    binding: Object.freeze({
+    binding: {
       load: session.store.load(sessionStoreLoad),
       commit: session.store.commit(sessionStoreCommit),
-    }),
-  })
+    },
+  }
 }
 
 export class MemorySuspenseLog implements SuspenseEventLog {

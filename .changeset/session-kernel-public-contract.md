@@ -1,7 +1,9 @@
 ---
 "@pumped-fn/codemod": patch
 "@pumped-fn/lite-extension-logging": patch
+"@pumped-fn/lite-extension-logging-pino": patch
 "@pumped-fn/lite-extension-observable": patch
+"@pumped-fn/lite-extension-observable-otel": patch
 "@pumped-fn/lite-extension-scheduler": patch
 "@pumped-fn/lite-extension-scheduler-nats": patch
 "@pumped-fn/lite-extension-suspense": patch

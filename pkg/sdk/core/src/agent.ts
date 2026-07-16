@@ -690,8 +690,16 @@ function json(value: unknown, seen = new WeakSet<object>()): Lite.JsonValue {
   if (typeof value === "object") {
     if (seen.has(value)) return "[Circular]"
     seen.add(value)
-    if (Array.isArray(value)) return value.map((item) => json(item, seen))
-    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, json(item, seen)]))
+    if (Array.isArray(value)) {
+      const result = value.map((item) => json(item, seen))
+      seen.delete(value)
+      return result
+    }
+    const result = Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, json(item, seen)]),
+    )
+    seen.delete(value)
+    return result
   }
   return String(value)
 }
