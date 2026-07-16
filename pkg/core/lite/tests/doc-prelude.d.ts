@@ -6,6 +6,8 @@ declare function connectDb(url: string): { findUser(id: string): unknown }
 declare function fetchConfig(): Promise<{ port: number }>
 declare function fetchUser(id: string): Promise<{ id: string; name: string }>
 declare function findUser(id: string): Promise<{ id: string; name: string }>
+declare function flushBuffer(buffer: Buffer): void
+declare function tick(): Promise<void>
 
 declare const loggingExt: import("../src/index").Lite.Extension
 declare const loggingExtension: import("../src/index").Lite.Extension
@@ -26,6 +28,9 @@ declare const scope: import("../src/index").Lite.Scope
 declare const ctx: import("../src/index").Lite.ExecutionContext
 
 declare const config: import("../src/index").Lite.Atom<{ port: number; connectionString?: string }>
+declare const ledger: import("../src/index").Lite.Atom<unknown>
+declare const orders: import("../src/index").Lite.Atom<{ sum(id: string): Promise<number> }>
+declare const poster: import("../src/index").Lite.Atom<{ post(id: string): Promise<void> }>
 declare const token: import("../src/index").Lite.Atom<{ jwt: string }>
 declare const src: import("../src/index").Lite.Atom<{ name: string }>
 declare const db: import("../src/index").Lite.Atom<{
@@ -52,6 +57,7 @@ declare const request: import("../src/index").Lite.Tag<unknown, false>
 declare const req: { body: unknown }
 declare const tenant: import("../src/index").Lite.Tag<string, false>
 declare const tenantId: string
+declare const customerId: string
 declare const name: import("../src/index").Lite.Tag<string, false>
 
 declare type Extension = import("../src/index").Lite.Extension

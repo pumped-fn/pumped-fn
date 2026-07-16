@@ -208,6 +208,8 @@ type ResourceDependencyConsumer = {
 
 type StreamSource<T> = AsyncIterable<T> | AsyncIterator<T>
 
+const pendingAbort = Symbol()
+
 type StreamHub<T> = {
   atom: Lite.Atom<StreamSource<T>>
   views: Set<Latest<T>>
@@ -2237,13 +2239,16 @@ function assertCreateContextOptions(options: unknown): asserts options is Lite.C
 
 class ExecutionContextImpl implements Lite.ExecutionContext {
   private cleanups: CloseCleanup[] = []
-  private resources = new Map<Lite.Resource<unknown>, ResourceEntry<unknown>>()
-  private resourceListeners = new Map<Lite.Resource<unknown>, ResourceListeners>()
-  private resourceControllers = new Map<Lite.Resource<unknown>, ResourceControllerImpl<unknown>>()
+  private resources: Map<Lite.Resource<unknown>, ResourceEntry<unknown>> | undefined
+  private resourceListeners: Map<Lite.Resource<unknown>, ResourceListeners> | undefined
+  private resourceControllers: Map<Lite.Resource<unknown>, ResourceControllerImpl<unknown>> | undefined
   private descendants = new Set<Promise<unknown>>()
   private activeIterators = new Set<AsyncIterator<unknown, unknown, unknown>>()
   private children = new Set<ExecutionContextImpl>()
-  private readonly abortController = new AbortController()
+  private readonly baselineMode: boolean
+  private abortController: AbortController | undefined
+  private abortReason: unknown = pendingAbort
+  private signalOverride: AbortSignal | undefined
   private closePromise: Promise<void> | undefined
   private closed = false
   private readonly _input: unknown
@@ -2252,7 +2257,6 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private readonly _flowName: string | undefined
   private readonly boundary: boolean
   readonly parent: Lite.ExecutionContext | undefined
-  readonly signal: AbortSignal
 
   constructor(
     readonly scope: ScopeImpl,
@@ -2270,13 +2274,20 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     this._execName = options?.execName
     this._flowName = options?.flowName
     this.boundary = options?.boundary ?? true
-    const signals = [this.abortController.signal]
-    if (this.parent) signals.push(this.parent.signal)
-    if (options?.signal) signals.push(options.signal)
-    this.signal = signals.length === 1 ? signals[0]! : combineAbortSignals(signals)
+    if (this.parent) assertExecutionContextImpl(this.parent)
+    this.baselineMode = options?.signal !== undefined || (this.parent?.baselineMode ?? false)
+    if (this.baselineMode) {
+      this.abortController = new AbortController()
+      const signals = [this.abortController.signal]
+      if (this.parent) signals.push(this.parent.signal)
+      if (options?.signal) signals.push(options.signal)
+      this.signalOverride = signals.length === 1 ? signals[0]! : combineAbortSignals(signals)
+    }
     if (this.parent) {
-      assertExecutionContextImpl(this.parent)
       this.parent.children.add(this)
+      if (!this.baselineMode && this.parent.abortReason !== pendingAbort) {
+        this.captureAbort(this.parent.abortReason)
+      }
     }
   }
 
@@ -2286,6 +2297,15 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   get name(): string | undefined {
     return this._execName ?? this._flowName
+  }
+
+  get signal(): AbortSignal {
+    if (this.signalOverride) return this.signalOverride
+    if (!this.abortController) {
+      this.abortController = new AbortController()
+      if (this.abortReason !== pendingAbort) this.abortController.abort(this.abortReason)
+    }
+    return this.abortController.signal
   }
 
   get data(): Lite.ContextData {
@@ -2327,7 +2347,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   findResourceEntry<T>(resource: Lite.Resource<T>): { owner: ExecutionContextImpl; entry: ResourceEntry<T> } | undefined {
     let current: ExecutionContextImpl | undefined = this
     while (current) {
-      const entry = current.resources.get(resource as Lite.Resource<unknown>) as ResourceEntry<T> | undefined
+      const entry = current.resources?.get(resource as Lite.Resource<unknown>) as ResourceEntry<T> | undefined
       if (entry) return { owner: current, entry }
       if (current.boundary) return undefined
       if (!current.parent) return undefined
@@ -2343,19 +2363,24 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       hasValue: false,
       cleanups: [],
     }
+    this.resources ??= new Map()
     this.resources.set(resource as Lite.Resource<unknown>, entry as ResourceEntry<unknown>)
     return entry
   }
 
   getLocalResourceEntry<T>(resource: Lite.Resource<T>): ResourceEntry<T> | undefined {
-    return this.resources.get(resource as Lite.Resource<unknown>) as ResourceEntry<T> | undefined
+    return this.resources?.get(resource as Lite.Resource<unknown>) as ResourceEntry<T> | undefined
   }
 
   controller<T>(resource: Lite.Resource<T>): Lite.ResourceController<T> {
-    let ctrl = this.resourceControllers.get(resource as Lite.Resource<unknown>) as ResourceControllerImpl<T> | undefined
+    let ctrl = this.resourceControllers?.get(resource as Lite.Resource<unknown>) as ResourceControllerImpl<T> | undefined
     if (!ctrl) {
       ctrl = new ResourceControllerImpl(resource, this)
-      this.resourceControllers.set(resource as Lite.Resource<unknown>, ctrl as ResourceControllerImpl<unknown>)
+      this.resourceControllers ??= new Map()
+      this.resourceControllers.set(
+        resource as Lite.Resource<unknown>,
+        ctrl as ResourceControllerImpl<unknown>
+      )
     }
     return ctrl
   }
@@ -2386,7 +2411,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 
   private getResourceListeners(resource: Lite.Resource<unknown>): ResourceListeners {
-    let listeners = this.resourceListeners.get(resource)
+    let listeners = this.resourceListeners?.get(resource)
     if (!listeners) {
       listeners = {
         idle: new Set(),
@@ -2395,6 +2420,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         failed: new Set(),
         all: new Set(),
       }
+      this.resourceListeners ??= new Map()
       this.resourceListeners.set(resource, listeners)
     }
     return listeners
@@ -2417,7 +2443,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 
   emitResourceState(resource: Lite.Resource<unknown>, state: AtomState): void {
-    const listeners = this.resourceListeners.get(resource)
+    const listeners = this.resourceListeners?.get(resource)
     if (!listeners) return
     notifyListeners(listeners[state])
     notifyListeners(listeners.all)
@@ -2481,9 +2507,9 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   async release<T>(resource: Lite.Resource<T>): Promise<void> {
     this.assertOpen()
-    const entry = this.resources.get(resource as Lite.Resource<unknown>)
+    const entry = this.resources?.get(resource as Lite.Resource<unknown>)
     if (!entry) return
-    this.resources.delete(resource as Lite.Resource<unknown>)
+    this.resources!.delete(resource as Lite.Resource<unknown>)
     if (entry.cleanups.length > 0) {
       await runCleanupsSafe(entry.cleanups)
       entry.cleanups = []
@@ -2614,8 +2640,21 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     if (execTags) for (let i = 0; i < execTags.length; i++) {
       childCtx.appendTagValue(execTags[i]!.key, execTags[i]!.value)
     }
-    const blocked = new Set([...(execTags ?? []), ...(blockedTags ?? [])].map((tagged) => tagged.key))
-    if (flowTags) for (let i = 0; i < flowTags.length; i++) {
+    if (!flowTags?.length) return
+    if (!execTags?.length && !blockedTags?.length) {
+      for (let i = 0; i < flowTags.length; i++) {
+        childCtx.appendTagValue(flowTags[i]!.key, flowTags[i]!.value)
+      }
+      return
+    }
+    const blocked = new Set<symbol>()
+    if (execTags) for (let i = 0; i < execTags.length; i++) {
+      blocked.add(execTags[i]!.key)
+    }
+    if (blockedTags) for (let i = 0; i < blockedTags.length; i++) {
+      blocked.add(blockedTags[i]!.key)
+    }
+    for (let i = 0; i < flowTags.length; i++) {
       if (!blocked.has(flowTags[i]!.key)) childCtx.appendTagValue(flowTags[i]!.key, flowTags[i]!.value)
     }
   }
@@ -2873,7 +2912,20 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   }
 
   abort(reason: unknown): void {
-    if (!this.abortController.signal.aborted) this.abortController.abort(reason)
+    if (this.baselineMode) {
+      if (!this.abortController!.signal.aborted) this.abortController!.abort(reason)
+      return
+    }
+    this.captureAbort(reason)
+  }
+
+  private captureAbort(reason: unknown): void {
+    if (this.abortReason !== pendingAbort) return
+    this.abortReason = reason
+    this.abortController?.abort(reason)
+    for (const child of this.children) {
+      if (!child.baselineMode) child.captureAbort(reason)
+    }
   }
 
   private trackDescendant<T>(pending: Promise<T>): Promise<T> {
@@ -2903,7 +2955,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     this.activeIterators.clear()
     await Promise.allSettled(iterators.map((iterator) => iterator.return?.()))
     const boundaryCloses = boundaryChildren.map((child) => child.close({ ok: false, error: child.signal.reason }))
-    const resourceResolutions = [...this.resources.values()]
+    const resourceResolutions = [...(this.resources?.values() ?? [])]
       .flatMap((entry) => entry.promise ? [entry.promise] : [])
     await Promise.allSettled([...this.descendants, ...boundaryCloses, ...resourceResolutions])
     await this.runCloseCleanups(result)
@@ -2919,10 +2971,10 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         if (result.ok) failures.push(error)
       }
     }
-    const resources = Array.from(this.resources.keys())
+    const resources = Array.from(this.resources?.keys() ?? [])
     for (let i = resources.length - 1; i >= 0; i--) {
-      const entry = this.resources.get(resources[i]!)
-      this.resources.delete(resources[i]!)
+      const entry = this.resources!.get(resources[i]!)
+      this.resources!.delete(resources[i]!)
       if (entry && entry.cleanups.length > 0) {
         if (result.ok) {
           for (let j = entry.cleanups.length - 1; j >= 0; j--) {

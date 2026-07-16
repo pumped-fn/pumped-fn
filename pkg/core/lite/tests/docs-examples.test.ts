@@ -37,19 +37,20 @@ const TSCONFIG = {
 }
 
 const SKIP_MANIFEST: Array<{ id: string; reason: string }> = [
-  { id: "MIGRATION.md#1", reason: "core-next before-example" },
-  { id: "MIGRATION.md#2", reason: "core-next before-example" },
-  { id: "MIGRATION.md#3", reason: "core-next before-example" },
-  { id: "MIGRATION.md#4", reason: "core-next before-example" },
-  { id: "MIGRATION.md#5", reason: "core-next before-example" },
-  { id: "MIGRATION.md#6", reason: "core-next before-example" },
+  { id: "MIGRATION.md#1", reason: "lite 5.x before-example" },
   { id: "MIGRATION.md#7", reason: "core-next before-example" },
-  { id: "MIGRATION.md#8", reason: "intentional type error illustration (userId(123))" },
+  { id: "MIGRATION.md#8", reason: "core-next before-example" },
   { id: "MIGRATION.md#9", reason: "core-next before-example" },
   { id: "MIGRATION.md#10", reason: "core-next before-example" },
-  { id: "MIGRATION.md#11", reason: "core-next before-example (imports zod)" },
+  { id: "MIGRATION.md#11", reason: "core-next before-example" },
   { id: "MIGRATION.md#12", reason: "core-next before-example" },
   { id: "MIGRATION.md#13", reason: "core-next before-example" },
+  { id: "MIGRATION.md#14", reason: "intentional type error illustration (userId(123))" },
+  { id: "MIGRATION.md#15", reason: "core-next before-example" },
+  { id: "MIGRATION.md#16", reason: "core-next before-example" },
+  { id: "MIGRATION.md#17", reason: "core-next before-example (imports zod)" },
+  { id: "MIGRATION.md#18", reason: "core-next before-example" },
+  { id: "MIGRATION.md#19", reason: "core-next before-example" },
 ]
 
 const skipIds = new Set(SKIP_MANIFEST.map((e) => e.id))

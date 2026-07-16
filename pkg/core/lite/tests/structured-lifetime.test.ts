@@ -445,6 +445,44 @@ describe("ExecutionContext structured lifetime", () => {
     await scope.dispose()
   })
 
+  it("replays a signal-free parent close through descendants before signal access", async () => {
+    const scope = createScope()
+    const parent = scope.createContext()
+    const child = scope.createContext({ parent })
+    const grandchild = scope.createContext({ parent: child })
+
+    await parent.close()
+
+    expect(grandchild.signal.aborted).toBe(true)
+    expect(grandchild.signal.reason).toMatchObject({
+      name: "AbortError",
+      message: "Execution context closed",
+    })
+    expect(child.signal.reason).toBe(parent.signal.reason)
+    expect(grandchild.signal.reason).toBe(parent.signal.reason)
+    await scope.dispose()
+  })
+
+  it("composes an explicit caller signal after a signal-free parent", async () => {
+    const scope = createScope()
+    const parent = scope.createContext()
+    const caller = new AbortController()
+    const child = scope.createContext({ parent, signal: caller.signal })
+    const signal = child.signal
+
+    await parent.close()
+
+    expect(signal.aborted).toBe(true)
+    expect(signal.reason).toMatchObject({
+      name: "AbortError",
+      message: "Execution context closed",
+    })
+    const reason = signal.reason
+    caller.abort(new Error("caller too late"))
+    expect(signal.reason).toBe(reason)
+    await scope.dispose()
+  })
+
   it("aborts nested descendants before joining and cleans parent resources last", async () => {
     const events: string[] = []
     const started = deferred()

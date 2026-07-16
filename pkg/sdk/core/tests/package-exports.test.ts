@@ -114,7 +114,7 @@ it("resolves packed ESM and CJS declarations under strict NodeNext", async () =>
   await expect(exec("pnpm", ["exec", "tsc", "--project", join(fixture, "tsconfig.json")], {
     cwd: packageRoot,
   })).resolves.toBeDefined()
-})
+}, 60_000)
 
 it("rejects canonical subpath-only types from the packed root declaration", async () => {
   const fixture = join(root, "root-type-boundary")

@@ -42,6 +42,7 @@ const total = await scope.run({
 const settle = flow({
   name: "settle",
   deps: { ledger },
+  parse: typed<{ entryId: string }>(),
   factory: (ctx, { ledger }) =>
     ctx.exec({
       name: "post-entry",
@@ -63,15 +64,39 @@ captured inputs stay visible instead of closing over the surrounding factory.
 Before, captured inputs closed over the enclosing factory:
 
 ```typescript
-ctx.cleanup(() => connection.close())
-ctx.onClose(() => flushBuffer(buffer))
+const connection = resource({
+  factory: (ctx) => {
+    const client = createConnection("primary")
+    ctx.cleanup(() => client.close())
+    return client
+  },
+})
+
+const flush = flow({
+  factory: (ctx) => {
+    const buffer = Buffer.from("pending")
+    ctx.onClose(() => flushBuffer(buffer))
+  },
+})
 ```
 
 In lite 6.0.0, captured inputs are explicit trailing parameters:
 
 ```typescript
-ctx.cleanup((conn) => conn.close(), connection)
-ctx.onClose((result, target) => flushBuffer(target), buffer)
+const connection = resource({
+  factory: (ctx) => {
+    const client = createConnection("primary")
+    ctx.cleanup((target) => target.close(), client)
+    return client
+  },
+})
+
+const flush = flow({
+  factory: (ctx) => {
+    const buffer = Buffer.from("pending")
+    ctx.onClose((_result, target) => flushBuffer(target), buffer)
+  },
+})
 ```
 
 Zero-parameter callbacks remain valid only when they use no surrounding value. Use trailing parameters
