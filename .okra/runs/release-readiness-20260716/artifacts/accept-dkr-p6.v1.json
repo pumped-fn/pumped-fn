@@ -1,0 +1,27 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P6",
+  "accepted_at": "2026-07-16T06:08:00Z",
+  "accepted_scope": "Reducing discovery only: the frozen A/A throughput protocol is stable for all three lifecycle rows, while the named async-wrapper allocation protocol is rejected for the two Lite rows.",
+  "checkpoint_ref": "workers/dkr-p6-measurement-protocol/checkpoint.v1.json",
+  "checkpoint_sha256": "e7d5a9dca0e4b29f5ea302cfcdabea8c47b58a5d78ac89c50d73ee1f737eb2d1",
+  "verification_ref": "workers/validator-dkr-p6/verification.v1.json",
+  "verification_sha256": "938e2d5d2f834480d7619d53f42adbe3cc57c9c51ba465208ec07fe7a7193adf",
+  "throughput_aa_ratios": {
+    "scope_run": 1.1033950315585894,
+    "managed_ctx_exec": 1.0924485916956188,
+    "sdk_session_run": 0.9625356967408338
+  },
+  "allocation_aa_ratios": {
+    "scope_run": 1.9992690058479532,
+    "managed_ctx_exec": 1.9893462469733656,
+    "sdk_session_run": 0.7488468074775431
+  },
+  "allocation_protocol_status": "rejected_two_of_three_rows",
+  "cleanup_walls": {
+    "post_close_live_resource_count": 0,
+    "cross_session_leak_count": 0,
+    "cleanup_business_state_mutation_count": 0
+  },
+  "downstream_authority": "Keep the accepted throughput procedure. Fund a new allocation discovery mechanism that measures the full active window across async continuation boundaries with frozen zero, one, and two-batch controls."
+}

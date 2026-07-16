@@ -1,0 +1,26 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P7",
+  "accepted_at": "2026-07-16T06:24:00Z",
+  "accepted_scope": "Reducing discovery only: the full active-window allocation method is replayable and rejected for all three lifecycle rows.",
+  "method_decision": "rejected",
+  "checkpoint_ref": "workers/dkr-p7-allocation-window/checkpoint.v1.json",
+  "checkpoint_sha256": "3e539a90172cfa6ec483f4359e61c0e6a5a0b1acd757ad7979586c6acedd0f42",
+  "verification_ref": "workers/validator-dkr-p7/verification.v1.txt",
+  "verification_sha256": "ce5ba19fc5d29e48f38dd91287611e4c0b3551bf8cf7169161de0f608d2db2e1",
+  "calibration": {
+    "accepted_rows": 0,
+    "rejected_rows": 3,
+    "scope_run_two_to_one_ratio": 1.4613917633543392,
+    "managed_ctx_exec_two_to_one_ratio": 4.6055087975733,
+    "sdk_session_run_two_to_one_ratio": 2.214381987289438,
+    "aa_ran": false
+  },
+  "cleanup_walls": {
+    "post_close_live_resource_count": 0,
+    "cross_session_leak_count": 0,
+    "cleanup_business_state_mutation_count": 0,
+    "sdk_post_close_rejection_passed": 900
+  },
+  "downstream_authority": "Do not optimize or claim allocation performance. Establish the canonical Node/V8 sampled-byte aggregate and a stationary warmup-separated calibration first."
+}

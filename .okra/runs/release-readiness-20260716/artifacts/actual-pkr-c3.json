@@ -1,0 +1,8 @@
+{
+  "type": "estimation_record",
+  "phase": "actual",
+  "unit_id": "PKR-C3",
+  "actual": { "time_min": 34, "turns": 2, "tokens": null },
+  "observed_at": "2026-07-16T06:34:00Z",
+  "result_ref": "artifacts/accept-pkr-c3.v1.json"
+}

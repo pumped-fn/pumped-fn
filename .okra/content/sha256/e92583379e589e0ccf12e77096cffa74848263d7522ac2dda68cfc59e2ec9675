@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "worker_id": "validator-pkr-c4-public-interface-tsdoc",
+  "unit_id": "PKR-C4-VALIDATION",
+  "verdict": "accepted",
+  "required_protocol_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "subject": {
+    "exact_start_head": "7745ad0cc99ace663510ddab40716869c09ddce7",
+    "before_metrics": {
+      "path": "/tmp/pkr-c4-before.json",
+      "sha256": "34f63fa743577234a8b81ad581b1ff14431c163bb2cd1849927df2c4119f952c",
+      "public_api_interface_count": 153,
+      "public_api_tsdoc_gap_count": 151
+    },
+    "after_metrics": {
+      "path": "/tmp/pkr-c4-after.json",
+      "sha256": "a4f468688dca5e95bbb1210afc5b59c826cdacdc98e75a802ff65b1d893bd83b",
+      "public_api_interface_count": 153,
+      "public_api_tsdoc_gap_count": 0
+    }
+  },
+  "independent_evidence": {
+    "source_file_count": 21,
+    "added_tsdoc_entry_count": 151,
+    "source_deletion_count": 0,
+    "non_tsdoc_source_change_count": 0,
+    "unique_tsdoc_description_count": 151,
+    "affected_package_build_count": 14,
+    "affected_package_build_exit_code": 0,
+    "baseline_replay": {
+      "public_api_interface_count": 153,
+      "public_api_tsdoc_gap_count": 151
+    },
+    "after_replay": {
+      "public_api_interface_count": 153,
+      "public_api_tsdoc_gap_count": 0
+    }
+  },
+  "semantic_review": {
+    "verdict": "accepted",
+    "placeholder_description_count": 0,
+    "duplicate_description_count": 0,
+    "reason": "Descriptions state interface-specific authority, lifecycle, validation, sandbox, state, workflow, or adapter contracts."
+  },
+  "remaining_gates": [
+    {
+      "gate": "public_contract_checker",
+      "status": "blocked_by_unrelated_contract_gaps",
+      "scope": "outside_pkr_c4"
+    },
+    {
+      "gate": "@pumped-fn/lite-lint typecheck",
+      "status": "failed",
+      "scope": "committed_start_state",
+      "diagnostics": [
+        "src/index.ts(1236,99): TS2339 Property 'text' does not exist on type 'Expression'.",
+        "src/index.ts(1237,70): TS2339 Property 'text' does not exist on type 'Expression'."
+      ]
+    }
+  ]
+}

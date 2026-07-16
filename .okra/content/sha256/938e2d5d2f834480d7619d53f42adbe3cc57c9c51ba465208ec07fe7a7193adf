@@ -1,0 +1,174 @@
+{
+  "schema": "pumped-fn.okra.independent-validation.v1",
+  "validatorId": "validator-dkr-p6-measurement-protocol",
+  "unitId": "DKR-P6-VALIDATION",
+  "subject": {
+    "checkpoint": "/tmp/dkr-p6-measurement-protocol-7745ad0c/checkpoint.v1.json",
+    "checkpointSha256": "e7d5a9dca0e4b29f5ea302cfcdabea8c47b58a5d78ac89c50d73ee1f737eb2d1",
+    "predeclarationSha256": "16e29598b18cb266cfbba94d03a73cf710bb811baeed2a5aa57e8815202f7cfb",
+    "exactHead": "7745ad0cc99ace663510ddab40716869c09ddce7"
+  },
+  "verdict": "accept_worker_conclusion_as_reducing_discovery_only",
+  "protocolAccepted": false,
+  "measurementProtocolAccepted": false,
+  "performanceTargetAccepted": false,
+  "optimizationClaimAccepted": false,
+  "claims": [
+    {
+      "claim": "The checkpoint and predeclaration hashes match the validator packet.",
+      "verdict": "accepted",
+      "evidence": {
+        "checkpointSha256": "e7d5a9dca0e4b29f5ea302cfcdabea8c47b58a5d78ac89c50d73ee1f737eb2d1",
+        "predeclarationSha256": "16e29598b18cb266cfbba94d03a73cf710bb811baeed2a5aa57e8815202f7cfb"
+      }
+    },
+    {
+      "claim": "Two exact-head archives and two built roots have valid, identical provenance.",
+      "verdict": "accepted",
+      "evidence": {
+        "archiveACommit": "7745ad0cc99ace663510ddab40716869c09ddce7",
+        "archiveBCommit": "7745ad0cc99ace663510ddab40716869c09ddce7",
+        "freshGitArchiveSha256": "df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee",
+        "archiveASha256": "df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee",
+        "archiveBSha256": "df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee",
+        "distManifestASha256": "a916f074f78fb24d2d9dd780d4de378fd1a51d93cd6941063523aff318b623ad",
+        "distManifestBSha256": "a916f074f78fb24d2d9dd780d4de378fd1a51d93cd6941063523aff318b623ad",
+        "allDistEntriesVerified": true
+      }
+    },
+    {
+      "claim": "The predeclaration preceded every observation, and the preserved files follow the frozen one-shot schedule without a missing, extra, rerun, or discarded preserved observation.",
+      "verdict": "accepted_with_evidence_boundary",
+      "evidence": {
+        "predeclarationMtimeUtc": "2026-07-16T05:59:59.675070573Z",
+        "firstObservationMtimeUtc": "2026-07-16T06:00:11.267287797Z",
+        "lastObservationMtimeUtc": "2026-07-16T06:00:23.423515635Z",
+        "replayMtimeUtc": "2026-07-16T06:00:23.491516910Z",
+        "rawFileCount": 54,
+        "manifestEntryCount": 54,
+        "rawInventoryEqualsFrozenInventory": true,
+        "mtimeOrderEqualsFrozenRunOnceSchedule": true,
+        "existingOutputGuardsPresent": true,
+        "oneShotReplayGuardPresent": true,
+        "boundary": "This confirms the complete preserved evidence set and its chronology; it cannot forensically prove that no external unpreserved process or deleted file ever existed."
+      }
+    },
+    {
+      "claim": "The three rows exercise the predeclared ownership and lifecycle boundaries.",
+      "verdict": "accepted",
+      "evidence": {
+        "scope_run": "A current-owned resource is created inside each scope.run, executed once, cleaned once at the one-shot boundary, and then the scope is disposed.",
+        "managed_ctx_exec": "A default-boundary resource is resolved by one flow across two ctx.exec calls in one managed context, then cleaned once on ctx.close.",
+        "sdk_session_run": "One tagged SDK session runtime drains one Session.run turn, closes its owning context, rejects post-close mutation, and then disposes its scope."
+      }
+    },
+    {
+      "claim": "All throughput A/A rows pass the frozen inclusive 0.80 to 1.25 ratio band.",
+      "verdict": "accepted",
+      "evidence": {
+        "scope_run": {
+          "archiveAMedianOpsPerSecond": 20838.6631470373,
+          "archiveBMedianOpsPerSecond": 22993.277380764037,
+          "ratioBToA": 1.1033950315585894,
+          "accepted": true
+        },
+        "managed_ctx_exec": {
+          "archiveAMedianOpsPerSecond": 16310.386392075005,
+          "archiveBMedianOpsPerSecond": 17818.258644033725,
+          "ratioBToA": 1.0924485916956188,
+          "accepted": true
+        },
+        "sdk_session_run": {
+          "archiveAMedianOpsPerSecond": 2040.7348845496585,
+          "archiveBMedianOpsPerSecond": 1964.2801739633308,
+          "ratioBToA": 0.9625356967408338,
+          "accepted": true
+        }
+      }
+    },
+    {
+      "claim": "Allocation A/A passes only sdk_session_run; scope_run and managed_ctx_exec correctly remain rejected.",
+      "verdict": "accepted",
+      "evidence": {
+        "noiseBand": [0.7, 1.43],
+        "scope_run": {
+          "zeroControlBytes": { "A": 0, "B": 0 },
+          "archiveABytesPerOperation": [6.5664, 0, 6.5824],
+          "archiveBBytesPerOperation": [0, 13.128, 19.6912],
+          "archiveAMedian": 6.5664,
+          "archiveBMedian": 13.128,
+          "ratioBToA": 1.9992690058479532,
+          "everyMeasuredObservationPositive": false,
+          "accepted": false,
+          "reason": "Two real observations have zero attributed signal and the ratio is outside the frozen band."
+        },
+        "managed_ctx_exec": {
+          "zeroControlBytes": { "A": 0, "B": 0 },
+          "archiveABytesPerOperation": [32.856, 0, 16.52],
+          "archiveBBytesPerOperation": [32.864, 33.016, 16.44],
+          "archiveAMedian": 16.52,
+          "archiveBMedian": 32.864,
+          "ratioBToA": 1.9893462469733656,
+          "everyMeasuredObservationPositive": false,
+          "accepted": false,
+          "reason": "One real observation has zero attributed signal and the ratio is outside the frozen band."
+        },
+        "sdk_session_run": {
+          "zeroControlBytes": { "A": 0, "B": 0 },
+          "archiveABytesPerOperation": [1765.1733333333334, 219.41333333333333, 878.72],
+          "archiveBBytesPerOperation": [218.66666666666666, 658.0266666666666, 875.3066666666666],
+          "archiveAMedian": 878.72,
+          "archiveBMedian": 658.0266666666666,
+          "ratioBToA": 0.7488468074775431,
+          "everyMeasuredObservationPositive": true,
+          "accepted": true
+        }
+      }
+    },
+    {
+      "claim": "All lifecycle cleanup walls remain zero across the 48 observations that invoke a lifecycle workload.",
+      "verdict": "accepted",
+      "evidence": {
+        "postCloseLiveResourceCount": 0,
+        "crossSessionLeakCount": 0,
+        "cleanupBusinessStateMutationCount": 0,
+        "independentLifecycleAssertionFailureCount": 0
+      }
+    },
+    {
+      "claim": "The worker's rejected protocol conclusion is reducing discovery only.",
+      "verdict": "accepted",
+      "evidence": {
+        "throughputAcceptedRows": 3,
+        "allocationAcceptedRows": 1,
+        "protocolAccepted": false,
+        "rejectedRowsPreserved": ["scope_run", "managed_ctx_exec"]
+      }
+    }
+  ],
+  "commands": [
+    "sha256sum checkpoint.v1.json predeclare.json archives/head-a.tar archives/head-b.tar results/raw.sha256 results/replay.v1.json",
+    "sha256sum scripts/workloads.mjs scripts/observe-throughput.mjs scripts/observe-allocation.mjs scripts/replay.mjs scripts/run-once.sh scripts/verify-checkpoint.mjs logs/build-a-dist.sha256 logs/build-b-dist.sha256",
+    "sha256sum -c results/raw.sha256",
+    "git get-tar-commit-id < archives/head-a.tar",
+    "git get-tar-commit-id < archives/head-b.tar",
+    "git -C /tmp/session-kernel-publish-20260715-0746 archive --format=tar 7745ad0cc99ace663510ddab40716869c09ddce7 | sha256sum",
+    "cd build-a && sha256sum -c ../logs/build-a-dist.sha256",
+    "cd build-b && sha256sum -c ../logs/build-b-dist.sha256",
+    "node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+    "node scripts/replay.mjs . | sha256sum",
+    "independent in-memory Node audit of exact file inventory, frozen schedules, JSON metadata, lifecycle equations, allocation-profile attribution, medians, ratios, and mtimes"
+  ],
+  "replay": {
+    "bundledVerifierPassed": true,
+    "deterministicReplaySha256": "bc7e0544239e8448d6c2152e693cfcea4c6ea23db6efb87992e82d843729f973",
+    "independentAuditFailureCount": 0
+  },
+  "blockedBoundary": [
+    "No allocation protocol is accepted across all three lifecycle rows.",
+    "No baseline-versus-candidate throughput or allocation comparison is supported.",
+    "No performance target, allocation reduction, product optimization, CKR success, or release claim is supported."
+  ],
+  "nextReducingDiscovery": "Use an allocation attribution mechanism that preserves ownership across async continuation boundaries; recalibrate it with exact-zero uninvoked controls and positive one- and two-lifecycle signals; then freeze a new one-shot A/A protocol without widening bands or rerunning these rejected rows.",
+  "workerBoundary": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

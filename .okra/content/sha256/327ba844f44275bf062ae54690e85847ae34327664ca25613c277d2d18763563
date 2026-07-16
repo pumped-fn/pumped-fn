@@ -1,0 +1,107 @@
+{
+  "schema": "okra.independent-validation.v1",
+  "validator_id": "validate_dkr_p5",
+  "unit_id": "DKR-P5-VALIDATION",
+  "recorded_at": "2026-07-16T05:49:17Z",
+  "required_protocol_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "subject": {
+    "checkpoint": "/tmp/dkr-p5-lifecycle-rows-7745ad0c/checkpoint.v1.json",
+    "checkpoint_sha256": "77b68ccb58cf12281e793f6ab3d6b67ee1490776b32635528233506c8b2dd182",
+    "exact_head": "7745ad0cc99ace663510ddab40716869c09ddce7",
+    "source_tree": "ecff2ed67fd4f65296ac52583cb8b6a886fbc572",
+    "archive_sha256": "df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee"
+  },
+  "independent_build": {
+    "root": "/tmp/validator-dkr-p5-7745ad0c.VdogQ0",
+    "dist_sha256": {
+      "pkg/core/lite/dist/index.mjs": "f57fd25f992f1e70a4997b46d1f10ad912eac3bb26caddf7daa389652285e705",
+      "pkg/core/lite/dist/index.d.mts": "e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713",
+      "pkg/sdk/core/dist/session.mjs": "eb869a73460b0d2dfae45e48f9dbadf54566320e7040ea10ef6b438c1d73a59b",
+      "pkg/sdk/core/dist/session.d.mts": "167a645f105fa02a011458cb8937a30cea1a472ee1256a6103df2d0ab7cdcf76"
+    }
+  },
+  "replay": {
+    "node": "v26.4.0",
+    "accepted_row_count": 3,
+    "rejected_row_count": 0,
+    "all_rows_accepted": true
+  },
+  "claims": [
+    {
+      "id": "lite:scope.run:owned-resource",
+      "verdict": "accept",
+      "creation": 1,
+      "execution": 1,
+      "cleanup": 1,
+      "post_close_live": 0,
+      "execution_owners": ["scope-run-owner-1"],
+      "cleanup_owners": ["scope-run-owner-1"],
+      "same_owner": true,
+      "cleanup_business_state_mutation_count": 0
+    },
+    {
+      "id": "lite:ctx.exec:managed-boundary-resource",
+      "verdict": "accept",
+      "before_close": {
+        "creation": 1,
+        "execution": 2,
+        "cleanup": 0,
+        "live": 1
+      },
+      "after_close": {
+        "creation": 1,
+        "execution": 2,
+        "cleanup": 1,
+        "post_close_live": 0
+      },
+      "execution_owners": ["managed-context-owner-1", "managed-context-owner-1"],
+      "cleanup_owners": ["managed-context-owner-1"],
+      "same_owner": true,
+      "cleanup_business_state_mutation_count": 0
+    },
+    {
+      "id": "sdk:session.run:trivial-turn",
+      "verdict": "accept",
+      "before_close": {
+        "creation": 1,
+        "execution": 1,
+        "cleanup": 0,
+        "live": 1,
+        "drained_result": 1
+      },
+      "after_close": {
+        "creation": 1,
+        "execution": 1,
+        "cleanup": 1,
+        "post_close_live": 0,
+        "post_close_mutation_rejected": 1
+      },
+      "execution_owners": ["dkr-p5-session"],
+      "cleanup_owners": ["dkr-p5-session"],
+      "same_owner": true,
+      "events": ["work.admitted", "work.started", "work.completed"],
+      "post_close_error": "Session activation is deactivated",
+      "cleanup_business_state_mutation_count": 0
+    }
+  ],
+  "aggregate_claims": {
+    "post_close_live_resource_count": 0,
+    "cross_session_leak_count": 0,
+    "cleanup_business_state_mutation_count": 0
+  },
+  "commands_completed": [
+    "git -C /tmp/session-kernel-publish-20260715-0746 archive --format=tar 7745ad0cc99ace663510ddab40716869c09ddce7 | sha256sum",
+    "node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+    "pnpm install --offline --frozen-lockfile",
+    "pnpm --filter @pumped-fn/lite --filter @pumped-fn/sdk build",
+    "node /tmp/dkr-p5-lifecycle-rows-7745ad0c/scripts/lifecycle-rows.mjs /tmp/validator-dkr-p5-7745ad0c.VdogQ0 7745ad0cc99ace663510ddab40716869c09ddce7"
+  ],
+  "remaining_blocked_claims": [
+    "throughput",
+    "allocation",
+    "CKR performance targets",
+    "representative batch size",
+    "comparison protocol"
+  ],
+  "verdict": "accept_lifecycle_rows_only"
+}

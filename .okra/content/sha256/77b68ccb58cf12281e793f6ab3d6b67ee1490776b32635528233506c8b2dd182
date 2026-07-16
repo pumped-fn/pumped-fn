@@ -1,0 +1,302 @@
+{
+  "checkpoint_id": "DKR-P5.lifecycle-rows.2026-07-16T05:42:39Z",
+  "conclusion_id": "dkr-p5-corrected-lifecycle-rows-pass-pending-validation",
+  "unit_id": "DKR-P5",
+  "worker_id": "dkr-p5-lifecycle-rows",
+  "worker_kind": "discovery",
+  "decision_target": "Decide whether the corrected owned scope.run, managed ctx.exec, and owning sdk.session.run lifecycle rows are valid inputs to the performance measurement design.",
+  "source_of_truth": [
+    "git:7745ad0cc99ace663510ddab40716869c09ddce7",
+    "/tmp/dkr-p5-lifecycle-rows-7745ad0c/head.tar",
+    "/tmp/dkr-p5-lifecycle-rows-7745ad0c/scripts/lifecycle-rows.mjs",
+    "/tmp/dkr-p5-lifecycle-rows-7745ad0c/results/lifecycle-rows.v1.json",
+    "pkg/core/lite/src/scope.ts",
+    "pkg/core/lite/src/resource.ts",
+    "pkg/sdk/core/src/session.ts"
+  ],
+  "read_method": "Build the git-archive snapshot at the exact head, run each frozen lifecycle row once, and require the execution owner to equal the cleanup owner with a zero post-close live balance.",
+  "exact_head": "7745ad0cc99ace663510ddab40716869c09ddce7",
+  "source_tree": "ecff2ed67fd4f65296ac52583cb8b6a886fbc572",
+  "observed_at": "2026-07-16T05:42:39Z",
+  "recorded_at": "2026-07-16T05:42:39Z",
+  "max_age": "10m",
+  "freshness_status": "fresh",
+  "confidence": 0.97,
+  "result_ref": "results/lifecycle-rows.v1.json",
+  "result": {
+    "accepted_worker_row_count": 3,
+    "rejected_worker_row_count": 0,
+    "fail_closed": true,
+    "dkr_learning_advance": "pending_independent_validation",
+    "measurement_implementation": "blocked",
+    "optimization": "blocked"
+  },
+  "rows": [
+    {
+      "id": "lite:scope.run:owned-resource",
+      "decision": "worker_pass_pending_independent_validation",
+      "ownership_assertion": "The current-owned lease resolved by the one-shot scope.run execution is the lease passed to cleanup.",
+      "counts": {
+        "creation": 1,
+        "execution": 1,
+        "cleanup": 1,
+        "post_close_live": 0
+      },
+      "execution_owners": [
+        "scope-run-owner-1"
+      ],
+      "cleanup_owners": [
+        "scope-run-owner-1"
+      ],
+      "same_owner": true,
+      "cleanup_business_state_mutation_count": 0
+    },
+    {
+      "id": "lite:ctx.exec:managed-boundary-resource",
+      "decision": "worker_pass_pending_independent_validation",
+      "ownership_assertion": "Both ctx.exec children reuse the single default-boundary lease owned by the managed root context, and root close cleans that same lease once.",
+      "counts_before_close": {
+        "creation": 1,
+        "execution": 2,
+        "cleanup": 0,
+        "live": 1
+      },
+      "counts_after_close": {
+        "creation": 1,
+        "execution": 2,
+        "cleanup": 1,
+        "post_close_live": 0
+      },
+      "execution_owners": [
+        "managed-context-owner-1",
+        "managed-context-owner-1"
+      ],
+      "cleanup_owners": [
+        "managed-context-owner-1"
+      ],
+      "same_owner": true,
+      "cleanup_business_state_mutation_count": 0
+    },
+    {
+      "id": "sdk:session.run:trivial-turn",
+      "decision": "worker_pass_pending_independent_validation",
+      "ownership_assertion": "The sdk.session runtime is pre-resolved by the root context, observed by the selected turn, returned as the drained result, and deactivated once by that same root context close.",
+      "counts_before_close": {
+        "creation": 1,
+        "execution": 1,
+        "cleanup": 0,
+        "live": 1,
+        "drained_result": 1
+      },
+      "counts_after_close": {
+        "creation": 1,
+        "execution": 1,
+        "cleanup": 1,
+        "post_close_live": 0,
+        "post_close_mutation_rejected": 1
+      },
+      "execution_owners": [
+        "dkr-p5-session"
+      ],
+      "cleanup_owners": [
+        "dkr-p5-session"
+      ],
+      "same_owner": true,
+      "events": [
+        "work.admitted",
+        "work.started",
+        "work.completed"
+      ],
+      "post_close_error": "Session activation is deactivated",
+      "cleanup_business_state_mutation_count": 0
+    }
+  ],
+  "questions_answered": [
+    "The owned scope.run row creates, executes, and cleans one current-owned resource within its one-shot boundary.",
+    "The managed ctx.exec row must omit current ownership so both child executions share one resource owned and closed by the managed root boundary.",
+    "The sdk.session row must resolve the current-owned runtime on the root context before session.run so introspection, execution, result draining, and cleanup address the same runtime.",
+    "All three worker-observed post-close live balances reached zero, and cleanup did not mutate the recorded business state."
+  ],
+  "questions_unanswered": [
+    "Independent deterministic replay has not yet accepted these worker findings.",
+    "This DKR did not collect allocation or throughput metrics and does not establish a performance baseline or improvement claim.",
+    "The representative batch size and comparison protocol remain outside this lifecycle-only probe."
+  ],
+  "decision": "Keep all three corrected lifecycle rows as candidate measurement workloads and dispatch independent validation. Do not implement measurement or optimize from worker evidence alone.",
+  "flag_if_missing_or_stale": "breaking:corrected-lifecycle-row-independent-validation-missing",
+  "reviewer_audit_status": "pending_independent_validation",
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "allocation_regression_case_count",
+    "post_close_live_resource_count",
+    "cross_session_leak_count",
+    "cleanup_business_state_mutation_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "metric_id": "invalid_performance_comparison_count",
+      "source_of_truth": "The lifecycle-only probe result and command manifest",
+      "read_method": "Confirm no throughput, allocation, or baseline-candidate comparison is present.",
+      "observed_at": "2026-07-16T05:42:39Z",
+      "recorded_at": "2026-07-16T05:42:39Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "worker_observed_pending_independent_validation",
+      "evidence_ref": "results/lifecycle-rows.v1.json",
+      "replay_command_or_checker": "node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+      "verification_record_ref": "pending:validator-dkr-p5"
+    },
+    {
+      "metric_id": "unsupported_performance_claim_count",
+      "source_of_truth": "This checkpoint decision and lifecycle result",
+      "read_method": "Confirm the checkpoint claims lifecycle row behavior only and blocks performance claims.",
+      "observed_at": "2026-07-16T05:42:39Z",
+      "recorded_at": "2026-07-16T05:42:39Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "worker_observed_pending_independent_validation",
+      "evidence_ref": "checkpoint.v1.json#decision",
+      "replay_command_or_checker": "node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+      "verification_record_ref": "pending:validator-dkr-p5"
+    },
+    {
+      "metric_id": "allocation_regression_case_count",
+      "source_of_truth": "The DKR-P5 assignment and lifecycle-only command manifest",
+      "read_method": "Count allocation comparisons or optimization moves in this lifecycle-only probe; the assignment forbids both and the command manifest contains neither.",
+      "observed_at": "2026-07-16T05:42:39Z",
+      "recorded_at": "2026-07-16T05:42:39Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "worker_observed_no_allocation_move_pending_independent_validation",
+      "evidence_ref": "checkpoint.v1.json#exact_commands",
+      "replay_command_or_checker": "node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+      "verification_record_ref": "pending:validator-dkr-p5"
+    },
+    {
+      "metric_id": "post_close_live_resource_count",
+      "source_of_truth": "The three exact-head lifecycle row counters",
+      "read_method": "Sum creation minus cleanup after each owning boundary closes.",
+      "observed_at": "2026-07-16T05:42:39Z",
+      "recorded_at": "2026-07-16T05:42:39Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "worker_observed_pending_independent_validation",
+      "evidence_ref": "results/lifecycle-rows.v1.json#rows",
+      "replay_command_or_checker": "node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+      "verification_record_ref": "pending:validator-dkr-p5"
+    },
+    {
+      "metric_id": "cross_session_leak_count",
+      "source_of_truth": "Row-specific execution and cleanup owner identities",
+      "read_method": "Count rows where an execution owner differs from its cleanup owner.",
+      "observed_at": "2026-07-16T05:42:39Z",
+      "recorded_at": "2026-07-16T05:42:39Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held_for_probed_owners_pending_independent_validation",
+      "evidence_ref": "results/lifecycle-rows.v1.json#rows",
+      "replay_command_or_checker": "node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+      "verification_record_ref": "pending:validator-dkr-p5"
+    },
+    {
+      "metric_id": "cleanup_business_state_mutation_count",
+      "source_of_truth": "Immutable lease values and sdk.session record snapshots before and after close",
+      "read_method": "Count a row when cleanup changes the recorded business value or session record.",
+      "observed_at": "2026-07-16T05:42:39Z",
+      "recorded_at": "2026-07-16T05:42:39Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "worker_observed_pending_independent_validation",
+      "evidence_ref": "results/lifecycle-rows.v1.json#rows",
+      "replay_command_or_checker": "node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+      "verification_record_ref": "pending:validator-dkr-p5"
+    },
+    {
+      "metric_id": "single_llm_truth_acceptance_count",
+      "source_of_truth": "Independent validator record",
+      "read_method": "Remain unread until a separate validator replays the checkpoint and row evidence.",
+      "observed_at": "2026-07-16T05:42:39Z",
+      "recorded_at": "2026-07-16T05:42:39Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_validation",
+      "evidence_ref": "checkpoint.v1.json#reviewer_audit_status",
+      "replay_command_or_checker": "node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+      "verification_record_ref": "pending:validator-dkr-p5"
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "source_of_truth": "One-shot row result, preserved counts, and blocked downstream decision",
+      "read_method": "Confirm all row outcomes are preserved and no worker evidence is represented as acceptance.",
+      "observed_at": "2026-07-16T05:42:39Z",
+      "recorded_at": "2026-07-16T05:42:39Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "worker_observed_pending_independent_validation",
+      "evidence_ref": "checkpoint.v1.json#result",
+      "replay_command_or_checker": "node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+      "verification_record_ref": "pending:validator-dkr-p5"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "blocked_pending_independent_validation",
+    "downstream_advance": "blocked",
+    "dkr_learning_advance": "pending_independent_validation",
+    "measurement_implementation": "blocked",
+    "optimization": "blocked",
+    "decided_at": "2026-07-16T05:42:39Z"
+  },
+  "evidence_refs_or_hashes": {
+    "head.tar": "sha256:df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee",
+    "archive/pnpm-lock.yaml": "sha256:5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120",
+    "scripts/lifecycle-rows.mjs": "sha256:2d2dcffa84bf571e4a14731fe0691fec6832c327c33cae676deea72c6eef3473",
+    "scripts/verify-checkpoint.mjs": "sha256:255332896d33f3f60e9ace655dc6eb1e43257061a74971b894efe2ea8cd0235c",
+    "results/lifecycle-rows.v1.json": "sha256:ac5c9d7dfa40c0c52a168537348b900ba58149a272ef360b00f4dc7fa9e800f1",
+    "archive/pkg/core/lite/src/scope.ts": "sha256:0b4832fedae34dee1dc627f26f885ce47eb6fb6a0eeee376e44f85dd2538013e",
+    "archive/pkg/core/lite/src/resource.ts": "sha256:8f4fedfe27e44221d389dde4c814d1f3adc39fa9548f97b2cab457e0e2d7fc27",
+    "archive/pkg/sdk/core/src/session.ts": "sha256:09037af628882fc4ce8a4c51fa12ec92e9f31de3d33915dbaaaf1f5c72bc800e",
+    "archive/pkg/core/lite/dist/index.mjs": "sha256:f57fd25f992f1e70a4997b46d1f10ad912eac3bb26caddf7daa389652285e705",
+    "archive/pkg/core/lite/dist/index.d.mts": "sha256:e74673ed99a2b5bb141db1cff8f79400f589c0bbe5f788d889e35524a86d4713",
+    "archive/pkg/sdk/core/dist/session.mjs": "sha256:eb869a73460b0d2dfae45e48f9dbadf54566320e7040ea10ef6b438c1d73a59b",
+    "archive/pkg/sdk/core/dist/session.d.mts": "sha256:167a645f105fa02a011458cb8937a30cea1a472ee1256a6103df2d0ab7cdcf76"
+  },
+  "replay_command_or_checker": "cd /tmp/dkr-p5-lifecycle-rows-7745ad0c && node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+  "exact_commands": [
+    "git archive --format=tar --output=/tmp/dkr-p5-lifecycle-rows-7745ad0c/head.tar 7745ad0cc99ace663510ddab40716869c09ddce7",
+    "tar -xf /tmp/dkr-p5-lifecycle-rows-7745ad0c/head.tar -C /tmp/dkr-p5-lifecycle-rows-7745ad0c/archive",
+    "pnpm install --offline --frozen-lockfile",
+    "pnpm --filter @pumped-fn/lite --filter @pumped-fn/sdk build",
+    "node --check /tmp/dkr-p5-lifecycle-rows-7745ad0c/scripts/lifecycle-rows.mjs",
+    "node /tmp/dkr-p5-lifecycle-rows-7745ad0c/scripts/lifecycle-rows.mjs /tmp/dkr-p5-lifecycle-rows-7745ad0c/archive 7745ad0cc99ace663510ddab40716869c09ddce7"
+  ],
+  "workspace_effect": "No publishing-clone product or .okra file was edited. Every generated file is under /tmp/dkr-p5-lifecycle-rows-7745ad0c.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "worker_evidence_is_acceptance": false
+}

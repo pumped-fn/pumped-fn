@@ -1,0 +1,97 @@
+validation_id: DKR-P7.allocation-window.independent.2026-07-16T06:25:50Z
+validator_role: read-only independent deterministic verifier
+checkpoint: /tmp/dkr-p7-allocation-window-7745ad0c/checkpoint.v1.json
+checkpoint_sha256: 3e539a90172cfa6ec483f4359e61c0e6a5a0b1acd757ad7979586c6acedd0f42
+scope: accept or reject the replayability and bounded conclusion; never accept the rejected allocation method
+
+claim_id: DKR-P7-checkpoint-integrity
+check: supplied checkpoint and every hash-pinned input remain intact
+replay: cd /tmp/dkr-p7-allocation-window-7745ad0c && node scripts/verify-checkpoint.mjs checkpoint.v1.json
+exit_code: 0
+value: checkpoint sha256 matched; every evidence and raw-observation hash matched vs threshold: exact equality
+source_of_truth: checkpoint.v1.json; results/calibration.sha256; scripts/verify-checkpoint.mjs
+sha256: checkpoint 3e539a90172cfa6ec483f4359e61c0e6a5a0b1acd757ad7979586c6acedd0f42; verifier 1a6debe0081c65acf9fadee04dcc2614667a8f046c607aef85dc1324b687537f
+observed_at: 2026-07-16T06:25:50Z
+decision: accepted
+evidence: exact head 7745ad0cc99ace663510ddab40716869c09ddce7; predeclaration 2cf5ef3e73fdf1953c78b304fa1b86f0c3cc13c9e63b984cda0c3c1999f195b6; rawObservationCount 9
+
+claim_id: DKR-P7-freeze-chronology
+check: thresholds, chronology, archives, and measurement scripts were frozen before the first raw observation
+replay: cd /tmp/dkr-p7-allocation-window-7745ad0c && node scripts/verify-checkpoint.mjs checkpoint.v1.json
+exit_code: 0
+value: predeclare mtime 2026-07-16T06:17:21.854Z and chronology mtime 2026-07-16T06:17:39.515Z precede first raw mtime 2026-07-16T06:17:45.483Z vs threshold: every frozen input precedes measurement
+source_of_truth: predeclare.json; predeclaration-chronology.json; raw result mtimes; hash-pinned scripts and archives
+sha256: predeclare 2cf5ef3e73fdf1953c78b304fa1b86f0c3cc13c9e63b984cda0c3c1999f195b6; chronology 6fbcaa62ae4bcf741ec528535efe61da16edf5f159f05298efd7190f035f9117
+observed_at: 2026-07-16T06:25:50Z
+decision: accepted
+evidence: verifier checked earliestRawMtime against firstMeasurementNotBefore and reproduced the frozen rejection
+
+claim_id: DKR-P7-control-inventory
+check: all zero, one, and two controls exist exactly once for every lifecycle row
+replay: cd /tmp/dkr-p7-allocation-window-7745ad0c && node scripts/verify-checkpoint.mjs checkpoint.v1.json
+exit_code: 0
+value: 9 raw observations: scope.run 0/4000/8000 operations; managed ctx.exec 0/2000/4000; SDK session.run 0/300/600 vs threshold: exactly 9 controls
+source_of_truth: results/calibration.sha256; results/calibration/*.json
+sha256: calibration manifest 1c4d58d38286a59d8d072d166105dfbaae7817d13e45fcd1a5f95e353494682c
+observed_at: 2026-07-16T06:25:50Z
+decision: accepted
+evidence: replay reported rawObservationCount 9, acceptedCalibrationRowCount 0, rejectedCalibrationRowCount 3
+
+claim_id: DKR-P7-calibration-arithmetic
+check: zero subtraction, signal, representation consistency, and proportionality were recomputed with the frozen bands
+replay: cd /tmp/dkr-p7-allocation-window-7745ad0c && node scripts/verify-checkpoint.mjs checkpoint.v1.json
+exit_code: 0
+value: scope corrected 62025832/90644040, two-to-one 1.4613917634, per-op 0.7306958817, consistency failed; managed corrected 10180080/46884448, two-to-one 4.6055087976, per-op 2.3027543988, consistency failed; SDK corrected 12672296/28061304, two-to-one 2.2143819873, per-op 1.1071909936, consistency failed vs thresholds: corrected one >=262144, signal/control >=3, two-to-one 1.75..2.25, per-op 0.875..1.125, exact node/sample consistency
+source_of_truth: results/calibration/*.json; scripts/replay-rejection.mjs; checkpoint.v1.json#calibration
+sha256: deterministic rejection replay 7e5f353e5750667d4e30203379ad4b90a54db3b9cac579048a0e1f4b170b59b2
+observed_at: 2026-07-16T06:25:50Z
+decision: accepted
+evidence: every nonzero profile had unequal summed node selfSize and sample size; scope and managed also missed both proportionality bands; SDK met proportionality but failed consistency
+
+claim_id: DKR-P7-conditional-aa
+check: the conditional A/A gate stayed closed after failed calibration and no A/A observation exists
+replay: cd /tmp/dkr-p7-allocation-window-7745ad0c && node scripts/verify-checkpoint.mjs checkpoint.v1.json
+exit_code: 0
+value: aaRan false and aaRawObservationCount 0 vs threshold: no A/A after any calibration rejection
+source_of_truth: predeclare.json#aa.acceptance; results/aa; scripts/replay-rejection.mjs
+sha256: predeclare 2cf5ef3e73fdf1953c78b304fa1b86f0c3cc13c9e63b984cda0c3c1999f195b6
+observed_at: 2026-07-16T06:25:50Z
+decision: accepted
+evidence: results/aa is empty and replay reported aaRan false
+
+claim_id: DKR-P7-cleanup-walls
+check: lifecycle cleanup walls held across every calibration observation
+replay: cd /tmp/dkr-p7-allocation-window-7745ad0c && node scripts/verify-checkpoint.mjs checkpoint.v1.json
+exit_code: 0
+value: post-close live 0; cross-owner leak 0; cleanup business-state mutation 0; SDK post-close mutation rejections 900/900 vs thresholds: 0, 0, 0, and every completed SDK operation rejected mutation
+source_of_truth: results/calibration/*.json lifecycle records; scripts/replay-rejection.mjs
+sha256: calibration manifest 1c4d58d38286a59d8d072d166105dfbaae7817d13e45fcd1a5f95e353494682c
+observed_at: 2026-07-16T06:25:50Z
+decision: accepted
+evidence: verifier reported all three cleanup counts at zero and checked everyCompletedOperationRejectedPostCloseMutation
+
+claim_id: DKR-P7-workspace-boundary
+check: measurement execution used exact-head scratch builds and did not write measurement artifacts into the publishing clone
+replay: cd /tmp/dkr-p7-allocation-window-7745ad0c && node scripts/verify-checkpoint.mjs checkpoint.v1.json
+exit_code: 0
+value: both source archives and both dist manifests are identical; observer output paths and every preserved measurement artifact are rooted under /tmp/dkr-p7-allocation-window-7745ad0c; publishing-clone HEAD remains 7745ad0cc99ace663510ddab40716869c09ddce7 vs threshold: no measurement product edit
+source_of_truth: archives/head-a.tar; archives/head-b.tar; scripts/run-once.sh; scripts/observe.mjs; current publishing-clone HEAD
+sha256: archive A/B df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee; identical dist manifest 7d38bb97b01bfdc85ac1cfe61590b291a79cd68ee1d253880c46855aab46d9f3
+observed_at: 2026-07-16T06:25:50Z
+decision: accepted
+evidence: run-once resolves root from its scratch location; observe imports scratch build output and writes only the supplied scratch output path. Concurrent unrelated publishing-clone changes are outside this attribution.
+
+claim_id: DKR-P7-bounded-conclusion
+check: evidence concludes only that this frozen full-active-window method is rejected
+replay: cd /tmp/dkr-p7-allocation-window-7745ad0c && node scripts/verify-checkpoint.mjs checkpoint.v1.json
+exit_code: 0
+value: methodAccepted false; measurement implementation blocked; optimization blocked; product performance claim blocked vs threshold: no baseline/candidate, optimization, allocation-reduction, or CKR-success claim
+source_of_truth: checkpoint.v1.json#result; scripts/replay-rejection.mjs result
+sha256: checkpoint 3e539a90172cfa6ec483f4359e61c0e6a5a0b1acd757ad7979586c6acedd0f42
+observed_at: 2026-07-16T06:25:50Z
+decision: accepted
+evidence: replay reported methodAccepted false; the checkpoint funds new discovery rather than reinterpreting or rerunning these profiles
+
+overall_decision: accept DKR-P7 as replayable rejected discovery evidence; reject the allocation method; do not advance measurement implementation or optimization from this checkpoint
+required_sentence: DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.
+summary: 8 accepted, 0 rejected; rejected claim_ids: none

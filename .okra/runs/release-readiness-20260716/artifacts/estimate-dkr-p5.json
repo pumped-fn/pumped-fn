@@ -1,0 +1,8 @@
+{
+  "type": "estimation_record",
+  "phase": "estimate",
+  "unit_id": "DKR-P5",
+  "estimate": { "time_min": 35, "turns": 1, "tokens": null },
+  "observed_at": "2026-07-16T08:00:00Z",
+  "dispatch_ref": "worker-packets/dkr-p5-lifecycle-rows.json"
+}

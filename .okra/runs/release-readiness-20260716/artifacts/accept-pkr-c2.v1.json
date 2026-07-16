@@ -1,0 +1,21 @@
+{
+  "type": "pkr_acceptance",
+  "unit_id": "PKR-C2",
+  "accepted_at": "2026-07-16T06:32:47Z",
+  "accepted_scope": "Public contract, migration, package packing, current guidance, inline execution, and example alignment gaps are zero on the frozen working tree.",
+  "verification_ref": "workers/validator-pkr-c2/verification.v1.json",
+  "verification_sha256": "1761e1db2aecea5876d3a13172aa871c0546866ce57acf4d753b197dbbc7658e",
+  "metrics": {
+    "public_contract_gap_count": 0,
+    "current_guidance_exec_gap_count": 0,
+    "documentation_example_failure_count": 0,
+    "major_migration_evidence_gap_count": 0,
+    "public_api_tsdoc_gap_count": 0,
+    "packed_file_omission_count": 0,
+    "inline_exec_contract_gap_count": 0,
+    "example_alignment_gap_count": 0,
+    "changed_public_source_package_without_changeset_count": 0
+  },
+  "negative_fixture_proof": "The contract checker deterministically rejects stale inline-execution prose and fenced callbacks missing dependencies or receiving ctx/scope.",
+  "remaining_gate": "Replay PR-head provenance after committing the accepted slice."
+}

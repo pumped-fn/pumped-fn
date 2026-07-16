@@ -1,0 +1,19 @@
+{
+  "type": "pkr_acceptance",
+  "unit_id": "PKR-C3",
+  "accepted_at": "2026-07-16T06:34:00Z",
+  "accepted_scope": "Session observation context exposes an optional application-owned channel on the base activation projection and refines only a selected tool child with its tool name.",
+  "verification_ref": "workers/validator-pkr-c3/verification.v1.json",
+  "verification_sha256": "4e3afd4b1c49a718e27e3e08fed22d6cbfb81a5245f6b1a589de5a4f380edd8f",
+  "evidence": {
+    "sdk_typecheck": "passed",
+    "focused_test_files": 2,
+    "focused_test_count": 37,
+    "inline_exec_callsite_count": 51,
+    "inline_exec_contract_gap_count": 0,
+    "context_callback_argument_count": 0,
+    "sibling_tool_projection_leak_count": 0,
+    "sibling_channel_projection_leak_count": 0
+  },
+  "anti_goal_disposition": "No arbitrary tag enumeration, prompt, tool input, memory, credential, or backend handle is exposed. No ctx or scope is passed as a callback argument."
+}

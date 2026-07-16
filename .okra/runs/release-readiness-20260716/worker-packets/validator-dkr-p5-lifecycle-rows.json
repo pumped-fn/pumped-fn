@@ -1,0 +1,15 @@
+{
+  "packet_version": 1,
+  "worker_id": "validator-dkr-p5-lifecycle-rows",
+  "unit_id": "DKR-P5-VALIDATION",
+  "worker_kind": "validator",
+  "required_protocol_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "subject": {
+    "checkpoint": "/tmp/dkr-p5-lifecycle-rows-7745ad0c/checkpoint.v1.json",
+    "expected_sha256": "77b68ccb58cf12281e793f6ab3d6b67ee1490776b32635528233506c8b2dd182",
+    "exact_head": "7745ad0cc99ace663510ddab40716869c09ddce7"
+  },
+  "assignment": "Independently inspect every subject script and input, verify hashes and exact-head provenance, replay the frozen checkpoint, and challenge the ownership claims. Confirm that scope.run owns its temporary context, managed ctx.exec reuses one default-boundary resource across two calls and closes it once at owning-context close, and SDK session.run drains its result then closes the owning runtime. Confirm post-close live resource count and cleanup business-state mutation count are zero. Do not edit product, subject evidence, or .okra. Do not accept throughput, allocation, or CKR performance claims.",
+  "stop_rule": "Accept or reject each lifecycle row once from independent replay and stop.",
+  "output_schema": "Claim-by-claim accepted/rejected verdicts with exact commands, values, provenance, and remaining blocked claims."
+}

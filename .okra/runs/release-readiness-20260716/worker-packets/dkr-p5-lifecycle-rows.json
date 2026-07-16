@@ -1,0 +1,28 @@
+{
+  "packet_version": 1,
+  "worker_id": "dkr-p5-lifecycle-rows",
+  "unit_id": "DKR-P5",
+  "worker_kind": "discovery",
+  "required_protocol_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "frame": {
+    "objective": { "metric_id": "release_readiness_gap_count", "target": 0, "comparator": "==" },
+    "source_dkr_refs": [
+      ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-p2.v1.json",
+      ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-p4.v1.json"
+    ],
+    "exact_head": "7745ad0cc99ace663510ddab40716869c09ddce7"
+  },
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "allocation_regression_case_count",
+    "post_close_live_resource_count",
+    "cross_session_leak_count",
+    "cleanup_business_state_mutation_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "assignment": "Discovery only. In an isolated scratch directory, build exact HEAD if needed and implement three minimal probes: an owned scope.run resource lifecycle; a managed ctx.exec resource executed twice with one creation and one close at the owning context close; and an SDK session.run trivial turn whose owning runtime is inspected, result drained, and session closed. Record creation, execution, cleanup, and post-close counts. Reject any row whose measured owner differs from the cleanup owner or whose cleanup does not reach zero. Do not edit product or .okra files. Do not collect allocation or throughput metrics yet.",
+  "budget_and_stop_rule": { "time_min": 35, "turns": 1, "stop": "Run each predeclared lifecycle row once, accept or reject each row, and stop." },
+  "output_schema": "Executable checkpoint with exact head, scripts, commands, hashes, row-specific ownership assertions, create/run/close/post-close counts, walls, and downstream decision. Worker evidence is not acceptance."
+}

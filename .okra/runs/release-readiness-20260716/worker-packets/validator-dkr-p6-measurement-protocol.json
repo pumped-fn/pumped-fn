@@ -1,0 +1,16 @@
+{
+  "packet_version": 1,
+  "worker_id": "validator-dkr-p6-measurement-protocol",
+  "unit_id": "DKR-P6-VALIDATION",
+  "worker_kind": "validator",
+  "required_protocol_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "subject": {
+    "checkpoint": "/tmp/dkr-p6-measurement-protocol-7745ad0c/checkpoint.v1.json",
+    "expected_sha256": "e7d5a9dca0e4b29f5ea302cfcdabea8c47b58a5d78ac89c50d73ee1f737eb2d1",
+    "predeclaration_sha256": "16e29598b18cb266cfbba94d03a73cf710bb811baeed2a5aa57e8815202f7cfb",
+    "exact_head": "7745ad0cc99ace663510ddab40716869c09ddce7"
+  },
+  "assignment": "Independently inspect hashes, predeclaration chronology, two exact-head archives, scripts, row ownership, all 54 raw observations, arithmetic, and frozen acceptance bands. Replay the checkpoint and verify throughput A/A passed all three rows while allocation A/A passed only SDK session.run and correctly rejected scope.run and managed ctx.exec for zero real signal and unstable roughly-two ratios. Confirm no rerun, no discarded observation, and all cleanup walls zero. Accept or reject the protocol result as reducing discovery only; do not accept a measurement protocol, performance target, or optimization claim. Do not edit product, subject evidence, or .okra.",
+  "stop_rule": "Replay and audit once, preserve the rejection, and stop.",
+  "output_schema": "Claim-by-claim verdicts with commands, row values, chronology, wall reads, and the exact blocked/downstream discovery boundary."
+}

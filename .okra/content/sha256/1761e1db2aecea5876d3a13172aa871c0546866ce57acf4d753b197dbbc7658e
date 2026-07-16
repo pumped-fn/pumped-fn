@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "worker_id": "validate_pkr_c2_docs",
+  "role": "verification",
+  "scope": "PKR-C2 release contract and documentation",
+  "repository": "/tmp/session-kernel-publish-20260715-0746",
+  "observed_at": "2026-07-16T06:32:47Z",
+  "decision": "accepted",
+  "worker_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "claims": [
+    {
+      "claim_id": "PKR-C2-public-contract",
+      "check": "Public contract, migration, README fence, TSDoc, packing, and current-guidance gaps equal zero",
+      "replay": "node scripts/check-public-contract.mjs --base origin/main --pr-json /tmp/pr-346-contract-local-head.json --expect-head \"$(git rev-parse HEAD)\"",
+      "exit_code": 0,
+      "value": {
+        "public_contract_gap_count": 0,
+        "current_guidance_exec_gap_count": 0,
+        "documentation_example_failure_count": 0,
+        "major_migration_evidence_gap_count": 0,
+        "public_api_tsdoc_gap_count": 0,
+        "packed_file_omission_count": 0,
+        "public_package_count": 26,
+        "public_api_interface_count": 153
+      },
+      "source_of_truth": "scripts/check-public-contract.mjs",
+      "sha256": "b5d7575dcb184a28342f5e479df4622100d28935f530af7bb425b4583bac75d0",
+      "decision": "accepted",
+      "evidence": "The checker returned ok=true. All gated metrics were zero. Current guidance contained no missing name, deps, params, or fn field and no ctx or scope callback argument."
+    },
+    {
+      "claim_id": "PKR-C2-contract-negative-fixtures",
+      "check": "Contract checker rejects stale prose and invalid fenced callbacks",
+      "replay": "pnpm contract:test",
+      "exit_code": 0,
+      "value": {
+        "tests": 3,
+        "passed": 3,
+        "failed": 0,
+        "negative_fixture_current_guidance_exec_gap_count": 2
+      },
+      "source_of_truth": "scripts/check-public-contract.test.mjs",
+      "sha256": "d59f8ce8b7da3fdb20a45004e6b2782c4c02bc12b22c5e28aa581d70f63b5494",
+      "decision": "accepted",
+      "evidence": "The complete fixture passed, the direct negative fixture exposed two current-guidance gaps, and the stale PR-head fixture was rejected."
+    },
+    {
+      "claim_id": "PKR-C2-inline-execution",
+      "check": "Source callsites declare dependencies and never receive ctx or scope callback arguments",
+      "replay": "node scripts/check-inline-exec-contract.mjs --expect-head \"$(git rev-parse HEAD)\"",
+      "exit_code": 0,
+      "value": {
+        "inline_exec_callsite_count": 51,
+        "inline_exec_contract_gap_count": 0,
+        "captured_dependency_count": 0,
+        "context_callback_argument_count": 0,
+        "ctx_scope_param_argument_count": 0,
+        "missing_deps_count": 0,
+        "missing_name_count": 0,
+        "missing_params_count": 0,
+        "legacy_inline_option_type_count": 0,
+        "public_context_callback_type_count": 0,
+        "uninspectable_callback_count": 0
+      },
+      "source_of_truth": "scripts/check-inline-exec-contract.mjs",
+      "sha256": "1d80090bc7ce240f515bd53333d055ce73dc299047e37d160a21676fd0dbf881",
+      "decision": "accepted",
+      "evidence": "The checker inspected 51 callsites. Every capture, callback-argument, missing-field, legacy-type, and uninspectable-callback counter was zero."
+    },
+    {
+      "claim_id": "PKR-C2-example-alignment",
+      "check": "Canonical examples, package map, dependency policy, guidance, and scripts remain aligned",
+      "replay": "pnpm examples:check",
+      "exit_code": 0,
+      "value": {
+        "example_package_count": 2,
+        "package_count": 27,
+        "example_readme_gap_count": 0,
+        "canonical_shape_gap_count": 0,
+        "dependency_policy_mismatch_count": 0,
+        "inventory_mismatch_count": 0,
+        "package_map_mismatch_count": 0,
+        "pattern_contract_gap_count": 0,
+        "script_surface_gap_count": 0,
+        "stale_markdown_example_ref_count": 0,
+        "usage_drift_count": 0
+      },
+      "source_of_truth": "scripts/check-example-alignment.mjs",
+      "sha256": "82bb2adca7d34fea29cad380d644b07dc3546ce0a2d8965de656a2d1ddb03fd9",
+      "decision": "accepted",
+      "evidence": "The checker covered two examples and 27 packages. All ten gap or drift metrics were zero."
+    },
+    {
+      "claim_id": "PKR-C2-package-release-coverage",
+      "check": "Every changed public source package has a changeset and every public package packs its changelog",
+      "replay": "deterministic worktree package and changeset manifest scan",
+      "exit_code": 0,
+      "value": {
+        "changed_public_source_package_count": 19,
+        "changed_public_source_package_without_changeset_count": 0,
+        "public_package_count": 26,
+        "missing_changelog_packing_count": 0
+      },
+      "source_of_truth": ".changeset/session-kernel-major.md, .changeset/session-kernel-public-contract.md, and public package manifests",
+      "sha256": [
+        "8e0bb2ee15af2929286c4693a7503423f758b8f450218049022fe1709cb77259",
+        "9d97005f5c9b42d8b0cdc879ba3931067cc9454251a80a5ff4ed9af67716b911"
+      ],
+      "decision": "accepted",
+      "evidence": "The worktree scan found 19 changed public source packages, no missing changesets, 26 public packages, and no missing CHANGELOG.md packing entry."
+    },
+    {
+      "claim_id": "PKR-C2-doc-hygiene",
+      "check": "Frozen documentation slice has no whitespace errors or stale current-guidance patterns",
+      "replay": "git diff --check plus current-guidance legacy-pattern scan excluding historical changelogs and explicit migration-before examples",
+      "exit_code": 0,
+      "value": {
+        "diff_error_count": 0,
+        "legacy_current_guidance_match_count": 0
+      },
+      "source_of_truth": "frozen worktree",
+      "sha256": {
+        "README.md": "35208f0ddc8345d55ca140bc253d41d196a39ffd4b9c7ab358463aad5c7f3328",
+        "pkg/core/lite/MIGRATION.md": "626cc0c90433b3efa4aa6d17a570f1db30c69a743ad981766ef24c2da10c657f",
+        "pkg/sdk/core/README.md": "b6f4472e05329b1ba57aeea91f38e2858f08b7510a4314871ae3e90ddf8bf41c",
+        "skills/pumped-fn/references/design.md": "e3f7e655ceacb3c0dab874dfea0bc88c65c333e12086789fa08cb3d3080d8b9c",
+        "pkg/framework/pumped/README.md": "4bd3b295a99a0f893dea20409a207dbc804aefa33a917bc33de4fffc4efae4b4"
+      },
+      "decision": "accepted",
+      "evidence": "Root, docs, skills, and examples use explicit inline execution. Pumped documents agent entries as application-owned structural adapters rather than an SDK facade."
+    }
+  ],
+  "summary": {
+    "accepted": 6,
+    "rejected": 0,
+    "rejected_claim_ids": []
+  },
+  "final_head_replay_caveat": "This artifact accepts the frozen PKR-C2 content slice at HEAD 7745ad0cc99ace663510ddab40716869c09ddce7. After the pending commit changes HEAD, rerun the public-contract and inline-execution checkers with the new exact head and refresh the PR snapshot before accepting final PR provenance."
+}

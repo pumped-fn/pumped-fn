@@ -1,0 +1,8 @@
+{
+  "type": "estimation_record",
+  "phase": "estimate",
+  "unit_id": "PKR-C4",
+  "estimate": { "time_min": 60, "turns": 1, "tokens": null },
+  "observed_at": "2026-07-16T08:05:00Z",
+  "dispatch_ref": "worker-packets/pkr-c4-public-interface-tsdoc.json"
+}

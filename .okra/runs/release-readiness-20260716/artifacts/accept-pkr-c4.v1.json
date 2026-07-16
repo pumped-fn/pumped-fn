@@ -1,0 +1,26 @@
+{
+  "type": "pkr_acceptance",
+  "unit_id": "PKR-C4",
+  "accepted_at": "2026-07-16T05:56:00Z",
+  "accepted_scope": "All 153 exported public interfaces remain in the denominator and all now have concise interface-specific TSDoc, with no runtime source change.",
+  "checkpoint_refs": [
+    "/tmp/pkr-c4-before.json",
+    "/tmp/pkr-c4-after.json"
+  ],
+  "checkpoint_sha256": {
+    "before": "34f63fa743577234a8b81ad581b1ff14431c163bb2cd1849927df2c4119f952c",
+    "after": "a4f468688dca5e95bbb1210afc5b59c826cdacdc98e75a802ff65b1d893bd83b"
+  },
+  "verification_ref": "workers/validator-pkr-c4/verification.v1.json",
+  "verification_sha256": "e92583379e589e0ccf12e77096cffa74848263d7522ac2dda68cfc59e2ec9675",
+  "metrics": {
+    "public_api_interface_count": 153,
+    "public_api_tsdoc_gap_count": 0,
+    "added_tsdoc_entry_count": 151,
+    "source_deletion_count": 0,
+    "non_tsdoc_source_change_count": 0,
+    "placeholder_description_count": 0,
+    "duplicate_description_count": 0
+  },
+  "remaining_gate": "The separate committed Lite lint callback narrowing defect required a narrow repair and is not part of this acceptance."
+}

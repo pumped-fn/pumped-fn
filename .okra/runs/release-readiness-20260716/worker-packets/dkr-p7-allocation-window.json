@@ -1,0 +1,29 @@
+{
+  "packet_version": 1,
+  "worker_id": "dkr-p7-allocation-window",
+  "unit_id": "DKR-P7",
+  "worker_kind": "discovery",
+  "required_protocol_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "frame": {
+    "objective": { "metric_id": "lifecycle_representative_allocation_ratio", "target": 0.9, "comparator": "<=" },
+    "source_dkr_refs": [
+      ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-p4.v1.json",
+      ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-p5.v1.json",
+      ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-p6.v1.json"
+    ],
+    "exact_head": "7745ad0cc99ace663510ddab40716869c09ddce7"
+  },
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "allocation_regression_case_count",
+    "post_close_live_resource_count",
+    "cross_session_leak_count",
+    "cleanup_business_state_mutation_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "assignment": "Discovery only in isolated scratch. Replace the rejected named async-wrapper attribution with one predeclared full active-window allocation method that includes allocations across async continuation boundaries. Use separate fresh processes and inspector sampling with collected objects included. For each DKR-P5 row, freeze a zero-operation control, one-batch observation, and two-batch observation before measurement. Define the zero subtraction, bytes-per-completed-operation calculation, minimum signal-to-control ratio, and acceptable corrected two-to-one proportionality band before running. Preserve exact operation counts, cleanup ownership, post-close zero live resources, and session post-close mutation rejection. Then, only if calibration passes for all three rows, run one frozen exact-head A/A allocation comparison in an interleaved order and require every row to stay inside a predeclared noise band. Do not reuse or widen the rejected DKR-P6 wrapper bands. Do not rerun until favorable. Do not edit product or .okra and do not claim baseline/candidate improvement or CKR success.",
+  "budget_and_stop_rule": { "time_min": 50, "turns": 1, "stop": "Run the new zero/one/two calibration and conditional A/A comparison once, accept or reject the method, and stop." },
+  "output_schema": "Executable checkpoint with predeclaration chronology/hash, exact runtime/build, scripts/hashes, zero/one/two raw bytes and corrected arithmetic per row, conditional A/A results, cleanup walls, replay, and reducing decision. Worker evidence is not acceptance."
+}

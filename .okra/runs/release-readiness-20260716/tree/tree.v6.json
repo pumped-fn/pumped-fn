@@ -1,0 +1,160 @@
+{
+  "ckrs": [
+    {
+      "id": "CKR-CONTRACT",
+      "metrics": [
+        {
+          "metric_id": "public_contract_gap_count",
+          "status": "accepted_working_tree",
+          "target": 0,
+          "value": 0
+        },
+        {
+          "metric_id": "public_api_tsdoc_gap_count",
+          "status": "accepted",
+          "target": 0,
+          "value": 0
+        },
+        {
+          "metric_id": "documentation_example_failure_count",
+          "status": "accepted",
+          "target": 0,
+          "value": 0
+        },
+        {
+          "metric_id": "current_guidance_exec_gap_count",
+          "status": "accepted",
+          "target": 0,
+          "value": 0
+        }
+      ],
+      "source_dkrs": [
+        "DKR-C",
+        "DKR-A"
+      ],
+      "status": "accepted_working_tree_pending_commit_head_replay"
+    },
+    {
+      "id": "CKR-PERFORMANCE",
+      "metrics": [
+        {
+          "metric_id": "lifecycle_representative_throughput_ratio",
+          "status": "protocol_accepted_measurement_pending",
+          "target": 1.1
+        },
+        {
+          "metric_id": "lifecycle_representative_allocation_ratio",
+          "status": "allocation_method_discovery_active",
+          "target": 0.9
+        }
+      ],
+      "source_dkrs": [
+        "DKR-P",
+        "DKR-P2",
+        "DKR-P3",
+        "DKR-P4",
+        "DKR-P5",
+        "DKR-P6",
+        "DKR-P7",
+        "DKR-P8"
+      ],
+      "status": "active_discovery_only"
+    }
+  ],
+  "dkrs": [
+    {
+      "acceptance_ref": "artifacts/accept-dkr-c.v1.json",
+      "id": "DKR-C",
+      "status": "accepted_reducing_discovery"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p.v2.json",
+      "id": "DKR-P",
+      "status": "accepted_reducing_discovery"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-a.v1.json",
+      "id": "DKR-A",
+      "status": "accepted_reducing_discovery_human_target_fixed"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p2.v1.json",
+      "id": "DKR-P2",
+      "status": "accepted_reducing_discovery"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p3.v1.json",
+      "id": "DKR-P3",
+      "status": "accepted_reducing_discovery"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p4.v1.json",
+      "id": "DKR-P4",
+      "status": "accepted_reducing_discovery"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p5.v1.json",
+      "id": "DKR-P5",
+      "status": "accepted_reducing_discovery"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p6.v1.json",
+      "id": "DKR-P6",
+      "status": "accepted_reducing_discovery_allocation_method_rejected"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p7.v1.json",
+      "id": "DKR-P7",
+      "status": "accepted_reducing_discovery_method_rejected"
+    },
+    {
+      "decision_target": "Establish the canonical Node/V8 sampled-allocation byte aggregate and a warmup-separated stationarity calibration.",
+      "id": "DKR-P8",
+      "status": "active",
+      "stop_rule": "Accept or reject the frozen aggregate and stationarity protocol once; do not measure product rows or optimize."
+    }
+  ],
+  "frame_version": 1,
+  "graph": {
+    "edges": [],
+    "nodes": []
+  },
+  "orchestrator": {
+    "owner": "Codex /root",
+    "responsibilities": [
+      "objective checks",
+      "check-ins",
+      "OKR board",
+      "subagent steering"
+    ],
+    "terminal_condition": "Continue until release_readiness_gap_count equals 0 with every active wall held, the human changes or stops the frame, or a blocking flag requires human resolution."
+  },
+  "pkrs": [
+    {
+      "acceptance_ref": "artifacts/accept-pkr-c1.v2.json",
+      "id": "PKR-C1",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-pkr-a1.v3.json",
+      "id": "PKR-A1",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-pkr-c2.v1.json",
+      "id": "PKR-C2",
+      "status": "accepted_pending_commit_head_replay"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-pkr-c3.v1.json",
+      "id": "PKR-C3",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-pkr-c4.v1.json",
+      "id": "PKR-C4",
+      "status": "accepted"
+    }
+  ],
+  "tree_version": 6
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "unit_id": "DKR-P8",
+  "worker_kind": "DKR",
+  "decision_target": "Establish the canonical Node/V8 sampled-allocation byte aggregate and a warmup-separated stationarity calibration before measuring product lifecycle allocation.",
+  "exact_start_head": "7745ad0cc99ace663510ddab40716869c09ddce7",
+  "workspace": "/tmp/session-kernel-publish-20260715-0746",
+  "scratch_only": true,
+  "primary_runtime_evidence": [
+    "https://nodejs.org/api/inspector.html",
+    "https://chromedevtools.github.io/devtools-protocol/v8/HeapProfiler/"
+  ],
+  "frozen_protocol": {
+    "runtime": "Node v26.4.0 / V8 14.6.202.34-node.21",
+    "candidate_aggregate": "sum HeapProfiler.SamplingHeapProfile.samples[].size across the complete sampling window",
+    "rationale": "The V8 inspector protocol defines each sample.size as allocation bytes attributed to that sample. Node exposes the protocol through node:inspector. node selfSize/sample equality is not a protocol invariant and must not be used as an acceptance gate.",
+    "sampling_interval_bytes": 1024,
+    "stack_depth": 64,
+    "warmup": "Complete identical unmeasured warmup before HeapProfiler.startSampling.",
+    "controls": ["zero retained allocation batches", "one retained allocation batch", "two retained allocation batches"],
+    "process_isolation": "Each control runs in a fresh process; keep allocated objects live until stopSampling returns.",
+    "zero_subtraction": "max(0, sampled bytes for N batches minus sampled bytes for zero batches)",
+    "proportionality_band": [1.75, 2.25],
+    "stationarity_band": [0.8, 1.25],
+    "minimum_corrected_signal_bytes": 1048576,
+    "chronology": "Write protocol and verifier before the first raw observation. Preserve every raw profile and hash. No favorable rerun."
+  },
+  "acceptance": [
+    "The verifier replays every raw profile hash and derived value.",
+    "All corrected one-batch signals exceed 1 MiB.",
+    "Every two-to-one corrected sampled-byte ratio is within 1.75 to 2.25.",
+    "Three independent one-batch observations are pairwise within the 0.80 to 1.25 stationarity band.",
+    "The method decision uses samples[].size only; node selfSize is informational.",
+    "No product, publishing clone source, or .okra state is edited by the worker."
+  ],
+  "stop_rule": "Accept or reject this aggregate and stationarity protocol once. Do not measure product rows, optimize code, or claim CKR performance."
+}

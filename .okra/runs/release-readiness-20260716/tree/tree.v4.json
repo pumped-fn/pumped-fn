@@ -1,0 +1,138 @@
+{
+  "ckrs": [
+    {
+      "id": "CKR-CONTRACT",
+      "metrics": [
+        {
+          "metric_id": "public_contract_gap_count",
+          "status": "baseline",
+          "target": 0,
+          "value": 182
+        },
+        {
+          "metric_id": "public_api_tsdoc_gap_count",
+          "status": "baseline",
+          "target": 0,
+          "value": 151
+        },
+        {
+          "metric_id": "documentation_example_failure_count",
+          "status": "baseline",
+          "target": 0,
+          "value": 3
+        }
+      ],
+      "source_dkrs": [
+        "DKR-C",
+        "DKR-A"
+      ],
+      "status": "active_baseline_readable"
+    },
+    {
+      "id": "CKR-PERFORMANCE",
+      "metrics": [
+        {
+          "metric_id": "lifecycle_representative_throughput_ratio",
+          "status": "unreadable",
+          "target": 1.1
+        },
+        {
+          "metric_id": "lifecycle_representative_allocation_ratio",
+          "status": "unreadable",
+          "target": 0.9
+        }
+      ],
+      "source_dkrs": [
+        "DKR-P",
+        "DKR-P2",
+        "DKR-P3",
+        "DKR-P4",
+        "DKR-P5"
+      ],
+      "status": "active_discovery_only"
+    }
+  ],
+  "dkrs": [
+    {
+      "acceptance_ref": "artifacts/accept-dkr-c.v1.json",
+      "id": "DKR-C",
+      "status": "accepted_reducing_discovery"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p.v2.json",
+      "id": "DKR-P",
+      "status": "accepted_reducing_discovery"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-a.v1.json",
+      "id": "DKR-A",
+      "status": "accepted_reducing_discovery_human_target_fixed"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p2.v1.json",
+      "id": "DKR-P2",
+      "status": "accepted_reducing_discovery"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p3.v1.json",
+      "id": "DKR-P3",
+      "status": "accepted_reducing_discovery"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-dkr-p4.v1.json",
+      "id": "DKR-P4",
+      "status": "accepted_reducing_discovery"
+    },
+    {
+      "decision_target": "Validate exact-head ownership-correct scope.run, managed ctx.exec, and SDK session lifecycle rows before product allocation measurement.",
+      "id": "DKR-P5",
+      "status": "active",
+      "stop_rule": "Accept or reject each predeclared row once; do not optimize or claim product allocation until ownership and cleanup checks pass."
+    }
+  ],
+  "frame_version": 1,
+  "graph": {
+    "edges": [],
+    "nodes": []
+  },
+  "orchestrator": {
+    "owner": "Codex /root",
+    "responsibilities": [
+      "objective checks",
+      "check-ins",
+      "OKR board",
+      "subagent steering"
+    ],
+    "terminal_condition": "Continue until release_readiness_gap_count equals 0 with every active wall held, the human changes or stops the frame, or a blocking flag requires human resolution."
+  },
+  "pkrs": [
+    {
+      "acceptance_ref": "artifacts/accept-pkr-c1.v2.json",
+      "id": "PKR-C1",
+      "status": "accepted"
+    },
+    {
+      "acceptance_ref": "artifacts/accept-pkr-a1.v3.json",
+      "id": "PKR-A1",
+      "status": "accepted"
+    },
+    {
+      "delivery": "Repair migration, changeset, package, PR, captured-exec, lint, codemod, and example contract gaps after the final execution API lands.",
+      "id": "PKR-C2",
+      "source_dkrs": [
+        "DKR-C",
+        "DKR-A"
+      ],
+      "status": "active"
+    },
+    {
+      "delivery": "Add TSDoc to the exported-interface denominator and prove built declaration coverage.",
+      "id": "PKR-C4",
+      "source_dkrs": [
+        "DKR-C"
+      ],
+      "status": "active"
+    }
+  ],
+  "tree_version": 4
+}

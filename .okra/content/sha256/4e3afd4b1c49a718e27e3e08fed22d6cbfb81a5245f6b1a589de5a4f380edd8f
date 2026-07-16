@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "review": "PKR-C3 observation context",
+  "decision": "accept",
+  "defects": [],
+  "evidence": [
+    {
+      "claim": "The safe projection is limited to session identity, activation, work lineage, channel, role, and tool.",
+      "location": "pkg/sdk/core/src/session.ts:249-258"
+    },
+    {
+      "claim": "The application channel is an explicit optional session.run dependency.",
+      "location": "pkg/sdk/core/src/session.ts:1563-1571"
+    },
+    {
+      "claim": "The session base projection includes the optional channel and does not include a tool.",
+      "location": "pkg/sdk/core/src/session.ts:1588-1595"
+    },
+    {
+      "claim": "The agent turn explicitly declares the current observation projection dependency.",
+      "location": "pkg/sdk/core/src/agent.ts:221-235"
+    },
+    {
+      "claim": "Selected tool execution receives a fresh child-local projection with only the selected tool name added.",
+      "location": "pkg/sdk/core/src/agent.ts:390-395"
+    },
+    {
+      "claim": "Exact assertions prove the parent agent.turn projection has no tool while the inspect child has tool=inspect, with no prompt, tool input, memory, credentials, or backend fields.",
+      "location": "pkg/sdk/core/tests/agent-runtime-safety.test.ts:103-125"
+    },
+    {
+      "claim": "Separate sibling contexts prove execution-local channel isolation.",
+      "location": "pkg/sdk/core/tests/session-kernel.test.ts:650-701"
+    }
+  ],
+  "gates": [
+    {
+      "command": "pnpm --filter ./pkg/sdk/core typecheck",
+      "result": "pass"
+    },
+    {
+      "command": "pnpm --filter ./pkg/sdk/core exec vitest run tests/agent-runtime-safety.test.ts tests/session-kernel.test.ts",
+      "result": "pass",
+      "test_files": 2,
+      "tests": 37
+    },
+    {
+      "command": "pnpm inline-exec:check -- --expect-head 7745ad0cc99ace663510ddab40716869c09ddce7",
+      "result": "pass",
+      "inline_exec_callsite_count": 51,
+      "inline_exec_contract_gap_count": 0,
+      "ctx_scope_param_argument_count": 0
+    }
+  ],
+  "worker_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

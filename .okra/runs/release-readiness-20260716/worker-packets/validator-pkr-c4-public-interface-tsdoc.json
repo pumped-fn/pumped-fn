@@ -1,0 +1,17 @@
+{
+  "packet_version": 1,
+  "worker_id": "validator-pkr-c4-public-interface-tsdoc",
+  "unit_id": "PKR-C4-VALIDATION",
+  "worker_kind": "validator",
+  "required_protocol_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "subject": {
+    "exact_start_head": "7745ad0cc99ace663510ddab40716869c09ddce7",
+    "before_metrics": "/tmp/pkr-c4-before.json",
+    "before_sha256": "34f63fa743577234a8b81ad581b1ff14431c163bb2cd1849927df2c4119f952c",
+    "after_metrics": "/tmp/pkr-c4-after.json",
+    "after_sha256": "a4f468688dca5e95bbb1210afc5b59c826cdacdc98e75a802ff65b1d893bd83b"
+  },
+  "assignment": "Independently validate only the source-interface TSDoc slice in the shared publishing clone. Confirm the two metric hashes, audit every source diff against exact_start_head, prove there are exactly 151 added TSDoc entries, zero source deletions, zero non-TSDoc source changes, and no interface-denominator shrink. Rebuild affected declarations and rerun the public-contract checker with a /tmp PR snapshot. Confirm public_api_interface_count=153 and public_api_tsdoc_gap_count=0. Review TSDoc for meaningful contract wording rather than placeholder repetition. Treat the known committed lite-lint type narrowing error as a separate unresolved gate, not as a reason to alter source. Do not edit any file.",
+  "stop_rule": "Accept or reject the TSDoc claim once from independent replay and stop.",
+  "output_schema": "Claim-by-claim accepted/rejected verdicts, exact commands/values, semantic sample review, and remaining blocked gates."
+}

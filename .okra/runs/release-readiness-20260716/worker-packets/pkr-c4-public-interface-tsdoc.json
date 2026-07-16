@@ -1,0 +1,23 @@
+{
+  "packet_version": 1,
+  "worker_id": "pkr-c4-public-interface-tsdoc",
+  "unit_id": "PKR-C4",
+  "worker_kind": "progression",
+  "required_protocol_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "frame": {
+    "objective": { "metric_id": "public_api_tsdoc_gap_count", "target": 0, "comparator": "==" },
+    "source_dkr_ref": ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-c.v1.json",
+    "exact_start_head": "7745ad0cc99ace663510ddab40716869c09ddce7"
+  },
+  "active_anti_goals": [
+    "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+    "redundant_graph_ceremony_count",
+    "failed_required_gate_count_and_unresolved_review_blocker_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "assignment": "Progression work in the shared publishing clone. Add concise, meaningful TSDoc only to source interface declarations that the public-contract checker reports in public_api_tsdoc_gaps. Do not add inline or block comments, document non-public interfaces, change runtime behavior, rename symbols, add facade types, or edit Markdown, manifests, changesets, scripts, tests, .okra, or generated dist. Rebuild affected packages and run the exact public-contract checker with /tmp/pr-346-contract-local-head.json adjusted to the resulting working tree HEAD expectation only where needed. The target is public_api_tsdoc_gap_count=0; all other contract metrics must not regress.",
+  "allowed_paths": ["pkg/**/src/**/*.ts", "pkg/**/src/**/*.tsx"],
+  "budget_and_stop_rule": { "time_min": 60, "turns": 1, "stop": "Stop when the TSDoc denominator reaches zero or when a source-to-declaration mapping cannot be proven. Do not commit." },
+  "output_schema": "Changed path list, before/after TSDoc metrics, exact build/check commands, failures, and wall reads. Worker evidence is not acceptance."
+}

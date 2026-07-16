@@ -1,0 +1,31 @@
+{
+  "packet_version": 1,
+  "worker_id": "dkr-p6-measurement-protocol",
+  "unit_id": "DKR-P6",
+  "worker_kind": "discovery",
+  "required_protocol_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "frame": {
+    "objective": {
+      "throughput": { "metric_id": "lifecycle_representative_throughput_ratio", "target": 1.1, "comparator": ">=" },
+      "allocation": { "metric_id": "lifecycle_representative_allocation_ratio", "target": 0.9, "comparator": "<=" }
+    },
+    "source_dkr_refs": [
+      ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-p4.v1.json",
+      ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-p5.v1.json"
+    ],
+    "exact_head": "7745ad0cc99ace663510ddab40716869c09ddce7"
+  },
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "allocation_regression_case_count",
+    "post_close_live_resource_count",
+    "cross_session_leak_count",
+    "cleanup_business_state_mutation_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "assignment": "Discovery only in an isolated scratch directory. Freeze one representative paired measurement protocol for the three accepted DKR-P5 lifecycle rows: owned scope.run resource, managed ctx.exec default-boundary resource, and drained SDK session.run trivial turn. Build two independent archives of the same exact HEAD and run them as an A/A control. Predeclare row batch sizes, warmup, ordering, aggregation, allocation sampling settings, wrapper attribution, zero controls, cleanup assertions, and acceptance bands before measurement. Throughput must use separate processes and an interleaved fixed order; do not rerun until favorable. Allocation must validate positive attributed bytes and exact-zero wrappers not invoked, cover collected lifecycle allocations or explicitly reject the method, and report bytes per completed operation. Require A/A throughput and allocation ratios to remain within frozen noise bands for every representative row. Preserve post-close live resource, cross-owner leak, and cleanup mutation checks. Do not edit product or .okra. Do not optimize or claim CKR success.",
+  "budget_and_stop_rule": { "time_min": 55, "turns": 1, "stop": "Run the predeclared A/A protocol once. Accept or reject the protocol and each row, then stop." },
+  "output_schema": "Executable checkpoint with predeclaration hash, exact archives/build/runtime, scripts and hashes, row semantics, raw throughput/allocation observations, ratios, cleanup walls, replay, accepted/rejected protocol decision, and the smallest downstream measurement-harness delivery if accepted. Worker evidence is not acceptance."
+}

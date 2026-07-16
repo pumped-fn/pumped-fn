@@ -1,0 +1,200 @@
+{
+  "schema": "pumped-fn.okra.discovery-checkpoint.v1",
+  "checkpointId": "DKR-P7.allocation-window.2026-07-16T06:20:13Z",
+  "conclusionId": "dkr-p7-full-active-window-rejected-calibration",
+  "unitId": "DKR-P7",
+  "workerId": "dkr-p7-allocation-window",
+  "workerKind": "discovery",
+  "decisionTarget": "Whether a full active-window Node inspector allocation method calibrates for all three DKR-P5 lifecycle rows and is stable enough for a frozen exact-head A/A comparison.",
+  "sourceOfTruth": [
+    "git:7745ad0cc99ace663510ddab40716869c09ddce7",
+    "/tmp/dkr-p7-allocation-window-7745ad0c/predeclare.json",
+    "/tmp/dkr-p7-allocation-window-7745ad0c/predeclaration-chronology.json",
+    "/tmp/dkr-p7-allocation-window-7745ad0c/results/calibration.sha256",
+    "/tmp/dkr-p7-allocation-window-7745ad0c/scripts/replay-rejection.mjs"
+  ],
+  "readMethod": "Verify the frozen predeclaration and scripts, verify all nine raw profile hashes, reproduce the frozen profile-consistency failure, recompute zero subtraction and proportionality for each row, and confirm that no A/A observation exists.",
+  "exactHead": "7745ad0cc99ace663510ddab40716869c09ddce7",
+  "observedAt": "2026-07-16T06:17:47.935Z",
+  "recordedAt": "2026-07-16T06:20:13Z",
+  "maxAge": "30m",
+  "freshnessStatus": "fresh",
+  "confidence": 0.99,
+  "predeclaration": {
+    "thresholdsAndChronologyFrozenAt": "2026-07-16T06:17:13Z",
+    "hashesRecordedAt": "2026-07-16T06:17:28Z",
+    "firstRawObservedAt": "2026-07-16T06:17:45.483Z",
+    "predeclarationSha256": "2cf5ef3e73fdf1953c78b304fa1b86f0c3cc13c9e63b984cda0c3c1999f195b6",
+    "chronologySha256": "6fbcaa62ae4bcf741ec528535efe61da16edf5f159f05298efd7190f035f9117",
+    "frozenBeforeMeasurement": true
+  },
+  "runtime": {
+    "node": "v26.4.0",
+    "v8": "14.6.202.34-node.21",
+    "pnpm": "10.33.4",
+    "kernel": "Linux forge 6.12.95+deb13-amd64 x86_64",
+    "cpu": "Intel(R) Xeon(R) CPU E3-1245 v5 @ 3.50GHz",
+    "logicalCpuCount": 8
+  },
+  "build": {
+    "archiveASha256": "df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee",
+    "archiveBSha256": "df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee",
+    "pnpmLockSha256": "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120",
+    "packageJsonSha256": "d01d6911abf560cd32dc1d39d84b7a5617f037bffffbd7e94aa987dcd490cdcb",
+    "distManifest": {
+      "A": "7d38bb97b01bfdc85ac1cfe61590b291a79cd68ee1d253880c46855aab46d9f3",
+      "B": "7d38bb97b01bfdc85ac1cfe61590b291a79cd68ee1d253880c46855aab46d9f3",
+      "fileCountPerBuild": 34,
+      "identical": true
+    },
+    "installCommand": "pnpm install --frozen-lockfile --offline",
+    "buildCommand": "pnpm --filter @pumped-fn/sdk... build"
+  },
+  "method": {
+    "activeWindow": "Runtime import completes before sampling. Sampling starts before the first lifecycle operation and stops only after every awaited continuation and cleanup in the batch completes.",
+    "samplingIntervalBytes": 16384,
+    "stackDepth": 64,
+    "includeObjectsCollectedByMajorGC": true,
+    "processIsolation": "Each zero, one, and two control ran in a separate fresh Node process.",
+    "zeroSubtraction": "max(0, measured full-window node selfSize bytes - zero-operation full-window node selfSize bytes)",
+    "bytesPerCompletedOperation": "corrected bytes divided by completed lifecycle operations",
+    "correctedOneBytesMin": 262144,
+    "signalToControlRatioMin": 3,
+    "correctedTwoToOneBand": [1.75, 2.25],
+    "perOperationBand": [0.875, 1.125],
+    "conditionalAaNoiseBand": [0.8, 1.25]
+  },
+  "rawObservationInventory": {
+    "calibration": 9,
+    "aa": 0,
+    "manifestRef": "results/calibration.sha256",
+    "manifestSha256": "1c4d58d38286a59d8d072d166105dfbaae7817d13e45fcd1a5f95e353494682c"
+  },
+  "calibration": {
+    "scope_run": {
+      "operations": { "zero": 0, "one": 4000, "two": 8000 },
+      "rawNodeBytes": { "zero": 16416, "one": 62042248, "two": 90660456 },
+      "rawSampleBytes": { "zero": 16416, "one": 62047464, "two": 90654872 },
+      "correctedNodeBytes": { "one": 62025832, "two": 90644040 },
+      "bytesPerCompletedOperation": { "one": 15506.458, "two": 11330.505 },
+      "twoToOneRatio": 1.4613917633543392,
+      "signalToControlRatio": 3778.3767056530214,
+      "perOperationRatio": 0.7306958816771695,
+      "failedChecks": ["profileConsistency", "correctedTwoToOneBand", "perOperationBand"],
+      "decision": "rejected"
+    },
+    "managed_ctx_exec": {
+      "operations": { "zero": 0, "one": 2000, "two": 4000 },
+      "rawNodeBytes": { "zero": 0, "one": 10180080, "two": 46884448 },
+      "rawSampleBytes": { "zero": 0, "one": 10190896, "two": 46939824 },
+      "correctedNodeBytes": { "one": 10180080, "two": 46884448 },
+      "bytesPerCompletedOperation": { "one": 5090.04, "two": 11721.112 },
+      "twoToOneRatio": 4.6055087975733,
+      "signalToControlRatio": 10180080,
+      "perOperationRatio": 2.3027543987866497,
+      "failedChecks": ["profileConsistency", "correctedTwoToOneBand", "perOperationBand"],
+      "decision": "rejected"
+    },
+    "sdk_session_run": {
+      "operations": { "zero": 0, "one": 300, "two": 600 },
+      "rawNodeBytes": { "zero": 0, "one": 12672296, "two": 28061304 },
+      "rawSampleBytes": { "zero": 0, "one": 12739464, "two": 28072592 },
+      "correctedNodeBytes": { "one": 12672296, "two": 28061304 },
+      "bytesPerCompletedOperation": { "one": 42240.986666666664, "two": 46768.84 },
+      "twoToOneRatio": 2.214381987289438,
+      "signalToControlRatio": 12672296,
+      "perOperationRatio": 1.107190993644719,
+      "failedChecks": ["profileConsistency"],
+      "decision": "rejected"
+    }
+  },
+  "result": {
+    "acceptedCalibrationRowCount": 0,
+    "rejectedCalibrationRowCount": 3,
+    "conditionalAaRan": false,
+    "methodAccepted": false,
+    "decision": "worker_rejected_pending_independent_validation",
+    "reason": "All nonzero controls violated the frozen profile node-versus-sample consistency rule. scope.run and managed ctx.exec also violated both frozen proportionality bands. The conditional A/A gate therefore did not open.",
+    "measurementImplementation": "blocked",
+    "optimization": "blocked",
+    "productPerformanceClaim": "blocked"
+  },
+  "cleanupWalls": {
+    "postCloseLiveResourceCount": 0,
+    "crossSessionLeakCount": 0,
+    "cleanupBusinessStateMutationCount": 0,
+    "sessionPostCloseMutationRejectedCount": 900,
+    "sessionCompletedOperationCount": 900,
+    "everySessionPostCloseMutationRejected": true
+  },
+  "questionsAnswered": [
+    "The full active-window observer collects large positive one-batch signals for every row, including allocations across awaited continuation boundaries.",
+    "The frozen representation-consistency rule does not hold in any nonzero profile: summed profile node selfSize and summed profile sample size differ.",
+    "scope.run and managed ctx.exec are not proportional under the frozen zero, one, and two chronology; sdk.session.run is proportional but still fails representation consistency.",
+    "Every calibration process preserves zero post-close live resources, zero cross-owner mismatches, zero cleanup business-state mutations, and per-operation SDK post-close mutation rejection.",
+    "The conditional A/A comparison did not run because calibration failed, exactly as predeclared."
+  ],
+  "questionsUnanswered": [
+    "Which Node/V8 HeapProfiler aggregate is the authoritative allocation-byte source when profile node selfSize and profile sample size differ with collected objects included.",
+    "Whether a source-justified aggregate plus a frozen pre-sampling lifecycle warmup can make full-window one/two batches stationary for all three rows.",
+    "No baseline-versus-candidate allocation ratio, product improvement, CKR success, or optimization target is supported."
+  ],
+  "decision": "Reject this frozen full active-window protocol. Fund a new reducing DKR only after choosing the canonical HeapProfiler aggregate from runtime protocol evidence and freezing a batch-stationarity control that does not reinterpret these rejected profiles.",
+  "nextReducingDiscovery": "Verify the canonical Node/V8 sampling-profile byte aggregate from primary runtime evidence, then predeclare a warmup-separated stationarity calibration with new raw observations. Preserve DKR-P7 as rejected and do not widen its bands or rerun it.",
+  "activeAntiGoals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "allocation_regression_case_count",
+    "post_close_live_resource_count",
+    "cross_session_leak_count",
+    "cleanup_business_state_mutation_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "activeAntiGoalVerification": {
+    "invalid_performance_comparison_count": { "value": 0, "threshold": 0, "verdict": "worker_observed_pending_independent_validation", "evidenceRef": "results/calibration.sha256" },
+    "unsupported_performance_claim_count": { "value": 0, "threshold": 0, "verdict": "worker_observed_pending_independent_validation", "evidenceRef": "checkpoint.v1.json#result" },
+    "allocation_regression_case_count": { "value": 0, "threshold": 0, "verdict": "worker_observed_pending_independent_validation", "evidenceRef": "checkpoint.v1.json#result" },
+    "post_close_live_resource_count": { "value": 0, "threshold": 0, "verdict": "worker_observed_pending_independent_validation", "evidenceRef": "checkpoint.v1.json#cleanupWalls" },
+    "cross_session_leak_count": { "value": 0, "threshold": 0, "verdict": "worker_observed_pending_independent_validation", "evidenceRef": "checkpoint.v1.json#cleanupWalls" },
+    "cleanup_business_state_mutation_count": { "value": 0, "threshold": 0, "verdict": "worker_observed_pending_independent_validation", "evidenceRef": "checkpoint.v1.json#cleanupWalls" },
+    "single_llm_truth_acceptance_count": { "value": null, "threshold": 0, "verdict": "pending_independent_validation", "evidenceRef": "checkpoint.v1.json#reviewerAuditStatus" },
+    "anti_goal_bypass_or_dishonesty_count": { "value": 0, "threshold": 0, "verdict": "worker_observed_pending_independent_validation", "evidenceRef": "predeclaration-chronology.json" }
+  },
+  "wallGate": {
+    "verdict": "blocked_pending_independent_validation",
+    "downstreamAdvance": "blocked",
+    "measurementImplementation": "blocked",
+    "optimization": "blocked",
+    "decidedAt": "2026-07-16T06:20:13Z"
+  },
+  "reviewerAuditStatus": "pending_independent_validation",
+  "evidenceHashes": {
+    "predeclare.json": "2cf5ef3e73fdf1953c78b304fa1b86f0c3cc13c9e63b984cda0c3c1999f195b6",
+    "predeclaration-chronology.json": "6fbcaa62ae4bcf741ec528535efe61da16edf5f159f05298efd7190f035f9117",
+    "scripts/workloads.mjs": "3bedd2f28108eeca478304f94e284af9e18092157b51c6126d7ed922a2c6096f",
+    "scripts/observe.mjs": "aea1dcf7321cf5197daa2b1e59724064542d1a6ac0b00e802286182d9d85e69f",
+    "scripts/replay.mjs": "8099875d6219a9a05a29a6371ec55a9714a174482061c738c21275e0b038c7f8",
+    "scripts/run-once.sh": "bc9c3c53a1496f3d6065673a11f5e558d359948b71788e92570f84904bf03a9b",
+    "scripts/replay-rejection.mjs": "1c389ad0658466ac4cf4c286b73429b085e0a59e616b6c8c7ecf82c33ad8685c",
+    "results/calibration.sha256": "1c4d58d38286a59d8d072d166105dfbaae7817d13e45fcd1a5f95e353494682c",
+    "archives/head-a.tar": "df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee",
+    "archives/head-b.tar": "df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee",
+    "build-a/pnpm-lock.yaml": "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120",
+    "build-a/package.json": "d01d6911abf560cd32dc1d39d84b7a5617f037bffffbd7e94aa987dcd490cdcb"
+  },
+  "replayOutputSha256": "7e5f353e5750667d4e30203379ad4b90a54db3b9cac579048a0e1f4b170b59b2",
+  "replayCommand": "cd /tmp/dkr-p7-allocation-window-7745ad0c && node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+  "exactCommands": [
+    "git archive --format=tar --output=archives/head-a.tar 7745ad0cc99ace663510ddab40716869c09ddce7",
+    "git archive --format=tar --output=archives/head-b.tar 7745ad0cc99ace663510ddab40716869c09ddce7",
+    "pnpm install --frozen-lockfile --offline",
+    "pnpm --filter @pumped-fn/sdk... build",
+    "bash scripts/run-once.sh",
+    "node scripts/replay-rejection.mjs ."
+  ],
+  "stopRuleObserved": "The frozen zero, one, and two controls ran once. Calibration rejected all three rows. The conditional A/A comparison did not run. Every raw outcome remains preserved, and no measurement was rerun after the result became visible.",
+  "workspaceEffect": "No publishing-clone product or .okra file was edited. Every generated file is under /tmp/dkr-p7-allocation-window-7745ad0c.",
+  "requiredSentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "workerEvidenceIsAcceptance": false
+}

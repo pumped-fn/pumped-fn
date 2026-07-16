@@ -1,0 +1,29 @@
+{
+  "packet_version": 1,
+  "worker_id": "pkr-c2-release-contract-docs",
+  "unit_id": "PKR-C2",
+  "worker_kind": "progression",
+  "required_protocol_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "frame": {
+    "objective": { "metric_id": "public_contract_gap_count", "target": 0, "comparator": "==" },
+    "source_dkr_refs": [
+      ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-c.v1.json",
+      ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-a.v1.json"
+    ],
+    "exact_start_head": "7745ad0cc99ace663510ddab40716869c09ddce7"
+  },
+  "active_anti_goals": [
+    "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+    "implicit_required_dependency_count",
+    "context_argument_pass_count",
+    "premature_tool_or_mcp_surface_count",
+    "redundant_graph_ceremony_count",
+    "failed_required_gate_count_and_unresolved_review_blocker_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "assignment": "Progression work in the shared publishing clone, using Claude Luna high as the writing engine in safe mode. Repair release-facing documentation and package contract gaps without touching source code, tests, scripts, generated dist, .okra, or PR state. Add current-major Lite and SDK migration evidence; align the root README diagram, Lite and SDK README/PATTERNS, observability and canonical examples with the final explicit ctx.exec/scope.run contract; remove stale material, cliWorker, facade, captured dependency, and obsolete codemod shapes; make the three failing TypeScript fences syntactically valid while preserving meaning; add changeset coverage for logging, observable, scheduler, sync, and lite-react; and include CHANGELOG.md in the 16 affected published package file lists. Do not document or expose MCP/tool collection work. Use inferred handles and explicit deps/params in every example. Do not pass ctx or scope as callback arguments.",
+  "allowed_paths": ["README.md", "docs/**/*.md", "examples/**/*.md", "pkg/**/*.md", "pkg/**/package.json", ".changeset/*.md"],
+  "budget_and_stop_rule": { "time_min": 75, "turns": 1, "stop": "Stop when the assigned docs/package gaps are repaired or when shipped code cannot support a statement. Do not commit or update the PR." },
+  "output_schema": "Changed path list, gap-by-gap disposition, exact checks run, remaining contract metrics, and wall reads. Writer evidence is not acceptance."
+}

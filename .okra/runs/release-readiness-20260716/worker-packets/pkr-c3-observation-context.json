@@ -1,0 +1,26 @@
+{
+  "packet_version": 1,
+  "worker_id": "pkr-c3-observation-context",
+  "unit_id": "PKR-C3",
+  "worker_kind": "progression",
+  "required_protocol_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "frame": {
+    "objective": { "metric_id": "docs_code_contract_mismatch_count_and_prime_rationale_violation_count", "target": 0, "comparator": "==" },
+    "source_dkr_ref": ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-c.v1.json",
+    "source_gap": "G3",
+    "exact_start_head": "7745ad0cc99ace663510ddab40716869c09ddce7"
+  },
+  "active_anti_goals": [
+    "sensitive_observation_export_count",
+    "implicit_required_dependency_count",
+    "hidden_execution_edge_count",
+    "context_argument_pass_count",
+    "cross_session_leak_count",
+    "premature_tool_or_mcp_surface_count",
+    "single_llm_truth_acceptance_count"
+  ],
+  "assignment": "Progression work. Complete the already-public ObservationProjection contract without arbitrary tag enumeration. Add a namespaced string tag that inbound adapters can set for channel identity; declare it as an optional session.run dependency and include it in the safe projection. Declare the current projection as an optional agent.turn dependency; when a selected tool executes, override only the safe projection tag for that child execution with the selected tool name. Do not pass ctx or scope, expose prompts/tool inputs/memory/credentials/backend handles, add MCP, or add implicit lookup. Test channel propagation, tool-only child refinement, sibling isolation, and the absence of widened data. Keep the tag/flow/resource graph explicit and use the existing scope seam.",
+  "allowed_paths": ["pkg/sdk/core/src/session.ts", "pkg/sdk/core/src/agent.ts", "pkg/sdk/core/tests/**/*.ts", "pkg/sdk/core/README.md", "pkg/sdk/core/PATTERNS.md"],
+  "budget_and_stop_rule": { "time_min": 35, "turns": 1, "stop": "Stop when focused SDK tests and typecheck pass and the projection contains only its declared safe fields. Do not commit or update the PR." },
+  "output_schema": "Changed paths, exact projection before/inside/after tool, focused tests, typecheck, and active-wall reads. Progression evidence is not acceptance."
+}

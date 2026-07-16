@@ -1,0 +1,21 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P5",
+  "accepted_at": "2026-07-16T05:50:30Z",
+  "accepted_scope": "Reducing discovery: the exact-head owned scope.run, managed ctx.exec, and SDK session.run rows use the same owners for execution and cleanup and reach zero live resources after close.",
+  "checkpoint_ref": "workers/dkr-p5-lifecycle-rows/checkpoint.v1.json",
+  "checkpoint_sha256": "77b68ccb58cf12281e793f6ab3d6b67ee1490776b32635528233506c8b2dd182",
+  "verification_ref": "workers/validator-dkr-p5/verification.v1.json",
+  "verification_sha256": "327ba844f44275bf062ae54690e85847ae34327664ca25613c277d2d18763563",
+  "rows": {
+    "scope_run": { "creation": 1, "execution": 1, "cleanup": 1, "post_close_live": 0 },
+    "managed_ctx_exec": { "creation": 1, "execution": 2, "cleanup": 1, "post_close_live": 0 },
+    "sdk_session_run": { "creation": 1, "execution": 1, "cleanup": 1, "post_close_live": 0, "drained_result": 1 }
+  },
+  "walls": {
+    "cross_session_leak_count": 0,
+    "cleanup_business_state_mutation_count": 0,
+    "single_llm_truth_acceptance_count": 0
+  },
+  "downstream_authority": "Fund one discovery unit that freezes representative batch sizes and paired throughput/allocation comparison protocol. This acceptance makes no throughput, allocation, CKR, or optimization claim."
+}

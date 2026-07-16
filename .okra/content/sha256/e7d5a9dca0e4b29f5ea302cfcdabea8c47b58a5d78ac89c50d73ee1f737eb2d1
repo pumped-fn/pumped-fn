@@ -1,0 +1,187 @@
+{
+  "schema": "pumped-fn.okra.discovery-checkpoint.v1",
+  "checkpointId": "DKR-P6.measurement-protocol.2026-07-16T06:01:25Z",
+  "conclusionId": "dkr-p6-aa-protocol-rejected-allocation-attribution-sparse",
+  "unitId": "DKR-P6",
+  "workerId": "dkr-p6-measurement-protocol",
+  "workerKind": "discovery",
+  "exactHead": "7745ad0cc99ace663510ddab40716869c09ddce7",
+  "observedAt": "2026-07-16T06:00:00Z",
+  "recordedAt": "2026-07-16T06:01:25Z",
+  "predeclarationRef": "predeclare.json",
+  "predeclarationHash": "16e29598b18cb266cfbba94d03a73cf710bb811baeed2a5aa57e8815202f7cfb",
+  "decisionTarget": "Whether one frozen A/A protocol can measure throughput and sampled allocation bytes per completed operation for the three accepted DKR-P5 lifecycle rows without violating cleanup walls.",
+  "readMethod": "Verify every preserved hash, deterministically replay the 54 raw observations, and apply the predeclared per-row throughput, allocation, zero-control, and cleanup gates.",
+  "archivesAndBuilds": {
+    "archiveA": {
+      "ref": "archives/head-a.tar",
+      "sha256": "df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee",
+      "buildRoot": "build-a",
+      "distManifestRef": "logs/build-a-dist.sha256",
+      "distManifestSha256": "a916f074f78fb24d2d9dd780d4de378fd1a51d93cd6941063523aff318b623ad"
+    },
+    "archiveB": {
+      "ref": "archives/head-b.tar",
+      "sha256": "df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee",
+      "buildRoot": "build-b",
+      "distManifestRef": "logs/build-b-dist.sha256",
+      "distManifestSha256": "a916f074f78fb24d2d9dd780d4de378fd1a51d93cd6941063523aff318b623ad"
+    },
+    "installCommand": "pnpm install --frozen-lockfile --offline",
+    "buildCommand": "pnpm --filter @pumped-fn/sdk... build",
+    "independentArchiveCount": 2,
+    "independentBuildCount": 2,
+    "identicalDistManifest": true
+  },
+  "runtime": {
+    "node": "v26.4.0",
+    "v8": "14.6.202.34-node.21",
+    "pnpm": "10.33.4",
+    "kernel": "Linux forge 6.12.95+deb13-amd64 x86_64",
+    "cpu": "Intel(R) Xeon(R) CPU E3-1245 v5 @ 3.50GHz",
+    "logicalCpuCount": 8
+  },
+  "rowSemantics": {
+    "scope_run": "One current-owned resource per scope.run operation; one execution and one cleanup; zero live after the one-shot boundary.",
+    "managed_ctx_exec": "One default-boundary resource per managed context; two ctx.exec executions share it; one cleanup and zero live after context close.",
+    "sdk_session_run": "One owned SDK session per operation; one drained trivial turn; one cleanup; post-close mutation rejection; zero live after context close."
+  },
+  "rawObservationInventory": {
+    "throughput": 30,
+    "allocationMeasured": 18,
+    "allocationZeroControl": 6,
+    "total": 54,
+    "manifestRef": "results/raw.sha256",
+    "manifestSha256": "ee2cf84fa79572176d584b367471f8d23bec8cc94a36097f03669cc9708bf6e6",
+    "replayRef": "results/replay.v1.json",
+    "replaySha256": "bc7e0544239e8448d6c2152e693cfcea4c6ea23db6efb87992e82d843729f973"
+  },
+  "throughput": {
+    "schedule": ["A", "B", "B", "A", "A", "B", "B", "A", "A", "B"],
+    "aggregation": "median operations per second from five fresh processes per archive and row",
+    "noiseBand": [0.8, 1.25],
+    "rows": {
+      "scope_run": {
+        "archiveAObservations": [24068.10392518223, 20703.73421142287, 24295.028279382546, 13676.804860408205, 20838.6631470373],
+        "archiveBObservations": [17507.913828726847, 22993.277380764037, 24825.566107779665, 24955.11619591845, 21541.665828112444],
+        "archiveAMedian": 20838.6631470373,
+        "archiveBMedian": 22993.277380764037,
+        "ratioBToA": 1.1033950315585894,
+        "workerDecision": "pass_pending_independent_validation"
+      },
+      "managed_ctx_exec": {
+        "archiveAObservations": [18635.135470819398, 6826.313524538785, 14935.867364539095, 16650.52994432554, 16310.386392075005],
+        "archiveBObservations": [16207.301630873502, 17818.258644033725, 13275.125448276096, 18135.83888410909, 18907.0167474762],
+        "archiveAMedian": 16310.386392075005,
+        "archiveBMedian": 17818.258644033725,
+        "ratioBToA": 1.0924485916956188,
+        "workerDecision": "pass_pending_independent_validation"
+      },
+      "sdk_session_run": {
+        "archiveAObservations": [1746.8604746640901, 2217.026743217644, 2040.7348845496585, 1592.8009221043094, 2052.8956061731637],
+        "archiveBObservations": [2133.0078192760493, 1964.2801739633308, 1851.740815985886, 2070.6632254590613, 1779.2821331436287],
+        "archiveAMedian": 2040.7348845496585,
+        "archiveBMedian": 1964.2801739633308,
+        "ratioBToA": 0.9625356967408338,
+        "workerDecision": "pass_pending_independent_validation"
+      }
+    }
+  },
+  "allocation": {
+    "samplingIntervalBytes": 32768,
+    "stackDepth": 64,
+    "includeObjectsCollectedByMajorGC": true,
+    "attribution": "Complete sampled subtree beneath every exact named lifecycle wrapper, divided by completed operations.",
+    "schedule": ["A", "B", "B", "A", "A", "B"],
+    "aggregation": "median attributed bytes per completed operation from three fresh processes per archive and row",
+    "noiseBand": [0.7, 1.43],
+    "rows": {
+      "scope_run": {
+        "zeroAttributedBytes": { "A": 0, "B": 0 },
+        "archiveABytesPerOperation": [6.5664, 0, 6.5824],
+        "archiveBBytesPerOperation": [0, 13.128, 19.6912],
+        "archiveAMedian": 6.5664,
+        "archiveBMedian": 13.128,
+        "ratioBToA": 1.9992690058479532,
+        "positiveAttributedBytesEveryObservation": false,
+        "workerDecision": "rejected_zero_real_signal_and_ratio_outside_band"
+      },
+      "managed_ctx_exec": {
+        "zeroAttributedBytes": { "A": 0, "B": 0 },
+        "archiveABytesPerOperation": [32.856, 0, 16.52],
+        "archiveBBytesPerOperation": [32.864, 33.016, 16.44],
+        "archiveAMedian": 16.52,
+        "archiveBMedian": 32.864,
+        "ratioBToA": 1.9893462469733656,
+        "positiveAttributedBytesEveryObservation": false,
+        "workerDecision": "rejected_zero_real_signal_and_ratio_outside_band"
+      },
+      "sdk_session_run": {
+        "zeroAttributedBytes": { "A": 0, "B": 0 },
+        "archiveABytesPerOperation": [1765.1733333333334, 219.41333333333333, 878.72],
+        "archiveBBytesPerOperation": [218.66666666666666, 658.0266666666666, 875.3066666666666],
+        "archiveAMedian": 878.72,
+        "archiveBMedian": 658.0266666666666,
+        "ratioBToA": 0.7488468074775431,
+        "positiveAttributedBytesEveryObservation": true,
+        "workerDecision": "pass_pending_independent_validation"
+      }
+    }
+  },
+  "cleanupWalls": {
+    "postCloseLiveResourceCount": 0,
+    "crossSessionLeakCount": 0,
+    "cleanupBusinessStateMutationCount": 0
+  },
+  "rowDecisions": {
+    "scope_run": "rejected_allocation_slice",
+    "managed_ctx_exec": "rejected_allocation_slice",
+    "sdk_session_run": "pass_pending_independent_validation"
+  },
+  "protocolDecision": "worker_rejected_pending_independent_validation",
+  "decisionReason": "All throughput rows and cleanup walls passed, but two allocation rows had a zero attributed-byte measured observation and A/A ratios near 2.0, outside the frozen allocation noise band. The named async wrapper subtree does not provide stable allocation attribution for the two smaller Lite lifecycle rows under this sampling interval and batch design.",
+  "smallestDownstreamMeasurementHarnessDelivery": null,
+  "nextReducingDiscovery": "Test an allocation attribution mechanism that preserves ownership across async continuation boundaries, recalibrate it with exact-zero uninvoked controls and positive one/two lifecycle signals, then freeze a new one-shot A/A protocol. Do not promote this rejected allocation method by widening bands or rerunning larger batches after seeing these results.",
+  "questionsAnswered": [
+    "Separate-process interleaved throughput medians are stable enough for all three exact-head A/A lifecycle rows under the frozen 0.8 to 1.25 band.",
+    "All 54 lifecycle observations preserve zero post-close live resources, zero cross-owner mismatches, and zero cleanup business-state mutations.",
+    "The frozen named-wrapper allocation method can produce exact-zero uninvoked controls and a passing SDK session A/A row, but it is too sparse and asymmetric for scope.run and managed ctx.exec."
+  ],
+  "questionsUnanswered": [
+    "No allocation protocol is accepted for all three lifecycle rows.",
+    "No baseline-versus-candidate throughput or allocation measurement exists.",
+    "No product performance improvement, allocation reduction, CKR success, or optimization target is supported."
+  ],
+  "activeAntiGoalVerification": {
+    "invalid_performance_comparison_count": 0,
+    "unsupported_performance_claim_count": 0,
+    "allocation_regression_case_count": 0,
+    "post_close_live_resource_count": 0,
+    "cross_session_leak_count": 0,
+    "cleanup_business_state_mutation_count": 0,
+    "single_llm_truth_acceptance_count": null,
+    "anti_goal_bypass_or_dishonesty_count": 0
+  },
+  "reviewerAuditStatus": "pending_independent_validation",
+  "stopRuleObserved": "The frozen protocol ran once. Both allocation failures were preserved. No measurement was rerun after results became visible.",
+  "replayCommand": "node scripts/verify-checkpoint.mjs checkpoint.v1.json",
+  "evidenceHashes": {
+    "predeclare.json": "16e29598b18cb266cfbba94d03a73cf710bb811baeed2a5aa57e8815202f7cfb",
+    "archives/head-a.tar": "df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee",
+    "archives/head-b.tar": "df473cbddca3ec0d6982153df4ff32804dd69a2db96bb42a6e0388ad997ca7ee",
+    "logs/build-a-dist.sha256": "a916f074f78fb24d2d9dd780d4de378fd1a51d93cd6941063523aff318b623ad",
+    "logs/build-b-dist.sha256": "a916f074f78fb24d2d9dd780d4de378fd1a51d93cd6941063523aff318b623ad",
+    "scripts/workloads.mjs": "77dba9a790e0f0e72aeb3b8b757b4d5081808ebbdf3f99ea10b60e4cd836797b",
+    "scripts/observe-throughput.mjs": "936e369c19357fc1192624dcc1c68aa6471aa048010193611eef2eb6c9321379",
+    "scripts/observe-allocation.mjs": "858952d25f5609726f83daa28f3f8fed7c2ec3e52bd41ff7767fa6219df58982",
+    "scripts/replay.mjs": "c7cc8c060732de834e5dc90f464b6b539c835d0b4318f74c35e7b8152485dce1",
+    "scripts/run-once.sh": "8bf3932ed6b04792ee5eb18ca19daf859b794f067efc16f36d096cca10cdf3ca",
+    "results/raw.sha256": "ee2cf84fa79572176d584b367471f8d23bec8cc94a36097f03669cc9708bf6e6",
+    "results/replay.v1.json": "bc7e0544239e8448d6c2152e693cfcea4c6ea23db6efb87992e82d843729f973"
+  },
+  "verifier": {
+    "ref": "scripts/verify-checkpoint.mjs",
+    "sha256": "ae4020683ae77a05bab160b543ea744558fc5be64a73513a5c72987b0642af20"
+  },
+  "workerBoundary": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}
