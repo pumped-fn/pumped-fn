@@ -259,8 +259,7 @@ export const sendReminder = flow({
     }
     try {
       return await ctx.exec({
-        deps: {},
-        fn: (_deps, target, content) => target.send(content),
+        fn: (target, content) => target.send(content),
         params: [notifier, message],
         name: "notifier.send",
         tags: [step({ workflow: true, kind: "email" })],

@@ -105,6 +105,28 @@ describe("ExecutionContext structured lifetime", () => {
     await scope.dispose()
   })
 
+  it("infers explicit params without allocating an empty dependency map", async () => {
+    const scope = createScope()
+    const scopeOutput = scope.run({
+      name: "scope-double",
+      params: [3],
+      fn: (value) => value * 2,
+    })
+    expectTypeOf(scopeOutput).toEqualTypeOf<Promise<number>>()
+    await expect(scopeOutput).resolves.toBe(6)
+
+    const ctx = scope.createContext()
+    const ctxOutput = ctx.exec({
+      name: "ctx-double",
+      params: [4],
+      fn: (value) => value * 2,
+    })
+    expectTypeOf(ctxOutput).toEqualTypeOf<Promise<number>>()
+    await expect(ctxOutput).resolves.toBe(8)
+    await ctx.close()
+    await scope.dispose()
+  })
+
   it("shares inline dependency execution across owned and managed boundaries", async () => {
     const tenant = tag<string>({ label: "inline-tenant" })
     const closes: string[] = []
@@ -170,11 +192,18 @@ describe("ExecutionContext structured lifetime", () => {
       [],
       { next: () => number }
     >>().toEqualTypeOf<never>()
+    expectTypeOf<Lite.ExecOptions<
+      [],
+      AsyncIterable<string>
+    >>().toEqualTypeOf<never>()
+    expectTypeOf<Lite.ExecOptions<
+      [],
+      { next: () => number }
+    >>().toEqualTypeOf<never>()
     const scope = createScope()
 
     await expect(Reflect.apply(scope.run, scope, [{
       name: "stream-once",
-      deps: {},
       params: [],
       fn: () => ({
         async *[Symbol.asyncIterator]() {
@@ -184,7 +213,6 @@ describe("ExecutionContext structured lifetime", () => {
     }])).rejects.toThrow("Flow returned an async iterable or iterator from a non-generator factory")
     await expect(Reflect.apply(scope.run, scope, [{
       name: "iterator-once",
-      deps: {},
       params: [],
       fn: () => ({
         next: async () => ({ done: true, value: undefined }),
@@ -200,7 +228,6 @@ describe("ExecutionContext structured lifetime", () => {
     }])).rejects.toThrow("Flow returned an async iterable or iterator from a non-generator factory")
     await expect(Reflect.apply(scope.run, scope, [{
       name: "sync-generator-once",
-      deps: {},
       params: [],
       fn: function* () {
         yield "value"
@@ -215,7 +242,6 @@ describe("ExecutionContext structured lifetime", () => {
     }])).rejects.toThrow("Flow returned an async iterable or iterator from a non-generator factory")
     await expect(Reflect.apply(scope.run, scope, [{
       name: "next-bearing-once",
-      deps: {},
       params: [],
       fn: () => ({ next: () => 1 }),
     }])).rejects.toThrow("Flow returned an async iterable or iterator from a non-generator factory")

@@ -62,9 +62,9 @@ That is the review move: find the uncontrolled edge, then ask where the graph sh
 | Module-level DB/client singleton used by a flow | Unsubstitutable edge | Wrap the client in an atom and preset that atom in tests |
 | Exported shared scope or helper that accepts `scope` | Service-locator shape | Create scopes at composition roots and run flows through contexts |
 | Child flow called through hidden same-file `ctx.exec({ flow })` | Invisible graph edge | Put child flow in `deps`, usually with `controller(child)` |
-| Awaited foreign call on a dep without `ctx.exec({ name, deps, params, fn })` or a workflow step tag | Unattributed effect | Give the call a named execution edge |
+| Awaited foreign call on a dep without named `ctx.exec({ name, params, fn })` or a workflow step tag | Unattributed effect | Give the call a named execution edge |
 
-For foreign SDK calls, prefer an adapter atom plus `ctx.exec({ name, deps, params, fn, tags })`. That gives tracing and workflow tags a named edge instead of an anonymous promise while keeping dependencies and runtime inputs explicit.
+For foreign SDK calls, prefer an adapter atom plus `ctx.exec({ name, params, fn, tags })`, adding `deps` only for graph dependencies. That gives tracing and workflow tags a named edge instead of an anonymous promise while keeping dependencies and runtime inputs explicit.
 
 > **Note:** This guide does not replace `@pumped-fn/lite-lint`. Use the scanner too; it exposes diagnostics through `scanPaths` and `scanText`.
 

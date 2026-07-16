@@ -10,9 +10,11 @@ dependency tree before its factory runs, and there is no legacy execution loop b
 
 ### Inline one-off execution
 
-`scope.run` and `ctx.exec` keep the flow form and add a named `deps`/`params`/`fn` form for a single
-graph-visible operation that needs no reusable flow handle. `fn` receives resolved `deps` first and
-the declared `params` tuple next — never a `ctx` or `scope` argument.
+`scope.run` and `ctx.exec` keep the flow form and add a named `params`/`fn` form for a single
+graph-visible operation that needs no reusable flow handle. Add `deps` only when the operation
+resolves graph dependencies. With `deps`, `fn` receives resolved dependencies first and the declared
+`params` tuple next. Without `deps`, `fn` receives the declared `params` directly — never a `ctx` or
+`scope` argument.
 
 Before, lite 5.x allowed a bare closure to capture dependencies and inputs:
 
@@ -53,8 +55,8 @@ const settle = flow({
 })
 ```
 
-Declare `deps: {}` and `params: []` only when the operation genuinely has no dependencies and no
-captured inputs.
+Omit `deps` when the operation has no graph dependencies. Keep `params: []` when it has no execution
+inputs so the call site still states that fact explicitly.
 
 ### Explicit callback parameters
 

@@ -219,7 +219,7 @@ describe("otel sink", () => {
     const outer = flow({
       name: "outer",
       factory: async (ctx): Promise<string> =>
-        ctx.exec({ name: "inner", deps: {}, params: [], fn: () => Promise.resolve("v") }),
+        ctx.exec({ name: "inner", params: [], fn: () => Promise.resolve("v") }),
     })
     const scope = createScope({
       extensions: [observable.extension()],

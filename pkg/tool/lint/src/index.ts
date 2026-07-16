@@ -2000,7 +2000,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
         && (inlineCtxExec || inlineScopeRun)
       ) {
         const receiver = inlineScopeRun ? "scope.run" : "ctx.exec"
-        const missing = ["name", "deps", "params"].filter((property) => !objectProperty(executionOptions, property))
+        const missing = ["name", "params"].filter((property) => !objectProperty(executionOptions, property))
         if (missing.length > 0) {
           pushNodeDiagnostic(
             diagnostics,
@@ -2008,7 +2008,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
             filePath,
             "pumped/no-hidden-exec-dependencies",
             executionOptions,
-            `${receiver} inline options require name, deps, and params; missing "${missing.join(", ")}".`,
+            `${receiver} inline options require name and params; missing "${missing.join(", ")}".`,
           )
         }
         const fnExpression = objectProperty(executionOptions, "fn")?.initializer

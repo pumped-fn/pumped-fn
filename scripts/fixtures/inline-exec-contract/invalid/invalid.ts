@@ -15,28 +15,24 @@ ctx.exec({
 
 scope.run({
   name: "arguments",
-  deps: {},
   params: [ctx, scope],
   fn: () => "invalid",
 })
 
 ctx.exec({
   name: "captured-identifier",
-  deps: {},
   params: [],
   fn: capturedCallback,
 })
 
 ctx.exec({
   name: "uninspectable-identifier",
-  deps: {},
   params: [],
   fn: importedCallback,
 })
 
 ctx.exec({
   name: "captured-declaration",
-  deps: {},
   params: [],
   fn: capturedDeclaration,
 })

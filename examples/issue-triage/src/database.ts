@@ -55,8 +55,7 @@ export const database = {
       ctx.cleanup((target) => target.end(), pool)
       for (const statement of migrations) {
         await ctx.exec({
-          deps: {},
-          fn: (_deps, target, sql) => target.query(sql),
+          fn: (target, sql) => target.query(sql),
           params: [pool, statement],
           name: "postgres.control.migrate",
           tags: [step({ workflow: true, kind: "database" })],
@@ -108,22 +107,19 @@ export const syncIssues = flow({
   tags: [step({ workflow: true, kind: "database" })],
   factory: async (ctx, { pool }): Promise<void> => {
     const client = await ctx.exec({
-      deps: {},
-      fn: (_deps, target) => target.connect(),
+      fn: (target) => target.connect(),
       params: [pool],
       name: "postgres.control.connect",
     })
     await ctx.exec({
-      deps: {},
-      fn: (_deps, target, sql) => target.query(sql),
+      fn: (target, sql) => target.query(sql),
       params: [client, "BEGIN"],
       name: "postgres.control.begin",
     })
     try {
       for (const issue of ctx.input.issues) {
         await ctx.exec({
-          deps: {},
-          fn: (_deps, target, sql, values) => target.query(sql, [...values]),
+          fn: (target, sql, values) => target.query(sql, [...values]),
           params: [
             client,
             `INSERT INTO issue_deliveries (
@@ -152,8 +148,7 @@ export const syncIssues = flow({
         })
       }
       await ctx.exec({
-        deps: {},
-        fn: (_deps, target, sql, values) => target.query(sql, [...values]),
+        fn: (target, sql, values) => target.query(sql, [...values]),
         params: [
           client,
           `INSERT INTO github_watch_cursors (repository, since_at, etag)
@@ -167,23 +162,20 @@ export const syncIssues = flow({
         name: "postgres.control.cursor-upsert",
       })
       await ctx.exec({
-        deps: {},
-        fn: (_deps, target, sql) => target.query(sql),
+        fn: (target, sql) => target.query(sql),
         params: [client, "COMMIT"],
         name: "postgres.control.commit",
       })
     } catch (error) {
       await ctx.exec({
-        deps: {},
-        fn: (_deps, target, sql) => target.query(sql),
+        fn: (target, sql) => target.query(sql),
         params: [client, "ROLLBACK"],
         name: "postgres.control.rollback",
       })
       throw error
     } finally {
       await ctx.exec({
-        deps: {},
-        fn: (_deps, target) => target.release(),
+        fn: (target) => target.release(),
         params: [client],
         name: "postgres.control.release",
       })
@@ -198,8 +190,7 @@ export const readCursor = flow({
   tags: [step({ workflow: true, kind: "database" })],
   factory: async (ctx, { pool }): Promise<{ sinceAt: string; etag?: string }> => {
     const result = await ctx.exec({
-      deps: {},
-      fn: (_deps, target, sql, values) => target.query<{ since_at: Date; etag: string | null }>(sql, [...values]),
+      fn: (target, sql, values) => target.query<{ since_at: Date; etag: string | null }>(sql, [...values]),
       params: [
         pool,
         "SELECT since_at, etag FROM github_watch_cursors WHERE repository = $1",
@@ -223,8 +214,7 @@ export const claimIssue = flow({
   tags: [step({ workflow: true, kind: "database" })],
   factory: async (ctx, { pool }): Promise<ClaimedIssue | undefined> => {
     const result = await ctx.exec({
-      deps: {},
-      fn: (_deps, target, sql, values) => target.query<{
+      fn: (target, sql, values) => target.query<{
         repository: string
         issue_number: number
         title: string
@@ -283,8 +273,7 @@ export const acknowledgeIssue = flow({
   tags: [step({ workflow: true, kind: "database" })],
   factory: async (ctx, { pool }): Promise<void> => {
     const result = await ctx.exec({
-      deps: {},
-      fn: (_deps, target, sql, values) => target.query(sql, [...values]),
+      fn: (target, sql, values) => target.query(sql, [...values]),
       params: [
         pool,
         `UPDATE issue_deliveries
@@ -306,8 +295,7 @@ export const rejectIssue = flow({
   tags: [step({ workflow: true, kind: "database" })],
   factory: async (ctx, { pool }): Promise<void> => {
     await ctx.exec({
-      deps: {},
-      fn: (_deps, target, sql, values) => target.query(sql, [...values]),
+      fn: (target, sql, values) => target.query(sql, [...values]),
       params: [
         pool,
         `UPDATE issue_deliveries
@@ -333,8 +321,7 @@ export const issueLeaseValid = flow({
   tags: [step({ workflow: true, kind: "database" })],
   factory: async (ctx, { pool }): Promise<boolean> => {
     const result = await ctx.exec({
-      deps: {},
-      fn: (_deps, target, sql, values) => target.query<{ valid: boolean }>(sql, [...values]),
+      fn: (target, sql, values) => target.query<{ valid: boolean }>(sql, [...values]),
       params: [
         pool,
         "SELECT lease_until > now() AS valid FROM issue_deliveries WHERE lease_id = $1 AND state = 'processing'",
@@ -353,8 +340,7 @@ export const readPublication = flow({
   tags: [step({ workflow: true, kind: "database" })],
   factory: async (ctx, { reservation }) => {
     const result = await ctx.exec({
-      deps: {},
-      fn: (_deps, target, sql, values) => target.query<{
+      fn: (target, sql, values) => target.query<{
         payload_digest: string
         publication_id: string
         issue_id: string
@@ -393,8 +379,7 @@ export const savePublication = flow({
   tags: [step({ workflow: true, kind: "database" })],
   factory: async (ctx, { reservation }) => {
     const result = await ctx.exec({
-      deps: {},
-      fn: (_deps, target, sql, values) => target.query<{ publication_id: string }>(sql, [...values]),
+      fn: (target, sql, values) => target.query<{ publication_id: string }>(sql, [...values]),
       params: [
         reservation,
         `INSERT INTO issue_publications (
@@ -432,21 +417,18 @@ export const reservePublication = flow({
   tags: [step({ workflow: true, kind: "database" })],
   factory: async (ctx, { pool }): Promise<PoolClient> => {
     const client = await ctx.exec({
-      deps: {},
-      fn: (_deps, target) => target.connect(),
+      fn: (target) => target.connect(),
       params: [pool],
       name: "postgres.control.publication-connect",
     })
     try {
       await ctx.exec({
-        deps: {},
-        fn: (_deps, target, sql) => target.query(sql),
+        fn: (target, sql) => target.query(sql),
         params: [client, "BEGIN"],
         name: "postgres.control.publication-begin",
       })
       await ctx.exec({
-        deps: {},
-        fn: (_deps, target, sql, values) => target.query(sql, [...values]),
+        fn: (target, sql, values) => target.query(sql, [...values]),
         params: [
           client,
           "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
@@ -455,8 +437,7 @@ export const reservePublication = flow({
         name: "postgres.control.publication-lock",
       })
       const lease = await ctx.exec({
-        deps: {},
-        fn: (_deps, target, sql, values) => target.query(sql, [...values]),
+        fn: (target, sql, values) => target.query(sql, [...values]),
         params: [
           client,
           `SELECT issue_number
@@ -478,15 +459,13 @@ export const reservePublication = flow({
     } catch (error) {
       try {
         await ctx.exec({
-          deps: {},
-          fn: (_deps, target, sql) => target.query(sql),
+          fn: (target, sql) => target.query(sql),
           params: [client, "ROLLBACK"],
           name: "postgres.control.publication-reservation-rollback",
         })
       } finally {
         await ctx.exec({
-          deps: {},
-          fn: (_deps, target, cause) => target.release(cause),
+          fn: (target, cause) => target.release(cause),
           params: [client, error instanceof Error ? error : new Error(String(error))],
           name: "postgres.control.publication-reservation-discard",
         })
@@ -504,23 +483,20 @@ export const releasePublication = flow({
   factory: async (ctx, { reservation }): Promise<void> => {
     try {
       await ctx.exec({
-        deps: {},
-        fn: (_deps, target, sql) => target.query(sql),
+        fn: (target, sql) => target.query(sql),
         params: [reservation, ctx.input.commit ? "COMMIT" : "ROLLBACK"],
         name: `postgres.control.publication-${ctx.input.commit ? "commit" : "rollback"}`,
       })
     } catch (error) {
       await ctx.exec({
-        deps: {},
-        fn: (_deps, target, cause) => target.release(cause),
+        fn: (target, cause) => target.release(cause),
         params: [reservation, error instanceof Error ? error : new Error(String(error))],
         name: "postgres.control.publication-discard",
       })
       throw error
     }
     await ctx.exec({
-      deps: {},
-      fn: (_deps, target) => target.release(),
+      fn: (target) => target.release(),
       params: [reservation],
       name: "postgres.control.publication-release",
     })

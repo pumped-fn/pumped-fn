@@ -99,7 +99,7 @@ The core package has zero runtime dependencies and ~12 kB min+gzip.
 
 ## Mental model
 
-A `scope` is the composition and test boundary. `scope.run` and `scope.runStream` own one temporary execution context. `scope.run({ name, deps, fn, params })` declares a named one-off operation without a reusable flow handle. Use `createContext` with `exec` or `execStream` when several turns or flows share one lifetime. `atom` values live in the scope. `resource` values are owned by an execution context. `tag` values carry request facts and role choices. `preset` replaces an edge for tests or alternate roots. `extension` wraps resolution and execution.
+A `scope` is the composition and test boundary. `scope.run` and `scope.runStream` own one temporary execution context. `scope.run({ name, fn, params })` declares a named one-off operation without a reusable flow handle; add `deps` only when it has graph dependencies. Use `createContext` with `exec` or `execStream` when several turns or flows share one lifetime. `atom` values live in the scope. `resource` values are owned by an execution context. `tag` values carry request facts and role choices. `preset` replaces an edge for tests or alternate roots. `extension` wraps resolution and execution.
 
 SDK applications use stable `session.run`, `agent.turn`, `agent.role`, and `agent.fromModel` definitions. Composition selects configuration and implementations through namespaced tags such as `agent.config.*`, `agent.impl.*`, and `session.execution.*`. Tool, skill, and subagent flows remain ordinary declared graph edges.
 
@@ -111,7 +111,7 @@ Read the full guide: [Request context without AsyncLocalStorage](docs/request-co
 
 ## OpenTelemetry spans without touching business code
 
-Extensions wrap graph execution. Install `observable.extension()` at the scope, pass an OpenTelemetry sink through runtime tags, and business flows stay ordinary TypeScript functions. Foreign SDK calls can still be named with `ctx.exec({ name, deps, params, fn, tags })` so traces show the edge.
+Extensions wrap graph execution. Install `observable.extension()` at the scope, pass an OpenTelemetry sink through runtime tags, and business flows stay ordinary TypeScript functions. Foreign SDK calls can still be named with `ctx.exec({ name, params, fn, tags })`, adding `deps` when needed, so traces show the edge.
 
 Read the full guide: [OpenTelemetry spans without editing business functions](docs/observability.md).
 

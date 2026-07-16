@@ -147,8 +147,7 @@ const load: session.Load = flow({
   tags: [step({ workflow: true, kind: "database" })],
   factory: async (ctx, { pool }): Promise<session.SessionRecord> => {
     const result = await ctx.exec({
-      deps: {},
-      fn: (_deps, target, sql, values) => target.query<{ record: unknown }>(sql, [...values]),
+      fn: (target, sql, values) => target.query<{ record: unknown }>(sql, [...values]),
       params: [pool, "SELECT record FROM session_records WHERE id = $1", [ctx.input.id]],
       name: "postgres.control.session-load",
     })
@@ -167,8 +166,7 @@ const commit: session.Commit = flow({
     const version = ctx.input.expectedVersion + 1
     const record = { ...ctx.input.record, version }
     const result = await ctx.exec({
-      deps: {},
-      fn: (_deps, target, sql, values) => target.query<{ version: number }>(sql, [...values]),
+      fn: (target, sql, values) => target.query<{ version: number }>(sql, [...values]),
       params: [
         pool,
         `INSERT INTO session_records (id, version, record)

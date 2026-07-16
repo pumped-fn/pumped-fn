@@ -63,9 +63,8 @@ export const waterBed = flow({
   factory: async (ctx, { plot, pump, record }) => {
     await ctx.exec({
       name: "pump.deliver",
-      deps: {},
       params: [pump, ctx.input.ml],
-      fn: (_deps, target, ml) => target.deliver(ml),
+      fn: (target, ml) => target.deliver(ml),
     })
     const entries = await record.exec({ input: { plot, ml: ctx.input.ml } })
     return { entries, plot, watered: ctx.input.ml }

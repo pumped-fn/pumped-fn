@@ -1626,15 +1626,14 @@ describe("ExecutionContext", () => {
     })
   })
 
-  describe("ctx.exec() with deps", () => {
-    it("executes an inline operation with explicit deps and params", async () => {
+  describe("ctx.exec() inline operations", () => {
+    it("executes an inline operation with explicit params and no dependency map", async () => {
       const scope = createScope()
       const ctx = scope.createContext()
 
       const result = await ctx.exec({
         name: "add",
-        deps: {},
-        fn: (_deps, a: number, b: number) => a + b,
+        fn: (a: number, b: number) => a + b,
         params: [1, 2],
       })
 
@@ -2762,7 +2761,7 @@ describe("Coverage: edge cases and error paths", () => {
 
     const ctx = scope.createContext()
     await expect(
-      ctx.exec({ name: "fail", deps: {}, fn: () => { throw new Error("fn-error") }, params: [] })
+      ctx.exec({ name: "fail", fn: () => { throw new Error("fn-error") }, params: [] })
     ).rejects.toThrow("fn-error")
 
     let callCount = 0
@@ -4020,8 +4019,7 @@ describe("public helper coverage", () => {
     expect(await ctx.exec({ flow: namedFlow })).toBe("named-flow:1")
     expect(await ctx.exec({
       name: "inline-exec",
-      deps: {},
-      fn: (_deps, value: number) => value,
+      fn: (value: number) => value,
       params: [7],
     })).toBe(7)
 
@@ -4272,7 +4270,7 @@ describe("public helper coverage", () => {
 
     const anonymousFn = (() => "anon") as (...args: unknown[]) => string
     Object.defineProperty(anonymousFn, "name", { value: "" })
-    expect(await ctx.exec({ name: "anonymous", deps: {}, fn: anonymousFn, params: [] })).toBe("anon")
+    expect(await ctx.exec({ name: "anonymous", fn: anonymousFn, params: [] })).toBe("anon")
 
     const presetAtom = atom({ factory: () => 1 })
     const presetScope = createScope({

@@ -16,7 +16,7 @@ const run = (fixture, expectedHead = head) => {
 };
 
 describe("inline execution contract checker", () => {
-  it("accepts explicit deps and params on both receivers", () => {
+  it("accepts explicit params with optional graph deps on both receivers", () => {
     const result = run("valid");
     assert.equal(result.status, 0);
     assert.deepEqual(result.output.metrics, {
@@ -26,7 +26,6 @@ describe("inline execution contract checker", () => {
       head_mismatch_count: 0,
       inline_exec_callsite_count: 3,
       legacy_inline_option_type_count: 0,
-      missing_deps_count: 0,
       missing_name_count: 0,
       missing_params_count: 0,
       public_context_callback_type_count: 0,
@@ -47,12 +46,11 @@ describe("inline execution contract checker", () => {
       head_mismatch_count: 0,
       inline_exec_callsite_count: 5,
       legacy_inline_option_type_count: 3,
-      missing_deps_count: 1,
       missing_name_count: 1,
       missing_params_count: 1,
       public_context_callback_type_count: 1,
       uninspectable_callback_count: 1,
-      inline_exec_contract_gap_count: 17,
+      inline_exec_contract_gap_count: 16,
     });
   });
 

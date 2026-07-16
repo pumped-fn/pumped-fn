@@ -12,14 +12,12 @@ ctx.exec({
 
 scope.run({
   name: "scope-operation",
-  deps: {},
   params: [],
   fn: operation,
 })
 
 scope.run({
   name: "declared-operation",
-  deps: {},
   params: [],
   fn: declaredOperation,
 })

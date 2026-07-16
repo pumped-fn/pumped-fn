@@ -40,7 +40,6 @@ const details = {
   ctx_scope_param_arguments: [],
   head_mismatches: [],
   legacy_inline_option_types: [],
-  missing_deps: [],
   missing_name: [],
   missing_params: [],
   public_context_callback_types: [],
@@ -190,7 +189,7 @@ for (const file of scannedFiles) {
       if (fnProperty) {
         inlineExecCallsiteCount++;
         const at = location(source, node);
-        for (const [name, target] of [["name", details.missing_name], ["deps", details.missing_deps], ["params", details.missing_params]]) {
+        for (const [name, target] of [["name", details.missing_name], ["params", details.missing_params]]) {
           if (!property(options, name)) target.push(at);
         }
         const callback = resolveCallback(fnProperty.initializer);
@@ -245,7 +244,6 @@ const metrics = {
   head_mismatch_count: details.head_mismatches.length,
   inline_exec_callsite_count: inlineExecCallsiteCount,
   legacy_inline_option_type_count: details.legacy_inline_option_types.length,
-  missing_deps_count: details.missing_deps.length,
   missing_name_count: details.missing_name.length,
   missing_params_count: details.missing_params.length,
   public_context_callback_type_count: details.public_context_callback_types.length,

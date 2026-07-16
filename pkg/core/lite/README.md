@@ -127,7 +127,7 @@ resources, tags, or cancellation must span several executions.
 | One owned execution | Managed execution lifetime |
 | --- | --- |
 | `scope.run({ flow, input, tags })` | `scope.createContext({ tags })`, then `ctx.exec({ flow, input })` |
-| `scope.run({ name, deps, fn, params, tags })` for a named one-off operation | Define a flow when the operation is reused inside a managed lifetime |
+| `scope.run({ name, fn, params, tags })` for a named one-off operation; add `deps` when needed | Define a flow when the operation is reused inside a managed lifetime |
 | `scope.runStream({ flow, input, tags })` | `scope.createContext({ tags })`, then `ctx.execStream({ flow, input })` |
 | Scope closes the temporary context after success, failure, or stream cancellation | The caller closes `ctx` after the last related execution |
 
@@ -165,8 +165,10 @@ rules. `scope.run*` seeds its tags on the temporary owner boundary. For a manage
 on `createContext`; `ctx.exec({ tags })` remains an invocation-local override. `scope.run*` is lifecycle
 ownership, not a second execution model.
 
-The inline form is for a named composition-root operation that is used once. Dependency values are inferred
-from `deps`; execution inputs must be listed in `params`; the callback receives neither `ctx` nor `scope`.
+The inline form is for a named composition-root operation that is used once. Add `deps` only for graph
+dependencies. Execution inputs must be listed in `params`; without `deps`, the callback receives those
+parameters directly. With `deps`, resolved dependency values come first. The callback receives neither
+`ctx` nor `scope`.
 Define a flow instead when the operation needs reuse, parsing, typed faults, flow tags, presets, a handle in
 another dependency graph, or streaming yields.
 

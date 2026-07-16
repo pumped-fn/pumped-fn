@@ -21,8 +21,9 @@ For foreign integration, wrap the client in an adapter atom (the substitution se
 Use `scope.run*` when one execution owns the boundary. Use `createContext` with `ctx.exec*` when several
 executions share resources, tags, and cancellation.
 
-A named one-off composition-root operation may use `scope.run({ name, deps, fn, params })`. Put graph
-values in `deps` and runtime values in `params`. Define a flow when the operation is reusable or streaming.
+A named one-off composition-root operation may use `scope.run({ name, fn, params })`. Add `deps`
+only for graph values and put runtime values in `params`. Define a flow when the operation is reusable
+or streaming.
 
 ```mermaid
 sequenceDiagram
@@ -449,9 +450,10 @@ sequenceDiagram
     participant App
     participant Ctx as ExecutionContext
 
-    App->>Ctx: ctx.exec({ name, deps, params, fn, tags })
+    App->>Ctx: ctx.exec({ name, params, fn, tags })
     Ctx->>Ctx: create childCtx (name + tags)
-    Ctx->>Ctx: resolve deps, then fn(deps, ...params)
+    Ctx->>Ctx: resolve deps when present
+    Ctx->>Ctx: fn(deps, ...params) or fn(...params)
     Ctx->>Ctx: childCtx.close(result)
     Ctx-->>App: output
     Note right of Ctx: name makes sub-executions observable by extensions

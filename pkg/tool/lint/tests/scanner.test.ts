@@ -1543,7 +1543,7 @@ describe("lite lint scanner", () => {
     `, "tests/example.test.ts")).toBe(0)
   })
 
-  it("requires ctx.exec callbacks to receive every execution dependency through params", () => {
+  it("requires ctx.exec callbacks to receive every execution input explicitly", () => {
     const hidden = (source: string) => diagnostics(source)
       .filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
 
@@ -1553,7 +1553,7 @@ describe("lite lint scanner", () => {
 
       const send = flow({
         deps: { client },
-        factory: (ctx, { client }) => ctx.exec({ fn: () => client.send(msg), name: "client.send", deps: {}, params: [] }),
+        factory: (ctx, { client }) => ctx.exec({ fn: () => client.send(msg), name: "client.send", params: [] }),
       })
     `).map((diagnostic) => diagnostic.message)).toEqual([
       'ctx.exec callback captures "client, msg"; declare graph values in deps and provide runtime values through params.',
@@ -1565,7 +1565,7 @@ describe("lite lint scanner", () => {
       const send = flow({
         factory: (ctx) => {
           const client = { send: (message: string) => message }
-          return ctx.exec({ name: "client.send", deps: {}, fn: () => client.send("hello"), params: [client] })
+          return ctx.exec({ name: "client.send", fn: () => client.send("hello"), params: [client] })
         },
       })
     `)).toHaveLength(1)
@@ -1576,8 +1576,7 @@ describe("lite lint scanner", () => {
       const send = flow({
         factory: (ctx) => ctx.exec({
           name: "target.send",
-          deps: {},
-          fn: (_deps, target, content) => {
+          fn: (target, content) => {
             const relay = ({ value }: { value: string }) => target.send(value)
             return relay({ value: content })
           },
@@ -1590,7 +1589,7 @@ describe("lite lint scanner", () => {
       import { flow } from "@pumped-fn/lite"
 
       const send = flow({
-        factory: (ctx) => ctx.exec({ name: "promise.resolve", deps: {}, fn: () => Promise.resolve("ok"), params: [] }),
+        factory: (ctx) => ctx.exec({ name: "promise.resolve", fn: () => Promise.resolve("ok"), params: [] }),
       })
     `)).toEqual([])
 
@@ -1599,7 +1598,7 @@ describe("lite lint scanner", () => {
 
       const unrelated = (Promise: { resolve: (value: string) => string }) => Promise.resolve("elsewhere")
       const send = flow({
-        factory: (ctx) => ctx.exec({ name: "promise.resolve", deps: {}, fn: () => Promise.resolve("ok"), params: [] }),
+        factory: (ctx) => ctx.exec({ name: "promise.resolve", fn: () => Promise.resolve("ok"), params: [] }),
       })
     `)).toEqual([])
 
@@ -1608,7 +1607,7 @@ describe("lite lint scanner", () => {
 
       const Promise = { resolve: (value: string) => value }
       const send = flow({
-        factory: (ctx) => ctx.exec({ name: "promise.resolve", deps: {}, fn: () => Promise.resolve("ok"), params: [] }),
+        factory: (ctx) => ctx.exec({ name: "promise.resolve", fn: () => Promise.resolve("ok"), params: [] }),
       })
     `).map((diagnostic) => diagnostic.message)).toEqual([
       'ctx.exec callback captures "Promise"; declare graph values in deps and provide runtime values through params.',
@@ -1619,7 +1618,7 @@ describe("lite lint scanner", () => {
 
       const send = flow({
         factory: (ctx, { Promise }: { Promise: { resolve: (value: string) => string } }) =>
-          ctx.exec({ name: "promise.resolve", deps: {}, fn: () => Promise.resolve("ok"), params: [] }),
+          ctx.exec({ name: "promise.resolve", fn: () => Promise.resolve("ok"), params: [] }),
       })
     `).map((diagnostic) => diagnostic.message)).toEqual([
       'ctx.exec callback captures "Promise"; declare graph values in deps and provide runtime values through params.',
@@ -1629,7 +1628,7 @@ describe("lite lint scanner", () => {
       import { flow } from "@pumped-fn/lite"
 
       const send = flow({
-        factory: (ctx) => ctx.exec({ name: "crypto.randomUUID", deps: {}, fn: () => crypto.randomUUID(), params: [] }),
+        factory: (ctx) => ctx.exec({ name: "crypto.randomUUID", fn: () => crypto.randomUUID(), params: [] }),
       })
     `).map((diagnostic) => diagnostic.message)).toEqual([
       'ctx.exec callback captures "crypto"; declare graph values in deps and provide runtime values through params.',
@@ -1658,8 +1657,8 @@ describe("lite lint scanner", () => {
       .map((diagnostic) => diagnostic.message)
 
     expect(missing).toEqual([
-      'ctx.exec inline options require name, deps, and params; missing "name, deps, params".',
-      'scope.run inline options require name, deps, and params; missing "name, deps, params".',
+      'ctx.exec inline options require name and params; missing "name, params".',
+      'scope.run inline options require name and params; missing "name, params".',
     ])
 
     expect(diagnostics(`
@@ -1668,7 +1667,6 @@ describe("lite lint scanner", () => {
       const operation = flow({
         factory: (ctx) => ctx.exec({
           name: "ctx-argument",
-          deps: {},
           params: [ctx],
           fn: (_ctx) => "invalid",
         }),
@@ -1676,7 +1674,6 @@ describe("lite lint scanner", () => {
       const scope = createScope()
       scope.run({
         name: "scope-argument",
-        deps: {},
         params: [scope],
         fn: () => "invalid",
       })
@@ -1692,18 +1689,17 @@ describe("lite lint scanner", () => {
     expect(diagnostics(`
       import { createScope, flow } from "@pumped-fn/lite"
 
-      const transform = (_deps: {}, value: string) => value.toUpperCase()
+      const transform = (value: string) => value.toUpperCase()
       function finish() { return "done" }
       const operation = flow({
         factory: (ctx) => ctx.exec({
           name: "transform",
-          deps: {},
           params: ["value"],
           fn: transform,
         }),
       })
       const scope = createScope()
-      scope.run({ name: "finish", deps: {}, params: [], fn: finish })
+      scope.run({ name: "finish", params: [], fn: finish })
     `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")).toEqual([])
 
     expect(diagnostics(`
@@ -1715,8 +1711,8 @@ describe("lite lint scanner", () => {
       const captured = () => client.send(message)
       const operation = flow({
         factory: (ctx) => {
-          void ctx.exec({ name: "captured", deps: {}, params: [], fn: captured })
-          return ctx.exec({ name: "imported", deps: {}, params: [], fn: importedCallback })
+          void ctx.exec({ name: "captured", params: [], fn: captured })
+          return ctx.exec({ name: "imported", params: [], fn: importedCallback })
         },
       })
     `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
@@ -1765,7 +1761,6 @@ describe("lite lint scanner", () => {
       const runner = { run: (_options: unknown) => undefined }
       runner.run({
         name: "unrelated",
-        deps: {},
         params: [],
         fn: () => message,
       })
@@ -1778,7 +1773,6 @@ describe("lite lint scanner", () => {
       const message = "hello"
       const unrelated = (scope: { run: (options: unknown) => void }) => scope.run({
         name: "unrelated",
-        deps: {},
         params: [],
         fn: () => message,
       })
@@ -1792,9 +1786,8 @@ describe("lite lint scanner", () => {
       const scope = createScope()
       scope.run({
         name: "scope-reach",
-        deps: {},
         params: [{ scope }],
-        fn: (_deps, { scope }) => scope.resolve(value),
+        fn: ({ scope }) => scope.resolve(value),
       })
     `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-argument")
       .map((diagnostic) => diagnostic.message)).toEqual([
@@ -1807,9 +1800,8 @@ describe("lite lint scanner", () => {
       const scope = createScope()
       scope.run({
         name: "transform",
-        deps: {},
         params: [(scope: string) => scope.toUpperCase()],
-        fn: (_deps, transform) => transform("value"),
+        fn: (transform) => transform("value"),
       })
     `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-argument"))
       .toEqual([])
@@ -1821,9 +1813,8 @@ describe("lite lint scanner", () => {
       const ctx = scope.createContext()
       scope.run({
         name: "context-reach",
-        deps: {},
         params: [{ ctx }],
-        fn: (_deps, { ctx }) => ctx.close(),
+        fn: ({ ctx }) => ctx.close(),
       })
     `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-ctx-argument")
       .map((diagnostic) => diagnostic.message)).toEqual([
@@ -1836,9 +1827,8 @@ describe("lite lint scanner", () => {
       const scope = createScope()
       scope.run({
         name: "transform-context",
-        deps: {},
         params: [(ctx: string) => ctx.toUpperCase()],
-        fn: (_deps, transform) => transform("value"),
+        fn: (transform) => transform("value"),
       })
     `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-ctx-argument"))
       .toEqual([])
@@ -1850,9 +1840,8 @@ describe("lite lint scanner", () => {
       const ctx = scope.createContext()
       scope.run({
         name: "property-names",
-        deps: {},
         params: [{ scope: "request", ctx: "request" }, { scope: "request" }.scope],
-        fn: (_deps, request, scopeName) => request.scope + request.ctx + scopeName,
+        fn: (request, scopeName) => request.scope + request.ctx + scopeName,
       })
     `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-argument" || diagnostic.ruleId === "pumped/no-ctx-argument"))
       .toEqual([])
@@ -1864,9 +1853,8 @@ describe("lite lint scanner", () => {
       const unrelated = (scope: string) => scope.toUpperCase()
       scope.run({
         name: "scope-reach-with-unrelated-binding",
-        deps: {},
         params: [scope],
-        fn: (_deps, scope) => scope.dispose(),
+        fn: (scope) => scope.dispose(),
       })
       unrelated("value")
     `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-argument")
@@ -1882,9 +1870,8 @@ describe("lite lint scanner", () => {
         const ctx = scope.createContext()
         return scope.run({
           name: "first-context",
-          deps: {},
           params: [{ ctx }],
-          fn: (_deps, { ctx }) => ctx.close(),
+          fn: ({ ctx }) => ctx.close(),
         })
       }
       const second = () => {
@@ -1892,9 +1879,8 @@ describe("lite lint scanner", () => {
         const ctx = scope.createContext()
         return scope.run({
           name: "second-context",
-          deps: {},
           params: [{ ctx }],
-          fn: (_deps, { ctx }) => ctx.close(),
+          fn: ({ ctx }) => ctx.close(),
         })
       }
       void first

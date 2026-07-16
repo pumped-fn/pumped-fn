@@ -141,7 +141,7 @@ describe("observable extension", () => {
     const load = flow({
       name: "load",
       factory: async (ctx) => {
-        return [await ctx.resolve(tx), await ctx.exec({ name: "helper", deps: {}, fn: function helper() { return "fn" }, params: [] })]
+        return [await ctx.resolve(tx), await ctx.exec({ name: "helper", fn: function helper() { return "fn" }, params: [] })]
       },
     })
     const scope = createScope({
@@ -455,7 +455,7 @@ describe("parent linking", () => {
     const outer = flow({
       name: "outer",
       factory: async (ctx): Promise<string> => {
-        return ctx.exec({ name: "inner", deps: {}, params: [], fn: () => Promise.resolve("v") })
+        return ctx.exec({ name: "inner", params: [], fn: () => Promise.resolve("v") })
       },
     })
     const scope = createScope({

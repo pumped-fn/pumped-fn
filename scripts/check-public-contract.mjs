@@ -194,7 +194,7 @@ const inspectGuidanceFence = (source, path, fence) => {
       const options = node.arguments[0];
       const properties = new Map(options.properties.map((member) => [propertyName(member), member]));
       if (properties.has("fn")) {
-        const required = ["name", "deps", "params", "fn"];
+        const required = ["name", "params", "fn"];
         const missing = required.filter((name) => !properties.has(name));
         const fn = properties.get("fn");
         const callback = ts.isPropertyAssignment(fn) ? fn.initializer : undefined;
@@ -231,7 +231,7 @@ for (const path of guidancePaths) {
   });
   [...content.matchAll(/`((?:ctx\.exec|scope\.run)\(\{[^`\n]*\}\))`/gu)].forEach((match) => {
     if (!/\bfn\b/u.test(match[1])) return;
-    const missing = ["name", "deps", "params", "fn"].filter((name) => !new RegExp(`\\b${name}\\b`, "u").test(match[1]));
+    const missing = ["name", "params", "fn"].filter((name) => !new RegExp(`\\b${name}\\b`, "u").test(match[1]));
     if (missing.length === 0) return;
     currentGuidanceExecGaps.push({
       path: fromRoot(path),

@@ -62,6 +62,10 @@ export namespace Lite {
       params?: never
     }): Promise<Output>
     run<
+      const Args extends unknown[],
+      Result,
+    >(options: ExecOptions<Args, Result>): Promise<Awaited<Result>>
+    run<
       const D extends Record<string, ExecutionDependency>,
       const Args extends unknown[],
       Result,
@@ -262,6 +266,10 @@ export namespace Lite {
     controller<T>(resource: Resource<T>): ResourceController<T>
     exec<Output, Input, Yield = never>(options: ExecFlowOptions<Output, Input, Yield>): Promise<Output>
     exec<
+      const Args extends unknown[],
+      Result,
+    >(options: ExecOptions<Args, Result>): Promise<Awaited<Result>>
+    exec<
       const D extends Record<string, ExecutionDependency>,
       const Args extends unknown[],
       Result,
@@ -304,6 +312,22 @@ export namespace Lite {
     name: string
     deps: D
     fn: (deps: InferDeps<D>, ...args: Args) => Result
+    params: Args
+    tags?: Tagged<any>[]
+    signal?: AbortSignal
+    flow?: never
+  } & (Extract<
+    Awaited<Result>,
+    AsyncIterable<unknown> | { next: (...args: never[]) => unknown }
+  > extends never ? unknown : never)
+
+  export type ExecOptions<
+    Args extends unknown[],
+    Result,
+  > = {
+    name: string
+    deps?: never
+    fn: (...args: Args) => Result
     params: Args
     tags?: Tagged<any>[]
     signal?: AbortSignal

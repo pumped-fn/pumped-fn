@@ -1,6 +1,6 @@
 # Invalid Guidance
 
-Use `ctx.exec({ fn, params, name })` for a foreign call.
+Use `ctx.exec({ fn, name })` for a foreign call.
 
 ```ts
 await ctx.exec({
