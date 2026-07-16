@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "checkpoint_type": "executable_dkr_checkpoint",
+  "conclusion_id": "DKR-A-EXEC-API-7bf966e6",
+  "unit_id": "DKR-A",
+  "worker_id": "dkr-a-exec-api",
+  "worker_kind": "discovery",
+  "decision_target": "Derive the final Lite execution API contract for ctx.exec dependency operations, explicit params, and the no-context-argument wall.",
+  "source_of_truth": {
+    "git_head": "7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+    "types": "pkg/core/lite/src/types.ts",
+    "runtime": "pkg/core/lite/src/scope.ts",
+    "tests": [
+      "pkg/core/lite/tests/structured-lifetime.test.ts",
+      "pkg/core/lite/tests/scope.test.ts"
+    ],
+    "lint": [
+      "pkg/tool/lint/src/index.ts",
+      "pkg/tool/lint/tests/scanner.test.ts"
+    ],
+    "docs": [
+      "pkg/core/lite/README.md",
+      "pkg/core/lite/PATTERNS.md",
+      ".changeset/session-kernel-major.md"
+    ]
+  },
+  "read_method": "Read public types, runtime dispatch, extension boundaries, tests, lint rules, docs, git history for the explicit callback-parameter work, and repository ctx.exec/scope.run function call candidates at the exact head.",
+  "observed_at": "2026-07-16T04:40:53Z",
+  "recorded_at": "2026-07-16T04:43:00Z",
+  "max_age": "10m",
+  "freshness_status": "fresh",
+  "confidence": 0.96,
+  "current_api_matrix": [
+    {
+      "receiver": "scope.run",
+      "form": "{ flow, input/rawInput, name?, tags?, signal? }",
+      "callback_context": "Flow factory receives ExecutionContext",
+      "status": "keep",
+      "evidence": "pkg/core/lite/src/types.ts:59-69"
+    },
+    {
+      "receiver": "scope.run",
+      "form": "{ name, deps, fn, params, tags?, signal? }",
+      "callback_context": "fn receives inferred deps and params; no ctx or scope",
+      "status": "keep and share with ctx.exec",
+      "evidence": "pkg/core/lite/src/types.ts:304-319"
+    },
+    {
+      "receiver": "scope.run",
+      "form": "{ fn, params, name?, tags?, signal? }",
+      "callback_context": "fn receives injected ExecutionContext",
+      "status": "remove",
+      "evidence": "pkg/core/lite/src/types.ts:69,321-332"
+    },
+    {
+      "receiver": "ctx.exec",
+      "form": "{ flow, input/rawInput, name?, tags?, signal? }",
+      "callback_context": "Flow factory receives core-owned ExecutionContext",
+      "status": "keep",
+      "evidence": "pkg/core/lite/src/types.ts:264,284-294"
+    },
+    {
+      "receiver": "ctx.exec",
+      "form": "{ fn, params, name?, tags?, signal? }",
+      "callback_context": "fn receives injected child ExecutionContext",
+      "status": "replace with shared deps form",
+      "evidence": "pkg/core/lite/src/types.ts:265,296-302; pkg/core/lite/src/scope.ts:2539-2555,2822-2825"
+    },
+    {
+      "receiver": "Extension.wrapExec",
+      "form": "(next, target, ctx)",
+      "callback_context": "Receives child ExecutionContext for observation and policy",
+      "status": "keep; this is an extension boundary, not operation input",
+      "evidence": "pkg/core/lite/src/types.ts:560-580"
+    },
+    {
+      "receiver": "atom/flow/resource/preset factories",
+      "form": "factory(ctx, deps?)",
+      "callback_context": "Receives the context that defines the primitive lifecycle",
+      "status": "keep; core primitive contract",
+      "evidence": "pkg/core/lite/src/types.ts:641-659; pkg/core/lite/src/preset.ts:5-55"
+    },
+    {
+      "receiver": "onClose/cleanup",
+      "form": "(result?, ...params) / (...params)",
+      "callback_context": "No injected ctx or scope",
+      "status": "already aligned",
+      "evidence": "pkg/core/lite/src/types.ts:271-281; pkg/core/lite/src/scope.ts:2855-2864"
+    }
+  ],
+  "recommended_target_contract": {
+    "shared_type": "ExecDepsOptions",
+    "signature": "type ExecDepsOptions<D extends Record<string, ExecutionDependency>, Args extends unknown[], Result> = { name: string; deps: D; params: Args; fn: (deps: InferDeps<D>, ...args: Args) => Result; tags?: Tagged<any>[]; signal?: AbortSignal; flow?: never } & NonStreaming<Result>",
+    "scope_signature": "run<const D extends Record<string, ExecutionDependency>, const Args extends unknown[], Result>(options: ExecDepsOptions<D, Args, Result>): Promise<Awaited<Result>>",
+    "context_signature": "exec<const D extends Record<string, ExecutionDependency>, const Args extends unknown[], Result>(options: ExecDepsOptions<D, Args, Result>): Promise<Awaited<Result>>",
+    "zero_dependency_example": "ctx.exec({ name: \"client.send\", deps: {}, params: [client, message], fn: (_deps, client, message) => client.send(message) })",
+    "tag_example": "ctx.exec({ name: \"tenant.read\", deps: { tenant: tags.required(tenant) }, params: [], tags: [tenant(\"acme\")], fn: ({ tenant }) => tenant })",
+    "decisions": {
+      "name": "required because the one-off callback has no reusable graph handle supplying stable identity",
+      "deps": "required; use deps: {} for zero graph dependencies",
+      "params": "required; use params: [] for zero runtime inputs",
+      "callback": "receives deps then params; never ctx or scope",
+      "tags": "remain invocation-local; values needed by the callback are read through declared tag executors in deps",
+      "signal": "remains an invocation lifecycle option; it combines with parent cancellation internally and is not injected into fn",
+      "streaming": "rejected at type and runtime; use a generator flow with execStream/runStream",
+      "scope_lifecycle": "scope.run owns and closes the temporary boundary",
+      "ctx_lifecycle": "ctx.exec creates and closes a child inside the caller-owned managed boundary"
+    }
+  },
+  "core_internal_boundary": {
+    "allowed": [
+      "Create the child ExecutionContext internally.",
+      "Store params in childCtx.input for extensions.",
+      "Resolve declared deps against the child context.",
+      "Seed tags and combine signals on the child context.",
+      "Pass child context to wrapExec extensions.",
+      "Use context inside atom, flow, resource, and preset factories."
+    ],
+    "forbidden": [
+      "Pass childCtx or scope into the public inline fn.",
+      "Allow deps, params, or name to be omitted.",
+      "Keep a second no-deps context-taking callback overload.",
+      "Let an inline callback close over graph or runtime inputs."
+    ]
+  },
+  "smallest_implementation_slice": [
+    "Replace RunDepsOptions, RunFnOptions, and ExecFnOptions with one documented ExecDepsOptions shared by Scope.run and ExecutionContext.exec.",
+    "Add the deps overload to ExecutionContext.exec and remove the two context-taking inline overloads.",
+    "Make the internal inline executor resolve options.deps, then call options.fn(resolvedDeps, ...options.params). It may use childCtx internally but must not pass it to fn.",
+    "Delegate Scope.run deps execution through the same internal path while retaining scope-owned tags, signal, close result, and resource boundary.",
+    "Retain Extension.wrapExec(next, target, ctx). Update ExecTargetFn to the type-erased deps callback shape if callback targets remain observable.",
+    "Update lint so both scope.run and ctx.exec require declared deps and explicit params, reject captured inputs, and reject passing ctx or scope through params."
+  ],
+  "breaking_impacts": [
+    "Remove ctx.exec({ fn: (ctx, ...params) => ... }) and scope.run({ fn: (ctx, ...params) => ... }).",
+    "Require name on every inline operation.",
+    "Require deps, including deps: {}.",
+    "Existing callbacks must remove their first ctx parameter.",
+    "Code reading child tags, data, name, signal, resolve, or scope from the inline callback must reify that need as a declared dependency or a flow.",
+    "Extension code keeps ctx access; operation code does not.",
+    "The broad source scan found ctx.exec function candidates in 11 TypeScript files. An AST migration checker must produce the exact call count before acceptance.",
+    "Current foreign-call docs and examples contain stale captured or _ctx callback shapes."
+  ],
+  "required_tests": [
+    "Type inference parity for scope.run and ctx.exec with atom, resource, tag, flow-controller, params, and awaited results.",
+    "Compile failures for missing name, deps, or params and for ctx-taking callbacks.",
+    "deps: {} plus params: [] as the sole zero-dependency form.",
+    "Dependency activation completes before fn runs and activation failure never calls fn.",
+    "Tags resolve through declared tag deps with invocation precedence.",
+    "Signal abort closes child resources and prevents post-close work without exposing ctx to fn.",
+    "Extensions observe ctx.name, ctx.input === params, tags, success, and failure.",
+    "Inline async iterables, iterators, and generators fail at type and runtime.",
+    "Scope-owned and managed-context resource cleanup remain distinct.",
+    "Lint rejects captures and direct ctx/scope params for both receivers while ignoring unrelated run/exec methods."
+  ],
+  "required_docs": [
+    "README.md diagram and entry examples",
+    "pkg/core/lite/README.md API table and foreign integration section",
+    "pkg/core/lite/PATTERNS.md inline execution diagram",
+    "pkg/core/lite/MIGRATION.md",
+    "pkg/core/lite/CHANGELOG.md",
+    ".changeset/session-kernel-major.md",
+    "docs/observability.md",
+    "examples/invoice-triage/README.md and source",
+    "examples/issue-triage source",
+    "skills/pumped-fn references",
+    "lite-lint README and changelog"
+  ],
+  "evidence_refs_or_hashes": [
+    { "ref": "pkg/core/lite/src/types.ts", "sha256": "09324f8545c7186bdc61b635bac4afec75fb19d98eed72ce3c5f509677482c6d" },
+    { "ref": "pkg/core/lite/src/scope.ts", "sha256": "74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912" },
+    { "ref": "pkg/core/lite/tests/structured-lifetime.test.ts", "sha256": "8f091511358eb2754c57b3083b7ea10ab0449a15187a30457173831e45305534" },
+    { "ref": "pkg/tool/lint/src/index.ts", "sha256": "f2f9212b3dfbd94f5bbbdeaae347e49d7d8d42069e909f18efb243a8d4f31ba7" },
+    { "ref": "pkg/tool/lint/tests/scanner.test.ts", "sha256": "7bdb5de69d8ecd8e368f0b6c20d16a20408b61e386928ac01d6ae881b5668177" },
+    { "ref": "pkg/core/lite/README.md", "sha256": "74356a7033bfd7ad37d351f7fa0a8c1fa1aa1cd77297deaa975e2b7e6448d11f" },
+    { "ref": ".okra/runs/release-readiness-20260716/worker-packets/dkr-a-exec-api.json", "sha256": "2e5a79a42ba0c5e9e3a07b714bc2380e3b3332d943c35539aaa7b002cf9ded61" }
+  ],
+  "replay_command_or_checker": {
+    "status": "required_not_implemented",
+    "checker": "scripts/check-inline-exec-contract.mjs",
+    "requirements": [
+      "Read the exact expected git head.",
+      "Use the TypeScript checker to confirm both overloads infer the same deps and params.",
+      "Fail on public inline fn signatures whose first parameter is ExecutionContext or Scope.",
+      "AST-scan ctx.exec and scope.run inline options for required name, deps, params, captures, and direct ctx/scope arguments.",
+      "Emit stable JSON counts."
+    ]
+  },
+  "questions_answered": [
+    "ctx.exec should receive the same inferred deps callback form as scope.run.",
+    "name, deps, and params must be required.",
+    "deps: {} is the one zero-dependency form.",
+    "tags and signal remain invocation options and are not callback arguments.",
+    "Core factories and extensions retain context access; inline operation callbacks do not.",
+    "The legacy context-taking fn forms are redundant and conflict with the standing wall."
+  ],
+  "questions_unanswered": [
+    "An independent validator has not replayed the proposed type surface.",
+    "The exact migration call count needs an AST checker.",
+    "Extension target identity behavior needs a regression decision: callback target versus synthetic flow target.",
+    "No product implementation or deterministic contract checker exists yet."
+  ],
+  "candidate_ckrs": [
+    { "ckr_id": "CKR-EXEC-API", "metric": "context_argument_pass_count == 0" }
+  ],
+  "candidate_pkrs": [
+    { "pkr_id": "PKR-A1", "assignment": "Implement the shared ExecDepsOptions type and one internal execution path." },
+    { "pkr_id": "PKR-A2", "assignment": "Migrate repository call sites, lint rules, and type/runtime tests." },
+    { "pkr_id": "PKR-A3", "assignment": "Update public TSDoc, README, PATTERNS, migration, changelog, changeset, and examples." },
+    { "pkr_id": "PKR-A4", "assignment": "Add and replay the exact-head inline execution contract checker." }
+  ],
+  "active_anti_goals": [
+    "context_argument_pass_count",
+    "implicit_required_dependency_count",
+    "hidden_execution_edge_count",
+    "redundant_graph_ceremony_count",
+    "breaking_model_api_change_count",
+    "scope_seam_escape_count",
+    "slop_violation_count",
+    "single_llm_truth_acceptance_count"
+  ],
+  "active_anti_goal_verification": [
+    { "metric_id": "context_argument_pass_count", "verdict": "breached_in_current_public_inline_types", "evidence_ref": "pkg/core/lite/src/types.ts:265,296-332" },
+    { "metric_id": "implicit_required_dependency_count", "verdict": "blocked_pending_implementation_and_checker", "evidence_ref": "pkg/tool/lint/src/index.ts:1933-1970" },
+    { "metric_id": "hidden_execution_edge_count", "verdict": "blocked_pending_callsite_migration", "evidence_ref": "pkg/core/lite/README.md:183-187" },
+    { "metric_id": "redundant_graph_ceremony_count", "verdict": "breached_by_three_overlapping_inline_option_types", "evidence_ref": "pkg/core/lite/src/types.ts:296-332" },
+    { "metric_id": "breaking_model_api_change_count", "verdict": "unverified", "evidence_ref": "No model-provider edit was made by this worker." },
+    { "metric_id": "scope_seam_escape_count", "verdict": "candidate_design_preserves_scope_seam_pending_validation", "evidence_ref": "pkg/core/lite/src/types.ts:50-80,253-281" },
+    { "metric_id": "slop_violation_count", "verdict": "no_product_edit_by_worker", "evidence_ref": "Worker operated read-only." },
+    { "metric_id": "single_llm_truth_acceptance_count", "verdict": "blocked_pending_independent_validation", "evidence_ref": "This is writer evidence only." }
+  ],
+  "result": {
+    "status": "reducing_discovery_candidate_pending_independent_validation",
+    "accepted_reducing_discovery": false,
+    "implementation_advance": "blocked until validator replay",
+    "reason": "The API decision is source-backed, but the exact-head checker and independent validation do not yet exist."
+  },
+  "wall_gate": {
+    "verdict": "blocked_pending_independent_validation",
+    "downstream_advance": "blocked",
+    "decided_at": "2026-07-16T04:43:00Z"
+  },
+  "decision": "Recommend one shared, required-name/deps/params inline execution form with no ctx or scope callback argument. Preserve context only inside core primitive factories and extension observation boundaries.",
+  "fail_closed": true,
+  "flag_if_missing_or_stale": "breaking:inline-exec-contract-or-independent-validation-missing",
+  "reviewer_audit_status": "pending",
+  "worker_evidence_is_acceptance": false,
+  "required_role_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+}

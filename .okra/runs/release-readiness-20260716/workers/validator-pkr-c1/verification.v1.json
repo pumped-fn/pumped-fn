@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "verification_id": "validator-pkr-c1.2026-07-16T04:47:39Z",
+  "worker_id": "validator-pkr-c1",
+  "worker_kind": "verification",
+  "unit_id": "PKR-C1",
+  "packet_ref": "worker-packets/pkr-c1-contract-checker.json",
+  "observed_at": "2026-07-16T04:47:39Z",
+  "decision": "rejected",
+  "fail_closed": true,
+  "product_files_changed": false,
+  "audit_traces": [
+    {
+      "claim_id": "pkr-c1-allowed-product-paths",
+      "check": "All product changes stay inside the worker allowlist",
+      "threshold": "Only package.json, scripts/check-public-contract.mjs, scripts/check-public-contract.test.mjs, and scripts/fixtures/public-contract/**",
+      "value": "All observed product paths are allowed",
+      "source_of_truth": "Git tracked diff and untracked-file inventory",
+      "replay": "git diff --name-only -- package.json scripts; git ls-files --others --exclude-standard -- scripts",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "pkr-c1-fixture-suite",
+      "check": "The deterministic public-contract fixture suite passes",
+      "threshold": "3 tests passed and 0 failed in one invocation",
+      "value": "3 passed, 0 failed",
+      "source_of_truth": "scripts/check-public-contract.test.mjs",
+      "replay": "pnpm contract:test",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "positive contract fixture passed",
+        "negative metric output was byte-identical across two internal fixture calls",
+        "stale PR head fixture was rejected"
+      ]
+    },
+    {
+      "claim_id": "pkr-c1-live-pr-provenance",
+      "check": "PR 346 snapshot matches the local exact head and origin/main",
+      "threshold": "head=7bf966e66b914cfe877ff5ee8d1990ca3bf3d162 and base=d974efe050b953e270c9972700f5dd5f355ba465",
+      "value": "head=7bf966e66b914cfe877ff5ee8d1990ca3bf3d162 and base=d974efe050b953e270c9972700f5dd5f355ba465",
+      "source_of_truth": "GitHub PR 346, git HEAD, and origin/main",
+      "replay": "gh pr view 346 --json number,url,baseRefName,baseRefOid,headRefName,headRefOid,state,title; git rev-parse HEAD; git rev-parse origin/main",
+      "exit_code": 0,
+      "sha256": [
+        "85420599e2c1ab98dfcac0d1063f3494bc59132d6f069316329a5f80005d0f8e"
+      ],
+      "decision": "accepted",
+      "evidence": [
+        "/tmp/pr-346-contract-validation-20260716.json"
+      ]
+    },
+    {
+      "claim_id": "pkr-c1-real-baseline",
+      "check": "The checker reads the exact-head PR baseline once and fails closed on live gaps",
+      "threshold": "Exact head accepted and public_contract_gap_count is readable",
+      "value": "Exact head accepted; public_contract_gap_count=182; process exit=1",
+      "source_of_truth": "Manifest-derived repository contract checker with path-backed PR snapshot",
+      "replay": "node scripts/check-public-contract.mjs --base origin/main --pr-json /tmp/pr-346-contract-validation-20260716.json --expect-head 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+      "exit_code": 1,
+      "decision": "accepted",
+      "metrics": {
+        "changed_public_source_package_count": 13,
+        "changed_public_source_package_without_changeset_count": 5,
+        "documentation_example_failure_count": 3,
+        "exported_symbol_count": 539,
+        "exported_symbol_tsdoc_gap_count": 464,
+        "major_migration_evidence_gap_count": 7,
+        "missing_runtime_target_count": 0,
+        "missing_type_target_count": 0,
+        "package_changelog_gap_count": 0,
+        "package_readme_gap_count": 0,
+        "packed_file_omission_count": 16,
+        "pr_snapshot_gap_count": 0,
+        "public_api_interface_count": 153,
+        "public_api_tsdoc_gap_count": 151,
+        "public_export_row_count": 30,
+        "public_package_count": 26,
+        "public_contract_gap_count": 182
+      }
+    },
+    {
+      "claim_id": "pkr-c1-manifest-discovery",
+      "check": "Public packages and export keys are discovered from non-private pkg/*/* manifests",
+      "threshold": "Manifest-driven discovery with private packages excluded",
+      "value": "Implemented at checker lines 32-41 and 81-88; live count 26 packages and 30 export rows",
+      "source_of_truth": "scripts/check-public-contract.mjs and live baseline output",
+      "replay": "Read packageDirectories and exportRows construction; compare public_package_count and public_export_row_count",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "pkr-c1-target-and-pack-audit",
+      "check": "Runtime/type resolution and package files inclusion contribute direct failure metrics",
+      "threshold": "Missing runtime, missing type, and packed-file omissions are separately reported and aggregated",
+      "value": "Implemented and exercised by the negative fixture; live values 0, 0, and 16",
+      "source_of_truth": "scripts/check-public-contract.mjs lines 90-123 and fixture assertions lines 59-63",
+      "replay": "Read checker target loop and negative fixture metric assertions",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "pkr-c1-changeset-and-migration-audit",
+      "check": "Changed public src packages require changeset entries and major bumps require current migration evidence",
+      "threshold": "Both metrics are direct, deterministic, and fixture-covered",
+      "value": "Negative fixture reports changeset gap 1 and migration gap 1; positive fixture reports 0 and 0",
+      "source_of_truth": "scripts/check-public-contract.mjs and fixture assertions",
+      "replay": "Read changed-package, changeset, and migration branches and fixture expected metrics",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "pkr-c1-wrong-head-rejection",
+      "check": "A path-backed PR snapshot with a stale head is rejected",
+      "threshold": "pr_snapshot_gap_count=1 and exit=1",
+      "value": "Fixture assertion passed",
+      "source_of_truth": "scripts/check-public-contract.test.mjs lines 73-81",
+      "replay": "pnpm contract:test",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "pkr-c1-tsdoc-denominator",
+      "check": "All direct exports are inventory while only exported TypeScript interface declarations contribute to the failing TSDoc metric",
+      "threshold": "exported_symbol_tsdoc_gap_count is inventory-only; public_api_tsdoc_gap_count is interface-only",
+      "value": "Inventory gap 464 and interface gap 151 are separate; only interface gap is aggregated",
+      "source_of_truth": "scripts/check-public-contract.mjs lines 224-253 and 276-306",
+      "replay": "Read compiler export enumeration, interface filter, metrics, and aggregate members",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "pkr-c1-aggregate-completeness",
+      "check": "The aggregate includes every direct failure metric and excludes inventory metrics",
+      "threshold": "Ten failure metrics included; six inventory metrics excluded",
+      "value": "All ten failure metrics are summed at lines 295-306; changed package, exported symbol, exported-symbol TSDoc gap, public interface, export row, and package counts are excluded",
+      "source_of_truth": "scripts/check-public-contract.mjs lines 276-310",
+      "replay": "Compare metric declaration keys with the public_contract_gap_count member list",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "pkr-c1-fixture-git-inclusion",
+      "check": "Every fixture target required by the tests is included by Git and replayable from a clean checkout",
+      "threshold": "All six fixture runtime and declaration targets are known to Git",
+      "value": "0 of 6 targets are known to Git; all six match .gitignore line 300",
+      "source_of_truth": ".gitignore and Git index",
+      "replay": "find scripts/fixtures/public-contract -type f | sort | git check-ignore -v --stdin; git ls-files --error-unmatch scripts/fixtures/public-contract/valid/pkg/core/demo/dist/index.d.mts scripts/fixtures/public-contract/valid/pkg/core/demo/dist/index.mjs scripts/fixtures/public-contract/invalid/pkg/core/demo/dist/index.d.mts scripts/fixtures/public-contract/invalid/pkg/core/demo/dist/index.mjs scripts/fixtures/public-contract/invalid/pkg/core/missing-docs/dist/index.d.mts scripts/fixtures/public-contract/invalid/pkg/core/missing-docs/dist/index.mjs",
+      "exit_code": 1,
+      "decision": "rejected",
+      "failure_mode": "non-replayable",
+      "evidence": [
+        ".gitignore:300:dist matched all six files",
+        "git ls-files rejected all six pathspecs as unknown"
+      ]
+    },
+    {
+      "claim_id": "pkr-c1-tsx-fixture-coverage",
+      "check": "TS and TSX README fence parsing each have deterministic valid and invalid fixture evidence",
+      "threshold": "At least one valid and one invalid fixture for each supported fence kind",
+      "value": "TS has one valid and one invalid fixture; TSX has zero fixtures",
+      "source_of_truth": "scripts/fixtures/public-contract and scripts/check-public-contract.test.mjs",
+      "replay": "rg -n 'tsx|```typescript|```ts' scripts/fixtures/public-contract scripts/check-public-contract.test.mjs",
+      "exit_code": 0,
+      "decision": "rejected",
+      "failure_mode": "missing fixture evidence"
+    },
+    {
+      "claim_id": "pkr-c1-static-syntax-and-whitespace",
+      "check": "Changed checker files parse and contain no diff whitespace errors",
+      "threshold": "All commands exit 0",
+      "value": "git diff --check, checker node --check, and test node --check all exit 0",
+      "source_of_truth": "Git diff and Node parser",
+      "replay": "git diff --check -- package.json scripts; node --check scripts/check-public-contract.mjs; node --check scripts/check-public-contract.test.mjs",
+      "exit_code": 0,
+      "decision": "accepted"
+    }
+  ],
+  "artifact_hashes": {
+    "scripts/check-public-contract.mjs": "2c7be4db0586cf0e17a5ca6dde4bd9002ff763ae6ad9f925cca804993d1c1a04",
+    "scripts/check-public-contract.test.mjs": "a9e81a608b365c8d8440481629aa8469a65717e72c9f89b0f97d632023f4a2bb",
+    "package.json": "5910b05e1e611984c62d8d53e8ce16f56fb64d9ce113fbe46691f0ee9a1e9f99",
+    "/tmp/pr-346-contract-validation-20260716.json": "85420599e2c1ab98dfcac0d1063f3494bc59132d6f069316329a5f80005d0f8e"
+  },
+  "summary": {
+    "accepted": 11,
+    "rejected": 2,
+    "rejected_claim_ids": [
+      "pkr-c1-fixture-git-inclusion",
+      "pkr-c1-tsx-fixture-coverage"
+    ],
+    "decision": "rejected"
+  },
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "rule_without_valid_and_invalid_fixture_count": 1,
+    "reason": "The locally green suite depends on six ignored fixture targets and the TSX parser branch has no valid or invalid fixture. PKR-C1 is not clean-checkout replayable and its fixture wall is not held."
+  }
+}

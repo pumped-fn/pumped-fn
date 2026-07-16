@@ -1,0 +1,53 @@
+{
+  "type": "worker-report",
+  "schema_version": 1,
+  "worker_id": "dkr-c-contract",
+  "worker_kind": "discovery",
+  "unit_id": "DKR-C",
+  "status": "checkpoint_written_pending_independent_validation",
+  "recorded_at": "2026-07-16T04:17:21Z",
+  "checkpoint_ref": "workers/dkr-c-contract/checkpoint.v1.json",
+  "checkpoint_sha256": "c6f6bdeae32f599e8fad7ce16c6095d7cad6af7a6292fb846819c017f803a2ee",
+  "result": "26 public packages, 30 export rows, 539 public declaration symbols, 464 TSDoc gaps, 10 confirmed contract-gap classes, and a fail-closed checker recommendation.",
+  "metrics": {
+    "public_package_count": 26,
+    "public_export_row_count": 30,
+    "public_api_tsdoc_gap_count": 464,
+    "changed_public_source_package_without_changeset_count": 5,
+    "single_llm_truth_acceptance_count": 1
+  },
+  "product_files_changed": false,
+  "acceptance_claimed": false,
+  "active_anti_goals": [
+    "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+    "breaking_model_api_change_count",
+    "premature_tool_or_mcp_surface_count",
+    "primitive_proof_gap_count",
+    "scope_seam_escape_count",
+    "hidden_execution_edge_count",
+    "implicit_required_dependency_count",
+    "ungrouped_related_handle_count",
+    "redundant_graph_ceremony_count",
+    "context_argument_pass_count",
+    "touched_surface_regression_count",
+    "slop_violation_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "reason": "Definite public-contract gaps exist, the deterministic checker is not implemented, and independent validation is absent."
+  },
+  "next_check_at": "Independent validator dispatch within the frame freshness window.",
+  "commanded_lines": [
+    "Action envelope: read the exact PR head and public surfaces; write only workers/dkr-c-contract/checkpoint.v1.json and progress.finish.json; no product, git, frame, tree, ledger, release, or external-state changes; permission owner is the user and runtime.",
+    "Anti-goal coverage: all 14 active walls are carried in checkpoint.v1.json; breached or unverified reads block downstream advance; anti_goal_coverage_gap_count == 0 for packet coverage, not acceptance.",
+    "CKR-level discovery/delivery balance: DKR-C identifies public-contract gaps and the checker needed to read them; delivery remains candidate PKR work after orchestrator acceptance.",
+    "progress signals: 26 packages; 30 export rows; 464 TSDoc gaps; 5 changed source packages without changeset coverage; 10 confirmed gap classes.",
+    "active anti-goals: product truth, API stability, no premature MCP, primitive proof, scope seam, visible edges and dependencies, namespace and ceremony, no context passing, regression, style, independence, and integrity all gate this checkpoint.",
+    "Introspection cadence: checkpoint acceptance, any flag, level descent, terminalization, and every third check-in.",
+    "Standing walls: all active walls remain standing and retire only through human-owned frame or standing-wall retirement.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  ]
+}

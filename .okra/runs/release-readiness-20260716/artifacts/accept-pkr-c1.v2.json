@@ -1,0 +1,39 @@
+{
+  "type": "pkr_acceptance",
+  "unit_id": "PKR-C1",
+  "accepted_at": "2026-07-16T04:52:00Z",
+  "changed_paths": [
+    "package.json",
+    "scripts/check-public-contract.mjs",
+    "scripts/check-public-contract.test.mjs",
+    "scripts/fixtures/public-contract"
+  ],
+  "worker_evidence": {
+    "checker_sha256": "e5f9dd2c8a10a70db96bf0787a42dcc9e7fee861b323cdb6fa41b9285ea1c698",
+    "test_sha256": "f7c5c294e4320e142e2ef0a2a9ca63c0c2f1bdfffb7ef3c49106e9d4784687a8"
+  },
+  "rejected_verification_ref": "workers/validator-pkr-c1/verification.v1.json",
+  "accepted_verification_ref": "workers/validator-pkr-c1/verification.v2.json",
+  "accepted_verification_sha256": "b9e77059d74797392a4ada2780924d259fcb42ff976f9697700687c4f14a2541",
+  "accepted_claims": [
+    "manifest-driven public package and export discovery",
+    "exact-head PR snapshot rejection",
+    "trackable positive and negative fixtures",
+    "deterministic TypeScript and TSX fence parsing",
+    "separate exported-symbol inventory and exported-interface TSDoc denominator",
+    "stable aggregate failure metric membership"
+  ],
+  "baseline": {
+    "public_contract_gap_count": 182,
+    "changed_public_source_package_without_changeset_count": 5,
+    "documentation_example_failure_count": 3,
+    "major_migration_evidence_gap_count": 7,
+    "packed_file_omission_count": 16,
+    "public_api_tsdoc_gap_count": 151,
+    "public_package_count": 26,
+    "public_export_row_count": 30,
+    "exported_symbol_count": 539,
+    "exported_symbol_tsdoc_gap_count": 464
+  },
+  "single_llm_truth_acceptance_count": 0
+}

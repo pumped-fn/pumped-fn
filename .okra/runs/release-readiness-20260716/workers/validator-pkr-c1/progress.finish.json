@@ -1,0 +1,18 @@
+{
+  "type": "worker_finish",
+  "worker_id": "validator-pkr-c1",
+  "worker_kind": "verification",
+  "unit_id": "PKR-C1",
+  "status": "complete",
+  "recorded_at": "2026-07-16T04:47:39Z",
+  "verification_ref": "workers/validator-pkr-c1/verification.v1.json",
+  "accepted": 11,
+  "rejected": 2,
+  "rejected_claim_ids": [
+    "pkr-c1-fixture-git-inclusion",
+    "pkr-c1-tsx-fixture-coverage"
+  ],
+  "decision": "rejected",
+  "downstream_advance": "blocked",
+  "product_files_changed": false
+}

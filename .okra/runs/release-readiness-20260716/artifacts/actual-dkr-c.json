@@ -1,0 +1,8 @@
+{
+  "type": "estimation_record",
+  "phase": "actual",
+  "unit_id": "DKR-C",
+  "actual": { "time_min": 15, "turns": 1, "tokens": null },
+  "observed_at": "2026-07-16T04:17:21Z",
+  "result_ref": "workers/dkr-c-contract/checkpoint.v1.json"
+}

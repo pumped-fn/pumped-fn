@@ -1,0 +1,132 @@
+{
+  "checkpoint_id": "DKR-P.checkpoint.2026-07-16T04:12:06Z",
+  "conclusion_id": "dkr-p-measurement-design-repairable-v1",
+  "decision_target": "Decide the valid throughput, allocation, and retained-memory design for Lite owned and managed execution and one SDK session turn, then rank source-backed optimization candidates.",
+  "source_of_truth": [
+    "PR head 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+    "benchmarks/lite-perf built-dist harness and row manifest",
+    "pkg/core/lite/src/scope.ts",
+    "pkg/sdk/core/src/session.ts",
+    "focused lifecycle and session tests"
+  ],
+  "read_method": "Inspect the exact row manifest, deterministic harness checks, built-artifact provenance, lifecycle and session source paths, and existing semantic tests. Run the deterministic harness checker once. Do not collect candidate performance samples.",
+  "observed_at": "2026-07-16T04:11:19Z",
+  "recorded_at": "2026-07-16T04:12:06Z",
+  "max_age": "10m",
+  "freshness_status": "fresh",
+  "confidence": 0.96,
+  "evidence_refs_or_hashes": [
+    "sha256:c780fe448719924c10f883af72d297a442f0d1d1cdfbafb0f88a06db47d24d70",
+    "sha256:ca4507dbcffca01a3ff012f6b96585acb9456c8d2bd47a588b0ce64553d42180",
+    "sha256:ac05933d183c007da10bada0e45f20919acd34631b07c05daff9b9dafa5fdcc9",
+    "sha256:02921c0e7b9fe3094c6c6700a22131cd14899477ace651746366bc563ae7110e",
+    "sha256:218d16dcaa959d0b7d57ef743cdb71429b0bbd20f6fbb29f47e1cc9511108197",
+    "sha256:53df5f014abddfd2a9ad9dd618b20970ea2dfa6d1b1133ceb8aebfeea4d1d644",
+    "sha256:74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912",
+    "sha256:09037af628882fc4ce8a4c51fa12ec92e9f31de3d33915dbaaaf1f5c72bc800e",
+    "sha256:df0d6997f53d978a28e35595cd71472f226c20f21de09b173c03352e73c86336",
+    "sha256:a8fab8195e448e3d1159af19a6084f88f18aff70327865f16a7ead9058f507b8",
+    "sha256:fcaa2d08cb26129db9246a4306206bb920c3646cc108375a5a80d47218551f90"
+  ],
+  "replay_command_or_checker": "pnpm --dir benchmarks/lite-perf perf:test",
+  "replay_result": { "passed": 14, "failed": 0, "samples_collected": 0 },
+  "measurement_validity": {
+    "overall_verdict": "repairable",
+    "existing_47_row_throughput_design": "valid for its declared 39 Lite and 8 Lite React micro-rows; no fresh comparison was collected",
+    "targeted_lifecycle_throughput": "invalid until the missing owned, resource, and session rows are fixed in the manifest",
+    "allocation": "invalid because no allocation observation schema, sampler, controls, rows, or comparator exists",
+    "retained_memory": "invalid because no post-close retained-memory probe, calibration, denominator rule, or comparator exists",
+    "baseline_provenance": "invalid for CKR use because ignored dist files are not proven clean builds of the exact head",
+    "improvement_claim": "forbidden"
+  },
+  "questions_answered": [
+    "The existing harness is built-dist-only and fingerprints artifacts, environment, lockfile, row manifest, and observation writer.",
+    "Its deterministic checker passes 14 of 14 and rejects missing rows, source imports, mixed environments, artifact drift, wrong order, unsupported pair counts, and false-green mixed evidence.",
+    "The manifest contains exactly 39 Lite and 8 Lite React throughput rows.",
+    "No existing row exercises scope.run owned execution, resource ownership lifecycle, SDK session.run, allocation, or post-close retained memory.",
+    "The current dist files cannot become the immutable baseline without a clean exact-head rebuild and recorded build provenance."
+  ],
+  "questions_unanswered": [
+    "Whether the representative SDK row is minimum session.run or complete agent.turn. Recommendation is minimum session.run as representative and agent.turn as supplementary.",
+    "No production frequency data supports workload weighting. Recommendation is equal-weight geometric aggregation until workload evidence exists.",
+    "A retained-memory baseline may be indistinguishable from calibrated noise. The denominator rule must fail closed.",
+    "No independent validator record exists yet."
+  ],
+  "missing_rows": [
+    { "id": "lite-owned:scope.run:no-deps-complete", "workload": "One scope.run with a scalar no-dependency flow, including temporary context creation, execution, and close", "metrics": ["throughput", "allocation"] },
+    { "id": "lite-owned:scope.run:boundary-resource-cleanup", "workload": "One owned run resolving one boundary-owned resource with one cleanup and awaiting full cleanup", "metrics": ["throughput", "allocation", "retained"] },
+    { "id": "lite-managed:ctx.exec:boundary-resource-cold", "workload": "Fresh managed context and first flow execution resolving one boundary-owned resource", "metrics": ["throughput", "allocation"] },
+    { "id": "lite-managed:ctx.exec:boundary-resource-warm", "workload": "Second execution on the same context with the same boundary-owned resource, followed by close", "metrics": ["throughput", "allocation", "retained"] },
+    { "id": "lite-managed:ctx.exec:current-resource-cleanup", "workload": "One execution resolving one current-owned resource with cleanup completed before return", "metrics": ["throughput", "allocation", "retained"] },
+    { "id": "lite-managed:ctx.exec:nested-current-resource", "workload": "Outer and one nested flow share exactly one current-owned resource while a sibling gets a fresh value", "metrics": ["throughput", "allocation"] },
+    { "id": "sdk-session:run:one-minimal-turn-close", "workload": "Fresh bound session context and empty record; one session.run selecting a scalar no-op turn; consume, settle, close, and await deactivation", "metrics": ["throughput", "allocation", "retained"] },
+    { "id": "sdk-agent:run:one-round-no-calls", "workload": "Supplementary one-round agent.turn with a stub model returning stop true and no tools, skills, or subagents", "metrics": ["throughput", "allocation"] }
+  ],
+  "allocation_calibration": {
+    "process": "Separate fixed Node process; warmup outside measurement; freeze batch size before variants",
+    "method": "V8 inspector allocation sampling with fixed interval; report gross sampled bytes per operation",
+    "controls": ["matched empty async loop", "one retained 1 KiB allocation per operation", "two retained 1 KiB allocations per operation"],
+    "admissibility": "workload signal at least 10x empty-loop signal and two-object to one-object ratio in [1.8, 2.2]",
+    "pairing": "same adjacent alternating five-pair order as throughput with only the predeclared four-pair fallback",
+    "ratio": "candidate sampled bytes per operation divided by baseline sampled bytes per operation",
+    "targets": { "representative": 0.9, "per_case_ceiling": 1.05 },
+    "required_artifacts": ["raw allocation profiles", "sampler settings", "calibration outputs", "batch manifest", "environment fingerprint", "artifact fingerprints"]
+  },
+  "retained_memory_design": {
+    "process": "Fresh --expose-gc process per observation",
+    "batch_sizes": ["N", "2N"],
+    "sequence": "fixed warmup, three fixed GC and microtask cycles, pre-snapshot, all operations and cleanup, clear references, three fixed GC and microtask cycles, post-snapshot",
+    "fields": ["heap snapshot hashes", "heapUsed", "external", "arrayBuffers"],
+    "controls": ["empty closed-workload negative control", "deliberately retained 1 KiB per operation positive control", "no-live-handle close assertion"],
+    "estimate": "retained bytes per operation from the N and 2N slope",
+    "denominator_rule": "fail closed when baseline slope is at or below calibrated noise",
+    "ratio": "(candidate slope + noise bound) / (baseline slope - noise bound)",
+    "target": "every first-stage pair <= 1.05 or at least 8 of 9 only after predeclared fallback"
+  },
+  "ranked_candidates": [
+    { "rank": 1, "surface": "pkg/core/lite/src/scope.ts:2622-2635", "finding": "Empty tag seeding allocates a Set and spread arrays when all tag lists are absent", "risk": "low" },
+    { "rank": 2, "surface": "pkg/core/lite/src/scope.ts:2252-2261", "finding": "Every execution context eagerly allocates three maps, three sets, and an AbortController", "risk": "medium-high" },
+    { "rank": 3, "surface": "pkg/core/lite/src/scope.ts:254-268,2287-2294", "finding": "Child execution creates its own abort controller and a second combined controller and listener graph", "risk": "high" },
+    { "rank": 4, "surface": "pkg/core/lite/src/scope.ts:2440-2480", "finding": "Every first resource resolution builds a context object with ten bound methods", "risk": "medium" },
+    { "rank": 5, "surface": "pkg/sdk/core/src/session.ts:914-923,1017-1058,1128-1163,1526-1530", "finding": "One session turn repeatedly copies record arrays and scans new work and branches", "risk": "high" },
+    { "rank": 6, "surface": "pkg/sdk/core/src/session.ts:680-845", "finding": "Each Runtime constructs and freezes registry objects with many capturing closures", "risk": "high" }
+  ],
+  "immutable_baseline": {
+    "product_commit": "7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+    "measurement_commit": "Create a benchmark-only descendant with workload, allocation, retained-memory, schema, comparator, and checker changes",
+    "node": "v26.4.0",
+    "lockfile_sha256": "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120",
+    "forbidden_baseline": "Current ignored dist files",
+    "existing_row_floor": 0.95
+  },
+  "decision": "Save the design learning, block optimization and performance claims, add and validate the measurement-only surface first, then establish an immutable baseline.",
+  "fail_closed": true,
+  "flag_if_missing_or_stale": "breaking:performance-evidence-missing",
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "existing_row_confirmed_regression_count",
+    "allocation_regression_case_count",
+    "retained_memory_regression_count",
+    "benchmark_only_production_branch_count",
+    "cleanup_business_state_mutation_count",
+    "cross_session_leak_count",
+    "post_close_live_resource_count",
+    "context_argument_pass_count",
+    "undeclared_effect_edge_count",
+    "touched_surface_regression_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "active_anti_goal_verification": {
+    "status": "unknown_pending_independent_verification",
+    "value": null,
+    "threshold": 0,
+    "comparator": "==",
+    "max_age": "10m",
+    "verification_record_ref": null
+  },
+  "wall_gate": { "verdict": "unknown", "downstream_advance": "blocked", "decided_at": "2026-07-16T04:12:06Z" },
+  "reviewer_audit_status": "pending_independent_verification",
+  "worker_evidence_is_acceptance": false
+}

@@ -1,0 +1,49 @@
+{
+  "type": "worker-report",
+  "schema_version": 1,
+  "worker_id": "dkr-p2-calibration",
+  "worker_kind": "discovery",
+  "unit_id": "DKR-P2",
+  "status": "checkpoint_written_pending_independent_validation",
+  "recorded_at": "2026-07-16T04:43:31Z",
+  "checkpoint_ref": "workers/dkr-p2-calibration/checkpoint.v1.json",
+  "checkpoint_sha256": "bf4effcb3837f8def31e999b6853d400a773fbe84f87f797ce196f2b5fa4febd",
+  "result": "Exact-head clean-build provenance and a pinned Node 26 retained-object method produced valid worker evidence. The allocation method was rejected, two row probes remain unaccepted, and performance implementation stays blocked.",
+  "metrics": {
+    "exact_head_clean_build_contract_count": 1,
+    "accepted_retained_control_count": 1,
+    "accepted_scope_run_row_count": 1,
+    "rejected_allocation_method_count": 1,
+    "unaccepted_lifecycle_row_count": 2,
+    "unsupported_performance_claim_count": 0,
+    "single_llm_truth_acceptance_count": null
+  },
+  "product_files_changed": false,
+  "acceptance_claimed": false,
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "allocation_regression_case_count",
+    "retained_memory_regression_count",
+    "benchmark_only_production_branch_count",
+    "post_close_live_resource_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "wall_gate": {
+    "verdict": "blocked_missing_valid_allocation_method_and_independent_replay",
+    "downstream_advance": "blocked",
+    "reason": "The one-shot inspector sampler did not account for the known 1 KiB controls, the corrected managed-context and session lifecycle rows still require replay, and independent validation is absent."
+  },
+  "next_check_at": "Independent validator dispatch within the frame freshness window.",
+  "commanded_lines": [
+    "Action envelope: read exact-head product sources; generate scratch probes only under /tmp/dkr-p2-calibration; write only the authorized checkpoint.v1.json and progress.finish.json records; no product, frame, tree, ledger, release, or external-state changes.",
+    "One-shot rule: every allocation, retained-memory, row, and provenance probe ran once; rejected or unaccepted results were preserved without favorable repetition.",
+    "Accepted worker evidence: exact-head clean-build provenance, Node 26 retained-object controls 0/0/1, and one scope.run owned lifecycle row.",
+    "Rejected worker evidence: the inspector allocation method measured 269 and 501.5 attributed bytes per iteration for controlled 1 KiB and 2 KiB allocations and therefore failed the byte-accounting contract.",
+    "Unaccepted rows: the managed ctx.exec probe used current ownership instead of default boundary ownership, and post-session introspection resolved a new current-owned session runtime.",
+    "Downstream decision: fund one reducing allocation-method DKR with thresholds declared before execution; do not implement measurement or optimize.",
+    "Standing walls: every unread or independently unverified wall blocks downstream advance.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  ]
+}

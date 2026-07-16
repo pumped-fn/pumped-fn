@@ -1,0 +1,19 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-A",
+  "accepted_at": "2026-07-16T04:52:00Z",
+  "accepted_scope": "Reducing discovery: current API matrix, two context-taking public inline forms, existing Scope.run deps behavior, primitive and extension context boundaries, and explicit cleanup params.",
+  "checkpoint_ref": "workers/dkr-a-exec-api/checkpoint.v1.json",
+  "checkpoint_sha256": "0bc4a9b3c2047790e70866423cf4fdbde07febc96a4059a86fe643732d6151f7",
+  "verification_ref": "workers/validator-dkr-a/verification.v1.json",
+  "verification_sha256": "1c1047e0cc7cb768f780921c0d336edb4b6e223a08214c74d7b1a9e179621e2c",
+  "human_owned_target_contract": {
+    "evidence": "User required every dependency declared, no ctx or scope arguments, explicit params, and the same deps form for ctx.exec as scope.run.",
+    "signature_boundary": "name, deps, and params required; fn receives inferred deps and params; deps {} and params [] cover the empty form."
+  },
+  "implementation_unknowns": [
+    "extension target identity and ExecTargetFn migration",
+    "exact AST migration count and deterministic contract checker"
+  ],
+  "downstream_authority": "Fund PKR-A1 implementation and its checker; completion remains independently gated."
+}

@@ -1,0 +1,352 @@
+{
+  "schema_version": 1,
+  "verification_type": "dkr_validator_audit",
+  "validator_id": "validator-dkr-a",
+  "unit_id": "DKR-A",
+  "checkpoint_ref": "workers/dkr-a-exec-api/checkpoint.v1.json",
+  "checkpoint_sha256": "0bc4a9b3c2047790e70866423cf4fdbde07febc96a4059a86fe643732d6151f7",
+  "observed_at": "2026-07-16T04:49:57Z",
+  "checkpoint_freshness": {
+    "checkpoint_observed_at": "2026-07-16T04:40:53Z",
+    "validated_at": "2026-07-16T04:49:57Z",
+    "age_seconds": 544,
+    "max_age_seconds": 600,
+    "decision": "accepted"
+  },
+  "decision": "accepted_reducing_discovery_only",
+  "fail_closed": true,
+  "product_files_changed_by_validator": false,
+  "audit_traces": [
+    {
+      "claim_id": "DKR-A-EXACT-HEAD",
+      "check": "The checkpoint was read against its declared Git head with no tracked or cached Lite or lint product diff",
+      "metric": "exact_head_match_and_validator_product_edit_count",
+      "threshold": "HEAD 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162 and product edit count 0",
+      "value": "HEAD 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162 and product edit count 0",
+      "source_of_truth": "Git object database and worktree paths pkg/core/lite and pkg/tool/lint",
+      "replay": "git rev-parse HEAD; git diff --quiet -- pkg/core/lite pkg/tool/lint; git diff --cached --quiet -- pkg/core/lite pkg/tool/lint",
+      "exit_code": 0,
+      "sha256": [],
+      "observed_at": "2026-07-16T04:49:57Z",
+      "decision": "accepted",
+      "evidence": [
+        "7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+        "tracked_product_diff_exit=0",
+        "cached_product_diff_exit=0"
+      ]
+    },
+    {
+      "claim_id": "DKR-A-EVIDENCE-HASHES",
+      "check": "Every source hash supplied by the checkpoint matches the exact-head file",
+      "metric": "checkpoint_evidence_hash_mismatch_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "The seven evidence paths in checkpoint.v1.json",
+      "replay": "sha256sum pkg/core/lite/src/types.ts pkg/core/lite/src/scope.ts pkg/core/lite/tests/structured-lifetime.test.ts pkg/tool/lint/src/index.ts pkg/tool/lint/tests/scanner.test.ts pkg/core/lite/README.md .okra/runs/release-readiness-20260716/worker-packets/dkr-a-exec-api.json",
+      "exit_code": 0,
+      "sha256": [
+        "09324f8545c7186bdc61b635bac4afec75fb19d98eed72ce3c5f509677482c6d",
+        "74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912",
+        "8f091511358eb2754c57b3083b7ea10ab0449a15187a30457173831e45305534",
+        "f2f9212b3dfbd94f5bbbdeaae347e49d7d8d42069e909f18efb243a8d4f31ba7",
+        "7bdb5de69d8ecd8e368f0b6c20d16a20408b61e386928ac01d6ae881b5668177",
+        "74356a7033bfd7ad37d351f7fa0a8c1fa1aa1cd77297deaa975e2b7e6448d11f",
+        "2e5a79a42ba0c5e9e3a07b714bc2380e3b3332d943c35539aaa7b002cf9ded61"
+      ],
+      "observed_at": "2026-07-16T04:48:37Z",
+      "decision": "accepted",
+      "evidence": [
+        "All seven observed hashes equal the checkpoint values."
+      ]
+    },
+    {
+      "claim_id": "DKR-A-CURRENT-PUBLIC-MATRIX",
+      "check": "The current public type matrix has three Scope.run forms, two ExecutionContext.exec forms, context-bearing primitive factories, context-bearing wrapExec, and explicit cleanup parameters",
+      "metric": "current_api_matrix_mismatch_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "pkg/core/lite/src/types.ts:59-69,253-332,560-580,641-659,684-692",
+      "replay": "pnpm --filter @pumped-fn/lite typecheck:full",
+      "exit_code": 0,
+      "sha256": [
+        "09324f8545c7186bdc61b635bac4afec75fb19d98eed72ce3c5f509677482c6d"
+      ],
+      "observed_at": "2026-07-16T04:49:12Z",
+      "decision": "accepted",
+      "evidence": [
+        "tsgo --noEmit -p tsconfig.test.json",
+        "exit_code=0",
+        "Scope.run exposes ExecFlowOptions, RunDepsOptions, and RunFnOptions.",
+        "ExecutionContext.exec exposes ExecFlowOptions and ExecFnOptions only."
+      ]
+    },
+    {
+      "claim_id": "DKR-A-LEGACY-CONTEXT-INJECTION",
+      "check": "The current Scope.run function form and ctx.exec function form pass a child ExecutionContext to the callback",
+      "metric": "current_inline_context_callback_form_count",
+      "threshold": 2,
+      "value": 2,
+      "source_of_truth": "pkg/core/lite/src/types.ts:265,296-302,321-332; pkg/core/lite/src/scope.ts:2107-2130,2517-2555,2822-2825; pkg/core/lite/tests/scope.test.ts:1629-1660",
+      "replay": "pnpm --filter @pumped-fn/lite test -- structured-lifetime.test.ts scope.test.ts",
+      "exit_code": 0,
+      "sha256": [
+        "09324f8545c7186bdc61b635bac4afec75fb19d98eed72ce3c5f509677482c6d",
+        "74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912",
+        "a8fab8195e448e3d1159af19a6084f88f18aff70327865f16a7ead9058f507b8"
+      ],
+      "observed_at": "2026-07-16T04:49:24Z",
+      "decision": "accepted",
+      "evidence": [
+        "Test Files 8 passed (8)",
+        "Tests 234 passed (234)",
+        "execFnInternal returns fn(this, ...params)."
+      ]
+    },
+    {
+      "claim_id": "DKR-A-SCOPE-DEPS-CONTRACT",
+      "check": "The existing Scope.run dependency form requires name, deps, params, infers dependency values and parameters, resolves dependencies before fn, and rejects scalar streaming results",
+      "metric": "scope_run_deps_contract_failure_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "pkg/core/lite/src/types.ts:64-68,304-319; pkg/core/lite/src/scope.ts:2101-2127; pkg/core/lite/tests/structured-lifetime.test.ts:70-199",
+      "replay": "pnpm --filter @pumped-fn/lite typecheck:full; pnpm --filter @pumped-fn/lite test -- structured-lifetime.test.ts scope.test.ts",
+      "exit_code": 0,
+      "sha256": [
+        "09324f8545c7186bdc61b635bac4afec75fb19d98eed72ce3c5f509677482c6d",
+        "74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912",
+        "8f091511358eb2754c57b3083b7ea10ab0449a15187a30457173831e45305534"
+      ],
+      "observed_at": "2026-07-16T04:49:24Z",
+      "decision": "accepted",
+      "evidence": [
+        "RunDepsOptions declares name, deps, fn, and params as required properties.",
+        "The callback is fn(deps: InferDeps<D>, ...args: Args).",
+        "The runtime lowers the operation to a flow with the declared deps before calling fn."
+      ]
+    },
+    {
+      "claim_id": "DKR-A-TAGS-SIGNAL-CURRENT",
+      "check": "Current scope.run dependency operations seed invocation tags, expose params as extension input, resolve declared tag dependencies, join caller cancellation, and close their owned boundary",
+      "metric": "current_scope_run_tag_signal_lifecycle_failure_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "pkg/core/lite/src/scope.ts:2107-2140,2287-2290,2622-2660; pkg/core/lite/tests/structured-lifetime.test.ts:70-105,188-254",
+      "replay": "pnpm --filter @pumped-fn/lite test -- structured-lifetime.test.ts scope.test.ts",
+      "exit_code": 0,
+      "sha256": [
+        "74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912",
+        "8f091511358eb2754c57b3083b7ea10ab0449a15187a30457173831e45305534"
+      ],
+      "observed_at": "2026-07-16T04:49:24Z",
+      "decision": "accepted",
+      "evidence": [
+        "Test Files 8 passed (8)",
+        "Tests 234 passed (234)",
+        "The operation-target test observed target name multiply-once, ctx.input [4], tag factor 3, and resource close."
+      ]
+    },
+    {
+      "claim_id": "DKR-A-CORE-AND-EXTENSION-BOUNDARIES",
+      "check": "Current atom, flow, resource, preset, and extension contracts intentionally retain lifecycle context, separate from inline operation inputs",
+      "metric": "current_core_extension_context_boundary_mismatch_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "pkg/core/lite/src/types.ts:560-580,641-659,684-692; pkg/core/lite/src/preset.ts:5-55; pkg/core/lite/src/scope.ts:2448-2482,2837-2852",
+      "replay": "pnpm --filter @pumped-fn/lite typecheck:full; pnpm --filter @pumped-fn/lite test -- structured-lifetime.test.ts scope.test.ts",
+      "exit_code": 0,
+      "sha256": [
+        "09324f8545c7186bdc61b635bac4afec75fb19d98eed72ce3c5f509677482c6d",
+        "74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912"
+      ],
+      "observed_at": "2026-07-16T04:49:24Z",
+      "decision": "accepted",
+      "evidence": [
+        "Extension.wrapExec receives next, ExecTarget, and child ExecutionContext.",
+        "AtomFactory, FlowFactory, and ResourceFactory receive their lifecycle contexts.",
+        "The test suite passes the extension, preset, resource, and flow context contracts."
+      ]
+    },
+    {
+      "claim_id": "DKR-A-CLEANUP-PARAMETERS",
+      "check": "ExecutionContext.onClose and ResourceContext.cleanup already use explicit rest parameters and runtime invocation without passing ctx or scope",
+      "metric": "cleanup_context_argument_pass_count",
+      "threshold": 0,
+      "value": 0,
+      "source_of_truth": "pkg/core/lite/src/types.ts:241,271-281; pkg/core/lite/src/scope.ts:53-54,2467-2478,2855-2864,2925-2951; pkg/core/lite/tests/structured-lifetime.test.ts:256-309; pkg/core/lite/tests/scope.test.ts:1663-1710",
+      "replay": "pnpm --filter @pumped-fn/lite test -- structured-lifetime.test.ts scope.test.ts",
+      "exit_code": 0,
+      "sha256": [
+        "09324f8545c7186bdc61b635bac4afec75fb19d98eed72ce3c5f509677482c6d",
+        "74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912"
+      ],
+      "observed_at": "2026-07-16T04:49:24Z",
+      "decision": "accepted",
+      "evidence": [
+        "Resource cleanup invokes cleanup.fn(...cleanup.params).",
+        "Context close invokes cleanup.fn(result, ...cleanup.params).",
+        "Tests 234 passed (234)."
+      ]
+    },
+    {
+      "claim_id": "DKR-A-CTX-DEPS-PARITY",
+      "check": "ctx.exec currently supports the proposed dependency form with required name, deps, params and inferred dependency values",
+      "metric": "ctx_exec_deps_contract_failure_count",
+      "threshold": 0,
+      "value": null,
+      "source_of_truth": "pkg/core/lite/src/types.ts:253-332 and pkg/core/lite/src/scope.ts:2508-2555",
+      "replay": "scripts/check-inline-exec-contract.mjs",
+      "exit_code": null,
+      "sha256": [
+        "09324f8545c7186bdc61b635bac4afec75fb19d98eed72ce3c5f509677482c6d",
+        "74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912"
+      ],
+      "observed_at": "2026-07-16T04:49:57Z",
+      "decision": "rejected",
+      "failure_mode": "contradicted_and_non_replayable",
+      "evidence": [
+        "ExecutionContext.exec has no RunDepsOptions or ExecDepsOptions overload.",
+        "ExecutionContextImpl.exec has no dependency-options runtime branch.",
+        "scripts/check-inline-exec-contract.mjs does not exist."
+      ]
+    },
+    {
+      "claim_id": "DKR-A-SHARED-EXEC-DEPS-OPTIONS",
+      "check": "One shared ExecDepsOptions with required name, deps, and params is the uniquely source-forced replacement contract",
+      "metric": "unsupported_api_recommendation_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "workers/dkr-a-exec-api/checkpoint.v1.json recommended_target_contract and current public source/tests",
+      "replay": "scripts/check-inline-exec-contract.mjs",
+      "exit_code": null,
+      "sha256": [
+        "0bc4a9b3c2047790e70866423cf4fdbde07febc96a4059a86fe643732d6151f7"
+      ],
+      "observed_at": "2026-07-16T04:49:57Z",
+      "decision": "rejected",
+      "failure_mode": "unsupported_and_non_replayable",
+      "evidence": [
+        "The frame forces no ctx or scope argument in inline operation callbacks.",
+        "The existing Scope.run dependency form proves one viable shape.",
+        "No source or test proves that sharing the exported type, requiring name for ctx.exec, or removing every separate zero-dependency type is the unique compatible design."
+      ]
+    },
+    {
+      "claim_id": "DKR-A-LEGACY-REMOVAL",
+      "check": "Legacy inline context callback forms must stop passing ctx or scope to satisfy the standing wall",
+      "metric": "context_argument_pass_count",
+      "threshold": 0,
+      "value": 2,
+      "source_of_truth": "Frame action envelope and pkg/core/lite/src/types.ts:265,296-332",
+      "replay": "pnpm --filter @pumped-fn/lite typecheck:full; pnpm --filter @pumped-fn/lite test -- structured-lifetime.test.ts scope.test.ts",
+      "exit_code": 0,
+      "sha256": [
+        "09324f8545c7186bdc61b635bac4afec75fb19d98eed72ce3c5f509677482c6d"
+      ],
+      "observed_at": "2026-07-16T04:49:24Z",
+      "decision": "accepted",
+      "evidence": [
+        "The action envelope forbids passing ctx or scope into inline operation callbacks.",
+        "Current types and runtime pass ExecutionContext to two inline callback forms.",
+        "The current wall is breached; the replay validates current behavior, not completion."
+      ]
+    },
+    {
+      "claim_id": "DKR-A-EXTENSION-TARGET-MIGRATION",
+      "check": "The recommendation defines a replayed compatible ExecTargetFn identity and type after inline callbacks stop receiving context",
+      "metric": "extension_target_contract_unknown_count",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "pkg/core/lite/src/types.ts:684-692; pkg/core/lite/src/scope.ts:2539-2555,2837-2852; checkpoint questions_unanswered",
+      "replay": "scripts/check-inline-exec-contract.mjs",
+      "exit_code": null,
+      "sha256": [
+        "09324f8545c7186bdc61b635bac4afec75fb19d98eed72ce3c5f509677482c6d",
+        "74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912"
+      ],
+      "observed_at": "2026-07-16T04:49:57Z",
+      "decision": "rejected",
+      "failure_mode": "unanswered_and_non_replayable",
+      "evidence": [
+        "Current wrapExec receives the original function target and child context.",
+        "Current ExecTargetFn requires (ctx, ...args).",
+        "The checkpoint leaves callback target versus synthetic flow target unresolved."
+      ]
+    },
+    {
+      "claim_id": "DKR-A-EXACT-MIGRATION-COUNT",
+      "check": "The repository has exactly the claimed migration set for ctx.exec and scope.run inline callbacks",
+      "metric": "unmeasured_inline_callback_callsite_count",
+      "threshold": 0,
+      "value": null,
+      "source_of_truth": "Repository TypeScript call sites",
+      "replay": "scripts/check-inline-exec-contract.mjs",
+      "exit_code": null,
+      "sha256": [],
+      "observed_at": "2026-07-16T04:49:57Z",
+      "decision": "rejected",
+      "failure_mode": "non_replayable",
+      "evidence": [
+        "The checkpoint reports only a broad source scan and explicitly requires an AST checker for the exact call count.",
+        "scripts/check-inline-exec-contract.mjs does not exist."
+      ]
+    },
+    {
+      "claim_id": "DKR-A-WALL-GATE",
+      "check": "Every active anti-goal is fresh, replayed, and held, allowing downstream implementation",
+      "metric": "active_anti_goal_unheld_or_unread_count",
+      "threshold": 0,
+      "value": 8,
+      "source_of_truth": "checkpoint active_anti_goal_verification and independent traces above",
+      "replay": "scripts/check-inline-exec-contract.mjs",
+      "exit_code": null,
+      "sha256": [
+        "0bc4a9b3c2047790e70866423cf4fdbde07febc96a4059a86fe643732d6151f7"
+      ],
+      "observed_at": "2026-07-16T04:49:57Z",
+      "decision": "rejected",
+      "failure_mode": "blocked_and_incomplete",
+      "evidence": [
+        "context_argument_pass_count is breached.",
+        "implicit_required_dependency_count and hidden_execution_edge_count are blocked.",
+        "redundant_graph_ceremony_count is reported breached without a checker.",
+        "breaking_model_api_change_count, scope_seam_escape_count, slop_violation_count, and single_llm_truth_acceptance_count are not fresh held replay traces.",
+        "The worker checkpoint itself sets downstream_advance to blocked."
+      ]
+    }
+  ],
+  "acceptance_boundary": {
+    "accepted": [
+      "The exact current public type and runtime matrix.",
+      "The current context injection breach.",
+      "The existing Scope.run dependency form and its inference, tag, signal, extension, close, and scalar-result behavior.",
+      "The intentional context boundary for core primitive factories and extensions.",
+      "The existing explicit-parameter cleanup and onClose forms.",
+      "The need to stop passing ctx or scope into public inline operation callbacks."
+    ],
+    "rejected": [
+      "ctx.exec dependency parity as a current or replayed contract.",
+      "One shared ExecDepsOptions as the uniquely source-forced public shape.",
+      "The unresolved extension-target migration.",
+      "Any exact migration count without the AST checker.",
+      "A held wall gate or permission to advance implementation."
+    ]
+  },
+  "summary": {
+    "accepted_claim_count": 9,
+    "rejected_claim_count": 5,
+    "rejected_claim_ids": [
+      "DKR-A-CTX-DEPS-PARITY",
+      "DKR-A-SHARED-EXEC-DEPS-OPTIONS",
+      "DKR-A-EXTENSION-TARGET-MIGRATION",
+      "DKR-A-EXACT-MIGRATION-COUNT",
+      "DKR-A-WALL-GATE"
+    ],
+    "decision": "accepted_reducing_discovery_only",
+    "downstream_advance": "blocked"
+  },
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "reason": "The current contract and the no-context breach are independently verified. The target ctx.exec type/runtime contract, extension target behavior, migration count, and active-wall gate are not replayable. API preference claims are not acceptance evidence."
+  }
+}

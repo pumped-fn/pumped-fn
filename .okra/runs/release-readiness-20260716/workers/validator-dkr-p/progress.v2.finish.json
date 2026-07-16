@@ -1,0 +1,17 @@
+{
+  "type": "worker_finish",
+  "worker_id": "validator-dkr-p",
+  "worker_kind": "verification",
+  "unit_id": "DKR-P",
+  "status": "complete",
+  "recorded_at": "2026-07-16T04:29:59Z",
+  "checkpoint_ref": "workers/dkr-p-performance/checkpoint.v2.json",
+  "verification_ref": "workers/validator-dkr-p/verification.v2.json",
+  "accepted": 6,
+  "rejected": 0,
+  "rejected_claim_ids": [],
+  "decision": "accepted_reducing_discovery",
+  "ckr_performance_advance": "blocked",
+  "optimization_advance": "blocked",
+  "product_files_changed": false
+}

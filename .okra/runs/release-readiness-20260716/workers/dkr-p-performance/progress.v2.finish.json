@@ -1,0 +1,27 @@
+{
+  "type": "worker_finish",
+  "worker_id": "dkr-p-performance",
+  "worker_kind": "discovery",
+  "unit_id": "DKR-P",
+  "status": "reducing_discovery_pending_v2_independent_validation",
+  "recorded_at": "2026-07-16T04:24:55Z",
+  "checkpoint_ref": "workers/dkr-p-performance/checkpoint.v2.json",
+  "validator_record_ref": "workers/validator-dkr-p/verification.v1.json",
+  "validator_record_sha256": "c952e05c552fa727d10726f00dfa90c3d60a2cb99dad73bf795d9752024feac4",
+  "decision": "record_replayed_facts_and_block_performance_advancement",
+  "accepted_reducing_discovery": false,
+  "downstream_advance": "blocked",
+  "ckr_performance_advance": "blocked",
+  "optimization_advance": "blocked",
+  "product_files_changed": false,
+  "changed_paths": [
+    "workers/dkr-p-performance/checkpoint.v2.json",
+    "workers/dkr-p-performance/progress.v2.finish.json"
+  ],
+  "hypotheses_left_unaccepted": [
+    "allocation and retained-memory calibration design",
+    "exact missing-row set",
+    "candidate ranking and semantic-risk labels",
+    "immutable-baseline procedure"
+  ]
+}

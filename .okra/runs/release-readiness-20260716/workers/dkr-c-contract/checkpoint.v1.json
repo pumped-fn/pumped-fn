@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "checkpoint_type": "executable_dkr_checkpoint",
+  "conclusion_id": "DKR-C-CONTRACT-INVENTORY-7bf966e6",
+  "unit_id": "DKR-C",
+  "worker_id": "dkr-c-contract",
+  "worker_kind": "discovery",
+  "decision_target": "Determine whether the published contract can be measured as complete across package exports, declarations and TSDoc, docs, examples, migration, changelogs, changeset, and PR 346.",
+  "source_of_truth": {
+    "git_head": "7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+    "git_base": "d974efe050b953e270c9972700f5dd5f355ba465",
+    "package_universe": "Non-private pkg/*/*/package.json manifests and every exports key",
+    "declarations": "Built .d.mts targets named by package exports",
+    "documentation": "Package README, PATTERNS, migration, changelog, examples, and lane docs",
+    "release_evidence": ".changeset/session-kernel-major.md and PR 346 JSON at the exact head"
+  },
+  "read_method": "Enumerate non-private manifests and exports; resolve each type target; use the TypeScript checker to enumerate public symbols and TSDoc; compare changed public src paths with changeset frontmatter; inspect docs, examples, migration, changelogs, and normalized PR JSON.",
+  "freshness": {
+    "observed_at": "2026-07-16T04:13:27Z",
+    "recorded_at": "2026-07-16T04:17:21Z",
+    "status": "fresh",
+    "max_age": "10m",
+    "head_matches_packet": true
+  },
+  "confidence": 0.96,
+  "decision": "Candidate decision only: public_contract_gap_count is not currently readable by a committed deterministic checker and must fail closed. Definite gaps exist; no downstream contract delivery should be accepted until an independent validator replays the matrix and checker.",
+  "fail_closed": true,
+  "acceptance_claimed": false,
+  "product_files_changed": false,
+  "metrics": {
+    "public_package_count": 26,
+    "public_export_row_count": 30,
+    "public_declaration_symbol_count": 539,
+    "documented_public_symbol_count": 75,
+    "public_api_tsdoc_gap_count": 464,
+    "sdk_public_symbol_count": 295,
+    "sdk_documented_public_symbol_count": 0,
+    "changed_public_source_package_count": 13,
+    "changed_public_source_package_without_changeset_count": 5,
+    "public_contract_gap_count": null,
+    "documentation_example_failure_count": null
+  },
+  "coverage_matrix_legend": {
+    "docs": "R README, P PATTERNS, M migration, C changelog",
+    "gap_codes": "T TSDoc, M migration, S stale docs or examples, CS changeset, P PR to runtime mismatch",
+    "tsdoc": "documented public symbols / total public symbols"
+  },
+  "coverage_matrix": [
+    {"surface":"@pumped-fn/lite","manifest_ref":"pkg/core/lite/package.json:2","export_ref":"pkg/core/lite/package.json:9","docs":"R/P/M/C","example":"package README and invoice example","tsdoc":"20/42","changeset":"yes","pr":"detailed","gaps":["T","M","S"]},
+    {"surface":"@pumped-fn/lite-extension-logging-pino","manifest_ref":"pkg/ext/logging-pino/package.json:2","export_ref":"pkg/ext/logging-pino/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/2","changeset":"not changed","pr":"not applicable","gaps":["T"]},
+    {"surface":"@pumped-fn/lite-extension-logging","manifest_ref":"pkg/ext/logging/package.json:2","export_ref":"pkg/ext/logging/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/2","changeset":"missing for changed source","pr":"absent","gaps":["T","CS"]},
+    {"surface":"@pumped-fn/lite-extension-observable-otel","manifest_ref":"pkg/ext/observable-otel/package.json:2","export_ref":"pkg/ext/observable-otel/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/2","changeset":"not changed","pr":"not applicable","gaps":["T"]},
+    {"surface":"@pumped-fn/lite-extension-observable","manifest_ref":"pkg/ext/observable/package.json:2","export_ref":"pkg/ext/observable/package.json:10","docs":"R/C","example":"package README and observability guide","tsdoc":"0/2","changeset":"missing for changed source","pr":"absent","gaps":["T","CS","S"]},
+    {"surface":"@pumped-fn/lite-extension-scheduler-nats","manifest_ref":"pkg/ext/scheduler-nats/package.json:2","export_ref":"pkg/ext/scheduler-nats/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/2","changeset":"not changed","pr":"not applicable","gaps":["T"]},
+    {"surface":"@pumped-fn/lite-extension-scheduler","manifest_ref":"pkg/ext/scheduler/package.json:2","export_ref":"pkg/ext/scheduler/package.json:10","docs":"R/C","example":"package README and invoice example","tsdoc":"0/5","changeset":"missing for changed source","pr":"absent","gaps":["T","CS"]},
+    {"surface":"@pumped-fn/lite-extension-suspense","manifest_ref":"pkg/ext/suspense/package.json:2","export_ref":"pkg/ext/suspense/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/17","changeset":"not changed","pr":"not applicable","gaps":["T"]},
+    {"surface":"@pumped-fn/lite-extension-sync-nats","manifest_ref":"pkg/ext/sync-nats/package.json:2","export_ref":"pkg/ext/sync-nats/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/2","changeset":"not changed","pr":"not applicable","gaps":["T"]},
+    {"surface":"@pumped-fn/lite-extension-sync","manifest_ref":"pkg/ext/sync/package.json:2","export_ref":"pkg/ext/sync/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/2","changeset":"missing for changed source","pr":"absent","gaps":["T","CS"]},
+    {"surface":"@pumped-fn/lite-hono","manifest_ref":"pkg/framework/hono/package.json:2","export_ref":"pkg/framework/hono/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/1","changeset":"not changed","pr":"not applicable","gaps":["T"]},
+    {"surface":"@pumped-fn/pumped","manifest_ref":"pkg/framework/pumped/package.json:2","export_ref":"pkg/framework/pumped/package.json:10","docs":"R/C","example":"package README","tsdoc":"1/16","changeset":"test-only change","pr":"not applicable","gaps":["T"]},
+    {"surface":"@pumped-fn/lite-tanstack-start","manifest_ref":"pkg/framework/tanstack-start/package.json:2","export_ref":"pkg/framework/tanstack-start/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/1","changeset":"not changed","pr":"not applicable","gaps":["T"]},
+    {"surface":"@pumped-fn/lite-react-json-render","manifest_ref":"pkg/react/json/package.json:2","export_ref":"pkg/react/json/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/15","changeset":"not changed","pr":"not applicable","gaps":["T"]},
+    {"surface":"@pumped-fn/lite-react","manifest_ref":"pkg/react/lite-react/package.json:2","export_ref":"pkg/react/lite-react/package.json:9","docs":"R/P/C","example":"package README","tsdoc":"11/49","changeset":"missing for changed source","pr":"absent","gaps":["T","CS"]},
+    {"surface":"@pumped-fn/lite-render-core","manifest_ref":"pkg/render/core/package.json:2","export_ref":"pkg/render/core/package.json:10","docs":"R/C","example":"package README","tsdoc":"32/56","changeset":"not changed","pr":"not applicable","gaps":["T"]},
+    {"surface":"@pumped-fn/lite-render-react","manifest_ref":"pkg/render/react/package.json:2","export_ref":"pkg/render/react/package.json:10","docs":"R/C","example":"package README","tsdoc":"9/11","changeset":"not changed","pr":"not applicable","gaps":["T"]},
+    {"surface":"@pumped-fn/sdk-just-bash","manifest_ref":"pkg/sdk/bash/package.json:2","export_ref":"pkg/sdk/bash/package.json:10","docs":"R/C","example":"package README and issue triage","tsdoc":"0/19","changeset":"yes","pr":"mentioned","gaps":["T"]},
+    {"surface":"@pumped-fn/sdk-claude","manifest_ref":"pkg/sdk/claude/package.json:2","export_ref":"pkg/sdk/claude/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/20","changeset":"yes","pr":"mentioned","gaps":["T"]},
+    {"surface":"@pumped-fn/sdk-codex","manifest_ref":"pkg/sdk/codex/package.json:2","export_ref":"pkg/sdk/codex/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/26","changeset":"yes","pr":"mentioned","gaps":["T"]},
+    {"surface":"@pumped-fn/sdk","manifest_ref":"pkg/sdk/core/package.json:2","export_ref":"pkg/sdk/core/package.json:10","docs":"R/P/C","example":"package README and issue triage","tsdoc":"0/67","changeset":"yes","pr":"detailed","gaps":["T","M"]},
+    {"surface":"@pumped-fn/sdk/agent","manifest_ref":"pkg/sdk/core/package.json:2","export_ref":"pkg/sdk/core/package.json:21","docs":"shared R/P/C","example":"package README and issue triage","tsdoc":"0/24","changeset":"yes","pr":"detailed","gaps":["T","M"]},
+    {"surface":"@pumped-fn/sdk/session","manifest_ref":"pkg/sdk/core/package.json:2","export_ref":"pkg/sdk/core/package.json:31","docs":"shared R/P/C","example":"package README and issue triage","tsdoc":"0/89","changeset":"yes","pr":"detailed","gaps":["T","M","P"]},
+    {"surface":"@pumped-fn/sdk/validation","manifest_ref":"pkg/sdk/core/package.json:2","export_ref":"pkg/sdk/core/package.json:41","docs":"shared R/P/C","example":"package README and issue triage","tsdoc":"0/7","changeset":"yes","pr":"detailed","gaps":["T","M"]},
+    {"surface":"@pumped-fn/sdk/sandbox","manifest_ref":"pkg/sdk/core/package.json:2","export_ref":"pkg/sdk/core/package.json:51","docs":"shared R/P/C","example":"package README and issue triage","tsdoc":"0/15","changeset":"yes","pr":"detailed","gaps":["T","M"]},
+    {"surface":"@pumped-fn/sdk-mcp","manifest_ref":"pkg/sdk/mcp/package.json:2","export_ref":"pkg/sdk/mcp/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/6","changeset":"not changed","pr":"not changed","gaps":["T"]},
+    {"surface":"@pumped-fn/sdk-pi","manifest_ref":"pkg/sdk/pi/package.json:2","export_ref":"pkg/sdk/pi/package.json:10","docs":"R/C","example":"package README","tsdoc":"0/9","changeset":"yes","pr":"mentioned","gaps":["T"]},
+    {"surface":"@pumped-fn/sdk-test","manifest_ref":"pkg/sdk/test/package.json:2","export_ref":"pkg/sdk/test/package.json:10","docs":"R/C","example":"package README and issue triage","tsdoc":"0/13","changeset":"yes","pr":"verifier evidence","gaps":["T"]},
+    {"surface":"@pumped-fn/codemod","manifest_ref":"pkg/tool/codemod/package.json:2","export_ref":"pkg/tool/codemod/package.json:10","docs":"R/C","example":"README migration examples","tsdoc":"0/8","changeset":"not changed","pr":"not applicable","gaps":["T","S"]},
+    {"surface":"@pumped-fn/lite-lint","manifest_ref":"pkg/tool/lint/package.json:2","export_ref":"pkg/tool/lint/package.json:12","docs":"R/C","example":"README fixtures","tsdoc":"2/9","changeset":"yes","pr":"detailed","gaps":["T","S"]}
+  ],
+  "confirmed_gaps": [
+    {"gap_id":"G1","summary":"The changeset directs users to a package migration table, but no SDK package migration file or section is shipped.","evidence":[".changeset/session-kernel-major.md:12","pkg/sdk/core/package.json:62","pkg/sdk/core/README.md:1"]},
+    {"gap_id":"G2","summary":"Lite's shipped migration guide is the old core-next to lite guide, not the current major migration.","evidence":["pkg/core/lite/MIGRATION.md:1"]},
+    {"gap_id":"G3","summary":"PR 346 says observation exposes channel and tool identity, but the sole runtime projection binding omits both.","evidence":["pkg/sdk/core/src/session.ts:229","pkg/sdk/core/src/session.ts:1542","pkg/sdk/core/README.md:178"]},
+    {"gap_id":"G4","summary":"Current docs teach captured ctx.exec values despite the explicit params contract.","evidence":["pkg/core/lite/README.md:183","examples/invoice-triage/README.md:151","docs/observability.md:47","examples/invoice-triage/README.md:127"]},
+    {"gap_id":"G5","summary":"The package lane still describes SDK materials and guards while current SDK docs say no material factory exists.","evidence":["pkg/README.md:16","pkg/sdk/README.md:48"]},
+    {"gap_id":"G6","summary":"Lint docs present material and cliWorker as current constructor examples, conflicting with the SDK deliberate-absence contract.","evidence":["pkg/tool/lint/README.md:90","pkg/tool/lint/README.md:102","pkg/sdk/core/README.md:217"]},
+    {"gap_id":"G7","summary":"Five changed public implementation packages have no changeset entry: logging, observable, scheduler, sync, and lite-react.","evidence":[".changeset/session-kernel-major.md:1","pkg/ext/logging/src/index.ts:91","pkg/ext/observable/src/index.ts:153","pkg/ext/scheduler/src/index.ts:58","pkg/ext/sync/src/index.ts:316","pkg/react/lite-react/src/scoped-value.ts:110"]},
+    {"gap_id":"G8","summary":"The codemod README emits obsolete dependency-factory and controller shapes.","evidence":["pkg/tool/codemod/README.md:98","pkg/tool/codemod/README.md:123"]},
+    {"gap_id":"G9","summary":"Existing checks false-pass the found public contract gaps and the root lint path list omits many package READMEs.","evidence":["package.json:11","scripts/check-example-alignment.mjs:341"]},
+    {"gap_id":"G10","summary":"Built declaration exports contain 464 public symbols without TSDoc; all 295 SDK public symbols lack TSDoc.","evidence":["pkg/sdk/core/dist/index.d.mts:2","pkg/sdk/core/dist/agent.d.mts:2","pkg/sdk/core/dist/session.d.mts:2","pkg/sdk/core/dist/validation.d.mts:2","pkg/sdk/core/dist/sandbox.d.mts:52"]}
+  ],
+  "evidence_refs_or_hashes": [
+    {"ref":".okra/runs/release-readiness-20260716/frame/frame.v1.json","sha256":"c780fe448719924c10f883af72d297a442f0d1d1cdfbafb0f88a06db47d24d70"},
+    {"ref":".okra/runs/release-readiness-20260716/worker-packets/dkr-c-contract.json","sha256":"89886849360ec6b69802db8310273141ed8f60f89fc9096877252706f7ec34c8"},
+    {"ref":".changeset/session-kernel-major.md","sha256":"f67cf1c2f090442b0cfb5e6b9a3c4aa52889950edef353322840bc1c1b968704"},
+    {"ref":"pkg/sdk/core/package.json","sha256":"bfe48c95db05653cb444c48f9e95082b713b5ce61901a8266f6b48d00e5f4ead"},
+    {"ref":"pkg/sdk/core/README.md","sha256":"48c4ef95bde1292f7ba825ac19a2408a92c441e942e572c95eba82f0b0a27548"},
+    {"ref":"pkg/sdk/core/src/session.ts","sha256":"09037af628882fc4ce8a4c51fa12ec92e9f31de3d33915dbaaaf1f5c72bc800e"},
+    {"ref":"pkg/core/lite/README.md","sha256":"74356a7033bfd7ad37d351f7fa0a8c1fa1aa1cd77297deaa975e2b7e6448d11f"},
+    {"ref":"examples/invoice-triage/README.md","sha256":"333309a262ea12ab505b4e49442e7a2e69f51fd54438b63a41d78aedb999bf07"},
+    {"ref":"PR 346 normalized JSON","sha256":"b6411aa5e56ed60bb7ff3be43838c875e01d52da5495509e0ac67af7b99e2f85"}
+  ],
+  "replay_command_or_checker": {
+    "status": "recommended_not_implemented",
+    "command": "node scripts/check-public-contract.mjs --base origin/main --pr-json <governed-pr-346.json> --expect-head 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+    "checker_contract": [
+      "Enumerate non-private package manifests and every export key without a hand-maintained package list.",
+      "Fail on missing runtime or type targets and packed-file omissions.",
+      "Use the TypeScript compiler API on every exported declaration and emit symbols without TSDoc.",
+      "Require README and changelog per public package and current migration evidence for every major changeset entry.",
+      "Extract and compile or lint every package README code fence and named external example.",
+      "Compare changed public src package directories with changeset frontmatter.",
+      "Read a path-backed PR JSON snapshot and require the exact head.",
+      "Emit stable JSON metrics and exit nonzero on missing, stale, or wrong-head input."
+    ]
+  },
+  "questions_answered": [
+    "The published universe is 26 packages and 30 manifest export rows.",
+    "Every current type target resolves.",
+    "Current declaration TSDoc coverage has 464 gaps, including all 295 SDK symbols.",
+    "Existing docs and example checks do not read the full public contract.",
+    "Concrete migration, PR-runtime, stale-doc, and changeset gaps are identified.",
+    "One manifest-driven checker can make the metric readable."
+  ],
+  "questions_unanswered": [
+    "The accepted TSDoc policy and any exemption for intentionally low-level exports requires orchestrator or human policy.",
+    "No independent validator has replayed the AST counts or semantic classifications.",
+    "The proposed checker does not exist, so public_contract_gap_count remains unreadable and fail-closed."
+  ],
+  "candidate_ckrs": [
+    {"ckr_id":"CKR-CONTRACT","status":"existing_candidate_only","note":"No promotion or acceptance claimed."}
+  ],
+  "candidate_pkrs": [
+    {"pkr_id":"PKR-C1","assignment":"Implement and fixture-test the manifest-driven public contract checker."},
+    {"pkr_id":"PKR-C2","assignment":"Add current Lite and SDK migration tables and align changeset and PR wording."},
+    {"pkr_id":"PKR-C3","assignment":"Correct captured-exec, SDK-lane, lint, and codemod documentation."},
+    {"pkr_id":"PKR-C4","assignment":"Add missing changeset coverage for the five changed public source packages."},
+    {"pkr_id":"PKR-C5","assignment":"Add TSDoc across the 30 export rows and check it from built declarations."}
+  ],
+  "active_anti_goals": [
+    "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+    "breaking_model_api_change_count",
+    "premature_tool_or_mcp_surface_count",
+    "primitive_proof_gap_count",
+    "scope_seam_escape_count",
+    "hidden_execution_edge_count",
+    "implicit_required_dependency_count",
+    "ungrouped_related_handle_count",
+    "redundant_graph_ceremony_count",
+    "context_argument_pass_count",
+    "touched_surface_regression_count",
+    "slop_violation_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "active_anti_goal_verification": [
+    {"metric_id":"docs_code_contract_mismatch_count_and_prime_rationale_violation_count","status":"breached","evidence":"Confirmed gaps G1-G9."},
+    {"metric_id":"breaking_model_api_change_count","status":"unverified","evidence":"Provider rows inventoried; no independent type replay in this worker."},
+    {"metric_id":"premature_tool_or_mcp_surface_count","status":"observed_not_accepted","value":0,"evidence":"No changed pkg/sdk/mcp product path in the head diff."},
+    {"metric_id":"primitive_proof_gap_count","status":"unverified","evidence":"Prior evidence is outside this fresh independent read."},
+    {"metric_id":"scope_seam_escape_count","status":"unverified","evidence":"No worker product edits; release claim not replayed."},
+    {"metric_id":"hidden_execution_edge_count","status":"breached","evidence":"Stale captured-exec documentation in G4."},
+    {"metric_id":"implicit_required_dependency_count","status":"incomplete_read","evidence":"Existing lint returned zero over only 111 selected files."},
+    {"metric_id":"ungrouped_related_handle_count","status":"unverified","evidence":"Namespace rows inventoried; independent semantic replay missing."},
+    {"metric_id":"redundant_graph_ceremony_count","status":"unverified","evidence":"Existing lint does not cover the full public docs universe."},
+    {"metric_id":"context_argument_pass_count","status":"contract_gap","evidence":"Current docs contain stale closure shapes."},
+    {"metric_id":"touched_surface_regression_count","status":"unverified","evidence":"No product edit by worker and no fresh full test replay."},
+    {"metric_id":"slop_violation_count","status":"observed_not_accepted","value":0,"evidence":"git diff --check emitted no output; worker wrote only governed report artifacts."},
+    {"metric_id":"single_llm_truth_acceptance_count","status":"breached_until_independent_validation","value":1,"evidence":"Writer-only checkpoint."},
+    {"metric_id":"anti_goal_bypass_or_dishonesty_count","status":"observed_not_accepted","value":0,"evidence":"Gaps retained and no success claim made."}
+  ],
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "reason": "Definite public-contract gaps exist, the deterministic checker is not implemented, and independent validation is absent."
+  }
+}

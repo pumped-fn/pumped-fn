@@ -1,0 +1,297 @@
+{
+  "schema_version": 1,
+  "verification_type": "dkr_validator_audit",
+  "verification_id": "validator-dkr-p2.2026-07-16T04:50:43Z",
+  "validator_id": "validator-dkr-p2",
+  "worker_kind": "verification",
+  "unit_id": "DKR-P2",
+  "checkpoint_ref": "workers/dkr-p2-calibration/checkpoint.v1.json",
+  "checkpoint_sha256": "bf4effcb3837f8def31e999b6853d400a773fbe84f87f797ce196f2b5fa4febd",
+  "observed_at": "2026-07-16T04:50:43Z",
+  "decision": "accepted_reducing_discovery_only",
+  "fail_closed": true,
+  "product_files_changed": false,
+  "one_shot_replay_count": 4,
+  "claims": [
+    {
+      "claim_id": "DKR-P2-CHECKPOINT-INTEGRITY",
+      "check": "The checkpoint hash matches its worker finish record",
+      "threshold": "bf4effcb3837f8def31e999b6853d400a773fbe84f87f797ce196f2b5fa4febd",
+      "value": "bf4effcb3837f8def31e999b6853d400a773fbe84f87f797ce196f2b5fa4febd",
+      "source_of_truth": "workers/dkr-p2-calibration/checkpoint.v1.json and progress.finish.json",
+      "replay": "sha256sum .okra/runs/release-readiness-20260716/workers/dkr-p2-calibration/checkpoint.v1.json",
+      "exit_code": 0,
+      "sha256": [
+        "bf4effcb3837f8def31e999b6853d400a773fbe84f87f797ce196f2b5fa4febd"
+      ],
+      "observed_at": "2026-07-16T04:50:43Z",
+      "decision": "accepted",
+      "evidence": [
+        "Checkpoint bytes match the hash recorded by dkr-p2-calibration."
+      ]
+    },
+    {
+      "claim_id": "DKR-P2-FRESHNESS",
+      "check": "The checkpoint remains within its 30 minute freshness window",
+      "threshold": "age_seconds <= 1800",
+      "value": "age_seconds=432",
+      "source_of_truth": "workers/dkr-p2-calibration/checkpoint.v1.json observed_at and max_age",
+      "replay": "Read observed_at and max_age with jq and compare with date -u +%Y-%m-%dT%H:%M:%SZ",
+      "exit_code": 0,
+      "sha256": [
+        "bf4effcb3837f8def31e999b6853d400a773fbe84f87f797ce196f2b5fa4febd"
+      ],
+      "observed_at": "2026-07-16T04:50:43Z",
+      "decision": "accepted",
+      "evidence": [
+        "checkpoint observed_at=2026-07-16T04:43:31Z",
+        "validator observed_at=2026-07-16T04:50:43Z",
+        "max_age=30m"
+      ]
+    },
+    {
+      "claim_id": "DKR-P2-EXACT-HEAD-BUILD",
+      "check": "The archive is reproducible from the named commit and the exact-head Lite and SDK build reproduces every recorded artifact",
+      "threshold": "HEAD and tree match; archive, lockfile, artifact sizes, and artifact hashes match; build exits 0",
+      "value": "HEAD/tree/archive/lockfile matched; build exit 0; 4 of 4 artifacts matched",
+      "source_of_truth": "git object database, /tmp/dkr-p2-calibration/head.tar, /tmp/dkr-p2-calibration/archive, and provenance.mjs",
+      "replay": "git archive --format=tar 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162 | sha256sum; pnpm --filter @pumped-fn/lite --filter @pumped-fn/sdk build; node /tmp/dkr-p2-calibration/scripts/provenance.mjs /tmp/dkr-p2-calibration/archive 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162 73d332418d7a08fa530ef57dd09029f37e7de60c /tmp/dkr-p2-calibration/head.tar pkg/core/lite/dist/index.mjs pkg/core/lite/dist/index.d.mts pkg/sdk/core/dist/session.mjs pkg/sdk/core/dist/session.d.mts",
+      "exit_code": 0,
+      "sha256": [
+        "8dbcdb616d7c1a0718c0779034be345cd6db5b57846b5e3998e0b5693a1261c1",
+        "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120",
+        "bd24e8db53c267d8b063fdb9bb27403a03d020516ba6e97c7c76b64ecf101945",
+        "b055717533ccd19bed1aa2c792f6a789b89c1ab66bbf68de7125cf9cea30f02e",
+        "eb869a73460b0d2dfae45e48f9dbadf54566320e7040ea10ef6b438c1d73a59b",
+        "167a645f105fa02a011458cb8937a30cea1a472ee1256a6103df2d0ab7cdcf76"
+      ],
+      "observed_at": "2026-07-16T04:50:43Z",
+      "decision": "accepted",
+      "evidence": [
+        "HEAD=7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+        "tree=73d332418d7a08fa530ef57dd09029f37e7de60c",
+        "regenerated archive sha256=8dbcdb616d7c1a0718c0779034be345cd6db5b57846b5e3998e0b5693a1261c1",
+        "Node=v26.4.0; pnpm=10.33.4",
+        "Lite index.mjs=91360 bytes; Lite index.d.mts=47986 bytes",
+        "SDK session.mjs=43409 bytes; SDK session.d.mts=2972 bytes"
+      ]
+    },
+    {
+      "claim_id": "DKR-P2-SOURCE-OWNERSHIP",
+      "check": "The cited exact-head sources support default boundary ownership for the managed context row and current ownership for sdk.session",
+      "threshold": "All four cited source hashes match exact head and ownership statements are present",
+      "value": "4 of 4 source hashes matched; ownership statements present",
+      "source_of_truth": "pkg/core/lite/src/resource.ts, pkg/core/lite/src/scope.ts, pkg/core/lite/tests/structured-lifetime.test.ts, pkg/sdk/core/src/session.ts, and pkg/sdk/core/tests/session-kernel.test.ts",
+      "replay": "Compare git show exact-head source hashes with archive source hashes and read the cited ownership contracts",
+      "exit_code": 0,
+      "sha256": [
+        "74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912",
+        "8f091511358eb2754c57b3083b7ea10ab0449a15187a30457173831e45305534",
+        "09037af628882fc4ce8a4c51fa12ec92e9f31de3d33915dbaaaf1f5c72bc800e",
+        "fcaa2d08cb26129db9246a4306206bb920c3646cc108375a5a80d47218551f90"
+      ],
+      "observed_at": "2026-07-16T04:50:43Z",
+      "decision": "accepted",
+      "evidence": [
+        "resource ownership defaults to the nearest execution boundary when ownership is not current",
+        "structured-lifetime.test.ts:58-64 reuses one default resource across two ctx.exec calls and closes it at ctx.close",
+        "session.ts:1229-1241 declares sdk.session ownership current",
+        "session-kernel.test.ts:206-215 resolves session before executing run"
+      ]
+    },
+    {
+      "claim_id": "DKR-P2-ALLOCATION-METHOD",
+      "check": "The inspector sampler accounts for predeclared 1 KiB and 2 KiB allocation controls",
+      "threshold": "Controlled byte accounting with accepted zero noise and proportionality rules",
+      "value": "zero=112 bytes; 1 KiB control=269 bytes per iteration; 2 KiB control=501.5 bytes per iteration; ratio=1.8643122676579926",
+      "source_of_truth": "/tmp/dkr-p2-calibration/scripts/allocation-calibration.mjs",
+      "replay": "node --expose-gc /tmp/dkr-p2-calibration/scripts/allocation-calibration.mjs",
+      "exit_code": 0,
+      "sha256": [
+        "c82ced1ddca55cbd2357d584cda7190d226b90e6e32e3e976eae5564af8269b4"
+      ],
+      "observed_at": "2026-07-16T04:50:43Z",
+      "decision": "rejected",
+      "failure_mode": "invalid_measurement_method",
+      "evidence": [
+        "The replay exactly reproduced 112, 17216, and 32096 attributed bytes for 0, 64, and 128 retained controls.",
+        "The method does not account for the known 1024 and 2048 byte TypedArray backing allocations."
+      ]
+    },
+    {
+      "claim_id": "DKR-P2-RETAINED-METHOD",
+      "check": "The retained-object detector distinguishes baseline, released, and deliberately leaked resources",
+      "threshold": "0/0/1 with acceptedSignal=true",
+      "value": "0/0/1 with acceptedSignal=true",
+      "source_of_truth": "/tmp/dkr-p2-calibration/scripts/retained-calibration.mjs",
+      "replay": "node --expose-gc /tmp/dkr-p2-calibration/scripts/retained-calibration.mjs",
+      "exit_code": 0,
+      "sha256": [
+        "666a00a7bd92ab46bde34624ddcc18adf1c0224327ad690c69e5bde311046474"
+      ],
+      "observed_at": "2026-07-16T04:50:43Z",
+      "decision": "accepted",
+      "evidence": [
+        "baseline=0",
+        "negativeAfterClose=0",
+        "positiveAfterClose=1",
+        "Node warned that v8.queryObjects is experimental; Node 26 pin and the 0/0/1 controls remain required"
+      ]
+    },
+    {
+      "claim_id": "DKR-P2-SCOPE-RUN-ROW",
+      "check": "The scope.run lifecycle row returns 42 and closes exactly one owned resource",
+      "threshold": "result=42, created=1, closed=1, accepted=true",
+      "value": "result=42, created=1, closed=1, accepted=true",
+      "source_of_truth": "/tmp/dkr-p2-calibration/scripts/row-calibration.mjs and exact-head Lite build",
+      "replay": "node --expose-gc /tmp/dkr-p2-calibration/scripts/row-calibration.mjs /tmp/dkr-p2-calibration/archive 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+      "exit_code": 0,
+      "sha256": [
+        "ee2c60be7deb3557e33989052cd601f9df3513a6b88152846f8434fb78851f37",
+        "bd24e8db53c267d8b063fdb9bb27403a03d020516ba6e97c7c76b64ecf101945"
+      ],
+      "observed_at": "2026-07-16T04:50:43Z",
+      "decision": "accepted",
+      "evidence": [
+        "ownedScopeRun={result:42,created:1,closed:1,accepted:true}"
+      ]
+    },
+    {
+      "claim_id": "DKR-P2-MANAGED-CONTEXT-ROW",
+      "check": "The managed ctx.exec row represents default boundary ownership and reuses one resource until ctx.close",
+      "threshold": "values=[1,1], beforeClose={created:1,closed:0}, afterClose={created:1,closed:1}, accepted=true",
+      "value": "values=[1,2], beforeClose={created:2,closed:2}, afterClose={created:2,closed:2}, accepted=false",
+      "source_of_truth": "/tmp/dkr-p2-calibration/scripts/row-calibration.mjs and pkg/core/lite/tests/structured-lifetime.test.ts:37-65",
+      "replay": "node --expose-gc /tmp/dkr-p2-calibration/scripts/row-calibration.mjs /tmp/dkr-p2-calibration/archive 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+      "exit_code": 0,
+      "sha256": [
+        "ee2c60be7deb3557e33989052cd601f9df3513a6b88152846f8434fb78851f37",
+        "8f091511358eb2754c57b3083b7ea10ab0449a15187a30457173831e45305534"
+      ],
+      "observed_at": "2026-07-16T04:50:43Z",
+      "decision": "rejected",
+      "failure_mode": "wrong_source_ownership",
+      "evidence": [
+        "The probe declares ownership=current, so each ctx.exec child creates and closes its own resource.",
+        "The exact-head source-backed representative row requires default boundary ownership."
+      ]
+    },
+    {
+      "claim_id": "DKR-P2-SESSION-ROW",
+      "check": "The session row verifies completed status and work events on the same current-owned session runtime used by session.run",
+      "threshold": "result=42, status=completed, work.started and work.completed present, accepted=true",
+      "value": "result=42, status absent, eventTypes=[], accepted=false",
+      "source_of_truth": "/tmp/dkr-p2-calibration/scripts/row-calibration.mjs, pkg/sdk/core/src/session.ts:1229-1241,1518-1587, and pkg/sdk/core/tests/session-kernel.test.ts:174-217",
+      "replay": "node --expose-gc /tmp/dkr-p2-calibration/scripts/row-calibration.mjs /tmp/dkr-p2-calibration/archive 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+      "exit_code": 0,
+      "sha256": [
+        "ee2c60be7deb3557e33989052cd601f9df3513a6b88152846f8434fb78851f37",
+        "09037af628882fc4ce8a4c51fa12ec92e9f31de3d33915dbaaaf1f5c72bc800e",
+        "fcaa2d08cb26129db9246a4306206bb920c3646cc108375a5a80d47218551f90"
+      ],
+      "observed_at": "2026-07-16T04:50:43Z",
+      "decision": "rejected",
+      "failure_mode": "wrong_runtime_instance",
+      "evidence": [
+        "sdk.session is current-owned.",
+        "Resolving sdk.session after session.run creates or observes a different current runtime from the run child.",
+        "The exact-head session test resolves sdk.session on the managed context before executing run."
+      ]
+    },
+    {
+      "claim_id": "DKR-P2-DOWNSTREAM-BOUNDARY",
+      "check": "Only reducing discovery may advance; measurement implementation and optimization remain blocked",
+      "threshold": "reducing discovery accepted; CKR performance, measurement implementation, and optimization blocked",
+      "value": "reducing discovery accepted; allocation method rejected; two lifecycle rows unaccepted; CKR performance, implementation, and optimization blocked",
+      "source_of_truth": "All four one-shot replay traces and checkpoint wall_gate",
+      "replay": "Compare replay decisions with checkpoint questions_unanswered, active_wall_readings, and wall_gate",
+      "exit_code": 0,
+      "sha256": [
+        "bf4effcb3837f8def31e999b6853d400a773fbe84f87f797ce196f2b5fa4febd"
+      ],
+      "observed_at": "2026-07-16T04:50:43Z",
+      "decision": "accepted",
+      "evidence": [
+        "No valid allocation method exists.",
+        "The retained method has no baseline-versus-candidate regression read.",
+        "Managed ctx.exec and session.run lifecycle rows remain unaccepted."
+      ]
+    }
+  ],
+  "active_wall_verification": [
+    {
+      "metric_id": "invalid_performance_comparison_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_for_reducing_discovery",
+      "evidence_claim_id": "DKR-P2-ALLOCATION-METHOD"
+    },
+    {
+      "metric_id": "unsupported_performance_claim_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_for_reducing_discovery",
+      "evidence_claim_id": "DKR-P2-DOWNSTREAM-BOUNDARY"
+    },
+    {
+      "metric_id": "allocation_regression_case_count",
+      "value": null,
+      "threshold": 0,
+      "verdict": "blocked_invalid_allocation_method",
+      "evidence_claim_id": "DKR-P2-ALLOCATION-METHOD"
+    },
+    {
+      "metric_id": "retained_memory_regression_count",
+      "value": null,
+      "threshold": 0,
+      "verdict": "blocked_missing_baseline_candidate_comparison",
+      "evidence_claim_id": "DKR-P2-RETAINED-METHOD"
+    },
+    {
+      "metric_id": "benchmark_only_production_branch_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_for_validator_scope",
+      "evidence_claim_id": "DKR-P2-DOWNSTREAM-BOUNDARY"
+    },
+    {
+      "metric_id": "post_close_live_resource_count",
+      "value": null,
+      "threshold": 0,
+      "verdict": "blocked_lifecycle_replay_required",
+      "evidence_claim_id": "DKR-P2-MANAGED-CONTEXT-ROW"
+    },
+    {
+      "metric_id": "single_llm_truth_acceptance_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_for_reducing_discovery",
+      "evidence_claim_id": "DKR-P2-DOWNSTREAM-BOUNDARY"
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "value": 0,
+      "threshold": 0,
+      "verdict": "held_for_validator_report",
+      "evidence_claim_id": "DKR-P2-DOWNSTREAM-BOUNDARY"
+    }
+  ],
+  "summary": {
+    "accepted": 7,
+    "rejected": 3,
+    "rejected_claim_ids": [
+      "DKR-P2-ALLOCATION-METHOD",
+      "DKR-P2-MANAGED-CONTEXT-ROW",
+      "DKR-P2-SESSION-ROW"
+    ],
+    "decision": "accepted_reducing_discovery_only"
+  },
+  "wall_gate": {
+    "verdict": "blocked",
+    "dkr_learning_advance": "allowed_reducing_discovery_only",
+    "ckr_performance_advance": "blocked",
+    "measurement_implementation": "blocked",
+    "optimization": "blocked",
+    "reason": "The allocation method is invalid and two representative lifecycle rows remain unaccepted."
+  }
+}

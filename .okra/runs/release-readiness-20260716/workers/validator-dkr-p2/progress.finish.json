@@ -1,0 +1,29 @@
+{
+  "type": "worker_finish",
+  "schema_version": 1,
+  "worker_id": "validator-dkr-p2",
+  "worker_kind": "verification",
+  "unit_id": "DKR-P2",
+  "status": "accepted_reducing_discovery",
+  "recorded_at": "2026-07-16T04:50:43Z",
+  "verification_ref": "workers/validator-dkr-p2/verification.v1.json",
+  "accepted": 7,
+  "rejected": 3,
+  "rejected_claim_ids": [
+    "DKR-P2-ALLOCATION-METHOD",
+    "DKR-P2-MANAGED-CONTEXT-ROW",
+    "DKR-P2-SESSION-ROW"
+  ],
+  "decision": "accepted_reducing_discovery_only",
+  "downstream_advance": "blocked",
+  "ckr_performance_advance": "blocked",
+  "measurement_implementation": "blocked",
+  "optimization": "blocked",
+  "product_files_changed": false,
+  "commanded_lines": [
+    "Action envelope: read-only validation; write only workers/validator-dkr-p2/verification.v1.json and progress.finish.json; no product, git, frame, tree, ledger, release, or external-state changes.",
+    "Validation decision: accept exact-head build provenance, retained 0/0/1 controls, scope.run lifecycle evidence, and the fail-closed discovery boundary; reject the allocation method and preserve both unaccepted lifecycle rows.",
+    "Downstream decision: only reducing discovery advances; CKR performance, measurement implementation, and optimization remain blocked.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  ]
+}

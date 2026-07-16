@@ -1,0 +1,26 @@
+{
+  "packet_version": 1,
+  "worker_id": "dkr-a-exec-api",
+  "unit_id": "DKR-A",
+  "worker_kind": "discovery",
+  "frame": {
+    "objective": { "metric_id": "release_readiness_gap_count", "target": 0, "comparator": "==" },
+    "frame_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json",
+    "tree_ref": ".okra/runs/release-readiness-20260716/tree/tree.v2.json",
+    "standing_wall": "context_argument_pass_count == 0"
+  },
+  "active_anti_goals": [
+    "context_argument_pass_count",
+    "implicit_required_dependency_count",
+    "hidden_execution_edge_count",
+    "redundant_graph_ceremony_count",
+    "breaking_model_api_change_count",
+    "scope_seam_escape_count",
+    "slop_violation_count",
+    "single_llm_truth_acceptance_count"
+  ],
+  "assignment": "Read-only derive the final Lite execution API. Compare Scope.run, ExecutionContext.exec, RunDepsOptions, RunFnOptions, ExecFnOptions, ResourceContext, extension ExecTargetFn, docs, type tests, and prior explicit-params work. Decide the exact inferred deps-form for ctx.exec, whether name and params are required, how tags/signal behave, and which public callback forms currently pass ctx or scope. Prefer one zero-dependency form through deps: {} over a redundant callback kind. Separate public removals from core-internal context access and extension observation boundaries. Return a compatibility matrix and smallest implementation/test/doc slice. Do not edit files.",
+  "budget_and_stop_rule": { "time_min": 35, "turns": 1, "stop": "Stop with one source-backed API decision or a fail-closed ambiguity requiring frame authority." },
+  "hand_back_rule": "Do not invent overloads, retain a context-passing callback for convenience, or edit product files.",
+  "output_schema": "Executable DKR checkpoint with source refs/hashes, freshness, confidence, current API matrix, accepted target signatures, breaking impacts, required tests/docs, questions, active walls, and blocked/accepted reducing-discovery status. Worker evidence is not acceptance."
+}

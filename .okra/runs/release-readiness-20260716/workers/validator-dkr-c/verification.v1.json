@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "verification_type": "dkr_validator_audit",
+  "validator_id": "validator-dkr-c",
+  "unit_id": "DKR-C",
+  "checkpoint_ref": "workers/dkr-c-contract/checkpoint.v1.json",
+  "checkpoint_sha256": "c6f6bdeae32f599e8fad7ce16c6095d7cad6af7a6292fb846819c017f803a2ee",
+  "observed_at": "2026-07-16T04:24:03Z",
+  "decision": "accepted_reducing_discovery_only",
+  "fail_closed": true,
+  "product_files_changed": false,
+  "claims": [
+    {
+      "claim_id": "DKR-C-HEAD",
+      "metric": "exact_head_match",
+      "threshold": "7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+      "value": "7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+      "source_of_truth": "git rev-parse HEAD",
+      "replay": "git rev-parse HEAD",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "DKR-C-PUBLIC-UNIVERSE",
+      "metric": "public_package_count/public_export_row_count/target_resolution_gap_count",
+      "threshold": "26/30/0",
+      "value": "26/30/0",
+      "source_of_truth": "pkg/*/*/package.json and manifest import type/default targets",
+      "replay": "Node manifest enumeration using private !== true, Object.entries(exports), and fs.existsSync on resolved import targets",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "DKR-C-TSDOC-COUNTS",
+      "metric": "public_declaration_symbol_count/documented_public_symbol_count/public_api_tsdoc_gap_count/sdk_public_symbol_count",
+      "threshold": "539/75/464/295",
+      "value": "539/75/464/295",
+      "source_of_truth": "30 built import .d.mts targets selected from manifests",
+      "replay": "TypeScript createProgram; getExportsOfModule; resolve alias symbols; getDocumentationComment",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "DKR-C-CHANGESET-COVERAGE",
+      "metric": "changed_public_source_package_count/changed_public_source_package_without_changeset_count",
+      "threshold": "13/5",
+      "value": "13/5",
+      "source_of_truth": "git diff d974efe050b953e270c9972700f5dd5f355ba465..HEAD, manifests, and .changeset/session-kernel-major.md",
+      "replay": "Manifest-derived package directories intersected with changed src paths; changeset frontmatter parsed by package name",
+      "exit_code": 0,
+      "source_sha256": "f67cf1c2f090442b0cfb5e6b9a3c4aa52889950edef353322840bc1c1b968704",
+      "decision": "accepted",
+      "missing": [
+        "@pumped-fn/lite-extension-logging",
+        "@pumped-fn/lite-extension-observable",
+        "@pumped-fn/lite-extension-scheduler",
+        "@pumped-fn/lite-extension-sync",
+        "@pumped-fn/lite-react"
+      ]
+    },
+    {
+      "claim_id": "DKR-C-G1",
+      "metric": "sdk_current_migration_gap",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": ".changeset/session-kernel-major.md:12 and pkg/sdk/core",
+      "replay": "Read changeset migration instruction; find SDK migration files; search SDK README and PATTERNS for migration",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "DKR-C-G2",
+      "metric": "lite_current_major_migration_gap",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "pkg/core/lite/MIGRATION.md",
+      "replay": "Read title and search for session.run, scope.run, agent.turn, resource-backed, ExecutionContext.signal, and onClose",
+      "exit_code": 1,
+      "decision": "accepted",
+      "note": "The absence search found none of the current-major contract terms; the guide title remains core-next to lite."
+    },
+    {
+      "claim_id": "DKR-C-G3",
+      "metric": "pr_runtime_observation_projection_mismatch",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "PR 346 at exact head and pkg/sdk/core/src/session.ts:1542-1548",
+      "replay": "gh pr view 346 --repo pumped-fn/pumped-fn --json number,headRefOid,title,body,state; numbered runtime projection read",
+      "exit_code": 0,
+      "decision": "accepted",
+      "note": "The PR promises channel and tool identity. Runtime binds session, activation, work, parent work, and role only."
+    },
+    {
+      "claim_id": "DKR-C-G4",
+      "metric": "stale_ctx_exec_documentation_count",
+      "threshold": 0,
+      "value": "greater_than_0",
+      "source_of_truth": "pkg/core/lite/README.md:183-186; examples/invoice-triage/README.md:127,151; docs/observability.md:47-57",
+      "replay": "Numbered source reads of all checkpoint references",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "DKR-C-G5",
+      "metric": "sdk_lane_contract_mismatch",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "pkg/README.md:16 and pkg/sdk/README.md:46-48",
+      "replay": "Numbered source comparison",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "DKR-C-G6",
+      "metric": "lint_sdk_absence_contract_mismatch",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "pkg/tool/lint/README.md:90-104 and pkg/sdk/core/README.md:217-221",
+      "replay": "Numbered source comparison",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "DKR-C-G7",
+      "metric": "changed_public_source_package_without_changeset_count",
+      "threshold": 0,
+      "value": 5,
+      "source_of_truth": "git diff base..HEAD, manifests, and changeset frontmatter",
+      "replay": "Same deterministic replay as DKR-C-CHANGESET-COVERAGE",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "DKR-C-G8",
+      "metric": "obsolete_codemod_documentation_count",
+      "threshold": 0,
+      "value": "greater_than_0",
+      "source_of_truth": "pkg/tool/codemod/README.md:98-129 and pkg/core/lite/dist/index.d.mts:848-891",
+      "replay": "Read codemod output examples; compare controller overload declarations",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "DKR-C-G9",
+      "metric": "existing_contract_check_false_green",
+      "threshold": 0,
+      "value": 1,
+      "source_of_truth": "package.json:12; scripts/check-example-alignment.mjs; pnpm lint",
+      "replay": "pnpm lint",
+      "exit_code": 0,
+      "decision": "accepted",
+      "note": "Lint scanned 112 files with zero diagnostics and alignment emitted zero gaps while G1-G8 and G10 remained present."
+    },
+    {
+      "claim_id": "DKR-C-G10",
+      "metric": "public_api_tsdoc_gap_count/sdk_public_api_tsdoc_gap_count",
+      "threshold": "0/0",
+      "value": "464/295",
+      "source_of_truth": "30 built declaration entrypoints",
+      "replay": "TypeScript compiler API export and resolved-alias documentation enumeration",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "DKR-C-PUBLIC-CONTRACT-GAP-TOTAL",
+      "metric": "public_contract_gap_count",
+      "threshold": 0,
+      "value": null,
+      "source_of_truth": "scripts/check-public-contract.mjs",
+      "replay": "test ! -e scripts/check-public-contract.mjs",
+      "exit_code": 0,
+      "decision": "rejected",
+      "failure_mode": "non-replayable",
+      "note": "The proposed aggregate checker does not exist. The total metric remains unreadable."
+    },
+    {
+      "claim_id": "DKR-C-DOCUMENTATION-EXAMPLE-FAILURE-TOTAL",
+      "metric": "documentation_example_failure_count",
+      "threshold": 0,
+      "value": null,
+      "source_of_truth": "No full public README fence checker exists",
+      "replay": "pnpm lint",
+      "exit_code": 0,
+      "decision": "rejected",
+      "failure_mode": "unsupported",
+      "note": "Current lint passing does not measure all public documentation examples."
+    },
+    {
+      "claim_id": "DKR-C-PR-SNAPSHOT-HASH",
+      "metric": "governed_pr_snapshot_integrity",
+      "threshold": "b6411aa5e56ed60bb7ff3be43838c875e01d52da5495509e0ac67af7b99e2f85",
+      "value": null,
+      "source_of_truth": "PR 346 normalized JSON",
+      "replay": "No path-backed normalized snapshot was supplied",
+      "exit_code": null,
+      "decision": "rejected",
+      "failure_mode": "non-replayable"
+    }
+  ],
+  "summary": {
+    "accepted_claim_count": 14,
+    "rejected_claim_count": 3,
+    "accepted_gap_classes": 10,
+    "rejected_claims": [
+      "public_contract_gap_count",
+      "documentation_example_failure_count",
+      "governed_pr_snapshot_integrity"
+    ]
+  },
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "reason": "Ten contract-gap classes are independently supported, but aggregate contract and documentation metrics remain unreadable because the deterministic checker and governed PR snapshot do not exist."
+  }
+}

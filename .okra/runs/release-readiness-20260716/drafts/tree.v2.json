@@ -1,0 +1,97 @@
+{
+  "tree_version": 2,
+  "frame_version": 1,
+  "orchestrator": {
+    "owner": "Codex /root",
+    "responsibilities": ["objective checks", "check-ins", "OKR board", "subagent steering"],
+    "terminal_condition": "Continue until release_readiness_gap_count equals 0 with every active wall held, the human changes or stops the frame, or a blocking flag requires human resolution."
+  },
+  "dkrs": [
+    {
+      "id": "DKR-C",
+      "status": "accepted_reducing_discovery",
+      "acceptance_ref": "artifacts/accept-dkr-c.v1.json",
+      "decision_target": "Derive the exact published API and documentation coverage matrix that makes public_contract_gap_count mechanically readable."
+    },
+    {
+      "id": "DKR-P",
+      "status": "accepted_reducing_discovery",
+      "acceptance_ref": "artifacts/accept-dkr-p.v2.json",
+      "decision_target": "Decide which performance facts are replayed and which measurement choices still require discovery."
+    },
+    {
+      "id": "DKR-A",
+      "status": "candidate",
+      "decision_target": "Derive the final Lite execution API contract for ctx.exec dependency operations, explicit params, and the no-context-argument wall.",
+      "stop_rule": "Return the smallest source-backed API and compatibility matrix; do not edit product code."
+    },
+    {
+      "id": "DKR-P2",
+      "status": "candidate",
+      "decision_target": "Validate one minimal exact-head provenance contract, one allocation calibration method, one retained-memory method, and the smallest representative owned and SDK row set.",
+      "stop_rule": "Return executable calibration and row-selection evidence or fail closed; do not optimize product code."
+    }
+  ],
+  "ckrs": [
+    {
+      "id": "CKR-CONTRACT",
+      "status": "active_blocked_by_readers_and_gaps",
+      "source_dkrs": ["DKR-C", "DKR-A"],
+      "metrics": [
+        { "metric_id": "public_contract_gap_count", "target": 0, "status": "unreadable" },
+        { "metric_id": "public_api_tsdoc_gap_count", "target": 0, "status": "denominator_unresolved" },
+        { "metric_id": "documentation_example_failure_count", "target": 0, "status": "unreadable" }
+      ]
+    },
+    {
+      "id": "CKR-PERFORMANCE",
+      "status": "active_discovery_only",
+      "source_dkrs": ["DKR-P", "DKR-P2"],
+      "metrics": [
+        { "metric_id": "lifecycle_representative_throughput_ratio", "target": 1.1, "status": "unreadable" },
+        { "metric_id": "lifecycle_representative_allocation_ratio", "target": 0.9, "status": "unreadable" }
+      ]
+    }
+  ],
+  "pkrs": [
+    {
+      "id": "PKR-C1",
+      "status": "candidate",
+      "source_dkrs": ["DKR-C"],
+      "delivery": "Add one manifest-driven public-contract checker, a governed exact-head PR snapshot input, fixture coverage, and separate exported-symbol inventory versus policy-denominator metrics.",
+      "depends_on": []
+    },
+    {
+      "id": "PKR-C2",
+      "status": "queued",
+      "source_dkrs": ["DKR-C"],
+      "delivery": "Repair migration, PR/runtime, captured-exec, package-lane, lint, codemod, and docs-example contract gaps read by PKR-C1.",
+      "depends_on": ["PKR-C1", "DKR-A"]
+    },
+    {
+      "id": "PKR-C3",
+      "status": "queued",
+      "source_dkrs": ["DKR-C"],
+      "delivery": "Add missing changeset coverage for the five changed public packages and align release wording.",
+      "depends_on": ["PKR-C1"]
+    },
+    {
+      "id": "PKR-C4",
+      "status": "queued",
+      "source_dkrs": ["DKR-C"],
+      "delivery": "Add TSDoc only for the source-backed public-interface denominator and prove built-declaration coverage.",
+      "depends_on": ["PKR-C1"]
+    },
+    {
+      "id": "PKR-A1",
+      "status": "queued",
+      "source_dkrs": ["DKR-A"],
+      "delivery": "Implement the accepted Lite execution API contract with inferred deps and explicit params, without passing ctx or scope into callbacks.",
+      "depends_on": ["DKR-A"]
+    }
+  ],
+  "graph": {
+    "nodes": [],
+    "edges": []
+  }
+}

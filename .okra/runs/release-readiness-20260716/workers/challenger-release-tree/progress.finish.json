@@ -1,0 +1,25 @@
+{
+  "type": "worker_finish",
+  "schema_version": 1,
+  "worker_id": "challenger-release-tree",
+  "worker_kind": "challenger",
+  "unit_id": "release-readiness-tree",
+  "status": "completed",
+  "recorded_at": "2026-07-16T04:32:31Z",
+  "review_ref": "workers/challenger-release-tree/review.v1.json",
+  "review_sha256": "d7d888f1dbb3bc3fad71d14e39a2fda69085e526f2d61598210eee4430908cfc",
+  "forced_verdict_count": 11,
+  "contribution_review_count": 4,
+  "decision": "contract_checker_first",
+  "dkr_p_v2_decision": "accepted_reducing_discovery",
+  "dkr_p_v2_boundary": "A new calibration and row-selection DKR is funded; measurement implementation, CKR performance advance, and optimization remain blocked.",
+  "product_files_changed": false,
+  "changed_paths": [
+    "workers/challenger-release-tree/review.v1.json",
+    "workers/challenger-release-tree/progress.finish.json"
+  ],
+  "commanded_lines": [
+    "Action envelope: read-only contribution review; write only workers/challenger-release-tree/review.v1.json and progress.finish.json; no product, git, frame, tree, ledger, release, or external-state changes.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  ]
+}

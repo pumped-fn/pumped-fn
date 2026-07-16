@@ -1,0 +1,74 @@
+{
+  "ckrs": [
+    {
+      "id": "CKR-CONTRACT",
+      "metric_id": "public_contract_gap_count",
+      "source_dkrs": [
+        "DKR-C"
+      ],
+      "status": "candidate",
+      "target": 0
+    },
+    {
+      "id": "CKR-PERFORMANCE",
+      "metric_id": "lifecycle_representative_target_pass_count",
+      "source_dkrs": [
+        "DKR-P"
+      ],
+      "status": "candidate",
+      "target": 2
+    }
+  ],
+  "dkrs": [
+    {
+      "budget": {
+        "time_min": 45,
+        "turns": 1
+      },
+      "decision_target": "Derive the exact published API and documentation coverage matrix that makes public_contract_gap_count mechanically readable.",
+      "id": "DKR-C",
+      "risk_or_anti_goal_uncertainty": [
+        "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+        "breaking_model_api_change_count",
+        "primitive_proof_gap_count",
+        "slop_violation_count"
+      ],
+      "status": "active",
+      "stop_rule": "Stop when every published package export and related release-content family has a source-backed coverage row, or return a replayable empty/blocked checkpoint."
+    },
+    {
+      "budget": {
+        "time_min": 60,
+        "turns": 1
+      },
+      "decision_target": "Decide the valid throughput, allocation, and retained-memory measurement design and rank evidence-backed optimization candidates.",
+      "id": "DKR-P",
+      "risk_or_anti_goal_uncertainty": [
+        "invalid_performance_comparison_count",
+        "unsupported_performance_claim_count",
+        "existing_row_confirmed_regression_count",
+        "allocation_regression_case_count",
+        "retained_memory_regression_count"
+      ],
+      "status": "active",
+      "stop_rule": "Stop after validating or rejecting the measurement design and ranking source-backed candidates; do not optimize or sample until a result turns favorable."
+    }
+  ],
+  "frame_version": 1,
+  "graph": {
+    "edges": [],
+    "nodes": []
+  },
+  "orchestrator": {
+    "owner": "Codex /root",
+    "responsibilities": [
+      "objective checks",
+      "check-ins",
+      "OKR board",
+      "subagent steering"
+    ],
+    "terminal_condition": "Continue until release_readiness_gap_count equals 0 with every active wall held, the human changes or stops the frame, or a blocking flag requires human resolution."
+  },
+  "pkrs": [],
+  "tree_version": 1
+}

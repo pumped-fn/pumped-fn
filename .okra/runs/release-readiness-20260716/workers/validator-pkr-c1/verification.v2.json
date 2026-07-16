@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "verification_id": "validator-pkr-c1.v2.2026-07-16T04:52:23Z",
+  "worker_id": "validator-pkr-c1",
+  "worker_kind": "verification",
+  "unit_id": "PKR-C1",
+  "prior_verification_ref": "workers/validator-pkr-c1/verification.v1.json",
+  "packet_ref": "worker-packets/pkr-c1-contract-checker.json",
+  "observed_at": "2026-07-16T04:52:23Z",
+  "decision": "accepted",
+  "fail_closed": true,
+  "product_files_changed": false,
+  "live_real_repo_checker_rerun": false,
+  "audit_traces": [
+    {
+      "claim_id": "pkr-c1-v2-fixture-git-inclusion",
+      "check": "All six runtime and declaration fixture targets are visible to normal Git tracking and are not ignored",
+      "threshold": "Six paths returned by git ls-files --others --exclude-standard and zero paths returned by git check-ignore",
+      "value": "Six trackable paths and zero ignored paths",
+      "source_of_truth": "Git exclude engine and untracked-file inventory",
+      "replay": "git ls-files --others --exclude-standard -- scripts/fixtures/public-contract/*/pkg/core/*/targets | sort; git check-ignore scripts/fixtures/public-contract/*/pkg/core/*/targets/*",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "scripts/fixtures/public-contract/invalid/pkg/core/demo/targets/index.d.mts",
+        "scripts/fixtures/public-contract/invalid/pkg/core/demo/targets/index.mjs",
+        "scripts/fixtures/public-contract/invalid/pkg/core/missing-docs/targets/index.d.mts",
+        "scripts/fixtures/public-contract/invalid/pkg/core/missing-docs/targets/index.mjs",
+        "scripts/fixtures/public-contract/valid/pkg/core/demo/targets/index.d.mts",
+        "scripts/fixtures/public-contract/valid/pkg/core/demo/targets/index.mjs"
+      ]
+    },
+    {
+      "claim_id": "pkr-c1-v2-tsx-fixtures",
+      "check": "The fixture set contains valid and invalid TSX README fences",
+      "threshold": "One valid TSX fence and one invalid TSX fence",
+      "value": "Valid README contains a closed JSX element; invalid README contains an unclosed JSX element",
+      "source_of_truth": "scripts/fixtures/public-contract/valid/pkg/core/demo/README.md and scripts/fixtures/public-contract/invalid/pkg/core/demo/README.md",
+      "replay": "rg -n '```tsx' scripts/fixtures/public-contract/valid/pkg/core/demo/README.md scripts/fixtures/public-contract/invalid/pkg/core/demo/README.md",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "pkr-c1-v2-deterministic-fixture-suite",
+      "check": "The remediated fixture suite accepts valid TS and TSX, rejects invalid TS and TSX, preserves stable negative output, and rejects stale PR heads",
+      "threshold": "3 tests passed, 0 failed, negative documentation_example_failure_count=2, aggregate=13, languages=[ts,tsx]",
+      "value": "3 tests passed and 0 failed; assertions require byte-identical negative output, documentation_example_failure_count=2, public_contract_gap_count=13, and ordered language evidence ts then tsx",
+      "source_of_truth": "scripts/check-public-contract.test.mjs and one pnpm contract:test invocation",
+      "replay": "pnpm contract:test",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "tests=3",
+        "pass=3",
+        "fail=0",
+        "valid TSX contributes no failure",
+        "invalid TS and TSX contribute two failures",
+        "two internal invalid-fixture outputs are byte-identical"
+      ]
+    },
+    {
+      "claim_id": "pkr-c1-v2-checker-semantic-continuity",
+      "check": "Previously accepted checker semantics remain unchanged outside added diagnostic language evidence",
+      "threshold": "Manifest discovery, runtime/type target audit, packing audit, changeset coverage, migration evidence, PR-head rejection, TSDoc split, sorting, metric schema, and aggregate membership unchanged",
+      "value": "All prior accepted control paths and metric members remain unchanged; documentation failures add only language=match[1].toLowerCase()",
+      "source_of_truth": "Captured v1 checker audit, workers/validator-pkr-c1/verification.v1.json, and current scripts/check-public-contract.mjs",
+      "replay": "Compare the v1 accepted semantic anchors with current packageDirectories, exportRows, target loop, changeset and migration loops, README fence parser, compiler export inventory, TSDoc filters, stable detail sorting, metric declaration, and aggregate member list",
+      "exit_code": 0,
+      "decision": "accepted",
+      "evidence": [
+        "checker v1 sha256=2c7be4db0586cf0e17a5ca6dde4bd9002ff763ae6ad9f925cca804993d1c1a04",
+        "checker v2 sha256=e5f9dd2c8a10a70db96bf0787a42dcc9e7fee861b323cdb6fa41b9285ea1c698",
+        "public_contract_gap_count still sums the same ten failure metrics",
+        "exported_symbol_tsdoc_gap_count remains inventory-only",
+        "public_api_tsdoc_gap_count remains exported-interface-only",
+        "No live real-repo checker rerun was performed"
+      ]
+    },
+    {
+      "claim_id": "pkr-c1-v2-fixture-path-continuity",
+      "check": "Relocating fixture targets does not alter the target-resolution and packing scenarios",
+      "threshold": "Equivalent valid, missing-runtime, missing-type, packed-omission, export-inventory, and interface-TSDoc scenarios",
+      "value": "Manifest targets changed from dist/* to targets/*; files patterns and missing target names changed in lockstep; expected non-documentation metrics are unchanged",
+      "source_of_truth": "Fixture manifests, target files, and v1/v2 expected metric objects",
+      "replay": "Read all three fixture manifests and compare v1 accepted metric assertions with current test assertions",
+      "exit_code": 0,
+      "decision": "accepted"
+    },
+    {
+      "claim_id": "pkr-c1-v2-diff-whitespace",
+      "check": "The complete current worktree diff has no whitespace errors",
+      "threshold": "git diff --check exits 0 in one invocation",
+      "value": "Exit 0 with empty output",
+      "source_of_truth": "Git diff parser",
+      "replay": "git diff --check",
+      "exit_code": 0,
+      "decision": "accepted"
+    }
+  ],
+  "artifact_hashes": {
+    "scripts/check-public-contract.mjs": "e5f9dd2c8a10a70db96bf0787a42dcc9e7fee861b323cdb6fa41b9285ea1c698",
+    "scripts/check-public-contract.test.mjs": "f7c5c294e4320e142e2ef0a2a9ca63c0c2f1bdfffb7ef3c49106e9d4784687a8",
+    "scripts/fixtures/public-contract/valid/pkg/core/demo/targets/index.d.mts": "8f31bbd60047c532cc20659d209f7e749a489a635c17dca632487a818b2e61d0",
+    "scripts/fixtures/public-contract/valid/pkg/core/demo/targets/index.mjs": "a10298e59cd5cdb9999f71a58b69724b6b4903bbd023ff5b34ba164ed39d9a26",
+    "scripts/fixtures/public-contract/invalid/pkg/core/demo/targets/index.d.mts": "982798766dec485e9d7fde7e740a6f1e14606138a95686a0ed05ea640d74d057",
+    "scripts/fixtures/public-contract/invalid/pkg/core/demo/targets/index.mjs": "a10298e59cd5cdb9999f71a58b69724b6b4903bbd023ff5b34ba164ed39d9a26",
+    "scripts/fixtures/public-contract/invalid/pkg/core/missing-docs/targets/index.d.mts": "f81d7b656f35a8ba045ff46859aeba215ba2a10dd4aa26b5969f94c87b40d5f1",
+    "scripts/fixtures/public-contract/invalid/pkg/core/missing-docs/targets/index.mjs": "70d14e4bd7e0d203ca43fbcc225268fc175e50ab9130b9c0564feb8dc5d882f6"
+  },
+  "summary": {
+    "accepted": 6,
+    "rejected": 0,
+    "rejected_claim_ids": [],
+    "decision": "accepted"
+  },
+  "wall_gate": {
+    "verdict": "held",
+    "downstream_advance": "allowed",
+    "rule_without_valid_and_invalid_fixture_count": 0,
+    "non_deterministic_lint_result_count": 0,
+    "reason": "Both v1 fixture blockers are removed, the deterministic suite passes once, and the prior accepted checker semantics remain intact."
+  }
+}

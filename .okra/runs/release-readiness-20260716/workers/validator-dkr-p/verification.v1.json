@@ -1,0 +1,240 @@
+{
+  "verification_id": "validator-dkr-p.2026-07-16T04:20:30Z",
+  "worker_id": "validator-dkr-p",
+  "worker_kind": "verification",
+  "unit_id": "DKR-P",
+  "checkpoint_ref": "workers/dkr-p-performance/checkpoint.v1.json",
+  "observed_at": "2026-07-16T04:20:30Z",
+  "audit_traces": [
+    {
+      "claim_id": "dkr_p_exact_head_and_product_worktree",
+      "check": "HEAD equals packet head and tracked product worktree is unchanged",
+      "threshold": "HEAD 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162 and no tracked product changes",
+      "value": "HEAD 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162; tracked product diff 0; cached product diff 0",
+      "source_of_truth": "git object database and worktree",
+      "replay": "git rev-parse HEAD && git status --short --untracked-files=all && git diff --quiet -- . ':(exclude).okra'",
+      "exit_code": 0,
+      "sha256": [],
+      "observed_at": "2026-07-16T04:19:07Z",
+      "decision": "accepted",
+      "evidence": [
+        "7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+        "tracked_product_diff_exit=0",
+        "cached_product_diff_exit=0",
+        "Only successor .okra files were untracked"
+      ]
+    },
+    {
+      "claim_id": "dkr_p_checkpoint_freshness",
+      "check": "Checkpoint evidence age is within max_age",
+      "threshold": "age_seconds <= 600",
+      "value": "age_seconds=551",
+      "source_of_truth": ".okra/runs/release-readiness-20260716/workers/dkr-p-performance/checkpoint.v1.json",
+      "replay": "Read observed_at and max_age with jq and compare against date -u",
+      "exit_code": 0,
+      "sha256": [
+        "2fb25893c611e9ce9ad9f427e20083ca66e1ed5efd708858a79b31693ef6f4a1"
+      ],
+      "observed_at": "2026-07-16T04:20:30Z",
+      "decision": "accepted",
+      "evidence": [
+        "observed_at=2026-07-16T04:11:19Z",
+        "max_age=10m",
+        "validated_at=2026-07-16T04:20:30Z",
+        "age_seconds=551"
+      ]
+    },
+    {
+      "claim_id": "dkr_p_manifest_counts",
+      "check": "Manifest contains exactly 39 Lite and 8 Lite React rows",
+      "threshold": "Lite=39 and Lite React=8",
+      "value": "Lite=39 and Lite React=8",
+      "source_of_truth": "benchmarks/lite-perf/rows.json",
+      "replay": "jq row-count and metric audit of benchmarks/lite-perf/rows.json",
+      "exit_code": 0,
+      "sha256": [
+        "ac05933d183c007da10bada0e45f20919acd34631b07c05daff9b9dafa5fdcc9"
+      ],
+      "observed_at": "2026-07-16T04:20:16Z",
+      "decision": "accepted",
+      "evidence": [
+        "lite_count=39",
+        "lite_react_count=8",
+        "metrics=hz,p75"
+      ]
+    },
+    {
+      "claim_id": "dkr_p_harness_14_of_14",
+      "check": "Deterministic harness passes all declared tests without collecting benchmark samples",
+      "threshold": "14 passed and 0 failed",
+      "value": "14 passed and 0 failed",
+      "source_of_truth": "benchmarks/lite-perf/scripts/harness.test.mjs",
+      "replay": "pnpm --dir benchmarks/lite-perf perf:test",
+      "exit_code": 0,
+      "sha256": [
+        "218d16dcaa959d0b7d57ef743cdb71429b0bbd20f6fbb29f47e1cc9511108197"
+      ],
+      "observed_at": "2026-07-16T04:20:16Z",
+      "decision": "accepted",
+      "evidence": [
+        "tests 14",
+        "pass 14",
+        "fail 0",
+        "The command ran harness tests only; no benchmark capture command ran"
+      ]
+    },
+    {
+      "claim_id": "dkr_p_missing_owned_session_retained_surfaces",
+      "check": "Manifest has no scope.run, session.run, owned-resource, retained-memory rows, or retained or allocation observation fields",
+      "threshold": "0 matching IDs and 0 matching observation fields",
+      "value": "0 matching owned, session, or retained IDs; 0 allocation or retained observation fields",
+      "source_of_truth": "benchmarks/lite-perf/rows.json",
+      "replay": "jq ID, metric, and recursive field-name audit of benchmarks/lite-perf/rows.json",
+      "exit_code": 0,
+      "sha256": [
+        "ac05933d183c007da10bada0e45f20919acd34631b07c05daff9b9dafa5fdcc9"
+      ],
+      "observed_at": "2026-07-16T04:20:16Z",
+      "decision": "accepted",
+      "evidence": [
+        "Only metrics present: hz and p75",
+        "No scope.run, session.run, sdk-session, sdk-agent, boundary-resource, current-resource, retained, heapUsed, external, arrayBuffers, sampler, or snapshot fields were found"
+      ]
+    },
+    {
+      "claim_id": "dkr_p_no_existing_allocation_exercise",
+      "check": "No existing row exercises allocation",
+      "threshold": "0 allocation-named exercises",
+      "value": "1 allocation-named throughput exercise",
+      "source_of_truth": "benchmarks/lite-perf/rows.json",
+      "replay": "jq -r '.lanes.lite.rows[] | [.id,.metric] | @tsv' benchmarks/lite-perf/rows.json",
+      "exit_code": 0,
+      "sha256": [
+        "ac05933d183c007da10bada0e45f20919acd34631b07c05daff9b9dafa5fdcc9"
+      ],
+      "observed_at": "2026-07-16T04:20:16Z",
+      "decision": "rejected",
+      "failure_mode": "contradicted",
+      "evidence": [
+        "lite:bench/lite/baseline.bench.ts:baselines (interpretation floors):object literal allocation hz",
+        "The row measures throughput, not allocated bytes; the supported claim is that no allocation measurement row or observation field exists"
+      ]
+    },
+    {
+      "claim_id": "dkr_p_ignored_dist_baseline_provenance",
+      "check": "Current dist artifacts are ignored and cannot prove an exact-head clean build",
+      "threshold": "Immutable exact-head build provenance",
+      "value": "Both dist trees ignored; artifact mtimes precede HEAD commit; no tracked build-provenance record",
+      "source_of_truth": ".gitignore, git HEAD, pkg/core/lite/dist/index.mjs, and pkg/react/lite-react/dist/index.mjs",
+      "replay": "git check-ignore, stat, git show commit timestamp, and sha256sum for Lite and Lite React dist artifacts",
+      "exit_code": 0,
+      "sha256": [
+        "3d9de6048050dbc8e5beba486a9bfb3c30836093552043123cb2f73eb1155056",
+        "cc3701336f0f07abf1e50a637755335c50d3b8fed3a476bd605b976fe82ae136"
+      ],
+      "observed_at": "2026-07-16T04:20:16Z",
+      "decision": "accepted",
+      "evidence": [
+        ".gitignore:300:dist pkg/core/lite/dist/index.mjs",
+        ".gitignore:300:dist pkg/react/lite-react/dist/index.mjs",
+        "HEAD commit_time=2026-07-15T13:35:29Z",
+        "Lite dist mtime=2026-07-15T13:26:24Z",
+        "Lite React dist mtime=2026-07-15T03:05:17Z"
+      ]
+    },
+    {
+      "claim_id": "dkr_p_candidate_source_locations",
+      "check": "Six candidate findings point to source containing the stated operations",
+      "threshold": "6 cited operations present",
+      "value": "6 cited operations present",
+      "source_of_truth": "pkg/core/lite/src/scope.ts and pkg/sdk/core/src/session.ts",
+      "replay": "Numbered source extraction for every cited range",
+      "exit_code": 0,
+      "sha256": [
+        "74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912",
+        "09037af628882fc4ce8a4c51fa12ec92e9f31de3d33915dbaaaf1f5c72bc800e"
+      ],
+      "observed_at": "2026-07-16T04:20:16Z",
+      "decision": "accepted",
+      "evidence": [
+        "scope.ts:2631 constructs Set from spread tag arrays",
+        "scope.ts:2253-2260 initializes three Maps, three Sets, and one AbortController",
+        "scope.ts:254-267 and 2287-2290 construct the combined abort controller and listeners",
+        "scope.ts:2453-2469 constructs the resource context and ten bound owner methods",
+        "session.ts:914-923,1017-1058,1128-1163,1526-1530 contain record copies, array scans, appends, and maps",
+        "session.ts:680-845 constructs frozen registries with capturing closures"
+      ]
+    },
+    {
+      "claim_id": "dkr_p_candidate_ranking",
+      "check": "Ranks 1 through 6 and assigned semantic risks are evidence-backed",
+      "threshold": "Deterministic ranking evidence",
+      "value": "No saved ranking or risk checker exists",
+      "source_of_truth": ".okra/runs/release-readiness-20260716/workers/dkr-p-performance/checkpoint.v1.json#ranked_candidates",
+      "replay": "No deterministic replay path exists",
+      "exit_code": null,
+      "sha256": [
+        "2fb25893c611e9ce9ad9f427e20083ca66e1ed5efd708858a79b31693ef6f4a1"
+      ],
+      "observed_at": "2026-07-16T04:20:30Z",
+      "decision": "rejected",
+      "failure_mode": "non-replayable",
+      "evidence": [
+        "Source locations are verified, but no samples, allocation profiles, frequency data, or deterministic semantic-risk checker establish the order or risk labels"
+      ]
+    },
+    {
+      "claim_id": "dkr_p_measurement_design_validation",
+      "check": "Proposed allocation calibration and retained-memory design are validated",
+      "threshold": "At least one calibrated checker for each measurement class",
+      "value": "0 executable allocation or retained-memory checkers",
+      "source_of_truth": ".okra/runs/release-readiness-20260716/workers/dkr-p-performance/checkpoint.v1.json#allocation_calibration",
+      "replay": "No deterministic replay path exists",
+      "exit_code": null,
+      "sha256": [
+        "2fb25893c611e9ce9ad9f427e20083ca66e1ed5efd708858a79b31693ef6f4a1"
+      ],
+      "observed_at": "2026-07-16T04:20:30Z",
+      "decision": "rejected",
+      "failure_mode": "non-replayable",
+      "evidence": [
+        "The manifest contains only hz and p75 metrics",
+        "The checkpoint reports allocation and retained memory as invalid",
+        "Missing checker: calibration controls plus allocation and retained-memory schema and comparator tests"
+      ]
+    },
+    {
+      "claim_id": "dkr_p_acceptance_wall",
+      "check": "Active anti-goals have fresh independent verification and the wall gate holds",
+      "threshold": "Verified value 0 and wall verdict held",
+      "value": "Status unknown; verification ref null; wall verdict unknown",
+      "source_of_truth": ".okra/runs/release-readiness-20260716/workers/dkr-p-performance/checkpoint.v1.json",
+      "replay": "Inspect checkpoint active_anti_goal_verification and wall_gate",
+      "exit_code": 0,
+      "sha256": [
+        "2fb25893c611e9ce9ad9f427e20083ca66e1ed5efd708858a79b31693ef6f4a1"
+      ],
+      "observed_at": "2026-07-16T04:20:30Z",
+      "decision": "rejected",
+      "failure_mode": "missing evidence",
+      "evidence": [
+        "active_anti_goal_verification.status=unknown_pending_independent_verification",
+        "active_anti_goal_verification.value=null",
+        "active_anti_goal_verification.verification_record_ref=null",
+        "wall_gate.verdict=unknown",
+        "wall_gate.downstream_advance=blocked"
+      ]
+    }
+  ],
+  "summary": {
+    "accepted": 7,
+    "rejected": 4,
+    "rejected_claim_ids": [
+      "dkr_p_no_existing_allocation_exercise",
+      "dkr_p_candidate_ranking",
+      "dkr_p_measurement_design_validation",
+      "dkr_p_acceptance_wall"
+    ],
+    "decision": "rejected"
+  }
+}

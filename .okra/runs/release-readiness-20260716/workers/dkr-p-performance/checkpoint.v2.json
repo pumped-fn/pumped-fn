@@ -1,0 +1,379 @@
+{
+  "checkpoint_id": "DKR-P.checkpoint.v2.2026-07-16T04:24:55Z",
+  "supersedes": "workers/dkr-p-performance/checkpoint.v1.json",
+  "conclusion_id": "dkr-p-replayed-measurement-gaps-v2",
+  "decision_target": "Decide which performance facts are independently replayed and which measurement choices still require discovery before CKR performance work or optimization can advance.",
+  "source_of_truth": [
+    "workers/validator-dkr-p/verification.v1.json",
+    "benchmarks/lite-perf/rows.json",
+    "benchmarks/lite-perf/scripts/harness.test.mjs",
+    "git object database and ignored built artifacts"
+  ],
+  "read_method": "Use only validator-replayed observations. Preserve rejected claims as rejected, replace the contradicted allocation wording, and keep designs, row selection, rankings, and risk labels outside the accepted conclusion.",
+  "observed_at": "2026-07-16T04:20:30Z",
+  "recorded_at": "2026-07-16T04:24:55Z",
+  "max_age": "10m",
+  "freshness_status": "fresh",
+  "confidence": 0.99,
+  "evidence_refs_or_hashes": [
+    "sha256:c952e05c552fa727d10726f00dfa90c3d60a2cb99dad73bf795d9752024feac4",
+    "sha256:ac05933d183c007da10bada0e45f20919acd34631b07c05daff9b9dafa5fdcc9",
+    "sha256:218d16dcaa959d0b7d57ef743cdb71429b0bbd20f6fbb29f47e1cc9511108197",
+    "sha256:3d9de6048050dbc8e5beba486a9bfb3c30836093552043123cb2f73eb1155056",
+    "sha256:cc3701336f0f07abf1e50a637755335c50d3b8fed3a476bd605b976fe82ae136"
+  ],
+  "replay_command_or_checker": "workers/validator-dkr-p/verification.v1.json",
+  "validator_record_ref": "workers/validator-dkr-p/verification.v1.json",
+  "validator_verification_id": "validator-dkr-p.2026-07-16T04:20:30Z",
+  "conclusion_claims": [
+    {
+      "claim_id": "exact-head-no-product-change",
+      "claim": "HEAD is 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162 and this DKR changed no tracked or cached product file.",
+      "validator_trace_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_exact_head_and_product_worktree]",
+      "validator_decision": "accepted"
+    },
+    {
+      "claim_id": "exact-throughput-row-count",
+      "claim": "The current manifest contains exactly 39 Lite rows and 8 Lite React rows, and its only measurement metrics are hz and p75.",
+      "validator_trace_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_manifest_counts]",
+      "validator_decision": "accepted"
+    },
+    {
+      "claim_id": "deterministic-harness-result",
+      "claim": "The current deterministic harness passes 14 of 14 declared tests with 0 failures and collected no benchmark sample.",
+      "validator_trace_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_harness_14_of_14]",
+      "validator_decision": "accepted"
+    },
+    {
+      "claim_id": "missing-owned-session-and-measurement-fields",
+      "claim": "The manifest has no scope.run, session.run, owned-resource, or retained-memory workload row and no allocation measurement row or observation field and no retained-memory measurement row or observation field.",
+      "validator_trace_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_missing_owned_session_retained_surfaces]",
+      "validator_decision": "accepted"
+    },
+    {
+      "claim_id": "missing-allocation-and-retained-checkers",
+      "claim": "No executable allocation or retained-memory checker was available to validate the proposed measurement design.",
+      "validator_trace_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_measurement_design_validation]",
+      "validator_decision": "rejected_broader_design_claim_with_replayed_value_zero_checkers"
+    },
+    {
+      "claim_id": "ignored-dist-provenance-gap",
+      "claim": "The current Lite and Lite React dist artifacts are ignored, predate the exact HEAD commit, and lack a tracked exact-head clean-build provenance record.",
+      "validator_trace_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_ignored_dist_baseline_provenance]",
+      "validator_decision": "accepted"
+    }
+  ],
+  "measurement_validity": {
+    "verdict": "repairable_missing_measurement_surfaces",
+    "accepted_scope": "Current manifest shape, exact 39 plus 8 row count, deterministic 14 of 14 harness result, missing owned and session rows, missing allocation and retained measurement fields, and ignored-dist provenance gap.",
+    "throughput_target_status": "blocked because no owned or SDK session workload row exists and no fresh paired target result exists",
+    "allocation_target_status": "blocked because no allocation measurement row or observation field and no validated allocation checker exists",
+    "retained_memory_wall_status": "blocked because no retained-memory measurement row or observation field and no validated retained-memory checker exists",
+    "improvement_claim_status": "blocked"
+  },
+  "questions_answered": [
+    "The current throughput manifest size and metric kinds are replayed.",
+    "The deterministic harness result is replayed.",
+    "The absence of owned, session, allocation-measurement, and retained-memory rows or observation fields is replayed.",
+    "The current ignored dist artifacts do not prove an exact-head clean build."
+  ],
+  "questions_unanswered": [
+    "Which owned and managed lifecycle workloads should become representative rows.",
+    "Whether the SDK workload should isolate session.run or include agent.turn.",
+    "Which allocation method and controls are valid under this Node runtime.",
+    "Which retained-memory method, noise bound, and denominator rule are valid.",
+    "Which source location should be attempted first and what its semantic risk is.",
+    "Which immutable-baseline procedure should be adopted after the measurement surface is validated."
+  ],
+  "unaccepted_hypotheses_for_followup_discovery": {
+    "measurement_design": {
+      "status": "unaccepted",
+      "items": [
+        "The allocation calibration protocol proposed in checkpoint.v1.",
+        "The retained-memory protocol proposed in checkpoint.v1.",
+        "Any aggregation, weighting, fallback, noise, or denominator rule not already fixed by the frame."
+      ],
+      "validator_trace_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_measurement_design_validation]"
+    },
+    "missing_row_set": {
+      "status": "unaccepted",
+      "items": "The eight exact row IDs and their representative or supplementary roles proposed in checkpoint.v1.",
+      "accepted_boundary": "At least one owned or scope.run row and at least one session.run or SDK session row are absent; the exact replacement set is not accepted."
+    },
+    "candidate_order_and_risk": {
+      "status": "unaccepted",
+      "accepted_boundary": "The six cited source ranges contain the stated operations.",
+      "unaccepted_items": "Ranks 1 through 6, expected effect, semantic-risk labels, and any first-candidate recommendation.",
+      "validator_trace_refs": [
+        "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_candidate_source_locations]",
+        "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_candidate_ranking]"
+      ]
+    },
+    "baseline_process": {
+      "status": "unaccepted",
+      "accepted_boundary": "The current ignored dist files lack exact-head provenance.",
+      "unaccepted_items": "The benchmark-only descendant, rebuild cadence, and artifact-freezing procedure proposed in checkpoint.v1."
+    }
+  },
+  "result": {
+    "status": "reducing_discovery_pending_v2_independent_validation",
+    "accepted_reducing_discovery": false,
+    "reason": "Five conclusion claims cite validator traces with decision accepted. The no-checker fact is replayed inside a trace whose broader design-validation decision is rejected, so this revised checkpoint does not self-promote it to an accepted DKR result.",
+    "ckr_performance_advance": "blocked",
+    "optimization_advance": "blocked"
+  },
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "existing_row_confirmed_regression_count",
+    "allocation_regression_case_count",
+    "retained_memory_regression_count",
+    "benchmark_only_production_branch_count",
+    "cleanup_business_state_mutation_count",
+    "cross_session_leak_count",
+    "post_close_live_resource_count",
+    "context_argument_pass_count",
+    "undeclared_effect_edge_count",
+    "touched_surface_regression_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "active_anti_goal_verification": [
+    {
+      "metric_id": "invalid_performance_comparison_count",
+      "source_of_truth": "validator harness trace and command ledger",
+      "read_method": "Confirm only deterministic harness tests ran and no benchmark samples or comparison were accepted.",
+      "observed_at": "2026-07-16T04:20:16Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held_for_discovery",
+      "evidence_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_harness_14_of_14]",
+      "replay_command_or_checker": "benchmarks/lite-perf/scripts/harness.test.mjs",
+      "verification_record_ref": "workers/validator-dkr-p/verification.v1.json"
+    },
+    {
+      "metric_id": "unsupported_performance_claim_count",
+      "source_of_truth": "revised checkpoint and independent validator",
+      "read_method": "Require a fresh validator to confirm that v2 advances no improvement claim.",
+      "observed_at": "2026-07-16T04:24:55Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_v2_validation",
+      "evidence_ref": "workers/dkr-p-performance/checkpoint.v2.json#measurement_validity",
+      "replay_command_or_checker": "workers/validator-dkr-p/verification.v1.json",
+      "verification_record_ref": null
+    },
+    {
+      "metric_id": "existing_row_confirmed_regression_count",
+      "source_of_truth": "fresh paired comparator output",
+      "read_method": "Replay a predeclared paired comparison over established rows.",
+      "observed_at": "2026-07-16T04:20:30Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "blocked_missing_comparison",
+      "evidence_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_acceptance_wall]",
+      "replay_command_or_checker": "benchmarks/lite-perf/scripts/compare.mjs",
+      "verification_record_ref": "workers/validator-dkr-p/verification.v1.json"
+    },
+    {
+      "metric_id": "allocation_regression_case_count",
+      "source_of_truth": "validated allocation checker and observations",
+      "read_method": "Read validated allocation rows only after a checker exists.",
+      "observed_at": "2026-07-16T04:20:30Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "blocked_missing_measurement_and_checker",
+      "evidence_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_measurement_design_validation]",
+      "replay_command_or_checker": null,
+      "verification_record_ref": "workers/validator-dkr-p/verification.v1.json"
+    },
+    {
+      "metric_id": "retained_memory_regression_count",
+      "source_of_truth": "validated retained-memory checker and observations",
+      "read_method": "Read validated post-close retained-memory rows only after a checker exists.",
+      "observed_at": "2026-07-16T04:20:30Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "blocked_missing_measurement_and_checker",
+      "evidence_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_measurement_design_validation]",
+      "replay_command_or_checker": null,
+      "verification_record_ref": "workers/validator-dkr-p/verification.v1.json"
+    },
+    {
+      "metric_id": "benchmark_only_production_branch_count",
+      "source_of_truth": "git object database and worktree",
+      "read_method": "Confirm no tracked or cached product diff exists.",
+      "observed_at": "2026-07-16T04:19:07Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held_for_discovery",
+      "evidence_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_exact_head_and_product_worktree]",
+      "replay_command_or_checker": "workers/validator-dkr-p/verification.v1.json",
+      "verification_record_ref": "workers/validator-dkr-p/verification.v1.json"
+    },
+    {
+      "metric_id": "cleanup_business_state_mutation_count",
+      "source_of_truth": "lifecycle conformance evidence for a future product change",
+      "read_method": "No product move is admissible until cleanup behavior is replayed.",
+      "observed_at": "2026-07-16T04:20:30Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "blocked_no_product_validation",
+      "evidence_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_exact_head_and_product_worktree]",
+      "replay_command_or_checker": "pkg/sdk/core/tests/session-kernel.test.ts",
+      "verification_record_ref": "workers/validator-dkr-p/verification.v1.json"
+    },
+    {
+      "metric_id": "cross_session_leak_count",
+      "source_of_truth": "session-isolation conformance evidence for a future product change",
+      "read_method": "No product move is admissible until sibling and nested boundary isolation is replayed.",
+      "observed_at": "2026-07-16T04:20:30Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "blocked_no_product_validation",
+      "evidence_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_exact_head_and_product_worktree]",
+      "replay_command_or_checker": "pkg/core/lite/tests/scope.test.ts",
+      "verification_record_ref": "workers/validator-dkr-p/verification.v1.json"
+    },
+    {
+      "metric_id": "post_close_live_resource_count",
+      "source_of_truth": "post-close lifecycle conformance evidence for a future product change",
+      "read_method": "No product move is admissible until complete close and disposal is replayed.",
+      "observed_at": "2026-07-16T04:20:30Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "blocked_no_product_validation",
+      "evidence_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_missing_owned_session_retained_surfaces]",
+      "replay_command_or_checker": "pkg/core/lite/tests/structured-lifetime.test.ts",
+      "verification_record_ref": "workers/validator-dkr-p/verification.v1.json"
+    },
+    {
+      "metric_id": "context_argument_pass_count",
+      "source_of_truth": "API and lint evidence for a future product change",
+      "read_method": "No product move is admissible until the context-argument rule is replayed.",
+      "observed_at": "2026-07-16T04:20:30Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "blocked_no_product_validation",
+      "evidence_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_exact_head_and_product_worktree]",
+      "replay_command_or_checker": null,
+      "verification_record_ref": "workers/validator-dkr-p/verification.v1.json"
+    },
+    {
+      "metric_id": "undeclared_effect_edge_count",
+      "source_of_truth": "graph and lint evidence for a future product change",
+      "read_method": "No product move is admissible until changed execution edges are replayed.",
+      "observed_at": "2026-07-16T04:20:30Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "blocked_no_product_validation",
+      "evidence_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_exact_head_and_product_worktree]",
+      "replay_command_or_checker": null,
+      "verification_record_ref": "workers/validator-dkr-p/verification.v1.json"
+    },
+    {
+      "metric_id": "touched_surface_regression_count",
+      "source_of_truth": "git object database and worktree",
+      "read_method": "Confirm the discovery worker touched no tracked or cached product surface.",
+      "observed_at": "2026-07-16T04:19:07Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held_for_discovery",
+      "evidence_ref": "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_exact_head_and_product_worktree]",
+      "replay_command_or_checker": "workers/validator-dkr-p/verification.v1.json",
+      "verification_record_ref": "workers/validator-dkr-p/verification.v1.json"
+    },
+    {
+      "metric_id": "single_llm_truth_acceptance_count",
+      "source_of_truth": "independent validator record",
+      "read_method": "Require conclusion facts to cite independent audit traces and leave v2 pending when a trace is not accepted.",
+      "observed_at": "2026-07-16T04:20:30Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held_for_discovery",
+      "evidence_ref": "workers/validator-dkr-p/verification.v1.json",
+      "replay_command_or_checker": "workers/validator-dkr-p/verification.v1.json",
+      "verification_record_ref": "workers/validator-dkr-p/verification.v1.json"
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "source_of_truth": "revised checkpoint plus a fresh validator",
+      "read_method": "Preserve the contradicted and non-replayable findings and require independent validation of the revision.",
+      "observed_at": "2026-07-16T04:24:55Z",
+      "recorded_at": "2026-07-16T04:24:55Z",
+      "max_age": "10m",
+      "freshness_status": "fresh",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_v2_validation",
+      "evidence_ref": "workers/dkr-p-performance/checkpoint.v2.json#unaccepted_hypotheses_for_followup_discovery",
+      "replay_command_or_checker": "workers/validator-dkr-p/verification.v1.json",
+      "verification_record_ref": null
+    }
+  ],
+  "wall_gate": {
+    "verdict": "blocked_performance_evidence_missing_and_v2_validation_pending",
+    "dkr_learning_advance": "pending_independent_v2_validation",
+    "ckr_performance_advance": "blocked",
+    "optimization_advance": "blocked",
+    "decided_at": "2026-07-16T04:24:55Z"
+  },
+  "decision": "Record replayed reducing discovery, require independent validation of v2, and keep CKR performance and optimization blocked.",
+  "fail_closed": true,
+  "flag_if_missing_or_stale": "breaking:performance-measurement-and-v2-validation-missing",
+  "reviewer_audit_status": "pending_independent_v2_validation",
+  "worker_evidence_is_acceptance": false
+}

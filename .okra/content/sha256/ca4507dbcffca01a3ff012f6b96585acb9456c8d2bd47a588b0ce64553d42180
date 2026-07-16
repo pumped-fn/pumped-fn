@@ -1,0 +1,41 @@
+{
+  "packet_version": 1,
+  "worker_id": "dkr-p-performance",
+  "unit_id": "DKR-P",
+  "worker_kind": "discovery",
+  "frame": {
+    "objective": { "metric_id": "release_readiness_gap_count", "target": 0, "comparator": "==" },
+    "frame_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json",
+    "anti_goals_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals",
+    "action_envelope_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#action_envelope",
+    "human_confirmation_boundary": "No frame, threshold, authority, merge, release, or standing-wall changes."
+  },
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "existing_row_confirmed_regression_count",
+    "allocation_regression_case_count",
+    "retained_memory_regression_count",
+    "benchmark_only_production_branch_count",
+    "cleanup_business_state_mutation_count",
+    "cross_session_leak_count",
+    "post_close_live_resource_count",
+    "context_argument_pass_count",
+    "undeclared_effect_edge_count",
+    "touched_surface_regression_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "current_state": {
+    "pr": "https://github.com/pumped-fn/pumped-fn/pull/346",
+    "head": "7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+    "branch": "feat/session-kernel",
+    "existing_harness": "benchmarks/lite-perf: 39 Lite rows and 8 Lite React rows, built-dist only, five-pair comparison with nine-pair fallback",
+    "targets": { "throughput_ratio": 1.10, "allocation_ratio": 0.90, "existing_row_floor": 0.95, "per_case_memory_ceiling": 1.05 }
+  },
+  "previous_dkr_checkpoint": "Prior performance evidence was inconclusive and explicitly forbids a speedup claim.",
+  "assignment": "Read-only performance review. Validate the workload, throughput, allocation, and retained-memory evidence design for Lite owned/managed execution and one SDK session turn. Inspect built-dist harness and source hot paths, identify missing rows, define allocation calibration controls, and rank source-backed optimization candidates with semantic risk. Do not edit, optimize, or run repeated samples until favorable.",
+  "budget_and_stop_rule": { "turns": 1, "time_min": 60, "stop": "Stop with a valid, repairable, or invalid measurement verdict and ranked candidates; do not exceed one exploratory measurement per claim or extend sampling." },
+  "hand_back_rule": "Hand back when a target or workload choice lacks evidence or needs human/frame authority; do not weaken semantics or invent a benchmark conclusion.",
+  "output_schema": "Return one executable DKR checkpoint with conclusion_id, decision_target, source_of_truth, read_method, freshness fields, numeric confidence, evidence_refs_or_hashes, replay_command_or_checker, questions_answered, questions_unanswered, decision, fail_closed, active_anti_goals, active_anti_goal_verification, wall_gate, measurement-validity verdict, exact missing rows, allocation calibration design, ranked file:line candidates, risks, required tests, and immutable baseline recommendations. Worker evidence is not acceptance."
+}

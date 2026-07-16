@@ -1,0 +1,12 @@
+{
+  "type": "worker_finish",
+  "worker_id": "pkr-c1-contract-checker",
+  "worker_kind": "progression",
+  "unit_id": "PKR-C1",
+  "status": "accepted_after_remediation",
+  "recorded_at": "2026-07-16T04:52:00Z",
+  "verification_ref": "workers/validator-pkr-c1/verification.v2.json",
+  "changed_paths_ref": "artifacts/accept-pkr-c1.v2.json",
+  "product_files_changed": true,
+  "downstream_advance": "contract_content_pkrs_allowed"
+}

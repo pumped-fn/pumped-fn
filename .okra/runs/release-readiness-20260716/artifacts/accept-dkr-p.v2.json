@@ -1,0 +1,27 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P",
+  "accepted_at": "2026-07-16T04:31:00Z",
+  "accepted_scope": "Reducing discovery only: exact current throughput surface and independently replayed missing measurement and provenance surfaces.",
+  "checkpoint_ref": "workers/dkr-p-performance/checkpoint.v2.json",
+  "checkpoint_sha256": "8be366b3da42ae49db0a3b1d77bd4d111892f258115b5e6ca029cd27d6c63db9",
+  "verification_ref": "workers/validator-dkr-p/verification.v2.json",
+  "verification_sha256": "06da2c016d0ea082fb2037a7abdd4a7285668e6e68ad7c5bd359d889ef60dbed",
+  "accepted_claims": [
+    "exact head with no tracked product change by discovery",
+    "39 Lite and 8 Lite React throughput rows using hz and p75",
+    "14 of 14 deterministic harness checks pass",
+    "owned lifecycle, SDK session, allocation measurement, and retained-memory measurement surfaces are absent",
+    "allocation and retained-memory executable checkers are absent",
+    "current ignored dist artifacts lack exact-head clean-build provenance"
+  ],
+  "rejected_or_blocked_claims": [
+    "exact measurement protocol and calibration controls are unaccepted",
+    "exact representative row set is unaccepted",
+    "candidate ranking and semantic-risk labels are unaccepted",
+    "immutable baseline procedure is unaccepted",
+    "CKR-PERFORMANCE, measurement implementation, and optimization remain blocked"
+  ],
+  "downstream_authority": "Fund a reducing measurement-calibration and row-selection DKR only.",
+  "single_llm_truth_acceptance_count": 0
+}

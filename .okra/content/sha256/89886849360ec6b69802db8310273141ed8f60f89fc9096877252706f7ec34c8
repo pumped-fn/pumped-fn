@@ -1,0 +1,40 @@
+{
+  "packet_version": 1,
+  "worker_id": "dkr-c-contract",
+  "unit_id": "DKR-C",
+  "worker_kind": "discovery",
+  "frame": {
+    "objective": { "metric_id": "release_readiness_gap_count", "target": 0, "comparator": "==" },
+    "frame_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json",
+    "anti_goals_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#anti_goals",
+    "action_envelope_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json#action_envelope",
+    "human_confirmation_boundary": "No frame, threshold, authority, merge, release, or standing-wall changes."
+  },
+  "active_anti_goals": [
+    "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+    "breaking_model_api_change_count",
+    "premature_tool_or_mcp_surface_count",
+    "primitive_proof_gap_count",
+    "scope_seam_escape_count",
+    "hidden_execution_edge_count",
+    "implicit_required_dependency_count",
+    "ungrouped_related_handle_count",
+    "redundant_graph_ceremony_count",
+    "context_argument_pass_count",
+    "touched_surface_regression_count",
+    "slop_violation_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "current_state": {
+    "pr": "https://github.com/pumped-fn/pumped-fn/pull/346",
+    "head": "7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+    "branch": "feat/session-kernel",
+    "known_gaps": ["SDK-wide TSDoc coverage is not mechanically read", "Lite docs harness does not cover the SDK release surface", "stale material, cliWorker, and captured ctx.exec wording was observed"]
+  },
+  "previous_dkr_checkpoint": "None for this successor; prior standing walls are imported and dispositioned.",
+  "assignment": "Read-only inventory. Build a source-backed matrix of every published package/subpath and the related README, PATTERNS, migration, changelog, example, declaration/TSDoc, package-export, changeset, and PR evidence. Identify stale or missing content and the smallest deterministic checker needed to read public_contract_gap_count. Do not edit files.",
+  "budget_and_stop_rule": { "turns": 1, "time_min": 45, "stop": "Stop when the matrix and checker recommendation answer the decision target, or return a replayable blocked/empty checkpoint." },
+  "hand_back_rule": "Hand back immediately if the public-surface definition requires a frame choice; do not invent scope or edit product files.",
+  "output_schema": "Return one executable DKR checkpoint with conclusion_id, decision_target, source_of_truth, read_method, freshness fields, numeric confidence, evidence_refs_or_hashes, replay_command_or_checker, questions_answered, questions_unanswered, decision, fail_closed, active_anti_goals, active_anti_goal_verification, wall_gate, candidate CKRs/PKRs, and exact coverage-matrix rows. Worker evidence is not acceptance."
+}

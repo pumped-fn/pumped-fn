@@ -1,0 +1,15 @@
+{
+  "name": "@fixture/demo",
+  "version": "1.0.0",
+  "exports": {
+    ".": {
+      "types": "./targets/index.d.mts",
+      "default": "./targets/missing.mjs"
+    },
+    "./missing-type": {
+      "types": "./targets/missing.d.mts",
+      "default": "./targets/index.mjs"
+    }
+  },
+  "files": ["README.md"]
+}

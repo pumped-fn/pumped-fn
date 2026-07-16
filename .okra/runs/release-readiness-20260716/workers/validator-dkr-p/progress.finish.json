@@ -1,0 +1,20 @@
+{
+  "type": "worker_finish",
+  "worker_id": "validator-dkr-p",
+  "worker_kind": "verification",
+  "unit_id": "DKR-P",
+  "status": "complete",
+  "recorded_at": "2026-07-16T04:20:30Z",
+  "verification_ref": "workers/validator-dkr-p/verification.v1.json",
+  "accepted": 7,
+  "rejected": 4,
+  "rejected_claim_ids": [
+    "dkr_p_no_existing_allocation_exercise",
+    "dkr_p_candidate_ranking",
+    "dkr_p_measurement_design_validation",
+    "dkr_p_acceptance_wall"
+  ],
+  "decision": "rejected",
+  "downstream_advance": "blocked",
+  "product_files_changed": false
+}

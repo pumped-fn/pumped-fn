@@ -1,0 +1,16 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-P2",
+  "accepted_at": "2026-07-16T04:52:00Z",
+  "accepted_scope": "Reducing discovery only: exact-head provenance, retained 0/0/1 controls, scope.run row, and preserved rejected allocation and lifecycle probes.",
+  "checkpoint_ref": "workers/dkr-p2-calibration/checkpoint.v1.json",
+  "checkpoint_sha256": "bf4effcb3837f8def31e999b6853d400a773fbe84f87f797ce196f2b5fa4febd",
+  "verification_ref": "workers/validator-dkr-p2/verification.v1.json",
+  "verification_sha256": "d481aa35b02e5079c690a8215e0566a4574e08f6f53ef0e615565731af541af0",
+  "rejected_claims": [
+    "allocation method invalid",
+    "managed ctx row used wrong ownership",
+    "session row inspected a different runtime"
+  ],
+  "downstream_authority": "Fund one narrower allocation-method DKR; measurement implementation and optimization remain blocked."
+}

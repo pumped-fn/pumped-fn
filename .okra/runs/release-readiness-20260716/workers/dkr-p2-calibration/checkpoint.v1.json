@@ -1,0 +1,301 @@
+{
+  "checkpoint_id": "DKR-P2.calibration.2026-07-16T04:43:31Z",
+  "conclusion_id": "dkr-p2-partial-calibration-fail-closed",
+  "unit_id": "DKR-P2",
+  "worker_id": "dkr-p2-calibration",
+  "worker_kind": "discovery",
+  "decision_target": "Validate exact-head build provenance, allocation and retained-memory methods, and the smallest lifecycle workload set.",
+  "source_of_truth": [
+    "git:7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+    "/tmp/dkr-p2-calibration/head.tar",
+    "/tmp/dkr-p2-calibration/scripts/allocation-calibration.mjs",
+    "/tmp/dkr-p2-calibration/scripts/retained-calibration.mjs",
+    "/tmp/dkr-p2-calibration/scripts/row-calibration.mjs",
+    "/tmp/dkr-p2-calibration/scripts/provenance.mjs",
+    "pkg/core/lite/src/scope.ts",
+    "pkg/core/lite/tests/structured-lifetime.test.ts",
+    "pkg/sdk/core/src/session.ts",
+    "pkg/sdk/core/tests/session-kernel.test.ts"
+  ],
+  "read_method": "Run each predeclared scratch probe exactly once against an offline build extracted from the exact git head. Preserve rejected controls and fail closed instead of repeating until favorable.",
+  "exact_head": "7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+  "source_tree": "73d332418d7a08fa530ef57dd09029f37e7de60c",
+  "observed_at": "2026-07-16T04:43:31Z",
+  "recorded_at": "2026-07-16T04:43:31Z",
+  "max_age": "30m",
+  "freshness_status": "fresh",
+  "confidence_probability_update": {
+    "before": 0.5,
+    "after": 0.88
+  },
+  "result": {
+    "status": "reducing_discovery_pending_independent_validation",
+    "fail_closed": true,
+    "ckr_performance_advance": "blocked",
+    "measurement_implementation": "blocked",
+    "optimization": "blocked"
+  },
+  "accepted_worker_findings": [
+    {
+      "id": "exact-head-clean-build-contract",
+      "finding": "A git-archive build from the exact head completed offline under Node v26.4.0 and pnpm 10.33.4.",
+      "contract": {
+        "required_inputs": [
+          "commit SHA",
+          "git tree SHA",
+          "regenerated git-archive SHA-256",
+          "pnpm-lock.yaml SHA-256",
+          "Node and pnpm versions",
+          "frozen offline install command",
+          "exact build command",
+          "built artifact paths, sizes, and SHA-256 values"
+        ],
+        "archive_sha256": "8dbcdb616d7c1a0718c0779034be345cd6db5b57846b5e3998e0b5693a1261c1",
+        "lockfile_sha256": "5bdf948fedb3d63ce2c4e98cb1e59925599bc3ff3a5416d1058741abc71d9120",
+        "build_command": "pnpm --filter @pumped-fn/lite --filter @pumped-fn/sdk build",
+        "artifacts": {
+          "pkg/core/lite/dist/index.mjs": {
+            "bytes": 91360,
+            "sha256": "bd24e8db53c267d8b063fdb9bb27403a03d020516ba6e97c7c76b64ecf101945"
+          },
+          "pkg/core/lite/dist/index.d.mts": {
+            "bytes": 47986,
+            "sha256": "b055717533ccd19bed1aa2c792f6a789b89c1ab66bbf68de7125cf9cea30f02e"
+          },
+          "pkg/sdk/core/dist/session.mjs": {
+            "bytes": 43409,
+            "sha256": "eb869a73460b0d2dfae45e48f9dbadf54566320e7040ea10ef6b438c1d73a59b"
+          },
+          "pkg/sdk/core/dist/session.d.mts": {
+            "bytes": 2972,
+            "sha256": "167a645f105fa02a011458cb8937a30cea1a472ee1256a6103df2d0ab7cdcf76"
+          }
+        }
+      }
+    },
+    {
+      "id": "retained-object-method",
+      "finding": "Node v26.4.0 v8.queryObjects with a unique workload-owned constructor distinguished baseline, released, and deliberately leaked resources as 0/0/1.",
+      "boundary": "Accept only with Node 26 pinned, a unique resource constructor, post-close measurement, and negative plus positive controls. The API is experimental.",
+      "raw": {
+        "control_bytes": 1024,
+        "baseline": 0,
+        "negative_after_close": 0,
+        "positive_after_close": 1,
+        "accepted_signal": true
+      }
+    },
+    {
+      "id": "scope-run-row",
+      "finding": "The owned scope.run row executed once and closed its resource once.",
+      "raw": {
+        "result": 42,
+        "created": 1,
+        "closed": 1,
+        "accepted": true
+      }
+    }
+  ],
+  "rejected_or_unaccepted_findings": [
+    {
+      "id": "inspector-allocation-method",
+      "decision": "rejected",
+      "reason": "The sampler produced a strong monotonic signal but did not account for the known 1 KiB TypedArray backing allocations. It measured 269 and 501.5 attributed bytes per iteration, not the controlled bytes.",
+      "raw": {
+        "node": "v26.4.0",
+        "iterations": 64,
+        "sampling_interval": 1,
+        "controls": [
+          {
+            "units": 0,
+            "retained_objects": 0,
+            "attributed_bytes": 112
+          },
+          {
+            "units": 1,
+            "retained_objects": 64,
+            "attributed_bytes": 17216
+          },
+          {
+            "units": 2,
+            "retained_objects": 128,
+            "attributed_bytes": 32096
+          }
+        ],
+        "known_zero_attributed_bytes": 112,
+        "one_kib_attributed_bytes_per_iteration": 269,
+        "two_kib_attributed_bytes_per_iteration": 501.5,
+        "two_to_one_ratio": 1.8643122676579926,
+        "signal_to_noise": 153.71428571428572
+      }
+    },
+    {
+      "id": "managed-context-row-probe",
+      "decision": "probe_rejected_source_backed_replacement_identified",
+      "reason": "The probe incorrectly selected ownership current. That creates and closes one resource for each top-level ctx.exec child. The representative row must use default boundary ownership.",
+      "raw": {
+        "values": [
+          1,
+          2
+        ],
+        "before_close": {
+          "created": 2,
+          "closed": 2
+        },
+        "after_close": {
+          "created": 2,
+          "closed": 2
+        },
+        "accepted": false
+      },
+      "source_contract": "pkg/core/lite/tests/structured-lifetime.test.ts:37-65"
+    },
+    {
+      "id": "session-post-run-introspection",
+      "decision": "probe_rejected_execution_returned_42",
+      "reason": "sdk.session is current-owned. Resolving it after session.run inspects a new runtime, so the empty event and status assertion was invalid.",
+      "raw": {
+        "result": 42,
+        "event_types": [],
+        "accepted": false
+      },
+      "source_contracts": [
+        "pkg/sdk/core/src/session.ts:1229-1241",
+        "pkg/sdk/core/src/session.ts:1518-1570",
+        "pkg/sdk/core/tests/session-kernel.test.ts:174-217"
+      ]
+    }
+  ],
+  "minimal_row_contract": [
+    {
+      "id": "lite:scope.run:owned-resource",
+      "operation": "One scope.run dependency operation using explicit params; include automatic close.",
+      "status": "calibrated"
+    },
+    {
+      "id": "lite:ctx.exec:managed-boundary-resource",
+      "operation": "Create one context, execute the same default-boundary resource flow twice, then close the context.",
+      "status": "source_backed_replay_required"
+    },
+    {
+      "id": "sdk:session.run:trivial-turn",
+      "operation": "Run one session work item through a trivial selected turn, drain its result, then close the owning context.",
+      "status": "source_backed_lifecycle_replay_required"
+    }
+  ],
+  "questions_answered": [
+    "The smallest clean-build provenance fields and replay path.",
+    "A viable Node 26 retained-object detector and its controls.",
+    "Why the tested allocation sampler is not valid for the controlled 1 KiB allocation.",
+    "The exact three-row representative workload shape.",
+    "Why current-owned resources cannot stand in for the managed ctx.exec row."
+  ],
+  "questions_unanswered": [
+    "Which allocation method captures a predeclared in-heap 1 KiB control with an accepted noise and proportionality rule.",
+    "Whether experimental v8.queryObjects is acceptable release policy.",
+    "Independent replay of the corrected managed-context and session lifecycle rows."
+  ],
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "allocation_regression_case_count",
+    "retained_memory_regression_count",
+    "benchmark_only_production_branch_count",
+    "post_close_live_resource_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "active_wall_readings": [
+    {
+      "metric_id": "invalid_performance_comparison_count",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held_for_discovery"
+    },
+    {
+      "metric_id": "unsupported_performance_claim_count",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held_for_discovery"
+    },
+    {
+      "metric_id": "allocation_regression_case_count",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "blocked_invalid_allocation_method"
+    },
+    {
+      "metric_id": "retained_memory_regression_count",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "blocked_missing_baseline_candidate_comparison"
+    },
+    {
+      "metric_id": "benchmark_only_production_branch_count",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held_for_worker_scope"
+    },
+    {
+      "metric_id": "post_close_live_resource_count",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "blocked_lifecycle_replay_required"
+    },
+    {
+      "metric_id": "single_llm_truth_acceptance_count",
+      "value": null,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "pending_independent_validation"
+    },
+    {
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "value": 0,
+      "threshold": 0,
+      "comparator": "==",
+      "verdict": "held_for_worker_report"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "blocked_missing_valid_allocation_method_and_independent_replay",
+    "dkr_learning_advance": "pending_independent_validation",
+    "ckr_performance_advance": "blocked",
+    "measurement_implementation": "blocked",
+    "optimization": "blocked",
+    "worker_evidence_is_acceptance": false
+  },
+  "evidence_refs_or_hashes": {
+    "/tmp/dkr-p2-calibration/scripts/allocation-calibration.mjs": "c82ced1ddca55cbd2357d584cda7190d226b90e6e32e3e976eae5564af8269b4",
+    "/tmp/dkr-p2-calibration/scripts/retained-calibration.mjs": "666a00a7bd92ab46bde34624ddcc18adf1c0224327ad690c69e5bde311046474",
+    "/tmp/dkr-p2-calibration/scripts/row-calibration.mjs": "ee2c60be7deb3557e33989052cd601f9df3513a6b88152846f8434fb78851f37",
+    "/tmp/dkr-p2-calibration/scripts/provenance.mjs": "f8829deb21131657692566ba97cc2c7c7696a09aa7afa4f382cf6d1200f6cffd",
+    "/tmp/dkr-p2-calibration/head.tar": "8dbcdb616d7c1a0718c0779034be345cd6db5b57846b5e3998e0b5693a1261c1",
+    "pkg/core/lite/src/scope.ts": "74cde564c5c9d4c8682dfb531e94b992ac09f99ab693d5bfa0915ce9b0a51912",
+    "pkg/core/lite/tests/structured-lifetime.test.ts": "8f091511358eb2754c57b3083b7ea10ab0449a15187a30457173831e45305534",
+    "pkg/sdk/core/src/session.ts": "09037af628882fc4ce8a4c51fa12ec92e9f31de3d33915dbaaaf1f5c72bc800e",
+    "pkg/sdk/core/tests/session-kernel.test.ts": "fcaa2d08cb26129db9246a4306206bb920c3646cc108375a5a80d47218551f90"
+  },
+  "exact_commands": [
+    "git archive --format=tar --output=/tmp/dkr-p2-calibration/head.tar 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+    "tar -xf /tmp/dkr-p2-calibration/head.tar -C /tmp/dkr-p2-calibration/archive",
+    "pnpm install --offline --frozen-lockfile",
+    "pnpm --filter @pumped-fn/lite --filter @pumped-fn/sdk build",
+    "node /tmp/dkr-p2-calibration/scripts/provenance.mjs /tmp/dkr-p2-calibration/archive 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162 73d332418d7a08fa530ef57dd09029f37e7de60c /tmp/dkr-p2-calibration/head.tar pkg/core/lite/dist/index.mjs pkg/core/lite/dist/index.d.mts pkg/sdk/core/dist/session.mjs pkg/sdk/core/dist/session.d.mts",
+    "node --expose-gc /tmp/dkr-p2-calibration/scripts/allocation-calibration.mjs",
+    "node --expose-gc /tmp/dkr-p2-calibration/scripts/retained-calibration.mjs",
+    "node --expose-gc /tmp/dkr-p2-calibration/scripts/row-calibration.mjs /tmp/dkr-p2-calibration/archive 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162"
+  ],
+  "replay_command_or_checker": "/tmp/dkr-p2-calibration/scripts/provenance.mjs plus the three one-shot calibration scripts",
+  "downstream_decision": "Fund one reducing allocation-method DKR with thresholds declared before execution. Do not implement measurement or optimize yet.",
+  "flag_if_missing_or_stale": "breaking:valid-allocation-method-and-independent-replay-missing",
+  "workspace_effect": "No product file was edited by this worker. Generated probe material is under /tmp/dkr-p2-calibration; this checkpoint is the authorized durable worker record.",
+  "required_sentence": "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker.",
+  "worker_evidence_is_acceptance": false
+}

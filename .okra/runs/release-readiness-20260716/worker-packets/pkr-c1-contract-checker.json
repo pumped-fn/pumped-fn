@@ -1,0 +1,30 @@
+{
+  "packet_version": 1,
+  "worker_id": "pkr-c1-contract-checker",
+  "unit_id": "PKR-C1",
+  "worker_kind": "progression",
+  "frame": {
+    "objective": { "metric_id": "release_readiness_gap_count", "target": 0, "comparator": "==" },
+    "frame_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json",
+    "tree_ref": ".okra/runs/release-readiness-20260716/tree/tree.v2.json",
+    "source_dkr_ref": ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-c.v1.json",
+    "challenge_ref": ".okra/runs/release-readiness-20260716/workers/challenger-release-tree/review.v1.json"
+  },
+  "active_anti_goals": [
+    "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+    "unsupported_static_rule_count",
+    "rule_without_valid_and_invalid_fixture_count",
+    "known_false_positive_fixture_count",
+    "non_deterministic_lint_result_count",
+    "slop_violation_count",
+    "touched_surface_regression_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "assignment": "Implement one manifest-driven scripts/check-public-contract.mjs and deterministic fixtures/tests. Enumerate every non-private pkg/*/* manifest and export key; verify runtime/type targets and packed-file inclusion; compare changed public src packages with changeset frontmatter; require package README/changelog and current migration evidence for major changes; read a path-backed PR JSON snapshot and reject wrong head; syntax-parse TypeScript/TSX package README fences; emit stable JSON direct metrics. For TSDoc, report all exported-symbol gaps as inventory, but define the failing public_api_tsdoc_gap_count denominator only from exported TypeScript interface declarations because the project instruction is TSDoc on public interfaces only. Do not invent exemptions or add blanket TSDoc. Add a root script entry for replay. Keep the implementation narrow and dependency-free beyond installed TypeScript.",
+  "allowed_paths": ["scripts/check-public-contract.mjs", "scripts/check-public-contract.test.mjs", "scripts/fixtures/public-contract/**", "package.json"],
+  "forbidden_paths": ["pkg/**", "examples/**", "docs/**", ".changeset/**", ".okra/**", "pnpm-lock.yaml"],
+  "budget_and_stop_rule": { "time_min": 75, "turns": 1, "stop": "Stop when positive and negative fixtures prove deterministic metric output and exact-head failure, or hand back any policy unknown without widening the checker." },
+  "hand_back_rule": "Do not repair content gaps, TSDoc, changesets, PR text, or public APIs. Do not weaken a failing fixture. Return product changes and raw command evidence for independent validation.",
+  "output_schema": "Changed files and intent, commands and key output, fixture pass/fail counts, exact metric schema, unknowns, hashes, and active-wall observations. Worker evidence is not acceptance."
+}

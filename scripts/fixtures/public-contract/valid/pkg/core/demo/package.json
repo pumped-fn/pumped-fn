@@ -1,0 +1,11 @@
+{
+  "name": "@fixture/demo",
+  "version": "1.0.0",
+  "exports": {
+    ".": {
+      "types": "./targets/index.d.mts",
+      "default": "./targets/index.mjs"
+    }
+  },
+  "files": ["targets/**", "README.md", "CHANGELOG.md", "MIGRATION.md"]
+}

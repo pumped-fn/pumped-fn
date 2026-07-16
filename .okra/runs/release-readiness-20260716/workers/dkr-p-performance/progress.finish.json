@@ -1,0 +1,12 @@
+{
+  "type": "worker_finish",
+  "worker_id": "dkr-p-performance",
+  "worker_kind": "discovery",
+  "unit_id": "DKR-P",
+  "status": "complete_pending_independent_validation",
+  "recorded_at": "2026-07-16T04:12:06Z",
+  "checkpoint_ref": "workers/dkr-p-performance/checkpoint.v1.json",
+  "decision": "repairable_measurement_design",
+  "downstream_advance": "blocked",
+  "product_files_changed": false
+}

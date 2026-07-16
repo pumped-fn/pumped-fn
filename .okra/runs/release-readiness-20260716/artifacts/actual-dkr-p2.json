@@ -1,0 +1,8 @@
+{
+  "type": "estimation_record",
+  "phase": "actual",
+  "unit_id": "DKR-P2",
+  "actual": { "time_min": 10, "turns": 1, "tokens": null },
+  "observed_at": "2026-07-16T04:43:31Z",
+  "result_ref": "workers/dkr-p2-calibration/checkpoint.v1.json"
+}

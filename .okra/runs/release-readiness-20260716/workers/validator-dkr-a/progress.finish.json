@@ -1,0 +1,55 @@
+{
+  "type": "worker-report",
+  "schema_version": 1,
+  "worker_id": "validator-dkr-a",
+  "worker_kind": "validator",
+  "unit_id": "DKR-A",
+  "status": "accepted_reducing_discovery",
+  "recorded_at": "2026-07-16T04:49:57Z",
+  "verification_ref": "workers/validator-dkr-a/verification.v1.json",
+  "result": "Exact-head typecheck and 234 runtime tests accepted the current API matrix, current two-form context breach, Scope.run dependency behavior, primitive and extension context boundaries, and explicit cleanup parameters. The proposed ctx.exec dependency contract, shared exported type, extension target migration, exact call-site count, and wall gate remain rejected.",
+  "metrics": {
+    "accepted_claim_count": 9,
+    "rejected_claim_count": 5,
+    "current_inline_context_callback_form_count": 2,
+    "scope_run_deps_contract_failure_count": 0,
+    "cleanup_context_argument_pass_count": 0,
+    "unsupported_api_recommendation_count": 1,
+    "extension_target_contract_unknown_count": 1
+  },
+  "accepted_status": "reducing_discovery_only",
+  "acceptance_claimed": false,
+  "product_files_changed": false,
+  "rejected": [
+    {
+      "claim_id": "DKR-A-CTX-DEPS-PARITY",
+      "reason": "contradicted by current types and runtime and non-replayable without scripts/check-inline-exec-contract.mjs"
+    },
+    {
+      "claim_id": "DKR-A-SHARED-EXEC-DEPS-OPTIONS",
+      "reason": "unsupported as the unique source-forced replacement contract"
+    },
+    {
+      "claim_id": "DKR-A-EXTENSION-TARGET-MIGRATION",
+      "reason": "unanswered and non-replayable"
+    },
+    {
+      "claim_id": "DKR-A-EXACT-MIGRATION-COUNT",
+      "reason": "non-replayable without the AST checker"
+    },
+    {
+      "claim_id": "DKR-A-WALL-GATE",
+      "reason": "active walls are breached, blocked, or lack fresh held replay traces"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "reason": "Only reducing discovery facts are accepted. Implementation needs an orchestrator decision on the exact target contract, a defined extension target, and a deterministic contract checker before its completion can be accepted."
+  },
+  "commanded_lines": [
+    "Action envelope: read-only validation; write only workers/validator-dkr-a/verification.v1.json and progress.finish.json; no product, git, frame, tree, ledger, release, or external-state changes.",
+    "Validation decision: accept current-contract discovery facts only; reject unsupported API preferences and non-replayable target-contract claims; keep downstream implementation blocked.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  ]
+}

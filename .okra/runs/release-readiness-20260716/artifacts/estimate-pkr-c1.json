@@ -1,0 +1,8 @@
+{
+  "type": "estimation_record",
+  "phase": "estimate",
+  "unit_id": "PKR-C1",
+  "estimate": { "time_min": 75, "turns": 1, "tokens": null },
+  "observed_at": "2026-07-16T04:33:00Z",
+  "dispatch_ref": "worker-packets/pkr-c1-contract-checker.json"
+}

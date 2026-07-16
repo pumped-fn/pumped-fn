@@ -1,0 +1,24 @@
+{
+  "type": "dkr_acceptance",
+  "unit_id": "DKR-C",
+  "accepted_at": "2026-07-16T04:31:00Z",
+  "accepted_scope": "Reducing discovery only: exact public universe, declaration counts, changeset omissions, and ten contract gap classes.",
+  "checkpoint_ref": "workers/dkr-c-contract/checkpoint.v1.json",
+  "checkpoint_sha256": "c6f6bdeae32f599e8fad7ce16c6095d7cad6af7a6292fb846819c017f803a2ee",
+  "verification_ref": "workers/validator-dkr-c/verification.v1.json",
+  "verification_sha256": "c79f5aee1bda5fbb5435692580098edf2588e2ef89bf58cddb05d0aafaf6b7a7",
+  "accepted_claims": [
+    "26 public packages and 30 export rows with zero missing type targets",
+    "539 public declaration symbols, 75 documented symbols, and 464 inventory gaps",
+    "13 changed public source packages and five changeset omissions",
+    "contract gap classes G1 through G10"
+  ],
+  "rejected_or_blocked_claims": [
+    "public_contract_gap_count remains unreadable until the checker exists",
+    "documentation_example_failure_count remains unreadable across the full public surface",
+    "the TSDoc policy denominator is not defined by the 464-symbol inventory",
+    "CKR-CONTRACT has not passed"
+  ],
+  "downstream_authority": "Fund the contract checker and denominator-policy PKR only; content fixes remain dependent on its independent replay.",
+  "single_llm_truth_acceptance_count": 0
+}

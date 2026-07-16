@@ -1,0 +1,49 @@
+{
+  "type": "worker-report",
+  "schema_version": 1,
+  "worker_id": "validator-dkr-c",
+  "worker_kind": "validator",
+  "unit_id": "DKR-C",
+  "status": "accepted_reducing_discovery",
+  "recorded_at": "2026-07-16T04:24:03Z",
+  "verification_ref": "workers/validator-dkr-c/verification.v1.json",
+  "result": "Exact-head replay accepted the 26-package, 30-export-row, 539-symbol, 464-TSDoc-gap, 13-changed-package, five-changeset-omission, and ten contract-gap-class discovery claims. Aggregate contract and documentation metrics, the missing checker, and the PR snapshot hash remain rejected.",
+  "metrics": {
+    "public_package_count": 26,
+    "public_export_row_count": 30,
+    "public_declaration_symbol_count": 539,
+    "documented_public_symbol_count": 75,
+    "public_api_tsdoc_gap_count": 464,
+    "sdk_public_api_tsdoc_gap_count": 295,
+    "changed_public_source_package_count": 13,
+    "changed_public_source_package_without_changeset_count": 5,
+    "confirmed_contract_gap_class_count": 10
+  },
+  "accepted_status": "reducing_discovery_only",
+  "acceptance_claimed": false,
+  "product_files_changed": false,
+  "rejected": [
+    {
+      "metric": "public_contract_gap_count",
+      "reason": "non-replayable because scripts/check-public-contract.mjs does not exist"
+    },
+    {
+      "metric": "documentation_example_failure_count",
+      "reason": "unsupported because current lint does not measure every public documentation example"
+    },
+    {
+      "metric": "governed_pr_snapshot_integrity",
+      "reason": "non-replayable because no path-backed normalized PR snapshot was supplied"
+    }
+  ],
+  "wall_gate": {
+    "verdict": "blocked",
+    "downstream_advance": "blocked",
+    "reason": "CKR-CONTRACT cannot advance while ten supported gap classes remain and the aggregate checker and governed PR snapshot are absent."
+  },
+  "commanded_lines": [
+    "Action envelope: read-only validation; write only workers/validator-dkr-c/verification.v1.json and progress.finish.json; no product, git, frame, tree, ledger, release, or external-state changes.",
+    "Validation decision: accept supported discovery claims only; reject unsupported or non-replayable aggregate claims; keep CKR-CONTRACT blocked.",
+    "DKRs are discovery-worker scopes; PKRs are progression-worker execution units; there is no CKR worker."
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "packet_version": 1,
+  "worker_id": "dkr-p2-calibration",
+  "unit_id": "DKR-P2",
+  "worker_kind": "discovery",
+  "frame": {
+    "objective": { "metric_id": "release_readiness_gap_count", "target": 0, "comparator": "==" },
+    "frame_ref": ".okra/runs/release-readiness-20260716/frame/frame.v1.json",
+    "tree_ref": ".okra/runs/release-readiness-20260716/tree/tree.v2.json",
+    "source_dkr_ref": ".okra/runs/release-readiness-20260716/artifacts/accept-dkr-p.v2.json",
+    "challenge_ref": ".okra/runs/release-readiness-20260716/workers/challenger-release-tree/review.v1.json"
+  },
+  "active_anti_goals": [
+    "invalid_performance_comparison_count",
+    "unsupported_performance_claim_count",
+    "allocation_regression_case_count",
+    "retained_memory_regression_count",
+    "benchmark_only_production_branch_count",
+    "post_close_live_resource_count",
+    "single_llm_truth_acceptance_count",
+    "anti_goal_bypass_or_dishonesty_count"
+  ],
+  "assignment": "Discovery only. Validate the smallest exact-head clean-build provenance contract; one Node 26 allocation method with known-zero, one-retained-1KiB, and two-retained-1KiB controls; one post-close retained-memory method with negative and positive controls; and the smallest representative workload set containing owned scope.run, managed ctx.exec resource lifecycle, and SDK session.run. Use scratch probes outside product source and at most one exploratory observation per claim. Do not optimize or edit product files. Reject any method whose signal, control ratio, noise denominator, cleanup, or replay path is not deterministic enough.",
+  "budget_and_stop_rule": { "time_min": 75, "turns": 1, "stop": "Stop with accepted/rejected calibration evidence and a minimal row/provenance contract; never repeat until favorable." },
+  "hand_back_rule": "Hand back when a method or row remains policy-dependent. Do not implement the harness, choose a hot path, or make a performance claim.",
+  "output_schema": "Executable DKR checkpoint with raw calibration results, exact commands, hashes, source-backed row choices, accepted/rejected claims, questions, confidence, active walls, and downstream decision. Worker evidence is not acceptance."
+}

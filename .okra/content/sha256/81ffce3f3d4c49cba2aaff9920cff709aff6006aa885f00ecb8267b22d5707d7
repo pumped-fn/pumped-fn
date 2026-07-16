@@ -1,0 +1,406 @@
+{
+  "type": "prior_anti_goal_disposition",
+  "run_id": "release-readiness-20260716",
+  "reviewed_at": "2026-07-16T04:01:38Z",
+  "prior_anti_goal_review_gap_count": 0,
+  "dispositions": [
+    {
+      "candidate_id": "prior:abstraction_level_jump_count",
+      "metric_id": "abstraction_level_jump_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[11]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[24]",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[11]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:anti_goal_bypass_or_dishonesty_count",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[13]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[6]",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[13]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:anti_goal_bypass_or_dishonesty_count_and_single_llm_truth_acceptance_count",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count_and_single_llm_truth_acceptance_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/main-integration-20260712/frame/frame.v1.json#anti_goals[4]"
+      ]
+    },
+    {
+      "candidate_id": "prior:breaking_model_api_change_count",
+      "metric_id": "breaking_model_api_change_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[3]"
+      ]
+    },
+    {
+      "candidate_id": "prior:cleanup_business_state_mutation_count",
+      "metric_id": "cleanup_business_state_mutation_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[2]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[2]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:cross_session_leak_count",
+      "metric_id": "cross_session_leak_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[3]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[3]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:destructive_or_unapproved_action_count",
+      "metric_id": "destructive_or_unapproved_action_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/main-integration-20260712/frame/frame.v1.json#anti_goals[3]"
+      ]
+    },
+    {
+      "candidate_id": "prior:docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+      "metric_id": "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/main-integration-20260712/frame/frame.v1.json#anti_goals[2]"
+      ]
+    },
+    {
+      "candidate_id": "prior:failed_required_gate_count_and_unresolved_review_blocker_count",
+      "metric_id": "failed_required_gate_count_and_unresolved_review_blocker_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/main-integration-20260712/frame/frame.v1.json#anti_goals[1]"
+      ]
+    },
+    {
+      "candidate_id": "prior:hidden_execution_edge_count",
+      "metric_id": "hidden_execution_edge_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[12]"
+      ]
+    },
+    {
+      "candidate_id": "prior:implicit_required_dependency_count",
+      "metric_id": "implicit_required_dependency_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[8]"
+      ]
+    },
+    {
+      "candidate_id": "prior:known_false_positive_fixture_count",
+      "metric_id": "known_false_positive_fixture_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[15]"
+      ]
+    },
+    {
+      "candidate_id": "prior:lost_or_duplicated_work_count",
+      "metric_id": "lost_or_duplicated_work_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/main-integration-20260712/frame/frame.v1.json#anti_goals[0]"
+      ]
+    },
+    {
+      "candidate_id": "prior:non_deterministic_lint_result_count",
+      "metric_id": "non_deterministic_lint_result_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[20]"
+      ]
+    },
+    {
+      "candidate_id": "prior:post_close_live_resource_count",
+      "metric_id": "post_close_live_resource_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[1]"
+      ]
+    },
+    {
+      "candidate_id": "prior:premature_tool_or_mcp_surface_count",
+      "metric_id": "premature_tool_or_mcp_surface_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[4]"
+      ]
+    },
+    {
+      "candidate_id": "prior:primitive_proof_gap_count",
+      "metric_id": "primitive_proof_gap_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[8]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[8]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:provider_execution_bypass_count",
+      "metric_id": "provider_execution_bypass_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[0]"
+      ]
+    },
+    {
+      "candidate_id": "prior:redundant_graph_ceremony_count",
+      "metric_id": "redundant_graph_ceremony_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[13]"
+      ]
+    },
+    {
+      "candidate_id": "prior:rule_suppression_added_for_provider_count",
+      "metric_id": "rule_suppression_added_for_provider_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[17]"
+      ]
+    },
+    {
+      "candidate_id": "prior:rule_without_valid_and_invalid_fixture_count",
+      "metric_id": "rule_without_valid_and_invalid_fixture_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[19]"
+      ]
+    },
+    {
+      "candidate_id": "prior:scope_seam_escape_count",
+      "metric_id": "scope_seam_escape_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[0]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[10]",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[0]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:sensitive_context_export_count",
+      "metric_id": "sensitive_context_export_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[6]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[6]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:single_llm_truth_acceptance_count",
+      "metric_id": "single_llm_truth_acceptance_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[7]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[23]",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[7]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:slop_violation_count",
+      "metric_id": "slop_violation_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[10]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[10]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:touched_file_lint_violation_count",
+      "metric_id": "touched_file_lint_violation_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[7]"
+      ]
+    },
+    {
+      "candidate_id": "prior:touched_surface_regression_count",
+      "metric_id": "touched_surface_regression_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[9]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[5]",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[9]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:unapproved_external_write_count",
+      "metric_id": "unapproved_external_write_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[4]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[4]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:undeclared_effect_edge_count",
+      "metric_id": "undeclared_effect_edge_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[1]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[1]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:undeclared_root_or_permission_grant_count",
+      "metric_id": "undeclared_root_or_permission_grant_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[2]"
+      ]
+    },
+    {
+      "candidate_id": "prior:undocumented_false_negative_class_count",
+      "metric_id": "undocumented_false_negative_class_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[16]"
+      ]
+    },
+    {
+      "candidate_id": "prior:ungoverned_direct_read_count",
+      "metric_id": "ungoverned_direct_read_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[21]"
+      ]
+    },
+    {
+      "candidate_id": "prior:ungoverned_direct_write_count",
+      "metric_id": "ungoverned_direct_write_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[22]"
+      ]
+    },
+    {
+      "candidate_id": "prior:ungoverned_write_or_read_count",
+      "metric_id": "ungoverned_write_or_read_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[12]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[12]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:ungrouped_related_handle_count",
+      "metric_id": "ungrouped_related_handle_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[11]"
+      ]
+    },
+    {
+      "candidate_id": "prior:unrelated_lint_cleanup_path_count",
+      "metric_id": "unrelated_lint_cleanup_path_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[18]"
+      ]
+    },
+    {
+      "candidate_id": "prior:unrequested_builtin_binding_count",
+      "metric_id": "unrequested_builtin_binding_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[9]"
+      ]
+    },
+    {
+      "candidate_id": "prior:unsupported_hypothesis_publish_count",
+      "metric_id": "unsupported_hypothesis_publish_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/issue-triage-session-20260715/frame/frame.v2.json#anti_goals[5]",
+        ".okra/runs/issue-triage-session-20260715/terminal/run-terminal.v1.json",
+        ".okra/runs/session-kernel-ci-node24-20260715/frame/frame.v1.json#anti_goals[5]",
+        ".okra/runs/session-kernel-ci-node24-20260715/terminal/run-terminal.v1.json"
+      ]
+    },
+    {
+      "candidate_id": "prior:unsupported_static_rule_count",
+      "metric_id": "unsupported_static_rule_count",
+      "decision": "keep",
+      "reason": "The major-release contract, runtime, provider, lint, documentation, benchmark, or governed-evidence surface remains in context; retain the wall in the full frame and activate it only on matching work.",
+      "source_refs": [
+        ".okra/runs/managed-agent-sessions-20260713/frame/frame.v2.json#anti_goals[14]"
+      ]
+    }
+  ]
+}

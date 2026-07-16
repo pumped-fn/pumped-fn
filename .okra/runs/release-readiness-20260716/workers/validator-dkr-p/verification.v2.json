@@ -1,0 +1,161 @@
+{
+  "verification_id": "validator-dkr-p.v2.2026-07-16T04:29:59Z",
+  "worker_id": "validator-dkr-p",
+  "worker_kind": "verification",
+  "unit_id": "DKR-P",
+  "checkpoint_ref": "workers/dkr-p-performance/checkpoint.v2.json",
+  "checkpoint_sha256": "8be366b3da42ae49db0a3b1d77bd4d111892f258115b5e6ca029cd27d6c63db9",
+  "observed_at": "2026-07-16T04:29:59Z",
+  "checkpoint_freshness": {
+    "observed_at": "2026-07-16T04:20:30Z",
+    "validated_at": "2026-07-16T04:29:59Z",
+    "age_seconds": 569,
+    "max_age_seconds": 600,
+    "decision": "accepted"
+  },
+  "audit_traces": [
+    {
+      "claim_id": "exact-head-no-product-change",
+      "check": "HEAD is the declared exact commit and the DKR changed no tracked or cached product file",
+      "threshold": "HEAD 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162 and both product diff exits 0",
+      "value": "HEAD 7bf966e66b914cfe877ff5ee8d1990ca3bf3d162; tracked product diff 0; cached product diff 0",
+      "source_of_truth": "git object database and worktree",
+      "replay": "git rev-parse HEAD; git diff --quiet -- . ':(exclude).okra'; git diff --cached --quiet -- . ':(exclude).okra'",
+      "exit_code": 0,
+      "sha256": [],
+      "observed_at": "2026-07-16T04:29:59Z",
+      "decision": "accepted",
+      "evidence": [
+        "7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+        "tracked_product_diff_exit=0",
+        "cached_product_diff_exit=0"
+      ]
+    },
+    {
+      "claim_id": "exact-throughput-row-count",
+      "check": "The manifest contains exactly 39 Lite rows and 8 Lite React rows and only hz and p75 metrics",
+      "threshold": "Lite=39, Lite React=8, metrics=[hz,p75]",
+      "value": "Lite=39, Lite React=8, metrics=[hz,p75]",
+      "source_of_truth": "benchmarks/lite-perf/rows.json",
+      "replay": "jq '{lite_count:(.lanes.lite.rows|length),lite_react_count:(.lanes[\"lite-react\"].rows|length),metrics:([.lanes[].rows[].metric]|unique)}' benchmarks/lite-perf/rows.json",
+      "exit_code": 0,
+      "sha256": [
+        "ac05933d183c007da10bada0e45f20919acd34631b07c05daff9b9dafa5fdcc9"
+      ],
+      "observed_at": "2026-07-16T04:29:59Z",
+      "decision": "accepted",
+      "evidence": [
+        "lite_count=39",
+        "lite_react_count=8",
+        "metrics=hz,p75"
+      ]
+    },
+    {
+      "claim_id": "deterministic-harness-result",
+      "check": "The deterministic harness passes 14 of 14 tests with 0 failures and collects no benchmark sample",
+      "threshold": "14 passed, 0 failed, 0 benchmark capture commands",
+      "value": "14 passed, 0 failed, 0 benchmark capture commands",
+      "source_of_truth": "benchmarks/lite-perf/scripts/harness.test.mjs",
+      "replay": "pnpm --dir benchmarks/lite-perf perf:test",
+      "exit_code": 0,
+      "sha256": [
+        "218d16dcaa959d0b7d57ef743cdb71429b0bbd20f6fbb29f47e1cc9511108197"
+      ],
+      "observed_at": "2026-07-16T04:29:59Z",
+      "decision": "accepted",
+      "evidence": [
+        "tests 14",
+        "pass 14",
+        "fail 0",
+        "The replay invoked harness.test.mjs and no record or capture command"
+      ]
+    },
+    {
+      "claim_id": "missing-owned-session-and-measurement-fields",
+      "check": "The manifest lacks scope.run, session.run, owned-resource, and retained-memory workload rows and lacks allocation and retained-memory measurement rows or observation fields",
+      "threshold": "0 matching workload rows, 0 allocation measurement metrics, 0 retained measurement metrics, 0 measurement fields",
+      "value": "0 matching workload rows, 0 allocation measurement metrics, 0 retained measurement metrics, 0 measurement fields",
+      "source_of_truth": "benchmarks/lite-perf/rows.json",
+      "replay": "jq workload-name, metric-kind, allocation-name, and recursive measurement-field audit of benchmarks/lite-perf/rows.json",
+      "exit_code": 0,
+      "sha256": [
+        "ac05933d183c007da10bada0e45f20919acd34631b07c05daff9b9dafa5fdcc9"
+      ],
+      "observed_at": "2026-07-16T04:29:59Z",
+      "decision": "accepted",
+      "evidence": [
+        "missing_workload_matches=0",
+        "allocation_measurement_metric_count=0",
+        "retained_measurement_metric_count=0",
+        "measurement_field_paths=[]",
+        "The existing object literal allocation row uses metric hz; it is an allocation-named throughput exercise, not an allocation measurement row"
+      ]
+    },
+    {
+      "claim_id": "missing-allocation-and-retained-checkers",
+      "check": "No executable allocation or retained-memory measurement checker is available",
+      "threshold": "0 checker paths, 0 checker-content matches, 0 package-script matches",
+      "value": "0 checker paths, 0 checker-content matches, 0 package-script matches",
+      "source_of_truth": "Repository filesystem excluding .git, .okra, node_modules, and dist; all package.json scripts",
+      "replay": "Fresh deterministic filesystem, checker-content, and package-script audit for allocation sampling, retained-memory, heap-profile, and heap-snapshot measurement checkers",
+      "exit_code": 0,
+      "sha256": [],
+      "observed_at": "2026-07-16T04:29:59Z",
+      "decision": "accepted",
+      "evidence": [
+        "checker_path_match_count=0",
+        "checker_content_match_count=0",
+        "package_script_match_count=0",
+        "This accepts only the absence fact; it does not accept either proposed measurement design"
+      ]
+    },
+    {
+      "claim_id": "ignored-dist-provenance-gap",
+      "check": "Lite and Lite React dist artifacts are ignored, predate exact HEAD, and lack a tracked exact-head clean-build provenance record",
+      "threshold": "Both files ignored, both mtimes before HEAD commit time, tracked dist file count 0",
+      "value": "Both files ignored, both mtimes before HEAD commit time, tracked dist file count 0",
+      "source_of_truth": ".gitignore, git HEAD, pkg/core/lite/dist/index.mjs, and pkg/react/lite-react/dist/index.mjs",
+      "replay": "git show HEAD timestamp; git check-ignore; stat both dist files; git ls-files both dist trees",
+      "exit_code": 0,
+      "sha256": [
+        "3d9de6048050dbc8e5beba486a9bfb3c30836093552043123cb2f73eb1155056",
+        "cc3701336f0f07abf1e50a637755335c50d3b8fed3a476bd605b976fe82ae136"
+      ],
+      "observed_at": "2026-07-16T04:29:59Z",
+      "decision": "accepted",
+      "evidence": [
+        "HEAD commit_time=2026-07-15T13:35:29Z",
+        ".gitignore:300:dist pkg/core/lite/dist/index.mjs",
+        ".gitignore:300:dist pkg/react/lite-react/dist/index.mjs",
+        "Lite dist mtime=2026-07-15T13:26:24Z",
+        "Lite React dist mtime=2026-07-15T03:05:17Z",
+        "tracked_dist_file_count=0"
+      ]
+    }
+  ],
+  "acceptance_boundary": {
+    "source_of_truth": "workers/dkr-p-performance/checkpoint.v2.json",
+    "replay": "jq explicit hypothesis-status, result-advance, wall-advance, improvement-claim, and fail-closed fields",
+    "exit_code": 0,
+    "measurement_design": "unaccepted",
+    "missing_row_set": "unaccepted",
+    "candidate_order_and_risk": "unaccepted",
+    "baseline_process": "unaccepted",
+    "improvement_claim_status": "blocked",
+    "checkpoint_accepted_reducing_discovery": false,
+    "ckr_performance_advance": "blocked",
+    "optimization_advance": "blocked",
+    "wall_ckr_performance_advance": "blocked",
+    "wall_optimization_advance": "blocked",
+    "fail_closed": true,
+    "decision": "accepted"
+  },
+  "summary": {
+    "accepted": 6,
+    "rejected": 0,
+    "rejected_claim_ids": [],
+    "decision": "accepted_reducing_discovery",
+    "accepted_scope": "Six factual conclusion claims only",
+    "unaccepted_scope": "Measurement designs, exact missing-row set, candidate ranking and risk, baseline process, performance claim, CKR performance advance, and optimization advance"
+  }
+}

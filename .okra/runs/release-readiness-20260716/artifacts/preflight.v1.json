@@ -1,0 +1,10 @@
+{
+  "type": "preflight",
+  "transport": "sequential",
+  "subagents": false,
+  "detected_via": "fallback:no-known-subagent-env",
+  "cross_model_writer": "codex-cli",
+  "actual_runtime_transport": "generic_subagents",
+  "actual_runtime_detected_via": "collaboration tools exposed by the runtime",
+  "note": "The helper cannot detect the collaboration transport; the raw verdict is preserved and the runtime capability is recorded separately."
+}

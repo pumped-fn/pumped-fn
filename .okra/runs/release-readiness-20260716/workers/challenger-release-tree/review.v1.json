@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "review_id": "challenger-release-tree.v1.2026-07-16T04:32:31Z",
+  "worker_id": "challenger-release-tree",
+  "worker_kind": "challenger",
+  "exact_head": "7bf966e66b914cfe877ff5ee8d1990ca3bf3d162",
+  "observed_at": "2026-07-16T04:32:31Z",
+  "objective_intent": "Make PR 346 release-ready only when contract gaps, release-gate failures, performance misses, and active anti-goal breaches all reach zero on the exact head.",
+  "hypothesis_registry_status": "No formal hypothesis records exist in the frame or tree. These verdicts reconstruct the live hypotheses from DKR checkpoints; any additional implied hypothesis is drifted by default.",
+  "forced_verdicts": [
+    {
+      "hypothesis_id": "H-C-INVENTORY",
+      "claim": "The public universe is 26 packages and 30 export rows, with ten proven contract-gap classes.",
+      "verdict": "intact",
+      "evidence": [
+        "workers/dkr-c-contract/checkpoint.v1.json",
+        "workers/validator-dkr-c/verification.v1.json#claims",
+        "git:7bf966e66b914cfe877ff5ee8d1990ca3bf3d162"
+      ],
+      "reason": "Independent replay accepted the universe, declaration counts, changeset coverage, and G1-G10."
+    },
+    {
+      "hypothesis_id": "H-C-CHECKER",
+      "claim": "The proposed contract checker makes public_contract_gap_count and documentation_example_failure_count readable.",
+      "verdict": "drifted",
+      "evidence": [
+        "workers/dkr-c-contract/checkpoint.v1.json#replay_command_or_checker",
+        "workers/validator-dkr-c/verification.v1.json#claims[DKR-C-PUBLIC-CONTRACT-GAP-TOTAL]",
+        "workers/validator-dkr-c/verification.v1.json#claims[DKR-C-DOCUMENTATION-EXAMPLE-FAILURE-TOTAL]"
+      ],
+      "reason": "scripts/check-public-contract.mjs does not exist. Both aggregate metrics remain null."
+    },
+    {
+      "hypothesis_id": "H-C-TSDOC-464",
+      "claim": "All 464 exported symbols without TSDoc are required documentation gaps.",
+      "verdict": "drifted",
+      "evidence": [
+        "workers/dkr-c-contract/checkpoint.v1.json#metrics",
+        "workers/validator-dkr-c/verification.v1.json#claims[DKR-C-TSDOC-COUNTS]",
+        "pkg/core/README.md:22",
+        "frame/frame.v1.json#ckrs[CKR-CONTRACT]"
+      ],
+      "reason": "The count 464 is independently supported. The required denominator is not. Repository policy says TSDoc belongs where exported types need it, while the frame names public API gaps. Treating every compiler export as required would invent policy and likely create slop.",
+      "required_correction": "The checker must separately report all exported symbols lacking TSDoc and symbols inside an explicitly defined public-interface denominator lacking TSDoc. Until that denominator is source-backed, public_api_tsdoc_gap_count stays null and fails closed. No exemption may be invented merely to lower the count."
+    },
+    {
+      "hypothesis_id": "H-C-CONTENT-NOW",
+      "claim": "The known contract content fixes can descend in parallel before the checker policy exists.",
+      "verdict": "drifted",
+      "evidence": [
+        "workers/validator-dkr-c/verification.v1.json#wall_gate",
+        "frame/frame.v1.json#metric_contracts"
+      ],
+      "reason": "Individual gaps are real, but the aggregate checker, example denominator, PR snapshot, and TSDoc policy are missing. Parallel edits now could move content without creating the required measurement seam."
+    },
+    {
+      "hypothesis_id": "H-P-MISSING-SURFACE",
+      "claim": "Current performance coverage lacks owned lifecycle, SDK session, allocation, retained-memory, and exact-head build provenance.",
+      "verdict": "intact",
+      "evidence": [
+        "workers/validator-dkr-p/verification.v2.json#audit_traces[missing-owned-session-and-measurement-fields]",
+        "workers/validator-dkr-p/verification.v2.json#audit_traces[ignored-dist-provenance-gap]",
+        "workers/dkr-p-performance/checkpoint.v2.json#conclusion_claims"
+      ],
+      "reason": "These absence claims were independently replayed. The current manifest has only hz and p75 observations."
+    },
+    {
+      "hypothesis_id": "H-P-PROTOCOL",
+      "claim": "DKR-P v1 defines a valid allocation and retained-memory protocol.",
+      "verdict": "drifted",
+      "evidence": [
+        "workers/validator-dkr-p/verification.v2.json#acceptance_boundary",
+        "workers/dkr-p-performance/checkpoint.v2.json#unaccepted_hypotheses_for_followup_discovery.measurement_design"
+      ],
+      "reason": "No executable calibration checker validates the method, controls, noise rule, denominator, pairing, or fallback. Validator v2 accepts only the absence of such checkers."
+    },
+    {
+      "hypothesis_id": "H-P-ROWS",
+      "claim": "DKR-P v1 identifies the accepted representative row set.",
+      "verdict": "drifted",
+      "evidence": [
+        "workers/dkr-p-performance/checkpoint.v2.json#unaccepted_hypotheses_for_followup_discovery.missing_row_set",
+        "workers/validator-dkr-p/verification.v2.json#acceptance_boundary"
+      ],
+      "reason": "Only the absence boundary is supported. Exact row IDs and representative versus supplementary roles remain unaccepted."
+    },
+    {
+      "hypothesis_id": "H-P-RANKING",
+      "claim": "The six source candidates are ranked strongly enough to select an optimization.",
+      "verdict": "dead",
+      "evidence": [
+        "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_candidate_ranking]",
+        "workers/dkr-p-performance/checkpoint.v2.json#unaccepted_hypotheses_for_followup_discovery.candidate_order_and_risk",
+        "workers/validator-dkr-p/verification.v2.json#acceptance_boundary"
+      ],
+      "reason": "Source operations exist, but no profile, sample, frequency evidence, or deterministic risk read supports their order."
+    },
+    {
+      "hypothesis_id": "H-P-BASELINE",
+      "claim": "The immutable baseline procedure is ready for implementation.",
+      "verdict": "drifted",
+      "evidence": [
+        "workers/dkr-p-performance/checkpoint.v2.json#unaccepted_hypotheses_for_followup_discovery.baseline_process",
+        "workers/validator-dkr-p/verification.v2.json#acceptance_boundary"
+      ],
+      "reason": "The ignored-dist provenance gap is proven. The replacement build and artifact-freezing procedure is not."
+    },
+    {
+      "hypothesis_id": "H-P-FUND-IMPLEMENTATION",
+      "claim": "DKR-P is complete enough to fund measurement implementation despite unaccepted protocol and rows.",
+      "verdict": "drifted",
+      "evidence": [
+        "workers/validator-dkr-p/verification.v2.json#summary",
+        "workers/validator-dkr-p/verification.v2.json#acceptance_boundary",
+        "workers/dkr-p-performance/checkpoint.v2.json#wall_gate",
+        "frame/frame.v1.json#action_envelope.approval_gates"
+      ],
+      "reason": "Validator v2 accepted all six narrowed factual conclusion claims as reducing discovery. That accepted boundary funds only a new calibration and row-selection DKR. Measurement implementation, CKR performance advance, and optimization remain blocked because the protocol, exact row set, baseline procedure, and candidate ranking remain unaccepted."
+    },
+    {
+      "hypothesis_id": "H-P-OPTIMIZE-NOW",
+      "claim": "Optimization should be the next descent.",
+      "verdict": "dead",
+      "evidence": [
+        "workers/dkr-p-performance/checkpoint.v2.json#wall_gate",
+        "workers/validator-dkr-p/verification.v2.json#acceptance_boundary",
+        "workers/validator-dkr-p/verification.v1.json#audit_traces[dkr_p_candidate_ranking]"
+      ],
+      "reason": "There is no accepted workload, baseline, allocation checker, retained-memory checker, or ranked hot path."
+    }
+  ],
+  "contribution_reviews": [
+    {
+      "node_id": "DKR-C",
+      "node_kind": "DKR",
+      "verdict": "reshape",
+      "contribution": "Keep the independently accepted public-universe and G1-G10 discovery. Narrow the next unit to the deterministic checker and denominator policy.",
+      "simpler_alternative": "Implement one manifest-driven checker that first reports export resolution, package docs, migration, changeset, PR-head integrity, and two separate TSDoc inventories. Keep unresolved policy-derived metrics null.",
+      "anti_goal_effects": {
+        "helps": [
+          "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+          "context_argument_pass_count",
+          "single_llm_truth_acceptance_count"
+        ],
+        "risks": [
+          "unsupported_static_rule_count if the TSDoc denominator is invented",
+          "slop_violation_count if 464 comments are added mechanically",
+          "abstraction_level_jump_count if the checker becomes a general documentation framework"
+        ]
+      }
+    },
+    {
+      "node_id": "DKR-P",
+      "node_kind": "DKR",
+      "verdict": "reshape",
+      "contribution": "Keep the six independently accepted absence and provenance findings. Continue discovery until the calibration protocol, representative rows, and immutable baseline procedure are independently accepted.",
+      "simpler_alternative": "Validate one measurement class at a time: exact-head artifact provenance, then one calibration checker with known-zero and known-allocation controls, then one owned lifecycle candidate and one SDK session candidate. Do not rank production code yet.",
+      "anti_goal_effects": {
+        "helps": [
+          "invalid_performance_comparison_count",
+          "unsupported_performance_claim_count",
+          "single_llm_truth_acceptance_count"
+        ],
+        "risks": [
+          "allocation_regression_case_count if an uncalibrated sampler is accepted",
+          "retained_memory_regression_count if close and disposal are not part of the workload",
+          "benchmark_only_production_branch_count if optimization begins before measurement"
+        ]
+      }
+    },
+    {
+      "node_id": "CKR-CONTRACT",
+      "node_kind": "CKR",
+      "verdict": "reshape",
+      "contribution": "The contribution remains aligned, but its metric contract is incomplete until public-interface and documentation-example denominators are deterministic.",
+      "simpler_alternative": "Make checker policy the first PKR. Keep independently proven content gaps as queued slices. Start parallel content fixes only after the checker can read their before and after state.",
+      "anti_goal_effects": {
+        "helps": [
+          "docs_code_contract_mismatch_count_and_prime_rationale_violation_count",
+          "failed_required_gate_count_and_unresolved_review_blocker_count"
+        ],
+        "risks": [
+          "slop_violation_count from blanket TSDoc generation",
+          "touched_surface_regression_count from parallel edits without a readable baseline"
+        ]
+      }
+    },
+    {
+      "node_id": "CKR-PERFORMANCE",
+      "node_kind": "CKR",
+      "verdict": "keep",
+      "contribution": "The throughput and allocation targets remain aligned with release readiness. The CKR stays blocked until its representative workload and measurement contracts exist.",
+      "simpler_alternative": "Do not optimize. Run a reducing measurement-calibration DKR, independently validate it, then descend into measurement implementation before selecting any hot path.",
+      "anti_goal_effects": {
+        "helps": [
+          "unsupported_performance_claim_count",
+          "existing_row_confirmed_regression_count"
+        ],
+        "risks": [
+          "invalid_performance_comparison_count if exact rows or protocol are chosen by convenience",
+          "cleanup_business_state_mutation_count and post_close_live_resource_count if lifecycle workloads omit complete cleanup"
+        ]
+      }
+    }
+  ],
+  "next_descent": {
+    "decision": "contract_checker_first",
+    "sequence": [
+      "contract checker and denominator policy",
+      "independent replay",
+      "contract content fixes in parallel",
+      "accepted measurement-calibration and row-selection DKR",
+      "measurement implementation",
+      "optimization"
+    ],
+    "performance_parallel_boundary": "Validator v2 accepts reducing discovery only. A new calibration and row-selection DKR may run in parallel, but measurement implementation and optimization remain blocked.",
+    "tsdoc_boundary": "Do not start blanket 464-symbol TSDoc work before the checker defines the source-backed public-interface denominator."
+  },
+  "validator_dkr_p_v2": {
+    "verification_ref": "workers/validator-dkr-p/verification.v2.json",
+    "sha256": "06da2c016d0ea082fb2037a7abdd4a7285668e6e68ad7c5bd359d889ef60dbed",
+    "accepted_claim_count": 6,
+    "rejected_claim_count": 0,
+    "decision": "accepted_reducing_discovery",
+    "acceptance_boundary": "Six narrowed factual conclusion claims only; measurement design, exact rows, candidate ranking, baseline process, CKR performance advance, and optimization remain unaccepted or blocked."
+  },
+  "product_files_changed": false
+}
