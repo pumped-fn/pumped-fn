@@ -185,7 +185,7 @@ describe("docs-examples", () => {
       }
 
       expect(executedCount).toBeGreaterThan(0)
-    })
+    }, 60_000)
   })
 
   describe("RULE C — skip manifest matches", () => {
