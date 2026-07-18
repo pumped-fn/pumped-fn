@@ -6,6 +6,10 @@
 
 - 55b7d92: Remove the text-only `pumped-lite` CLI. The Lite package no longer installs a bin entry; use the package documentation directly.
 
+- Atom lifecycle generations now own their pending factory and cleanup list. Release waits for pending
+  settlement and late cleanup registration, invalidation detaches cleanup before re-entry, and listener
+  failures surface only after the transition and sibling notifications finish.
+
 ## 4.0.0
 
 ### Major Changes

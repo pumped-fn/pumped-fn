@@ -5,6 +5,14 @@ resolved value is a registration (`{ trigger, next, stop }`) against a pluggable
 This package does not import or ship a durable backend — only an in-process, non-persistent one for
 dev/test.
 
+## Migration to 1.0.0
+
+Install 1.0 with Lite 6:
+
+```bash
+npm install @pumped-fn/lite@^6.0.0 @pumped-fn/lite-extension-scheduler@^1.0.0
+```
+
 ## Contract
 
 ```ts

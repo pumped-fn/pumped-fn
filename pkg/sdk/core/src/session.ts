@@ -279,7 +279,6 @@ export interface ToolRegistry {
 export interface BranchRegistry {
   current(): BranchRecord
   fork(input: { id: BranchId; parentId: BranchId; workId: WorkId; authority: AuthorityConstraints }): BranchRecord
-  record(branch: BranchRecord): void
 }
 
 /** Tracks invocation start and terminal settlement by invocation identity. */
@@ -291,11 +290,6 @@ export interface InvocationRegistry {
 /** Records artifacts published within the session boundary. */
 export interface ArtifactRegistry {
   record(value: ArtifactRef): ArtifactRef
-}
-
-/** Records memory entries within the session boundary. */
-export interface MemoryRegistry {
-  record(value: MemoryRef): MemoryRef
 }
 
 /** Stores opaque provider continuation tokens by provider key. */
@@ -324,7 +318,6 @@ export interface SessionRuntime {
   readonly controls: ControlRegistry
   readonly invocations: InvocationRegistry
   readonly artifacts: ArtifactRegistry
-  readonly memory: MemoryRegistry
   readonly continuations: ProviderContinuationRegistry
   snapshot(status: SessionRecord["status"]): SessionRecord
   deactivate(): Promise<void>
@@ -696,6 +689,180 @@ function upsertVersioned<T extends { readonly id: string; readonly version: numb
   return Object.freeze([...values.filter((item) => item.id !== value.id), Object.freeze(value)])
 }
 
+function normalizeEvidence(values: readonly EvidenceRef[]): readonly EvidenceRef[] {
+  return Object.freeze(values.map((value) => Object.freeze({
+    id: normalized(value.id),
+    kind: normalized(value.kind),
+    ...(value.digest === undefined ? {} : { digest: normalized(value.digest) }),
+  })))
+}
+
+function sameEvidence(left: readonly EvidenceRef[], right: readonly EvidenceRef[]): boolean {
+  return left.length === right.length && left.every((value, index) => {
+    const expected = right[index]!
+    return value.id === expected.id && value.kind === expected.kind && value.digest === expected.digest
+  })
+}
+
+function validatedAuthority(value: Authority, label: string): Authority {
+  const canonical = createAuthority(value)
+  if (!constantEqual(canonical.fingerprint, value.fingerprint)) throw new TypeError(`${label} fingerprint is invalid`)
+  return canonical
+}
+
+function assertAuthorityWithin(value: Authority, parent: Authority, label: string): void {
+  if (value.tenant !== parent.tenant) throw new TypeError(`${label} tenant exceeds its parent`)
+  let narrowed: Authority
+  try {
+    narrowed = narrowAuthority(parent, {
+      roots: value.roots,
+      permissions: value.permissions,
+      tools: value.tools,
+      sandbox: value.sandbox,
+    })
+  } catch {
+    throw new TypeError(`${label} exceeds its parent`)
+  }
+  if (!sameAuthority(narrowed, value)) throw new TypeError(`${label} exceeds its parent`)
+}
+
+function uniqueBy<T>(values: readonly T[], key: (value: T) => string, label: string): Map<string, T> {
+  const result = new Map<string, T>()
+  for (const value of values) {
+    const id = key(value)
+    if (result.has(id)) throw new TypeError(`Session record has duplicate ${label} ${id}`)
+    result.set(id, value)
+  }
+  return result
+}
+
+function assertAcyclic<T>(values: ReadonlyMap<string, T>, parent: (value: T) => string | undefined, label: string): void {
+  for (const [id, value] of values) {
+    const seen = new Set([id])
+    let parentId = parent(value)
+    while (parentId !== undefined) {
+      if (seen.has(parentId)) throw new TypeError(`Session record has cyclic ${label} lineage at ${id}`)
+      seen.add(parentId)
+      const parentValue = values.get(parentId)
+      if (!parentValue) throw new TypeError(`Session record ${label} ${id} has missing parent ${parentId}`)
+      parentId = parent(parentValue)
+    }
+  }
+}
+
+function validateSessionRecord(input: SessionRecord, supplied: Authority): SessionRecord {
+  const authority = validatedAuthority(supplied, "Session authority")
+  const stored = createAuthority(input.authorityConstraints)
+  if (
+    !constantEqual(authority.fingerprint, input.authorityFingerprint)
+    || !constantEqual(stored.fingerprint, input.authorityFingerprint)
+    || !sameAuthority(authority, stored)
+  ) throw new TypeError("Session record authority does not match its bound authority")
+
+  const branches = Object.freeze(input.branches.map((branch) => {
+    const branchAuthority = validatedAuthority(branch.authority, `Branch ${branch.id} authority`)
+    if (!constantEqual(branchAuthority.fingerprint, branch.authorityFingerprint)) {
+      throw new TypeError(`Branch ${branch.id} authority fingerprint is invalid`)
+    }
+    return Object.freeze({ ...branch, authority: branchAuthority, evidence: normalizeEvidence(branch.evidence) })
+  }))
+  const work = Object.freeze(input.work.map((value) => Object.freeze({
+    ...value,
+    authority: validatedAuthority(value.authority, `Work ${value.id} authority`),
+  })))
+  const branchById = uniqueBy(branches, (value) => value.id, "branch")
+  const workById = uniqueBy(work, (value) => value.id, "work")
+  if (!branchById.has(input.currentBranchId)) throw new TypeError(`Current branch ${input.currentBranchId} does not exist`)
+  assertAcyclic(branchById, (value) => value.parentId, "branch")
+  assertAcyclic(workById, (value) => value.parentId, "work")
+  const roots = branches.filter((value) => value.parentId === undefined)
+  if (roots.length !== 1) throw new TypeError("Session record must have exactly one root branch")
+
+  for (const branch of branches) {
+    if (branch.parentId === undefined) {
+      if (!sameAuthority(branch.authority, authority)) throw new TypeError(`Root branch ${branch.id} authority does not match the session`)
+      continue
+    }
+    const parent = branchById.get(branch.parentId)!
+    const creator = workById.get(branch.createdBy)
+    if (!creator || creator.branchId !== parent.id) throw new TypeError(`Branch ${branch.id} creator is not on parent branch ${parent.id}`)
+    assertAuthorityWithin(branch.authority, creator.authority, `Branch ${branch.id} authority`)
+  }
+
+  for (const value of work) {
+    const branch = branchById.get(value.branchId)
+    if (!branch) throw new TypeError(`Work ${value.id} branch ${value.branchId} does not exist`)
+    const parent = value.parentId === undefined ? undefined : workById.get(value.parentId)
+    if (value.parentId !== undefined && (!parent || parent.branchId !== value.branchId)) {
+      throw new TypeError(`Work ${value.id} parent is not on branch ${value.branchId}`)
+    }
+    assertAuthorityWithin(value.authority, parent?.authority ?? branch.authority, `Work ${value.id} authority`)
+  }
+
+  const attempts = Object.freeze(input.attempts.map((value) => Object.freeze({ ...value })))
+  uniqueBy(attempts, (value) => `${value.workId}:${value.attempt}`, "attempt")
+  for (const value of attempts) {
+    if (!workById.has(value.workId)) throw new TypeError(`Attempt ${value.workId}:${value.attempt} has missing work`)
+  }
+  const invocations = Object.freeze(input.invocations.map((value) => Object.freeze({ ...value })))
+  uniqueBy(invocations, (value) => value.id, "invocation")
+  uniqueBy(invocations, (value) => value.idempotencyKey, "invocation idempotency key")
+  for (const value of invocations) {
+    if (!attempts.some((attempt) => attempt.workId === value.workId && attempt.attempt === value.attempt)) {
+      throw new TypeError(`Invocation ${value.id} has missing attempt`)
+    }
+  }
+
+  const artifacts = Object.freeze(input.artifacts.map((value) => Object.freeze({ ...value })))
+  uniqueBy(artifacts, (value) => value.id, "artifact")
+  for (const value of artifacts) {
+    const owner = workById.get(value.workId)
+    if (!owner || owner.branchId !== value.branchId || owner.authority.fingerprint !== value.authorityFingerprint) {
+      throw new TypeError(`Artifact ${value.id} has invalid ownership`)
+    }
+  }
+  const validMemoryAuthorities = new Set<string>([
+    authority.fingerprint,
+    ...branches.map((value) => value.authority.fingerprint),
+    ...work.map((value) => value.authority.fingerprint),
+  ])
+  const memory = Object.freeze(input.memory.map((value) => Object.freeze({
+    ...value,
+    evidence: normalizeEvidence(value.evidence),
+  })))
+  uniqueBy(memory, (value) => value.id, "memory")
+  for (const value of memory) {
+    if (!validMemoryAuthorities.has(value.authorityFingerprint)) throw new TypeError(`Memory ${value.id} has invalid authority`)
+  }
+  const schedules = Object.freeze(input.schedules.map((value) => Object.freeze({ ...value })))
+  uniqueBy(schedules, (value) => value.id, "schedule")
+  for (const value of schedules) {
+    if (!workById.has(value.workId)) throw new TypeError(`Schedule ${value.id} has missing work`)
+  }
+
+  return Object.freeze({
+    ...input,
+    authorityFingerprint: authority.fingerprint,
+    authorityConstraints: authority,
+    branches,
+    work,
+    attempts,
+    invocations,
+    artifacts,
+    memory,
+    schedules,
+    providerContinuations: Object.freeze({ ...input.providerContinuations }),
+  })
+}
+
+const memoryWriters = new WeakMap<SessionRuntime, (value: MemoryRef) => MemoryRef>()
+
+function recordMemory(runtime: SessionRuntime, value: MemoryRef): MemoryRef {
+  const write = memoryWriters.get(runtime)
+  if (!write) throw new TypeError("Session memory writer is unavailable")
+  return write(value)
+}
+
 function isSettled(status: WorkRecord["status"]): boolean {
   return status === "completed" || status === "failed" || status === "cancelled"
 }
@@ -707,6 +874,7 @@ class Runtime implements SessionRuntime {
   #deactivation: Promise<void> | undefined
   #finish: Promise<void> | undefined
   #completion: Promise<SessionRecord> | undefined
+  #completionReady = false
   #active = new Map<string, {
     readonly value: ActiveAttempt
     readonly controller: AbortController
@@ -724,11 +892,10 @@ class Runtime implements SessionRuntime {
   readonly controls: ControlRegistry
   readonly invocations: InvocationRegistry
   readonly artifacts: ArtifactRegistry
-  readonly memory: MemoryRegistry
   readonly continuations: ProviderContinuationRegistry
 
   constructor(record: SessionRecord, readonly authority: Authority, private readonly clock: Clock) {
-    this.#record = record
+    this.#record = validateSessionRecord(record, authority)
     this.#status = record.status
 
     this.work = Object.freeze({
@@ -772,9 +939,11 @@ class Runtime implements SessionRuntime {
       current: () => this.branch(this.#record.currentBranchId),
       fork: (input: { id: BranchId; parentId: BranchId; workId: WorkId; authority: AuthorityConstraints }) => {
         this.assertOpenMutation()
-        this.branch(input.parentId)
+        const parent = this.branch(input.parentId)
+        const creator = this.workRecord(input.workId)
+        if (creator.branchId !== parent.id) throw new Error(`Work ${creator.id} is not on branch ${parent.id}`)
         if (this.#record.branches.some((item) => item.id === input.id)) throw new Error(`Branch ${input.id} already exists`)
-        const child = narrowAuthority(this.branch(input.parentId).authority, input.authority)
+        const child = narrowAuthority(creator.authority, input.authority)
         const branch = Object.freeze({
           id: input.id,
           parentId: input.parentId,
@@ -786,13 +955,6 @@ class Runtime implements SessionRuntime {
         })
         this.#record = Object.freeze({ ...this.#record, branches: Object.freeze([...this.#record.branches, branch]) })
         return branch
-      },
-      record: (branch: BranchRecord) => {
-        this.assertOpenMutation()
-        this.#record = Object.freeze({
-          ...this.#record,
-          branches: Object.freeze([...this.#record.branches.filter((item) => item.id !== branch.id), Object.freeze(branch)]),
-        })
       },
     })
 
@@ -829,6 +991,14 @@ class Runtime implements SessionRuntime {
         this.assertOpenMutation()
         if (this.#record.invocations.some((item) => item.id === record.id)) {
           throw new Error(`Invocation ${record.id} already exists`)
+        }
+        const work = this.workRecord(record.workId)
+        const key = this.attemptKey(record.workId, record.attempt)
+        if (work.attempt !== record.attempt || work.status !== "working" || !this.#active.has(key)) {
+          throw new Error(`Attempt ${key} is not active`)
+        }
+        if (this.#record.invocations.some((item) => item.idempotencyKey === record.idempotencyKey)) {
+          throw new Error(`Invocation idempotency key ${record.idempotencyKey} already exists`)
         }
         const started = Object.freeze({
           id: record.id,
@@ -869,14 +1039,14 @@ class Runtime implements SessionRuntime {
       return value
     } })
 
-    this.memory = Object.freeze({ record: (value: MemoryRef) => {
+    memoryWriters.set(this, (value: MemoryRef) => {
       this.assertOpenMutation()
       this.#record = Object.freeze({
         ...this.#record,
         memory: upsertVersioned(this.#record.memory, value),
       })
       return value
-    } })
+    })
 
     this.continuations = Object.freeze({
       get: (key: string) => this.#record.providerContinuations[key],
@@ -945,6 +1115,8 @@ class Runtime implements SessionRuntime {
   }
 
   completeFinish(version: number): void {
+    if (!this.#completionReady) throw new Error("Session completion is not authorized")
+    this.#completionReady = false
     this.#status = "finished"
     this.#record = Object.freeze({ ...this.#record, status: "finished", version })
   }
@@ -954,6 +1126,10 @@ class Runtime implements SessionRuntime {
     if (this.#activation !== "active") {
       return Promise.reject(new Error(`Session activation is ${this.#activation}`))
     }
+    const live = this.#record.invocations.find(
+      (invocation) => invocation.status === "working" || invocation.status === "quarantined",
+    )
+    if (live) return Promise.reject(new Error(`Invocation ${live.id} is still ${live.status}`))
     this.#completion = this.finishNow(commit)
     return this.#completion
   }
@@ -963,6 +1139,11 @@ class Runtime implements SessionRuntime {
   }
 
   emit(input: SessionEventInput): SessionEvent {
+    this.assertOpenMutation()
+    return this.#emit(input)
+  }
+
+  #emit(input: SessionEventInput): SessionEvent {
     const event = Object.freeze({
       sessionId: this.#record.id,
       sequence: this.#record.nextEventSequence,
@@ -1052,9 +1233,7 @@ class Runtime implements SessionRuntime {
     for (const source of sources) {
       for (const item of source.evidence) evidence.set(`${item.kind}:${item.id}:${item.digest ?? ""}`, item)
     }
-    const merged = Object.freeze({ ...target, version: target.version + 1, evidence: Object.freeze([...evidence.values()]) })
-    this.branches.record(merged)
-    return merged
+    return this.recordMergedBranch(target, Object.freeze([...evidence.values()]))
   }
 
   settlement(workId: WorkId): AttemptSettlement {
@@ -1074,8 +1253,9 @@ class Runtime implements SessionRuntime {
       return this.resume(existing, input)
     }
     const branch = this.branch(input.branchId)
-    if (input.parentId) this.workRecord(input.parentId)
-    const authority = narrowAuthority(branch.authority, input.authority ?? {})
+    const parent = input.parentId === undefined ? undefined : this.workRecord(input.parentId)
+    if (parent && parent.branchId !== branch.id) throw new Error(`Work ${parent.id} is not on branch ${branch.id}`)
+    const authority = narrowAuthority(parent?.authority ?? branch.authority, input.authority ?? {})
 
     const work = Object.freeze({ ...input, status: "working" as const, attempt: 1, authority })
     const attempt = Object.freeze({
@@ -1159,7 +1339,12 @@ class Runtime implements SessionRuntime {
     await this.beginFinish()
     const expectedVersion = this.#record.version
     const version = await commit(this.snapshot("finished"), expectedVersion)
-    this.completeFinish(version)
+    this.#completionReady = true
+    try {
+      this.completeFinish(version)
+    } finally {
+      this.#completionReady = false
+    }
     return this.#record
   }
 
@@ -1201,7 +1386,7 @@ class Runtime implements SessionRuntime {
     })
     this.#active.delete(key)
     active.resolve(settlement)
-    this.emit({
+    this.#emit({
       workId: settledWork.id,
       attempt: settledWork.attempt,
       branchId: settledWork.branchId,
@@ -1218,6 +1403,23 @@ class Runtime implements SessionRuntime {
     const branch = this.#record.branches.find((item) => item.id === id)
     if (!branch) throw new Error(`Branch ${id} does not exist`)
     return branch
+  }
+
+  private recordMergedBranch(target: BranchRecord, evidence: readonly EvidenceRef[]): BranchRecord {
+    const merged = Object.freeze({
+      id: target.id,
+      ...(target.parentId === undefined ? {} : { parentId: target.parentId }),
+      version: target.version + 1,
+      createdBy: target.createdBy,
+      authorityFingerprint: target.authorityFingerprint,
+      authority: target.authority,
+      evidence,
+    })
+    this.#record = Object.freeze({
+      ...this.#record,
+      branches: Object.freeze(this.#record.branches.map((branch) => branch.id === target.id ? merged : branch)),
+    })
+    return merged
   }
 
   private workRecord(id: WorkId): WorkRecord {
@@ -1400,8 +1602,9 @@ export const commitMemory: CommitMemory = flow({
     const work = boundaryWork(session, ctx.input.workId, "memory.commit")
     if (work.branchId !== ctx.input.branchId) throw new BoundaryMismatchError("memory.commit", work.id)
     const branch = branchFrom(session, ctx.input.branchId)
+    const evidence = normalizeEvidence(ctx.input.evidence)
     const value = await impl.exec({
-      input: ctx.input,
+      input: { ...ctx.input, evidence },
       tags: [
         current.session(session),
         current.work(work),
@@ -1409,10 +1612,15 @@ export const commitMemory: CommitMemory = flow({
         current.authority(work.authority),
       ],
     })
-    if (value.authorityFingerprint !== work.authority.fingerprint) {
+    if (
+      value.status !== "candidate"
+      || value.source !== "session"
+      || value.authorityFingerprint !== work.authority.fingerprint
+      || !sameEvidence(normalizeEvidence(value.evidence), evidence)
+    ) {
       throw new BoundaryMismatchError("memory.commit", value.id)
     }
-    return session.memory.record(value)
+    return recordMemory(session, Object.freeze({ ...value, evidence }))
   },
 })
 
@@ -1425,12 +1633,14 @@ export const acceptMemory: AcceptMemory = flow({
     const work = boundaryWork(session, ctx.input.workId, "memory.accept")
     const branch = branchFrom(session, work.branchId)
     const candidate = session.record.memory.find((value) => value.id === ctx.input.id)
-    if (!candidate) throw new BoundaryMismatchError("memory.accept", ctx.input.id)
+    if (!candidate || candidate.status !== "candidate") throw new BoundaryMismatchError("memory.accept", ctx.input.id)
     if (candidate.authorityFingerprint !== work.authority.fingerprint) {
       throw new BoundaryMismatchError("memory.accept", candidate.id)
     }
+    const evidence = normalizeEvidence(ctx.input.evidence)
+    if (!sameEvidence(candidate.evidence, evidence)) throw new BoundaryMismatchError("memory.accept", candidate.id)
     const value = await impl.exec({
-      input: ctx.input,
+      input: { ...ctx.input, evidence },
       tags: [
         current.session(session),
         current.work(work),
@@ -1438,10 +1648,17 @@ export const acceptMemory: AcceptMemory = flow({
         current.authority(work.authority),
       ],
     })
-    if (value.id !== candidate.id || value.authorityFingerprint !== candidate.authorityFingerprint) {
+    if (
+      value.id !== candidate.id
+      || value.status !== "accepted"
+      || (value.source !== "human" && value.source !== "policy")
+      || value.version <= candidate.version
+      || value.authorityFingerprint !== candidate.authorityFingerprint
+      || !sameEvidence(normalizeEvidence(value.evidence), evidence)
+    ) {
       throw new BoundaryMismatchError("memory.accept", value.id)
     }
-    return session.memory.record(value)
+    return recordMemory(session, Object.freeze({ ...value, evidence }))
   },
 })
 
@@ -1461,10 +1678,11 @@ export const loadAndBind = flow({
     if (!sameAuthority(supplied, loaded.authorityConstraints)) {
       throw new AuthorityBindingError(ctx.input.id, "stored-constraints")
     }
+    const validated = validateSessionRecord(loaded, supplied)
     return Object.freeze({
-      record: loaded,
+      record: validated,
       authority: supplied,
-      tags: Object.freeze([authority(supplied), record(loaded)]),
+      tags: Object.freeze([authority(supplied), record(validated)]),
     }) satisfies SessionBindings
   },
 })

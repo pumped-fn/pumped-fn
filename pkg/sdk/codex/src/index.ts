@@ -1,3 +1,5 @@
+import { existsSync, realpathSync } from "node:fs"
+import { basename, dirname, isAbsolute, resolve } from "node:path"
 import {
   PROTOCOL_VERSION,
   client,
@@ -8,7 +10,7 @@ import {
   type RequestPermissionResponse,
   type SessionNotification,
 } from "@agentclientprotocol/sdk"
-import { atom, controller, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
+import { atom, controller, flow, resource, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 import {
   formatModelPrompt,
   model,
@@ -27,10 +29,11 @@ export type CodexAuth =
   | { kind: "api-key"; env?: string }
   | { kind: "global" }
 
-/** Configures Codex authentication, sandboxing, isolation, arguments, and timeout. */
+/** Configures Codex authentication, working directory, sandboxing, isolation, arguments, and timeout. */
 export interface CodexConfig {
   auth: CodexAuth
   command?: string
+  cwd: string
   sandbox?: "read-only" | "workspace-write" | "danger-full-access"
   extraArgs?: readonly string[]
   isolate?: boolean | CliIsolateOptions
@@ -66,12 +69,18 @@ export const codexRun = flow({
   name: "codex.run",
   parse: typed<PromptInput>(),
   deps: {
+    absolutePath,
+    authority: tags.optional(session.current.authority),
     config: tags.required(codexConfig),
     environment,
+    work: tags.optional(session.current.work),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async (ctx, { config, environment }) => {
-    if (config.extraArgs?.some((arg) => arg === "--")) throw new CodexConfigError("Codex extraArgs cannot include --")
+  factory: async (ctx, { absolutePath, authority, config, environment, work }) => {
+    if (!absolutePath(config.cwd)) throw new CodexConfigError("Codex cwd must be absolute")
+    assertExtraArgs(config.extraArgs ?? [])
+    const boundAuthority = bindAuthority(authority, work)
+    const effectiveConfig = boundAuthority ? authorizeCliConfig(config, boundAuthority) : config
     const env = config.auth.kind === "api-key"
       ? { CODEX_API_KEY: requiredEnvironment(environment, config.auth.env ?? "CODEX_API_KEY") }
       : undefined
@@ -87,9 +96,10 @@ export const codexRun = flow({
         "--",
         ctx.input.prompt,
       ],
+      cwd: effectiveConfig.cwd,
       env,
-      isolate: config.isolate,
-      timeoutMs: config.timeoutMs,
+      isolate: effectiveConfig.isolate,
+      timeoutMs: effectiveConfig.timeoutMs,
       signal: ctx.signal,
     })).stdout.trim()
   },
@@ -140,27 +150,31 @@ export const acp = resource({
     config: tags.required(codexAcpConfig),
     environment,
     absolutePath,
+    authority: tags.optional(session.current.authority),
     spawn: spawnProcess,
     streams: webStreams,
+    work: tags.optional(session.current.work),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async (ctx, { absolutePath, clock, config, environment, spawn, streams }) => {
-    if (!config.auth) throw new CodexConfigError("ACP auth must be explicitly set")
-    if (!absolutePath(config.cwd)) throw new CodexConfigError("ACP cwd must be absolute")
-    if (config.additionalDirectories.some((directory) => !absolutePath(directory))) {
+  factory: async (ctx, { absolutePath, authority, clock, config, environment, spawn, streams, work }) => {
+    const boundAuthority = bindAuthority(authority, work)
+    const effectiveConfig = boundAuthority ? authorizeAcpConfig(config, boundAuthority) : config
+    if (!effectiveConfig.auth) throw new CodexConfigError("ACP auth must be explicitly set")
+    if (!absolutePath(effectiveConfig.cwd)) throw new CodexConfigError("ACP cwd must be absolute")
+    if (effectiveConfig.additionalDirectories.some((directory) => !absolutePath(directory))) {
       throw new CodexConfigError("ACP additionalDirectories must be absolute")
     }
-    if (!Number.isFinite(config.shutdownTimeoutMs) || config.shutdownTimeoutMs <= 0) {
+    if (!Number.isFinite(effectiveConfig.shutdownTimeoutMs) || effectiveConfig.shutdownTimeoutMs <= 0) {
       throw new CodexConfigError("ACP shutdownTimeoutMs must be greater than zero")
     }
     const sessions = new Map<string, string[]>()
     const eventStreams = new Map<string, EventQueue<agent.ModelEvent>>()
     const continuations = new Map<string, string | Promise<string>>()
     const metadata = new Map<string, { agentName: string; round: number }>()
-    const child = spawn(config.command ?? "codex-acp", [...(config.args ?? [])], {
-      cwd: config.cwd,
-      env: config.auth.kind === "api-key"
-        ? Object.assign({}, environment, { CODEX_API_KEY: requiredEnvironment(environment, config.auth.env ?? "CODEX_API_KEY") })
+    const child = spawn(effectiveConfig.command ?? "codex-acp", [...(effectiveConfig.args ?? [])], {
+      cwd: effectiveConfig.cwd,
+      env: effectiveConfig.auth.kind === "api-key"
+        ? Object.assign({}, environment, { CODEX_API_KEY: requiredEnvironment(environment, effectiveConfig.auth.env ?? "CODEX_API_KEY") })
         : environment,
       stdio: ["pipe", "pipe", "pipe"],
     })
@@ -193,7 +207,7 @@ export const acp = resource({
       })
       .onRequest("session/request_permission", async ({ params: request }: { params: RequestPermissionRequest }): Promise<RequestPermissionResponse> => {
         const granted = request.options.find((option) => option.kind === "allow_once" || option.kind === "allow_always")
-        if (config.permission === "grant" && granted) {
+        if (effectiveConfig.permission === "grant" && granted) {
           eventStreams.get(request.sessionId)?.push({ type: "provider_status", status: "permission:selected" })
           return { outcome: { outcome: "selected", optionId: granted.optionId } }
         }
@@ -206,7 +220,8 @@ export const acp = resource({
         streams.readable(child.stdout) as ReadableStream<Uint8Array>,
       ),
     )
-    const close = async () => {
+    let closing: Promise<void> | undefined
+    const close = () => closing ??= (async () => {
       sessions.clear()
       eventStreams.clear()
       continuations.clear()
@@ -219,7 +234,7 @@ export const acp = resource({
       const within = async () => {
         let timer: ReturnType<typeof setTimeout> | undefined
         const timeout = new Promise<false>((resolve) => {
-          timer = clock.set(() => resolve(false), config.shutdownTimeoutMs)
+          timer = clock.set(() => resolve(false), effectiveConfig.shutdownTimeoutMs)
         })
         const result = await Promise.race([settled.then(() => true as const), timeout])
         if (timer) clock.clear(timer)
@@ -246,34 +261,44 @@ export const acp = resource({
           }
         }
         if (!await within()) {
-          throw new CodexShutdownError(`Codex ACP did not close within ${config.shutdownTimeoutMs * 2}ms`)
+          throw new CodexShutdownError(`Codex ACP did not close within ${effectiveConfig.shutdownTimeoutMs * 2}ms`)
         }
       }
       if (connectionFailure || childFailure) {
         throw new CodexShutdownError("Codex ACP closed with a lifecycle failure", { cause: connectionFailure ?? childFailure })
       }
-    }
+    })()
     ctx.cleanup((target) => target(), close)
     await connection.agent.request("initialize", {
       protocolVersion: PROTOCOL_VERSION,
       clientCapabilities: {},
     })
-    return { connection, sessions, streams: eventStreams, continuations, metadata }
+    return { connection, sessions, streams: eventStreams, continuations, metadata, terminate: close }
   },
 })
+
+const acpResource = acp
 
 export const codexAcpPrompt = flow({
   name: "codex.acp.prompt",
   parse: typed<ModelRequest>(),
   deps: {
     acp,
+    attempt: tags.optional(session.current.attempt),
+    authority: tags.optional(session.current.authority),
+    clock,
     config: tags.required(codexAcpConfig),
+    runtime: tags.optional(session.current.session),
+    work: tags.optional(session.current.work),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async (ctx, { acp, config }) => {
+  factory: async (ctx, { acp, attempt, authority, clock, config, runtime, work }) => {
     const signal = ctx.signal
     signal.throwIfAborted()
-    const sessionId = await createAcpSession(acp.connection.agent, config, signal)
+    const boundAuthority = bindSessionAuthority(runtime, work, attempt, authority)
+    const effectiveConfig = boundAuthority ? authorizeAcpConfig(config, boundAuthority) : config
+    const sessionId = await createAcpSession(acp.connection.agent, effectiveConfig, signal)
+    const remote = startRemoteInvocation(runtime, work, attempt, sessionId)
     const chunks: string[] = []
     acp.sessions.set(sessionId, chunks)
     acp.metadata.set(sessionId, { agentName: ctx.input.agentName, round: ctx.input.round })
@@ -283,20 +308,39 @@ export const codexAcpPrompt = flow({
     }
     signal.addEventListener("abort", cancel, { once: true })
     if (signal.aborted) cancel()
-    await (signal.aborted
-      ? Promise.reject(signal.reason)
-      : acp.connection.agent.request("session/prompt", {
-          sessionId,
-          prompt: [{ type: "text", text: formatModelPrompt(ctx.input) }],
-        })).finally(async () => {
-      signal.removeEventListener("abort", cancel)
-      try {
-        if (cancellation) await cancellation
-      } finally {
-        acp.sessions.delete(sessionId)
-        acp.metadata.delete(sessionId)
-      }
+    const prompt = acp.connection.agent.request("session/prompt", {
+      sessionId,
+      prompt: [{ type: "text", text: formatModelPrompt(ctx.input) }],
     })
+    let completed = false
+    try {
+      await abortable(prompt, signal)
+      completed = true
+    } finally {
+      signal.removeEventListener("abort", cancel)
+      if (signal.aborted) cancel()
+      acp.sessions.delete(sessionId)
+      acp.metadata.delete(sessionId)
+      if (signal.aborted) {
+        const stopped = await bounded(Promise.allSettled([
+          prompt,
+          ...(cancellation ? [cancellation] : []),
+        ]), clock, effectiveConfig.shutdownTimeoutMs)
+        if (!stopped) {
+          try {
+            await acp.terminate()
+            for (let current: Lite.ExecutionContext | undefined = ctx; current; current = current.parent) {
+              await current.release(acpResource)
+            }
+          } catch (error) {
+            settleRemoteInvocation(runtime, remote, "quarantined")
+            throw error
+          }
+        }
+      }
+      settleRemoteInvocation(runtime, remote, completed ? "completed" : signal.aborted ? "cancelled" : "failed")
+    }
+    signal.throwIfAborted()
     return chunks.join("")
   },
 })
@@ -306,18 +350,23 @@ export const codexAcpAttempt: agent.Attempt = flow({
   parse: typed<ModelRequest>(),
   deps: {
     acp,
+    attempt: tags.optional(session.current.attempt),
+    authority: tags.optional(session.current.authority),
     clock,
     config: tags.required(codexAcpConfig),
     record: tags.optional(session.record),
     branch: tags.optional(session.current.branch),
     runtime: tags.optional(session.current.session),
+    work: tags.optional(session.current.work),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async function* (ctx, { acp, branch, clock, config, record, runtime }) {
+  factory: async function* (ctx, { acp, attempt, authority, branch, clock, config, record, runtime, work }) {
     const signal = ctx.signal
     signal.throwIfAborted()
+    const boundAuthority = bindSessionAuthority(runtime, work, attempt, authority)
+    const effectiveConfig = boundAuthority ? authorizeAcpConfig(config, boundAuthority) : config
     const continuationKey = record && branch ? `codex-acp:${record.id}:${branch.id}` : undefined
-    const createSession = () => createAcpSession(acp.connection.agent, config, signal)
+    const createSession = () => createAcpSession(acp.connection.agent, effectiveConfig, signal)
     let sessionId: string
     if (continuationKey) {
       let continuation: string | Promise<string> | undefined = runtime?.continuations.get(continuationKey)
@@ -356,13 +405,15 @@ export const codexAcpAttempt: agent.Attempt = flow({
     if (acp.sessions.has(sessionId)) {
       throw new CodexConcurrencyError(`ACP session ${sessionId} already has an active prompt`)
     }
+    const remote = startRemoteInvocation(runtime, work, attempt, sessionId)
     const chunks: string[] = []
     const stream = new EventQueue<agent.ModelEvent>()
+    const metadata = { agentName: ctx.input.agentName, round: ctx.input.round }
     acp.sessions.set(sessionId, chunks)
     acp.streams.set(sessionId, stream)
-    acp.metadata.set(sessionId, { agentName: ctx.input.agentName, round: ctx.input.round })
+    acp.metadata.set(sessionId, metadata)
     let cancellation: Promise<void> | undefined
-    let settled = false
+    let promptStatus: "completed" | "failed" | undefined
     const cancel = () => {
       cancellation ??= acp.connection.agent.notify("session/cancel", { sessionId })
       stream.fail(signal.reason ?? new DOMException("Codex ACP stream closed", "AbortError"))
@@ -373,11 +424,11 @@ export const codexAcpAttempt: agent.Attempt = flow({
       sessionId,
       prompt: [{ type: "text", text: formatModelPrompt(ctx.input) }],
     }).then(() => {
-      settled = true
+      promptStatus = "completed"
       stream.push({ type: "provider_status", status: "completed" })
       stream.end()
     }, (error) => {
-      settled = true
+      promptStatus = "failed"
       stream.fail(error)
     })
     stream.push({ type: "provider_status", status: "started" })
@@ -387,28 +438,38 @@ export const codexAcpAttempt: agent.Attempt = flow({
       return parseModelResponse(chunks.join(""))
     } finally {
       signal.removeEventListener("abort", cancel)
-      if (!settled) cancel()
+      if (!promptStatus) cancel()
       const release = () => {
-        acp.sessions.delete(sessionId)
-        acp.streams.delete(sessionId)
-        acp.metadata.delete(sessionId)
+        if (acp.sessions.get(sessionId) === chunks) acp.sessions.delete(sessionId)
+        if (acp.streams.get(sessionId) === stream) acp.streams.delete(sessionId)
+        if (acp.metadata.get(sessionId) === metadata) acp.metadata.delete(sessionId)
       }
       const completion = Promise.allSettled([
         ...(cancellation ? [cancellation] : []),
         prompt,
       ])
-      if (await bounded(completion, clock, config.shutdownTimeoutMs)) {
+      const stopped = await bounded(completion, clock, effectiveConfig.shutdownTimeoutMs)
+      if (stopped) {
         release()
+        settleRemoteInvocation(runtime, remote, signal.aborted ? "cancelled" : promptStatus ?? "failed")
       } else {
-        if (continuationKey && runtime?.continuations.get(continuationKey) === sessionId) {
-          runtime.continuations.delete(continuationKey)
-        }
-        void completion.then(() => {
+        try {
+          await acp.terminate()
+          for (let current: Lite.ExecutionContext | undefined = ctx; current; current = current.parent) {
+            await current.release(acpResource)
+          }
           release()
+          if (continuationKey && runtime?.continuations.get(continuationKey) === sessionId) {
+            runtime.continuations.delete(continuationKey)
+          }
           if (continuationKey && acp.continuations.get(continuationKey) === sessionId) {
             acp.continuations.delete(continuationKey)
           }
-        })
+          settleRemoteInvocation(runtime, remote, "cancelled")
+        } catch (error) {
+          settleRemoteInvocation(runtime, remote, "quarantined")
+          throw error
+        }
       }
     }
   },
@@ -437,6 +498,151 @@ function requiredEnvironment(environment: NodeJS.ProcessEnv, name: string): stri
   const value = environment[name]
   if (!value) throw new CodexConfigError(`Codex API key environment variable "${name}" is not set`)
   return value
+}
+
+function assertExtraArgs(args: readonly string[]): void {
+  const values = new Set(["-m", "--model", "--color"])
+  const switches = new Set(["--json", "--skip-git-repo-check"])
+  for (let index = 0; index < args.length; index++) {
+    const argument = args[index]!
+    const equals = argument.indexOf("=")
+    const option = equals === -1 ? argument : argument.slice(0, equals)
+    if (switches.has(option) && equals === -1) continue
+    if (!values.has(option)) throw new CodexConfigError(`Codex extra argument ${argument} is not allowed`)
+    if (equals !== -1) {
+      if (argument.length === equals + 1) throw new CodexConfigError(`Codex extra argument ${option} requires a value`)
+      continue
+    }
+    const value = args[++index]
+    if (value === undefined || value.startsWith("-")) throw new CodexConfigError(`Codex extra argument ${option} requires a value`)
+  }
+}
+
+function bindAuthority(
+  authority: session.Authority | undefined,
+  work: session.WorkRecord | undefined,
+): session.Authority | undefined {
+  if (!work) return authority
+  if (!authority || authority.fingerprint !== work.authority.fingerprint) {
+    throw new CodexConfigError("Codex authority does not match current work")
+  }
+  return work.authority
+}
+
+function bindSessionAuthority(
+  runtime: session.SessionRuntime | undefined,
+  work: session.WorkRecord | undefined,
+  attempt: session.AttemptRecord | undefined,
+  authority: session.Authority | undefined,
+): session.Authority | undefined {
+  if (!work) return authority
+  if (!runtime || !attempt) throw new CodexConfigError("Codex session tags must be provided as one bound tuple")
+  return bindAuthority(authority, work)
+}
+
+function authorizeCliConfig(config: CodexConfig, authority: session.Authority): CodexConfig {
+  assertCliAuthority(config, authority)
+  const isolate = typeof config.isolate === "object" ? config.isolate : undefined
+  return {
+    ...config,
+    cwd: canonicalPath(config.cwd),
+    isolate: isolate ? {
+      ...isolate,
+      ...(isolate.home ? { home: canonicalPath(isolate.home) } : {}),
+      ...(isolate.codexHome ? { codexHome: canonicalPath(isolate.codexHome) } : {}),
+      ...(isolate.bind ? { bind: isolate.bind.map((bind) => ({ ...bind, source: canonicalPath(bind.source) })) } : {}),
+    } : config.isolate,
+  }
+}
+
+function authorizeAcpConfig(config: CodexAcpConfig, authority: session.Authority): CodexAcpConfig {
+  assertAcpAuthority(config, authority)
+  return {
+    ...config,
+    cwd: canonicalPath(config.cwd),
+    additionalDirectories: config.additionalDirectories.map(canonicalPath),
+  }
+}
+
+function startRemoteInvocation(
+  runtime: session.SessionRuntime | undefined,
+  work: session.WorkRecord | undefined,
+  attempt: session.AttemptRecord | undefined,
+  sessionId: string,
+): string | undefined {
+  if (!runtime || !work || !attempt) return undefined
+  const id = `codex-acp:${work.id}:${attempt.attempt}:${sessionId}`
+  runtime.invocations.start({
+    id,
+    workId: work.id,
+    attempt: attempt.attempt,
+    kind: "adapter",
+    idempotencyKey: id,
+  })
+  return id
+}
+
+function settleRemoteInvocation(
+  runtime: session.SessionRuntime | undefined,
+  id: string | undefined,
+  status: "completed" | "failed" | "cancelled" | "quarantined",
+): void {
+  if (runtime && id) runtime.invocations.settle(id, status)
+}
+
+function assertCliAuthority(config: CodexConfig, authority: session.Authority): void {
+  const isolate = typeof config.isolate === "object" ? config.isolate : undefined
+  const roots = [
+    config.cwd,
+    ...(isolate?.home ? [isolate.home] : []),
+    ...(isolate?.codexHome ? [isolate.codexHome] : []),
+    ...(isolate?.bind?.map((bind) => bind.source) ?? []),
+  ]
+  if (roots.some((root) => !isAbsolute(root))) throw new CodexConfigError("Codex authority roots must be absolute")
+  assertRoots("Codex", roots, authority)
+  const sandbox = config.sandbox ?? "read-only"
+  const write = sandbox !== "read-only"
+    || isolate?.writable === true
+    || isolate?.home !== undefined
+    || isolate?.codexHome !== undefined
+    || isolate?.bind?.some((bind) => bind.mode === "rw") === true
+  if (write && !authority.sandbox.write) throw new CodexConfigError("Codex write exceeds current work authority")
+  if ((sandbox === "danger-full-access" || isolate?.network === true) && !authority.sandbox.network) {
+    throw new CodexConfigError("Codex network exceeds current work authority")
+  }
+}
+
+function assertAcpAuthority(config: CodexAcpConfig, authority: session.Authority): void {
+  assertRoots("ACP", [config.cwd, ...config.additionalDirectories], authority)
+  if (config.permission === "grant" && !authority.sandbox.write) {
+    throw new CodexConfigError("ACP write exceeds current work authority")
+  }
+  if (config.permission === "grant" && !authority.sandbox.network) {
+    throw new CodexConfigError("ACP network exceeds current work authority")
+  }
+}
+
+function assertRoots(provider: "Codex" | "ACP", roots: readonly string[], authority: session.Authority): void {
+  const allowedRoots = authority.sandbox.roots.map(canonicalPath)
+  if (roots.map(canonicalPath).some((root) => !allowedRoots.some((allowed) => within(root, allowed)))) {
+    throw new CodexConfigError(`${provider} roots exceed current work authority`)
+  }
+}
+
+function within(path: string, root: string): boolean {
+  return root === "/" || path === root || path.startsWith(`${root}/`)
+}
+
+function canonicalPath(path: string): string {
+  let current = resolve(path)
+  const remainder: string[] = []
+  while (!existsSync(current)) {
+    const parent = dirname(current)
+    if (parent === current) throw new CodexConfigError(`Codex root ${path} cannot be resolved`)
+    remainder.unshift(basename(current))
+    current = parent
+  }
+  return resolve(realpathSync(current), ...remainder)
 }
 
 async function createAcpSession(

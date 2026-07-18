@@ -2,10 +2,12 @@
 
 Strict replicated state for Lite scopes.
 
-## Install
+## Migration to 1.0.0
+
+Install 1.0 with Lite 6:
 
 ```bash
-npm install @pumped-fn/lite @pumped-fn/lite-extension-sync
+npm install @pumped-fn/lite@^6.0.0 @pumped-fn/lite-extension-sync@^1.0.0
 ```
 
 ## Usage

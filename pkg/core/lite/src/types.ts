@@ -243,6 +243,13 @@ export namespace Lite {
   export interface ResolveContext {
     cleanup<Args extends unknown[]>(fn: (...args: Args) => MaybePromise<void>, ...params: Args): void
     invalidate(): void
+    /**
+     * Release the atom generation that created this context.
+     *
+     * During that generation's cleanup this settles without joining its own
+     * release. After replacement it cannot release the newer generation.
+     */
+    release(): Promise<void>
     readonly scope: Scope
     readonly data: ContextData
   }

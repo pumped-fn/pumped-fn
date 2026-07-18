@@ -4398,6 +4398,179 @@ describe("public helper coverage", () => {
 })
 
 describe("release() cleanup", () => {
+  it("waits for a pending generation and drains cleanup registered after release starts", async () => {
+    let factoryStarted!: () => void
+    let finishFactory!: () => void
+    const started = new Promise<void>(resolve => { factoryStarted = resolve })
+    const finish = new Promise<void>(resolve => { finishFactory = resolve })
+    const cleaned: number[] = []
+    let factoryCalls = 0
+    const scope = createScope()
+    const subject = atom({
+      factory: async (ctx) => {
+        const generation = ++factoryCalls
+        if (generation === 1) {
+          factoryStarted()
+          await finish
+        }
+        ctx.cleanup(() => { cleaned.push(generation) })
+        return generation
+      },
+    })
+
+    const first = scope.resolve(subject)
+    await started
+    let released = false
+    const release = scope.release(subject).then(() => { released = true })
+    let replacementSettled = false
+    const replacement = scope.resolve(subject).then(value => {
+      replacementSettled = true
+      return value
+    })
+
+    await Promise.resolve()
+    expect(released).toBe(false)
+    expect(replacementSettled).toBe(false)
+    finishFactory()
+
+    expect(await first).toBe(1)
+    await release
+    expect(await replacement).toBe(2)
+    expect(factoryCalls).toBe(2)
+    expect(cleaned).toEqual([1])
+
+    await scope.release(subject)
+    expect(cleaned).toEqual([1, 2])
+    await scope.dispose()
+  })
+
+  it("detaches invalidation cleanups before a cleanup awaits its release capability", async () => {
+    const cleaned: number[] = []
+    const releases: Array<() => Promise<void>> = []
+    let factoryCalls = 0
+    const scope = createScope()
+    const subject = atom({
+      factory: (ctx) => {
+        const generation = ++factoryCalls
+        releases.push(ctx.release)
+        ctx.cleanup(async () => {
+          cleaned.push(generation)
+          await ctx.release()
+        })
+        return generation
+      },
+    })
+
+    expect(await scope.resolve(subject)).toBe(1)
+    const ctrl = scope.controller(subject)
+    ctrl.invalidate()
+    await scope.flush()
+
+    expect(ctrl.state).toBe("resolved")
+    expect(ctrl.get()).toBe(2)
+    expect(cleaned).toEqual([1])
+
+    await releases[0]!()
+    expect(ctrl.state).toBe("resolved")
+    expect(ctrl.get()).toBe(2)
+    await releases[1]!()
+    expect(cleaned).toEqual([1, 2])
+    await scope.dispose()
+  })
+
+  it("keeps outside callers waiting while cleanup awaits its release capability", async () => {
+    let cleanupStarted!: () => void
+    let enterReentrantRelease!: () => void
+    let reentrantReleaseFinished!: () => void
+    let finishCleanup!: () => void
+    const started = new Promise<void>(resolve => { cleanupStarted = resolve })
+    const enterReentrant = new Promise<void>(resolve => { enterReentrantRelease = resolve })
+    const reentrantFinished = new Promise<void>(resolve => { reentrantReleaseFinished = resolve })
+    const finish = new Promise<void>(resolve => { finishCleanup = resolve })
+    let cleanupCalls = 0
+    const scope = createScope()
+    const subject = atom({
+      factory: (ctx) => {
+        ctx.cleanup(async () => {
+          cleanupCalls++
+          cleanupStarted()
+          await enterReentrant
+          await ctx.release()
+          reentrantReleaseFinished()
+          await finish
+        })
+        return "value"
+      },
+    })
+    await scope.resolve(subject)
+    const ctrl = scope.controller(subject)
+
+    const first = scope.release(subject)
+    await started
+    let outsideReleased = false
+    const second = scope.release(subject).then(() => { outsideReleased = true })
+    let resolutionSettled = false
+    let resolutionError: unknown
+    const resolving = scope.resolve(subject).then(
+      () => { resolutionSettled = true },
+      (error: unknown) => {
+        resolutionSettled = true
+        resolutionError = error
+      },
+    )
+    let disposed = false
+    const disposing = scope.dispose().then(() => { disposed = true })
+
+    expect(cleanupCalls).toBe(1)
+    expect(outsideReleased).toBe(false)
+    expect(resolutionSettled).toBe(false)
+    expect(disposed).toBe(false)
+    enterReentrantRelease()
+    await reentrantFinished
+    expect(cleanupCalls).toBe(1)
+    expect(outsideReleased).toBe(false)
+    expect(resolutionSettled).toBe(false)
+    expect(disposed).toBe(false)
+    finishCleanup()
+    await Promise.all([first, second, resolving, disposing])
+    expect(cleanupCalls).toBe(1)
+    expect(outsideReleased).toBe(true)
+    expect(resolutionSettled).toBe(true)
+    expect(resolutionError).toEqual(new Error("Scope is disposed"))
+    expect(disposed).toBe(true)
+    expect(ctrl.state).toBe("idle")
+  })
+
+  it("does not let a stale release capability release a replacement generation", async () => {
+    const releases: Array<() => Promise<void>> = []
+    let cleanupCalls = 0
+    const scope = createScope()
+    const subject = atom({
+      factory: (ctx) => {
+        const generation = releases.length
+        releases.push(ctx.release)
+        ctx.cleanup(() => { cleanupCalls++ })
+        return generation
+      },
+    })
+
+    expect(await scope.resolve(subject)).toBe(0)
+    await scope.release(subject)
+    expect(cleanupCalls).toBe(1)
+
+    expect(await scope.resolve(subject)).toBe(1)
+    const ctrl = scope.controller(subject)
+    await releases[0]!()
+    expect(ctrl.state).toBe("resolved")
+    expect(ctrl.get()).toBe(1)
+    expect(cleanupCalls).toBe(1)
+
+    await releases[1]!()
+    expect(ctrl.state).toBe("idle")
+    expect(cleanupCalls).toBe(2)
+    await scope.dispose()
+  })
+
   it("removes dependents on release and controller ops throw after release", async () => {
     let factoryCalls = 0
     const depAtom = atom({ factory: () => { factoryCalls++; return "dep" } })
@@ -4452,6 +4625,26 @@ describe("pendingSet on failure path", () => {
 })
 
 describe("listener notification", () => {
+  it("finishes invalidation after a listener throws and surfaces the failure from flush", async () => {
+    let factoryCalls = 0
+    let siblingCalls = 0
+    const scope = createScope()
+    const subject = atom({ factory: () => ++factoryCalls })
+    await scope.resolve(subject)
+    const ctrl = scope.controller(subject)
+
+    ctrl.on("resolving", () => { throw new Error("listener failed") })
+    ctrl.on("resolving", () => { siblingCalls++ })
+    ctrl.invalidate()
+
+    await expect(scope.flush()).rejects.toThrow("listener failed")
+    expect(siblingCalls).toBe(1)
+    expect(factoryCalls).toBe(2)
+    expect(ctrl.state).toBe("resolved")
+    expect(ctrl.get()).toBe(2)
+    await scope.dispose()
+  })
+
   it("adding a listener during notification does not fire it in the same cycle", async () => {
     const myAtom = atom({ factory: () => 42 })
     const scope = createScope()

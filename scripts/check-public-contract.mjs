@@ -17,9 +17,9 @@ const changedFilesPath = option("--changed-files");
 const prJsonPath = option("--pr-json");
 const expectedHead = option("--expect-head");
 
-if ((!base && !changedFilesPath) || !prJsonPath || !expectedHead) {
+if (!base || !prJsonPath || !expectedHead) {
   process.stderr.write(
-    "Usage: node scripts/check-public-contract.mjs (--base <ref> | --changed-files <path>) --pr-json <path> --expect-head <sha> [--root <path>]\n",
+    "Usage: node scripts/check-public-contract.mjs --base <ref> [--changed-files <path>] --pr-json <path> --expect-head <sha> [--root <path>]\n",
   );
   process.exit(2);
 }
@@ -39,6 +39,19 @@ const packageDirectories = readdirSync(join(root, "pkg"), { withFileTypes: true 
   .filter((directory) => existsSync(join(directory, "package.json")))
   .map((directory) => ({ directory, manifest: readJson(join(directory, "package.json")) }))
   .filter(({ manifest }) => manifest.private !== true);
+const packagesByName = new Map(packageDirectories.map((entry) => [entry.manifest.name, entry]));
+const basePackageDirectories = execFileSync("git", ["ls-tree", "-r", "--name-only", base, "--", "pkg"], {
+  cwd: root,
+  encoding: "utf8",
+})
+  .split("\n")
+  .filter((path) => /^pkg\/[^/]+\/[^/]+\/package\.json$/u.test(path))
+  .map((path) => ({
+    manifest: JSON.parse(execFileSync("git", ["show", `${base}:${path}`], { cwd: root, encoding: "utf8" })),
+    path,
+  }))
+  .filter(({ manifest }) => manifest.private !== true);
+const basePackagesByName = new Map(basePackageDirectories.map((entry) => [entry.manifest.name, entry]));
 
 const escapeRegExp = (value) => value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
 
@@ -87,6 +100,23 @@ const exportRows = packageDirectories.flatMap(({ directory, manifest }) =>
   })),
 );
 
+const exportRemovalCandidates = [];
+for (const { manifest: previous } of basePackageDirectories) {
+  const current = packagesByName.get(previous.name)?.manifest;
+  if (!current) continue;
+  const currentExports = new Set(Object.keys(current.exports ?? {}));
+  for (const exportKey of Object.keys(previous.exports ?? {})) {
+    if (!currentExports.has(exportKey)) {
+      exportRemovalCandidates.push({
+        package: previous.name,
+        export: exportKey,
+        previous_version: previous.version,
+        current_version: current.version,
+      });
+    }
+  }
+}
+
 const missingRuntimeTargets = [];
 const missingTypeTargets = [];
 const packedFileOmissions = [];
@@ -122,17 +152,45 @@ for (const row of exportRows) {
   }
 }
 
-const changesets = readdirSync(join(root, ".changeset"), { withFileTypes: true })
+const changesetFiles = readdirSync(join(root, ".changeset"), { withFileTypes: true })
   .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
-  .flatMap((entry) => {
+  .map((entry) => {
     const path = join(root, ".changeset", entry.name);
-    const content = readFileSync(path, "utf8");
-    const frontmatter = content.match(/^---\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? "";
-    return frontmatter.split(/\r?\n/u).flatMap((line) => {
-      const match = line.match(/^\s*["']?([^"']+?)["']?\s*:\s*(major|minor|patch)\s*$/u);
-      return match ? [{ package: match[1], bump: match[2], path: fromRoot(path) }] : [];
-    });
+    return { content: readFileSync(path, "utf8"), path, recovered: false };
   });
+const currentChangesetPaths = new Set(changesetFiles.map(({ path }) => normalize(relative(root, path))));
+const baseChangesetPaths = execFileSync("git", ["ls-tree", "-r", "--name-only", base, "--", ".changeset"], {
+  cwd: root,
+  encoding: "utf8",
+})
+  .split("\n")
+  .filter((path) => /^\.changeset\/[^/]+\.md$/u.test(path) && path !== ".changeset/README.md");
+for (const path of baseChangesetPaths) {
+  if (currentChangesetPaths.has(path)) continue;
+  changesetFiles.push({
+    content: execFileSync("git", ["show", `${base}:${path}`], { cwd: root, encoding: "utf8" }),
+    path: join(root, path),
+    recovered: true,
+  });
+}
+const changesets = changesetFiles.flatMap(({ content, path, recovered }) => {
+  const frontmatter = content.match(/^---\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? "";
+  return frontmatter.split(/\r?\n/u).flatMap((line) => {
+    const match = line.match(/^\s*["']?([^"']+?)["']?\s*:\s*(major|minor|patch)\s*$/u);
+    return match ? [{ package: match[1], bump: match[2], path: fromRoot(path), recovered }] : [];
+  });
+});
+const retiredPackages = new Set(changesetFiles.flatMap(({ content }) =>
+  [...content.matchAll(/^Retires:\s*["']?([^"'\s]+)["']?\s*$/gimu)].map((match) => match[1]),
+));
+const majorChangesetPackages = new Set(changesets
+  .filter(({ bump, recovered }) => bump === "major" && !recovered)
+  .map(({ package: name }) => name));
+const majorOf = (version) => Number.parseInt(String(version).split(".")[0], 10);
+const packageExportRemovalGaps = exportRemovalCandidates
+  .filter(({ package: name, previous_version, current_version }) =>
+    !majorChangesetPackages.has(name) && majorOf(current_version) <= majorOf(previous_version)
+  );
 
 const changedFiles = changedFilesPath
   ? readJson(resolve(root, changedFilesPath))
@@ -150,6 +208,10 @@ const changedWithoutChangeset = changedPackages.flatMap((path) => {
     ? []
     : [{ package: manifest.name, path }];
 });
+const currentPackageNames = new Set(packageDirectories.map(({ manifest }) => manifest.name));
+const packageRetirementGaps = basePackageDirectories
+  .filter(({ manifest }) => !currentPackageNames.has(manifest.name) && !retiredPackages.has(manifest.name))
+  .map(({ manifest, path }) => ({ package: manifest.name, path }));
 
 const packageReadmeGaps = [];
 const packageChangelogGaps = [];
@@ -279,8 +341,12 @@ for (const { directory, manifest } of packageDirectories) {
     });
   }
   for (const change of changesets.filter((entry) => entry.package === manifest.name && entry.bump === "major")) {
+    const previous = basePackagesByName.get(manifest.name)?.manifest;
     const currentMajor = Number.parseInt(String(manifest.version).split(".")[0], 10);
-    const targetMajor = currentMajor + 1;
+    const previousMajor = previous
+      ? Number.parseInt(String(previous.version).split(".")[0], 10)
+      : currentMajor;
+    const targetMajor = previousMajor + 1;
     const migrationPaths = [join(directory, "MIGRATION.md"), readme].filter(existsSync);
     const versionPattern = new RegExp(`(?:${targetMajor}\\.0\\.0|v${targetMajor}\\b|to\\s+${targetMajor}\\b)`, "iu");
     const evidence = migrationPaths.find((path) => {
@@ -340,10 +406,23 @@ const exportedSymbolTsdocGaps = exportedSymbols.filter(({ documented }) => !docu
 const publicInterfaces = exportedSymbols.filter((entry) => entry.interface);
 const publicApiTsdocGaps = publicInterfaces.filter(({ documented }) => !documented);
 const pr = readJson(resolve(root, prJsonPath));
-const actualHead = pr.headRefOid ?? pr.head?.sha ?? null;
-const prSnapshotGaps = actualHead === expectedHead
-  ? []
-  : [{ expected_head: expectedHead, actual_head: actualHead, path: normalize(relative(root, resolve(root, prJsonPath))) }];
+const actualHead = pr.headRefOid ?? pr.head?.sha ?? pr.pull_request?.head?.sha ?? null;
+const checkoutHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+const snapshotPath = normalize(relative(root, resolve(root, prJsonPath)));
+const prSnapshotGaps = [
+  ...(actualHead === checkoutHead ? [] : [{
+    kind: "pr_head_checkout_mismatch",
+    expected_head: checkoutHead,
+    actual_head: actualHead,
+    path: snapshotPath,
+  }]),
+  ...(expectedHead === checkoutHead ? [] : [{
+    kind: "expected_head_checkout_mismatch",
+    expected_head: checkoutHead,
+    actual_head: expectedHead,
+    path: snapshotPath,
+  }]),
+];
 
 const details = {
   changed_public_source_packages_without_changeset: changedWithoutChangeset,
@@ -355,6 +434,8 @@ const details = {
   missing_type_targets: missingTypeTargets,
   package_changelog_gaps: packageChangelogGaps,
   package_readme_gaps: packageReadmeGaps,
+  package_export_removal_gaps: packageExportRemovalGaps,
+  package_retirement_gaps: packageRetirementGaps,
   packed_file_omissions: packedFileOmissions,
   pr_snapshot_gaps: prSnapshotGaps,
   public_api_tsdoc_gaps: publicApiTsdocGaps,
@@ -373,7 +454,9 @@ const metrics = {
   missing_runtime_target_count: missingRuntimeTargets.length,
   missing_type_target_count: missingTypeTargets.length,
   package_changelog_gap_count: packageChangelogGaps.length,
+  package_export_removal_gap_count: packageExportRemovalGaps.length,
   package_readme_gap_count: packageReadmeGaps.length,
+  package_retirement_gap_count: packageRetirementGaps.length,
   packed_file_omission_count: packedFileOmissions.length,
   pr_snapshot_gap_count: prSnapshotGaps.length,
   public_api_interface_count: publicInterfaces.length,
@@ -390,7 +473,9 @@ metrics.public_contract_gap_count = [
   metrics.missing_runtime_target_count,
   metrics.missing_type_target_count,
   metrics.package_changelog_gap_count,
+  metrics.package_export_removal_gap_count,
   metrics.package_readme_gap_count,
+  metrics.package_retirement_gap_count,
   metrics.packed_file_omission_count,
   metrics.pr_snapshot_gap_count,
   metrics.public_api_tsdoc_gap_count,
@@ -399,7 +484,7 @@ metrics.public_contract_gap_count = [
 const result = {
   schema_version: 1,
   ok: metrics.public_contract_gap_count === 0,
-  head: { actual: actualHead, expected: expectedHead },
+  head: { checkout: checkoutHead, pr: actualHead, expected: expectedHead },
   metrics,
   details,
 };

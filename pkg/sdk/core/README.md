@@ -219,11 +219,13 @@ The runnable issue-triage verifier shipped with `@pumped-fn/sdk-test` proves all
 
 The durable `SessionRecord` is data. The current-owned `SessionRuntime` coordinates attempts and registries for one activation. Resolve `session.session` in the context that owns the logical session before nested work.
 
+Tagged and loaded records are validated recursively before activation: one root branch, authority fingerprints, branch and work lineage, current-branch references, owned artifacts, memory authorities, schedules, invocation idempotency keys, and other unique identities must agree. Memory mutation remains behind `session.memory.commit` and `session.memory.accept`; the runtime has no public raw memory writer. Commit accepts only session-sourced candidates with the requested normalized evidence. Accept requires an increasing human- or policy-sourced result for the same candidate and preserves its normalized evidence.
+
 `session.finish` and context cleanup have different jobs:
 
 | Path | Admission | Active attempts | Commit | Durable status |
 |---|---|---|---|---|
-| `session.finish` | Fenced | Joined | Once through `session.store.commit` | `finished` |
+| `session.finish` | Fenced by working or quarantined invocations | Joined | Once through `session.store.commit` | `finished` |
 | `SessionRuntime.deactivate()` | Fenced | Aborted, then joined | Never | Unchanged |
 
 The session resource registers `deactivate()` as cleanup. Cleanup does not commit, schedule, write memory, or call a model. Finish-first makes deactivation wait for the existing finish. Deactivate-first makes later finish fail without a commit.

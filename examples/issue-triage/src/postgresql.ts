@@ -29,67 +29,81 @@ export const postgresql = flow({
       params: [pool],
       name: "postgres.target.connect",
     })
-    await ctx.exec({
-      fn: (target, sql) => target.query(sql),
-      params: [client, "BEGIN READ ONLY"],
-      name: "postgres.target.begin-read-only",
-    })
+    let releaseError: Error | undefined
     try {
       await ctx.exec({
         fn: (target, sql) => target.query(sql),
-        params: [client, `SET LOCAL statement_timeout = '${plan.statementTimeoutMs}ms'`],
-        name: "postgres.target.statement-timeout",
+        params: [client, "BEGIN READ ONLY"],
+        name: "postgres.target.begin-read-only",
       })
-      const schema = await ctx.exec({
-        fn: (target, sql) => target.query<{
-          table_schema: string
-          table_name: string
-          column_name: string
-          data_type: string
-        }>(sql),
-        params: [
-          client,
-          `SELECT table_schema, table_name, column_name, data_type
-          FROM information_schema.columns
-          WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-          ORDER BY table_schema, table_name, ordinal_position
-          LIMIT 500`,
-        ],
-        name: "postgres.target.inspect-schema",
-      })
-      ctx.signal.throwIfAborted()
-      const explanation = await ctx.exec({
-        fn: (target, sql) => target.query<{ "QUERY PLAN": unknown }>(sql),
-        params: [client, `EXPLAIN (FORMAT JSON, ANALYZE FALSE, BUFFERS FALSE) ${ctx.input.sql}`],
-        name: "postgres.target.explain-query",
-      })
-      ctx.signal.throwIfAborted()
-      await ctx.exec({
-        fn: (target, sql) => target.query(sql),
-        params: [client, "ROLLBACK"],
-        name: "postgres.target.rollback-read-only",
-      })
-      return {
-        id: `postgresql:${digest(ctx.input)}`,
-        source: "postgresql",
-        citation: `postgresql://target/explain?query=${encodeURIComponent(digest(ctx.input))}`,
-        capturedAt: new Date(clock()).toISOString(),
-        maxAgeMs: plan.evidenceMaxAgeMs,
-        queryIdentity: digest(ctx.input),
-        capabilityScope: "postgresql:read-only",
-        summary: bounded({ schema: schema.rows, explanation: explanation.rows }, plan.maxEvidenceBytes),
+      try {
+        await ctx.exec({
+          fn: (target, sql) => target.query(sql),
+          params: [client, `SET LOCAL statement_timeout = '${plan.statementTimeoutMs}ms'`],
+          name: "postgres.target.statement-timeout",
+        })
+        const schema = await ctx.exec({
+          fn: (target, sql) => target.query<{
+            table_schema: string
+            table_name: string
+            column_name: string
+            data_type: string
+          }>(sql),
+          params: [
+            client,
+            `SELECT table_schema, table_name, column_name, data_type
+            FROM information_schema.columns
+            WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+            ORDER BY table_schema, table_name, ordinal_position
+            LIMIT 500`,
+          ],
+          name: "postgres.target.inspect-schema",
+        })
+        ctx.signal.throwIfAborted()
+        const explanation = await ctx.exec({
+          fn: (target, sql) => target.query<{ "QUERY PLAN": unknown }>(sql),
+          params: [client, `EXPLAIN (FORMAT JSON, ANALYZE FALSE, BUFFERS FALSE) ${ctx.input.sql}`],
+          name: "postgres.target.explain-query",
+        })
+        ctx.signal.throwIfAborted()
+        try {
+          await ctx.exec({
+            fn: (target, sql) => target.query(sql),
+            params: [client, "ROLLBACK"],
+            name: "postgres.target.rollback-read-only",
+          })
+        } catch (error) {
+          releaseError = error instanceof Error ? error : new Error(String(error))
+          throw error
+        }
+        return {
+          id: `postgresql:${digest(ctx.input)}`,
+          source: "postgresql",
+          citation: `postgresql://target/explain?query=${encodeURIComponent(digest(ctx.input))}`,
+          capturedAt: new Date(clock()).toISOString(),
+          maxAgeMs: plan.evidenceMaxAgeMs,
+          queryIdentity: digest(ctx.input),
+          capabilityScope: "postgresql:read-only",
+          summary: bounded({ schema: schema.rows, explanation: explanation.rows }, plan.maxEvidenceBytes),
+        }
+      } catch (error) {
+        if (!releaseError) {
+          try {
+            await ctx.exec({
+              fn: (target, sql) => target.query(sql),
+              params: [client, "ROLLBACK"],
+              name: "postgres.target.rollback-error",
+            })
+          } catch (rollbackError) {
+            releaseError = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError))
+          }
+        }
+        throw error
       }
-    } catch (error) {
-      await ctx.exec({
-        fn: (target, sql) => target.query(sql),
-        params: [client, "ROLLBACK"],
-        name: "postgres.target.rollback-error",
-      })
-      throw error
     } finally {
       await ctx.exec({
-        fn: (target) => target.release(),
-        params: [client],
+        fn: (target, cause) => cause ? target.release(cause) : target.release(),
+        params: [client, releaseError],
         name: "postgres.target.release",
       })
     }

@@ -100,6 +100,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -113,21 +114,64 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check release policy
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          pnpm release-policy:test
+          pnpm release-policy:check -- --base "$BASE_SHA"
+
       - name: Check for changeset
         env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          if [[ "$PR_TITLE" == *"chore:"* ]] || \
-             [[ "$PR_TITLE" == *"docs:"* ]] || \
-             [[ "$PR_TITLE" == *"ci:"* ]] || \
+          TITLE_SKIP_PATTERN='^(chore|docs|ci)(\([^)]+\))?!?:([[:space:]]|$)'
+          if [[ "$PR_TITLE" =~ $TITLE_SKIP_PATTERN ]] || \
              [[ "$PR_TITLE" == *"[skip-changeset]"* ]]; then
             echo "Skipping changeset check for this PR type"
             exit 0
           fi
 
-          pnpm release-policy:test
-          pnpm release-policy:check -- --base origin/main
-          pnpm changeset status --since=origin/main
+          pnpm changeset status --since="$BASE_SHA"
+
+  contract:
+    name: Public Contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check public and inline execution contracts
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          CHECKOUT_HEAD="$(git rev-parse HEAD)"
+          CHANGED_FILES="$RUNNER_TEMP/public-contract-changed-files.json"
+          git diff --name-only "$BASE_SHA...$CHECKOUT_HEAD" |
+            node -e 'let value = ""; process.stdin.setEncoding("utf8"); process.stdin.on("data", chunk => value += chunk); process.stdin.on("end", () => process.stdout.write(JSON.stringify(value.split(/\r?\n/u).filter(Boolean))))' > "$CHANGED_FILES"
+          pnpm examples:test
+          pnpm examples:check
+          pnpm contract:test
+          pnpm contract:check -- --base "$BASE_SHA" --changed-files "$CHANGED_FILES" --pr-json "$GITHUB_EVENT_PATH" --expect-head "$CHECKOUT_HEAD"
+          pnpm inline-exec:test
+          pnpm inline-exec:check -- --expect-head "$CHECKOUT_HEAD"
 
   changed-packages:
     name: Changed Packages
@@ -137,6 +181,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -152,5 +197,5 @@ jobs:
 
       - name: Rebuild changed packages
         env:
-          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: pnpm ci:changed-packages

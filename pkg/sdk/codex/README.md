@@ -9,7 +9,10 @@ import { createScope } from "@pumped-fn/lite"
 import * as codex from "@pumped-fn/sdk-codex"
 
 const scope = createScope({
-  tags: [codex.codexConfig({ auth: { kind: "global" } })],
+  tags: [codex.codexConfig({
+    auth: { kind: "global" },
+    cwd: "/absolute/path/to/project",
+  })],
 })
 const ctx = scope.createContext()
 await ctx.exec({ flow: codex.codexTurn, input: {
@@ -22,12 +25,23 @@ await ctx.close()
 await scope.dispose()
 ```
 
-Global auth reuses writable `CODEX_HOME` state. API-key auth reads the configured environment name
-and passes it to `codex exec` as `CODEX_API_KEY`:
+CLI auth and an absolute working directory are required. Global auth reuses writable `CODEX_HOME`
+state. API-key auth reads the configured environment name and passes it to `codex exec` as
+`CODEX_API_KEY`:
 
 ```ts
-codex.codexConfig({ auth: { kind: "api-key", env: "MY_CODEX_KEY" } })
+codex.codexConfig({
+  auth: { kind: "api-key", env: "MY_CODEX_KEY" },
+  cwd: "/absolute/path/to/project",
+})
 ```
+
+When a current SDK work authority is present, the CLI checks `cwd`, explicit isolate roots, write
+access, and network access against that authority before starting `codex exec`. Standalone calls
+without session work keep their explicit config contract. Root checks resolve symlinks before
+containment. `extraArgs` accepts only `-m`/`--model`, `--color`, `--json`, and
+`--skip-git-repo-check`; working-directory, sandbox, config, and other authority-bearing flags are
+rejected in split and `--flag=value` forms.
 
 ACP uses `@agentclientprotocol/codex-acp` over stdio through the official TypeScript client. Its auth,
 working directory, extra roots, permission policy, and shutdown bound are required. Paths must be
@@ -59,8 +73,14 @@ await ctx.close()
 await scope.dispose()
 ```
 
+ACP applies the same current-work check to `cwd`, `additionalDirectories`, and granted write and
+network capabilities before starting its process or creating a session.
+
 Each ACP prompt sends `cwd`, `additionalDirectories`, and `mcpServers: []`. Pumped-fn tool collection
-and MCP projection remain deferred. Abort sends `session/cancel`. Scope cleanup closes the ACP
+and MCP projection remain deferred. Abort sends `session/cancel`, releases local correlation state,
+and waits at most `shutdownTimeoutMs` for the remote prompt and cancellation to settle. A timed-out
+prompt terminates and releases its transport before a replacement can start. Failed termination
+quarantines the session invocation, which fences session finish. Scope cleanup closes the ACP
 connection and child within `shutdownTimeoutMs`, escalates to `SIGKILL` for one more bound, waits for
 the child process and transport to close, and clears request correlation state. Cleanup rejects with
 `CodexShutdownError` instead of reporting success if the second bound expires.

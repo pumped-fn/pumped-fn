@@ -12,6 +12,7 @@
     "lint": "pnpm -F @pumped-fn/lite-lint build && node pkg/tool/lint/dist/cli.mjs README.md docs examples/README.md scripts/README.md pkg/README.md pkg/sdk/README.md pkg/core/README.md pkg/ext/README.md pkg/framework/README.md pkg/react/README.md pkg/render/README.md pkg/tool/README.md pkg/core/lite/README.md pkg/core/lite/PATTERNS.md pkg/react/lite-react/README.md pkg/react/lite-react/PATTERNS.md examples/invoice-triage examples/issue-triage playground/compare/README.md playground/compare/cases playground/compare/src playground/compare/sandbox playground/compare/scripts playground/compare/vite.config.ts && node scripts/check-example-alignment.mjs",
     "lint:check": "pnpm lint",
     "examples:check": "node scripts/check-example-alignment.mjs",
+    "examples:test": "node --test scripts/check-example-alignment.test.mjs",
     "actionlint": "github-actionlint .github/workflows/*.yml",
     "act": "node scripts/act.mjs",
     "actions:check": "pnpm actionlint && pnpm act -l",

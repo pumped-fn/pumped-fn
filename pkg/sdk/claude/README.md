@@ -60,7 +60,8 @@ claude.config({
 same `ModelResponse` shape as `claudeTurn`. `claudeAttemptBinding` injects it through
 `agent.impl.attempt`. When a session record is present, a root-owned lease manager keeps one isolated
 sequential process for that logical session. Concurrent sessions never share a process, and abort
-releases only the selected session lease.
+releases only the selected session lease. A child process error poisons its lease before the active
+prompt settles, so queued prompts reject without starting.
 
 The scalar turn drains `claudeAttempt`. `claudeRun` and `claudeSession` remain direct prompt
 compatibility handles. `roots` lists extra absolute roots; `[]` means no extra roots. Permission policy is explicit and fail-closed. This

@@ -169,6 +169,117 @@ describe("load and bind", () => {
     await ctx.close()
     await scope.dispose()
   })
+
+  it("rejects injected nested authority at tagged and loaded record boundaries", async () => {
+    const bound = authorityValue()
+    const root = initial(bound).branches[0]!
+    const forest = Object.freeze({
+      ...initial(bound),
+      currentBranchId: "injected-root",
+      branches: Object.freeze([
+        root,
+        Object.freeze({
+          id: "injected-root",
+          version: 0,
+          createdBy: "forged",
+          authorityFingerprint: bound.fingerprint,
+          authority: bound,
+          evidence: Object.freeze([]),
+        }),
+      ]),
+    })
+    const forestScope = createScope({ tags: [authority(bound), record(forest), clock(fixedClock)] })
+    const forestContext = forestScope.createContext()
+    await expect(forestContext.resolve(session)).rejects.toThrow("exactly one root branch")
+    await forestContext.close()
+    await forestScope.dispose()
+
+    const wider = createAuthority({
+      ...bound,
+      permissions: [...bound.permissions, "database:write"],
+    })
+    const branch = initial(bound).branches[0]!
+    const injectedBranch = Object.freeze({
+      ...initial(bound),
+      branches: Object.freeze([{ ...branch, authority: wider, authorityFingerprint: wider.fingerprint }]),
+    })
+    const direct = createScope({ tags: [authority(bound), record(injectedBranch), clock(fixedClock)] })
+    const directContext = direct.createContext()
+    await expect(directContext.resolve(session)).rejects.toThrow("Root branch main authority")
+    await directContext.close()
+    await direct.dispose()
+
+    const injectedWork = Object.freeze({
+      ...initial(bound),
+      work: Object.freeze([{
+        id: "injected",
+        branchId: "main",
+        role: "test",
+        status: "completed" as const,
+        policy: "all" as const,
+        attempt: 1,
+        authority: wider,
+      }]),
+    })
+    const load = flow({
+      name: "test.session.load-injected-work",
+      parse: typed<{ id: string }>(),
+      factory: () => injectedWork,
+    })
+    const loaded = createScope({ tags: [store.load(load)] })
+    const loadedContext = loaded.createContext()
+    await expect(loadedContext.exec({
+      flow: loadAndBind,
+      input: { id: injectedWork.id, authority: bound },
+    })).rejects.toThrow("Work injected authority")
+    await loadedContext.close()
+    await loaded.dispose()
+  })
+
+  it("rejects duplicate invocation idempotency keys in loaded records", async () => {
+    const bound = authorityValue()
+    const work = Object.freeze({
+      id: "work",
+      branchId: "main",
+      role: "test",
+      status: "completed" as const,
+      policy: "all" as const,
+      attempt: 1,
+      authority: bound,
+    })
+    const attempt = Object.freeze({
+      workId: work.id,
+      attempt: 1,
+      snapshotEpoch: 1,
+      status: "completed" as const,
+      startedAt: fixedClock.now(),
+      settledAt: fixedClock.now(),
+    })
+    const stored = Object.freeze({
+      ...initial(bound),
+      work: Object.freeze([work]),
+      attempts: Object.freeze([attempt]),
+      invocations: Object.freeze([
+        Object.freeze({ id: "first", workId: work.id, attempt: 1, kind: "model" as const, status: "completed" as const, idempotencyKey: "same-effect" }),
+        Object.freeze({ id: "second", workId: work.id, attempt: 1, kind: "tool" as const, status: "completed" as const, idempotencyKey: "same-effect" }),
+      ]),
+    })
+    const load = flow({
+      name: "test.session.load-duplicate-invocation-key",
+      parse: typed<{ id: string }>(),
+      factory: () => stored,
+    })
+    const scope = createScope({ tags: [store.load(load)] })
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({
+      flow: loadAndBind,
+      input: { id: stored.id, authority: bound },
+    })).rejects.toThrow("duplicate invocation idempotency key same-effect")
+
+    await ctx.close()
+    await scope.dispose()
+  })
 })
 
 describe("session runtime", () => {
@@ -774,14 +885,6 @@ describe("session runtime", () => {
         workId: "late",
         branchId: "main",
       })],
-      ["memory", () => runtime.memory.record({
-        id: "late",
-        version: 1,
-        status: "candidate",
-        source: "session",
-        evidence: [],
-        authorityFingerprint: bound.fingerprint,
-      })],
       ["continuation", () => runtime.continuations.set("late", "value")],
     ]
 
@@ -1180,9 +1283,20 @@ describe("session runtime", () => {
         }
       },
     })
+    const stored = Object.freeze({
+      ...initial(bound),
+      memory: Object.freeze([{
+        id: "candidate",
+        version: 1,
+        status: "candidate" as const,
+        source: "session" as const,
+        evidence: Object.freeze([]),
+        authorityFingerprint: bound.fingerprint,
+      }]),
+    })
     const scope = createScope({ tags: [
       authority(bound),
-      record(initial(bound)),
+      record(stored),
       clock(fixedClock),
       artifacts.publish(publish),
       memory.commit(commitCandidate),
@@ -1190,6 +1304,7 @@ describe("session runtime", () => {
     ] })
     const ctx = scope.createContext()
     const runtime = await ctx.resolve(session)
+    expect(runtime.record.memory.map((value) => value.id)).toEqual(["candidate"])
     const host = runtime.work.admit({ id: "host", branchId: "main", role: "host", policy: "all" })
     runtime.work.settle("host", host.record.attempt, { status: "completed" })
     const narrowed = runtime.work.admit({
@@ -1230,14 +1345,6 @@ describe("session runtime", () => {
       flow: commitMemory,
       input: { workId: "host", branchId: "main", value: null, evidence: [] },
     })).rejects.toThrow("memory.commit boundary")
-    runtime.memory.record({
-      id: "candidate",
-      version: 1,
-      status: "candidate",
-      source: "session",
-      evidence: [],
-      authorityFingerprint: bound.fingerprint,
-    })
     await expect(ctx.exec({
       flow: acceptMemory,
       input: { id: "candidate", workId: "narrowed-host", evidence: [] },
@@ -1348,10 +1455,6 @@ describe("session runtime", () => {
       },
     })
     expect(child.authorityFingerprint).not.toBe(bound.fingerprint)
-    runtime.branches.record({
-      ...child,
-      evidence: [{ id: "plan", kind: "query-plan", digest: "sha256:plan" }],
-    })
     await ctx.exec({
       flow: run,
       input: {
@@ -1362,7 +1465,7 @@ describe("session runtime", () => {
     await expect(ctx.exec({
       flow: merge,
       input: { targetId: "main", sourceIds: ["analysis"], workId: "registry-work", expectedTargetVersion: 0 },
-    })).resolves.toMatchObject({ version: 1, evidence: [{ id: "plan", kind: "query-plan" }] })
+    })).resolves.toMatchObject({ version: 1, evidence: [] })
     await expect(ctx.exec({
       flow: merge,
       input: { targetId: "main", sourceIds: ["analysis"], workId: "registry-work", expectedTargetVersion: 0 },

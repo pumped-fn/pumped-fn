@@ -652,6 +652,35 @@ describe("lite lint scanner", () => {
     `)).toEqual([])
   })
 
+  it("allows named timer boundaries and rejects unclassified GC helpers", () => {
+    expect(ids(`
+      class Runtime {
+        scheduleGCTimer(): ReturnType<typeof setTimeout> {
+          return setTimeout(() => undefined, 0)
+        }
+
+        cancelGCTimer(timer: ReturnType<typeof setTimeout>): void {
+          clearTimeout(timer)
+        }
+      }
+    `)).toEqual([])
+
+    expect(ids(`
+      class Runtime {
+        scheduleGC(): ReturnType<typeof setTimeout> {
+          return setTimeout(() => undefined, 0)
+        }
+
+        cancelGC(timer: ReturnType<typeof setTimeout>): void {
+          clearTimeout(timer)
+        }
+      }
+    `)).toEqual([
+      "pumped/no-ambient-io-outside-boundary",
+      "pumped/no-ambient-io-outside-boundary",
+    ])
+  })
+
   it("keeps ambient effects invalid without explicit boundary ownership", () => {
     expect(ids(`
       import { resource } from "@pumped-fn/lite"

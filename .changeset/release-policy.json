@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "majorReleasePackages": [
     "@pumped-fn/lite",
+    "@pumped-fn/lite-react",
     "@pumped-fn/sdk",
     "@pumped-fn/sdk-claude",
     "@pumped-fn/sdk-codex",
@@ -11,7 +12,7 @@
   ],
   "compatibilityBumps": {
     "pre1Breaking": "major",
-    "stableBreaking": "minor",
+    "stableBreaking": "major",
     "widening": "patch"
   }
 }

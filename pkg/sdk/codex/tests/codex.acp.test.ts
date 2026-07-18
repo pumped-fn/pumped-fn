@@ -1,4 +1,7 @@
 import { EventEmitter } from "node:events"
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { PassThrough } from "node:stream"
 import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "node:child_process"
 import { createScope, preset, type Lite } from "@pumped-fn/lite"
@@ -171,6 +174,10 @@ lines.on("line", (line) => {
 })
 `
 
+const recoveringAgent = String.raw`
+recovering
+`
+
 function managedConfig(source = agent, shutdownTimeoutMs = 5_000) {
   return codexAcpConfig({
     auth: { kind: "global" },
@@ -185,7 +192,9 @@ function managedConfig(source = agent, shutdownTimeoutMs = 5_000) {
 
 it("passes explicit roots with no MCP servers and leaves no live state after close", async () => {
   const scope = createScope({ presets: [preset(spawnProcess, managedProcess(agent))], tags: [managedConfig()] })
-  const ctx = scope.createContext()
+  const ctx = scope.createContext({
+    tags: [session.current.authority(testAuthority([process.cwd(), "/tmp"]))],
+  })
   const boundary = await ctx.resolve(acp)
   const output = JSON.parse(await ctx.exec({ flow: codexAcpPrompt, input: request })) as {
     cwd: string
@@ -331,8 +340,7 @@ it("does not publish a late continuation after the session starts finishing", as
   }
   expect(boundary.continuations.get("codex-acp:sdk-session:main")).toBeInstanceOf(Promise)
   controller.abort()
-  await runtime.beginFinish()
-  runtime.completeFinish(1)
+  await runtime.finishWith(async (_record, expectedVersion) => expectedVersion + 1)
 
   await expect(events).resolves.toMatchObject({ name: "AbortError" })
   await expect(stream.result).rejects.toMatchObject({ name: "AbortError" })
@@ -385,14 +393,14 @@ it("bounds consumer-stop when the ACP agent ignores cancellation", async () => {
   await scope.dispose()
 })
 
-it("quarantines a timed-out continuation until the active prompt settles", async () => {
+it("releases timed-out state and ignores late settlement after replacement", async () => {
   const lifecycle = createClock()
   const branch = branchRecord()
   const record = sessionRecord("sdk-session", branch)
   const scope = createScope({
-    presets: [preset(clock, lifecycle.value), preset(spawnProcess, managedProcess(uncooperativeAgent))],
+    presets: [preset(clock, lifecycle.value), preset(spawnProcess, managedProcess(recoveringAgent))],
     tags: [
-      managedConfig(uncooperativeAgent, 25),
+      managedConfig(recoveringAgent, 25),
       session.authority(branch.authority),
       session.record(record),
       session.clock({ now: () => new Date(0).toISOString() }),
@@ -409,9 +417,7 @@ it("quarantines a timed-out continuation until the active prompt settles", async
     done: false,
     value: { type: "provider_status", status: "started" },
   })
-  expect(runtime.record.providerContinuations).toEqual({
-    "codex-acp:sdk-session:main": "uncooperative-session",
-  })
+  expect(runtime.record.providerContinuations).toEqual({ "codex-acp:sdk-session:main": "recovering-session-0" })
   const result = stream.result.catch(() => undefined)
   const stopped = iterator.return?.()
   await lifecycle.pending(1)
@@ -420,16 +426,39 @@ it("quarantines a timed-out continuation until the active prompt settles", async
   await result
 
   expect(runtime.record.providerContinuations).toEqual({})
-  expect(boundary.continuations).toEqual(new Map([
-    ["codex-acp:sdk-session:main", "uncooperative-session"],
-  ]))
-  expect(boundary.sessions.has("uncooperative-session")).toBe(true)
+  expect(boundary.continuations).toEqual(new Map())
+  expect(boundary.sessions).toEqual(new Map())
+  expect(boundary.streams).toEqual(new Map())
+  expect(boundary.metadata).toEqual(new Map())
 
+  const replacementBoundary = await host.resolve(acp)
+  expect(replacementBoundary).not.toBe(boundary)
   const replacement = host.execStream({ flow: codexAcpAttempt, input: request, tags: executionTags })
-  const replacementEvents = collect(replacement).catch((error: unknown) => error)
-  await expect(replacement.result).rejects.toMatchObject({ name: "CodexConcurrencyError" })
-  await expect(replacementEvents).resolves.toMatchObject({ name: "CodexConcurrencyError" })
-  expect(boundary.sessions.has("uncooperative-session")).toBe(true)
+  const replacementIterator = replacement[Symbol.asyncIterator]()
+  await expect(replacementIterator.next()).resolves.toMatchObject({
+    done: false,
+    value: { type: "provider_status", status: "started" },
+  })
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  expect(runtime.record.providerContinuations).toEqual({ "codex-acp:sdk-session:main": "recovering-session-0" })
+  expect(replacementBoundary.continuations).toEqual(new Map([
+    ["codex-acp:sdk-session:main", "recovering-session-0"],
+  ]))
+  expect(replacementBoundary.sessions.has("recovering-session-0")).toBe(true)
+  expect(replacementBoundary.streams.has("recovering-session-0")).toBe(true)
+  expect(replacementBoundary.metadata.has("recovering-session-0")).toBe(true)
+
+  const replacementResult = replacement.result.catch(() => undefined)
+  const replacementStopped = replacementIterator.return?.()
+  await lifecycle.pending(1)
+  lifecycle.fire()
+  await expect(replacementStopped).resolves.toMatchObject({ done: true })
+  await replacementResult
+  expect(runtime.record.providerContinuations).toEqual({})
+  expect(replacementBoundary.continuations).toEqual(new Map())
+  expect(replacementBoundary.sessions).toEqual(new Map())
+  expect(replacementBoundary.streams).toEqual(new Map())
+  expect(replacementBoundary.metadata).toEqual(new Map())
 
   await host.close()
   await scope.dispose()
@@ -472,9 +501,100 @@ it("sends ACP cancellation from AbortSignal and settles correlation state", asyn
   await new Promise<void>((resolve) => setTimeout(resolve, 25))
   controller.abort()
 
-  await expect(prompt).resolves.toBe("")
+  await expect(prompt).rejects.toMatchObject({ name: "AbortError" })
   expect(boundary.sessions.size).toBe(0)
   expect(boundary.metadata.size).toBe(0)
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("bounds scalar ACP cancellation and releases local state when the agent does not settle", async () => {
+  const lifecycle = createClock()
+  const controller = new AbortController()
+  const scope = createScope({
+    presets: [preset(clock, lifecycle.value), preset(spawnProcess, managedProcess(uncooperativeAgent))],
+    tags: [managedConfig(uncooperativeAgent, 25)],
+  })
+  const ctx = scope.createContext()
+  const boundary = await ctx.resolve(acp)
+  const prompt = ctx.exec({ flow: codexAcpPrompt, input: request, signal: controller.signal })
+  while (boundary.sessions.size === 0) await new Promise((resolve) => setImmediate(resolve))
+
+  controller.abort()
+  await lifecycle.pending(1)
+  expect(boundary.sessions).toEqual(new Map())
+  expect(boundary.metadata).toEqual(new Map())
+  lifecycle.fire()
+
+  await expect(prompt).rejects.toMatchObject({ name: "AbortError" })
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("rejects ACP roots outside current work authority before spawning", async () => {
+  const lifecycle = createLifecycleHarness({ closeOnForce: true })
+  const cwd = process.cwd()
+  const config = managedConfig(agent)
+  const authority = session.createAuthority({
+    tenant: "codex-acp-test",
+    roots: [cwd],
+    permissions: [],
+    tools: [],
+    sandbox: { roots: [cwd], commands: [], write: false, network: false },
+  })
+  const scope = createScope({ presets: [preset(spawnProcess, lifecycle.spawn)], tags: [config] })
+  const ctx = scope.createContext({ tags: [session.current.authority(authority)] })
+
+  await expect(ctx.resolve(acp)).rejects.toThrow("ACP roots exceed current work authority")
+  expect(lifecycle.starts).toBe(0)
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("rejects an ACP directory that escapes authority through a symlink", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pumped-acp-symlink-"))
+  const allowed = join(root, "allowed")
+  const outside = join(root, "outside")
+  await mkdir(allowed)
+  await mkdir(outside)
+  const escape = join(allowed, "escape")
+  await symlink(outside, escape, "dir")
+  const scope = createScope({ tags: [codexAcpConfig({
+    auth: { kind: "global" },
+    cwd: allowed,
+    additionalDirectories: [escape],
+    permission: "deny",
+    shutdownTimeoutMs: 10,
+  })] })
+  const ctx = scope.createContext({ tags: [session.current.authority(testAuthority([allowed]))] })
+
+  await expect(ctx.resolve(acp)).rejects.toThrow("ACP roots exceed current work authority")
+
+  await ctx.close()
+  await scope.dispose()
+  await rm(root, { recursive: true })
+})
+
+it.each([
+  [false, true, "ACP write exceeds current work authority"],
+  [true, false, "ACP network exceeds current work authority"],
+] as const)("rejects ACP grant outside current work capabilities %#", async (write, network, message) => {
+  const lifecycle = createLifecycleHarness({ closeOnForce: true })
+  const cwd = process.cwd()
+  const scope = createScope({
+    presets: [preset(spawnProcess, lifecycle.spawn)],
+    tags: [codexAcpConfig({
+      auth: { kind: "global" },
+      cwd,
+      additionalDirectories: [],
+      permission: "grant",
+      shutdownTimeoutMs: 25,
+    })],
+  })
+  const ctx = scope.createContext({ tags: [session.current.authority(testAuthority([cwd], write, network))] })
+
+  await expect(ctx.resolve(acp)).rejects.toThrow(message)
+  expect(lifecycle.starts).toBe(0)
   await ctx.close()
   await scope.dispose()
 })
@@ -619,6 +739,7 @@ function managedProcess(source: string): Lite.Utils.AtomValue<typeof spawnProces
     let buffered = ""
     let exitCode: number | null = null
     let sessionConfig: AcpMessage["params"]
+    let stalePrompt: number | undefined
     const send = (message: unknown) => output.write(`${JSON.stringify(message)}\n`)
     const kind = source === parallelAgent
       ? "parallel"
@@ -630,14 +751,18 @@ function managedProcess(source: string): Lite.Utils.AtomValue<typeof spawnProces
             ? "late"
             : source === blockedSessionAgent
               ? "blocked"
-              : source === uncooperativeAgent
-                ? "uncooperative"
-                : "agent"
+              : source === recoveringAgent
+                ? "recovering"
+                : source === uncooperativeAgent
+                  ? "uncooperative"
+                  : "agent"
     const sessionId = () => kind === "agent"
       ? "probe-session"
       : kind === "uncooperative"
         ? "uncooperative-session"
-        : `session-${created++}`
+        : kind === "recovering"
+          ? `recovering-session-${created++}`
+          : `session-${created++}`
     const respondSession = (message: AcpMessage, id: string) => send({
       jsonrpc: "2.0",
       id: message.id,
@@ -667,6 +792,15 @@ function managedProcess(source: string): Lite.Utils.AtomValue<typeof spawnProces
           const id = message.params?.sessionId ?? ""
           const text = message.params?.prompt?.[0]?.text ?? ""
           if (kind === "uncooperative") continue
+          if (kind === "recovering") {
+            if (stalePrompt === undefined) {
+              stalePrompt = message.id
+            } else {
+              send({ jsonrpc: "2.0", id: stalePrompt, result: { stopReason: "cancelled" } })
+              stalePrompt = undefined
+            }
+            continue
+          }
           if (text.includes("wait for cancellation")) {
             if (message.id !== undefined) pending.set(id, message.id)
           } else if (kind === "agent") {
@@ -859,13 +993,13 @@ function sessionRecord(id: string, branch: session.BranchRecord): session.Sessio
   }
 }
 
-function testAuthority(): session.Authority {
+function testAuthority(roots: readonly string[] = [], write = false, network = false): session.Authority {
   return session.createAuthority({
     tenant: "test",
-    roots: [],
+    roots,
     permissions: [],
     tools: [],
-    sandbox: { roots: [], commands: [], write: false, network: false },
+    sandbox: { roots, commands: [], write, network },
   })
 }
 

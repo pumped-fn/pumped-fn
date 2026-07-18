@@ -345,6 +345,27 @@ it("runs sequential stream-json prompts through a scope-owned engine", async () 
   expect(harness.live).toBe(false)
 })
 
+it("poisons a managed lease before child failure settles queued prompts", async () => {
+  const harness = createHarness()
+  const scope = createScope({
+    presets: [preset(engine, harness.engine)],
+    tags: [claudeConfig(managedConfig())],
+  })
+  const ctx = scope.createContext()
+  const leases = await ctx.resolve(claudeLeases)
+  const first = leases.prompt("shared", "first")
+  const queued = leases.prompt("shared", "must-not-start")
+  await harness.writes(1)
+
+  harness.fail(new Error("Claude child failed"))
+
+  await expect(first.result).rejects.toThrow("Claude child failed")
+  await expect(queued.result).rejects.toThrow("Claude session is closed")
+  expect(harness.prompts).toEqual(["first"])
+  await ctx.close()
+  await scope.dispose()
+})
+
 it("interrupts an active prompt and awaits child close", async () => {
   const harness = createHarness({ closeOnEnd: false, closeOnInterrupt: false })
   const controller = new AbortController()
@@ -543,6 +564,11 @@ function createHarness(options: { closeOnEnd?: boolean; closeOnInterrupt?: boole
     prompts,
     result(value: string) {
       output.write(`${JSON.stringify({ type: "result", result: value, is_error: false })}\n`)
+    },
+    fail(reason: Error) {
+      if (!live) return
+      live = false
+      child.emit("error", reason)
     },
     close,
     async writes(count: number) {

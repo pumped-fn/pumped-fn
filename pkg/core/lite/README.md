@@ -360,6 +360,22 @@ await scope.dispose()
 
 > **Note:** Use `controller(dep, { resolve: true, watch: true, eq })` in atom dependencies for derived atoms that should invalidate when a dependency changes. That replaces manual subscription wiring and automatically cleans up on re-resolve, release, and dispose.
 
+### Atom Release Ownership
+
+An atom factory's resolve context exposes `ctx.release()`, bound to the exact atom generation that created
+that context. Use it when a cleanup path can re-enter release after an async boundary. Releasing that
+generation remains exactly once: the owning cleanup does not wait on itself, while outside
+`scope.release(atom)`, `scope.resolve(atom)`, and `scope.dispose()` callers wait for cleanup to finish.
+After the atom resolves again, an older context's release capability is stale and cannot release the new
+generation. `ctx.scope` remains the original scope.
+
+The generation also owns its pending factory and cleanup list. `scope.release(atom)` waits for a pending
+factory to settle, drains cleanup registered before settlement, and only then lets a replacement resolve.
+Invalidation detaches the old generation before running its cleanup, so cleanup can await its own stale
+`ctx.release()` without running twice or releasing the replacement. Listener failures still reject the
+owning `resolve()`, `release()`, or `flush()` call, but only after sibling listeners run and the state
+transition finishes.
+
 ### Async Iteration
 
 Every subscription surface is also consumable as an async iterator. `scope.changes(atom)` yields values

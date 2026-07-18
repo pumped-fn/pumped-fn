@@ -11,6 +11,7 @@
 ### Major Changes
 
 - Remove `claudeCliWorker`, `codexCliWorker`, `claudeHarness`, `codexHarness`, and their provider-specific option types. Provider packages now own stable module-level handles and config tags. Add `formatModelPrompt` and `parseModelResponse` as reference-level building blocks.
+- Validate tagged and loaded session records recursively before activation. Remove the public raw memory writer, bind commit and accept results to their source and normalized evidence, and keep quarantined invocations as a finish fence.
 
 ## 2.0.0
 

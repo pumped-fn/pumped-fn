@@ -111,12 +111,13 @@ export const syncIssues = flow({
       params: [pool],
       name: "postgres.control.connect",
     })
-    await ctx.exec({
-      fn: (target, sql) => target.query(sql),
-      params: [client, "BEGIN"],
-      name: "postgres.control.begin",
-    })
+    let releaseError: Error | undefined
     try {
+      await ctx.exec({
+        fn: (target, sql) => target.query(sql),
+        params: [client, "BEGIN"],
+        name: "postgres.control.begin",
+      })
       for (const issue of ctx.input.issues) {
         await ctx.exec({
           fn: (target, sql, values) => target.query(sql, [...values]),
@@ -167,16 +168,20 @@ export const syncIssues = flow({
         name: "postgres.control.commit",
       })
     } catch (error) {
-      await ctx.exec({
-        fn: (target, sql) => target.query(sql),
-        params: [client, "ROLLBACK"],
-        name: "postgres.control.rollback",
-      })
+      try {
+        await ctx.exec({
+          fn: (target, sql) => target.query(sql),
+          params: [client, "ROLLBACK"],
+          name: "postgres.control.rollback",
+        })
+      } catch (rollbackError) {
+        releaseError = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError))
+      }
       throw error
     } finally {
       await ctx.exec({
-        fn: (target) => target.release(),
-        params: [client],
+        fn: (target, cause) => cause ? target.release(cause) : target.release(),
+        params: [client, releaseError],
         name: "postgres.control.release",
       })
     }

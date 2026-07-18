@@ -397,9 +397,9 @@ function createManagedLease(
     stdio: ["pipe", "pipe", "pipe"],
   })
   const lines = deps.lineReader({ input: child.stdout })
-  const exited = new Promise<void>((resolve, reject) => {
-    child.once("error", reject)
-    child.once("close", () => resolve())
+  const exited = new Promise<Error | undefined>((resolve) => {
+    child.once("error", resolve)
+    child.once("close", () => resolve(undefined))
   })
   let current: {
     readonly events: EventQueue<agent.ModelEvent>
@@ -430,14 +430,11 @@ function createManagedLease(
     }
   }
 
-  const awaitExit = () => new Promise<boolean>((resolve, reject) => {
+  const awaitExit = () => new Promise<boolean>((resolve) => {
     const timeout = deps.clock.set(() => resolve(false), config.shutdownTimeoutMs)
     exited.then(() => {
       deps.clock.clear(timeout)
       resolve(true)
-    }, (error) => {
-      deps.clock.clear(timeout)
-      reject(error)
     })
   })
 
@@ -460,10 +457,16 @@ function createManagedLease(
   }
 
   child.stderr.resume()
-  exited.then(() => {
+  exited.then((error) => {
     closed = true
-    if (!closing && current) settle({ error: new ClaudeProcessError("Claude process closed before result") })
-  }, (error: Error) => settle({ error }))
+    if (error) {
+      closing = true
+      lines.close()
+      settle({ error })
+    } else if (!closing && current) {
+      settle({ error: new ClaudeProcessError("Claude process closed before result") })
+    }
+  })
   lines.on("line", (line) => {
     try {
       const event = parseManagedEvent(line)

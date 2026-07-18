@@ -7,10 +7,12 @@ subscribe to atoms, selected slices, resources, and scoped values. Event handler
 `useFlow`, through the provider-owned execution context. Forms and nested UI state can live in execution-scoped resources instead
 of local component mirrors.
 
-## Install
+## Migration to 3.0.0
+
+Install 3.0 with Lite 6:
 
 ```bash
-npm install @pumped-fn/lite @pumped-fn/lite-react
+npm install @pumped-fn/lite@^6.0.0 @pumped-fn/lite-react@^3.0.0
 ```
 
 ## The Rule
