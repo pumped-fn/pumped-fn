@@ -158,6 +158,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build packages
+        run: pnpm build
+
       - name: Check public and inline execution contracts
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
