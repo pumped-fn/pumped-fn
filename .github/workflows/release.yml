@@ -45,8 +45,8 @@ jobs:
 
       - name: Install Lightpanda browser
         run: |
-          lightpanda_sha256=7c2ed74b65b002203de17ff0289b19616db77321f762e1c1e9a0cd4d47e64b81
-          curl -fsSL -o /tmp/lightpanda https://github.com/lightpanda-io/browser/releases/download/nightly/lightpanda-x86_64-linux
+          lightpanda_sha256=5713d49d06e8d4948d3358b6ce859ecca8e6f07dc312134d9f54999fb6e66c52
+          curl -fsSL -o /tmp/lightpanda https://github.com/lightpanda-io/browser/releases/download/0.3.5/lightpanda-x86_64-linux
           echo "${lightpanda_sha256}  /tmp/lightpanda" | sha256sum --check --status
           chmod +x /tmp/lightpanda
           echo "LIGHTPANDA_EXECUTABLE_PATH=/tmp/lightpanda" >> "$GITHUB_ENV"
