@@ -61,6 +61,8 @@ lines.on("line", (line) => {
 })
 `
 
+const allowAlwaysAgent = agent.replace("kind: \"allow_once\"", "kind: \"allow_always\"")
+
 const parallelAgent = String.raw`
 import readline from "node:readline"
 setInterval(() => {}, 1_000)
@@ -551,6 +553,35 @@ it("rejects ACP roots outside current work authority before spawning", async () 
   await scope.dispose()
 })
 
+it("never selects an allow_always ACP permission", async () => {
+  const cwd = process.cwd()
+  const authority = session.createAuthority({
+    tenant: "codex-acp-test",
+    roots: [cwd],
+    permissions: ["write"],
+    tools: [],
+    sandbox: { roots: [cwd], commands: [], write: true, network: true },
+  })
+  const scope = createScope({
+    presets: [preset(spawnProcess, managedProcess(allowAlwaysAgent))],
+    tags: [codexAcpConfig({
+      auth: { kind: "global" },
+      command: process.execPath,
+      args: ["--input-type=module", "--eval", allowAlwaysAgent],
+      cwd,
+      additionalDirectories: [],
+      permission: "grant",
+      shutdownTimeoutMs: 5_000,
+    })],
+  })
+  const ctx = scope.createContext({ tags: [session.current.authority(authority)] })
+  const output = JSON.parse(await ctx.exec({ flow: codexAcpPrompt, input: request })) as { permission: unknown }
+
+  expect(output.permission).toEqual({ outcome: { outcome: "cancelled" } })
+  await ctx.close()
+  await scope.dispose()
+})
+
 it("rejects an ACP directory that escapes authority through a symlink", async () => {
   const root = await mkdtemp(join(tmpdir(), "pumped-acp-symlink-"))
   const allowed = join(root, "allowed")
@@ -741,22 +772,24 @@ function managedProcess(source: string): Lite.Utils.AtomValue<typeof spawnProces
     let sessionConfig: AcpMessage["params"]
     let stalePrompt: number | undefined
     const send = (message: unknown) => output.write(`${JSON.stringify(message)}\n`)
-    const kind = source === parallelAgent
-      ? "parallel"
-      : source === continuationAgent
-        ? "continuation"
-        : source === delayedContinuationAgent
-          ? "delayed"
-          : source === lateContinuationAgent
-            ? "late"
-            : source === blockedSessionAgent
-              ? "blocked"
-              : source === recoveringAgent
-                ? "recovering"
-                : source === uncooperativeAgent
-                  ? "uncooperative"
-                  : "agent"
-    const sessionId = () => kind === "agent"
+    const kind = source.includes("kind: \"allow_always\"")
+      ? "allow-always"
+      : source === parallelAgent
+        ? "parallel"
+        : source === continuationAgent
+          ? "continuation"
+          : source === delayedContinuationAgent
+            ? "delayed"
+            : source === lateContinuationAgent
+              ? "late"
+              : source === blockedSessionAgent
+                ? "blocked"
+                : source === recoveringAgent
+                  ? "recovering"
+                  : source === uncooperativeAgent
+                    ? "uncooperative"
+                    : "agent"
+    const sessionId = () => kind === "agent" || kind === "allow-always"
       ? "probe-session"
       : kind === "uncooperative"
         ? "uncooperative-session"
@@ -803,7 +836,7 @@ function managedProcess(source: string): Lite.Utils.AtomValue<typeof spawnProces
           }
           if (text.includes("wait for cancellation")) {
             if (message.id !== undefined) pending.set(id, message.id)
-          } else if (kind === "agent") {
+          } else if (kind === "agent" || kind === "allow-always") {
             activePrompt = message.id
             send({
               jsonrpc: "2.0",
@@ -812,7 +845,7 @@ function managedProcess(source: string): Lite.Utils.AtomValue<typeof spawnProces
               params: {
                 sessionId: id,
                 toolCall: { toolCallId: "tool-1", title: "write" },
-                options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }],
+                options: [{ optionId: "allow", name: "Allow", kind: kind === "allow-always" ? "allow_always" : "allow_once" }],
               },
             })
           } else {

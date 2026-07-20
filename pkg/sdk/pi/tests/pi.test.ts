@@ -89,6 +89,57 @@ function request(): ModelRequest {
   }
 }
 
+function piProvenance(authority: session.Authority): {
+  runtime: session.SessionRuntime
+  work: session.WorkRecord
+  attempt: session.AttemptRecord
+  branch: session.BranchRecord
+} {
+  const branch: session.BranchRecord = {
+    id: "main",
+    version: 0,
+    createdBy: "root",
+    authorityFingerprint: authority.fingerprint,
+    authority,
+    evidence: [],
+  }
+  const work: session.WorkRecord = {
+    id: "work-1",
+    branchId: branch.id,
+    role: "task",
+    status: "working",
+    policy: "all",
+    attempt: 1,
+    authority,
+  }
+  const attempt: session.AttemptRecord = {
+    workId: work.id,
+    attempt: 1,
+    snapshotEpoch: 0,
+    status: "working",
+    startedAt: "now",
+  }
+  const record = {
+    id: "pi-session",
+    version: 0,
+    schemaVersion: 1,
+    status: "open" as const,
+    authorityFingerprint: authority.fingerprint,
+    authorityConstraints: authority,
+    currentBranchId: branch.id,
+    branches: [branch],
+    work: [work],
+    attempts: [attempt],
+    invocations: [],
+    artifacts: [],
+    memory: [],
+    schedules: [],
+    providerContinuations: {},
+    nextEventSequence: 0,
+  } as session.SessionRecord
+  return { runtime: { authority, record } as session.SessionRuntime, work, attempt, branch }
+}
+
 it("requires session provenance before using a bound provider", async () => {
   const authority = session.createAuthority({
     tenant: "pi-test",
@@ -104,6 +155,65 @@ it("requires session provenance before using a bound provider", async () => {
   const ctx = scope.createContext({ tags: [session.current.authority(authority)] })
 
   await expect(ctx.exec({ flow: piAttempt, input: request() })).rejects.toThrow("complete session provenance")
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("rejects a forged authority body before using a bound provider", async () => {
+  const authority = session.createAuthority({
+    tenant: "pi-test",
+    roots: [],
+    permissions: [],
+    tools: [],
+    sandbox: { roots: [], commands: [], write: false, network: true },
+  })
+  const forged = { ...authority, tenant: "forged" } as session.Authority
+  const provenance = piProvenance(authority)
+  const scope = createScope({
+    presets: [preset(models, collection())],
+    tags: [piConfig({ provider: "test", modelId: "test-model" })],
+  })
+  const ctx = scope.createContext({ tags: [
+    session.current.authority(forged),
+    session.current.session(provenance.runtime),
+    session.current.work({ ...provenance.work, authority: forged }),
+    session.current.attempt(provenance.attempt),
+    session.current.branch(provenance.branch),
+    session.current.epoch(provenance.attempt.snapshotEpoch),
+  ] })
+
+  await expect(ctx.exec({ flow: piAttempt, input: request() })).rejects.toThrow("authority does not match work provenance")
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("rejects a bound provider when runtime membership is stale", async () => {
+  const authority = session.createAuthority({
+    tenant: "pi-test",
+    roots: [],
+    permissions: [],
+    tools: [],
+    sandbox: { roots: [], commands: [], write: false, network: true },
+  })
+  const provenance = piProvenance(authority)
+  const runtime = {
+    ...provenance.runtime,
+    record: { ...provenance.runtime.record, work: [] },
+  } as session.SessionRuntime
+  const scope = createScope({
+    presets: [preset(models, collection())],
+    tags: [piConfig({ provider: "test", modelId: "test-model" })],
+  })
+  const ctx = scope.createContext({ tags: [
+    session.current.authority(authority),
+    session.current.session(runtime),
+    session.current.work(provenance.work),
+    session.current.attempt(provenance.attempt),
+    session.current.branch(provenance.branch),
+    session.current.epoch(provenance.attempt.snapshotEpoch),
+  ] })
+
+  await expect(ctx.exec({ flow: piAttempt, input: request() })).rejects.toThrow("provenance does not match the active attempt")
   await ctx.close()
   await scope.dispose()
 })

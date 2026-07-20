@@ -73,13 +73,14 @@ export const codexRun = flow({
     authority: tags.optional(session.current.authority),
     config: tags.required(codexConfig),
     environment,
+    runtime: tags.optional(session.current.session),
     work: tags.optional(session.current.work),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async (ctx, { absolutePath, authority, config, environment, work }) => {
+  factory: async (ctx, { absolutePath, authority, config, environment, runtime, work }) => {
     if (!absolutePath(config.cwd)) throw new CodexConfigError("Codex cwd must be absolute")
     assertExtraArgs(config.extraArgs ?? [])
-    const boundAuthority = bindAuthority(authority, work)
+    const boundAuthority = bindSessionAuthority(runtime, work, undefined, authority)
     const effectiveConfig = boundAuthority ? authorizeCliConfig(config, boundAuthority) : config
     const env = config.auth.kind === "api-key"
       ? { CODEX_API_KEY: requiredEnvironment(environment, config.auth.env ?? "CODEX_API_KEY") }
@@ -552,14 +553,63 @@ function bindSessionAuthority(
   authority: session.Authority | undefined,
 ): session.Authority | undefined {
   if (
-    (work && (!runtime || !attempt || !authority))
+    (work && (!runtime || !authority))
     || (attempt && (!runtime || !work || !authority))
   ) {
     throw new CodexConfigError("Codex session tags must be provided as one bound tuple")
   }
-  if (!work) return authority
-  if (!runtime || !attempt) throw new CodexConfigError("Codex session tags must be provided as one bound tuple")
+  if (!work) return bindAuthority(authority, undefined)
+  if (!runtime || !authority) throw new CodexConfigError("Codex session tags must be provided as one bound tuple")
+  if (session.authorityFingerprint(runtime.authority) !== runtime.authority.fingerprint
+    || session.authorityFingerprint(runtime.record.authorityConstraints) !== runtime.record.authorityFingerprint
+    || runtime.record.authorityFingerprint !== runtime.authority.fingerprint) {
+    throw new CodexConfigError("Codex session authority fingerprint is invalid")
+  }
+  const recordedWork = runtime.record.work.find((value) => value.id === work.id)
+  if (!recordedWork || recordedWork.status !== "working") {
+    throw new CodexConfigError("Codex session provenance does not match the active work")
+  }
+  if (recordedWork.branchId !== work.branchId || !authorityEquivalent(recordedWork.authority, work.authority)) {
+    throw new CodexConfigError("Codex session provenance does not match the active work")
+  }
+  const recordedAttempt = attempt && runtime.record.attempts.find((value) => value.workId === attempt.workId
+    && value.attempt === attempt.attempt
+    && value.snapshotEpoch === attempt.snapshotEpoch)
+  if (attempt) {
+    if (!recordedAttempt
+      || work.attempt !== attempt.attempt
+      || attempt.status !== "working"
+      || recordedAttempt.status !== "working") {
+      throw new CodexConfigError("Codex session provenance does not match the active attempt")
+    }
+  } else if (recordedWork.attempt !== work.attempt) {
+    throw new CodexConfigError("Codex session provenance does not match the active attempt")
+  }
+  if (!authorityWithin(runtime.authority, authority)) {
+    throw new CodexConfigError("Codex authority does not match current runtime")
+  }
   return bindAuthority(authority, work)
+}
+
+function authorityWithin(parent: session.Authority, child: session.Authority): boolean {
+  try {
+    return session.narrowAuthority(parent, {
+      roots: child.roots,
+      permissions: child.permissions,
+      tools: child.tools,
+      sandbox: child.sandbox,
+    }).fingerprint === child.fingerprint
+  } catch {
+    return false
+  }
+}
+
+function authorityEquivalent(left: session.Authority, right: session.Authority): boolean {
+  try {
+    return JSON.stringify(session.createAuthority(left)) === JSON.stringify(session.createAuthority(right))
+  } catch {
+    return false
+  }
 }
 
 function authorizeCliConfig(config: CodexConfig, authority: session.Authority): CodexConfig {
@@ -632,7 +682,7 @@ function assertCliAuthority(config: CodexConfig, authority: session.Authority): 
     || isolate?.codexHome !== undefined
     || isolate?.bind?.some((bind) => bind.mode === "rw") === true
   if (write && !authority.sandbox.write) throw new CodexConfigError("Codex write exceeds current work authority")
-  if ((sandbox === "danger-full-access" || isolate?.network === true) && !authority.sandbox.network) {
+  if (isolate?.network === true && !authority.sandbox.network) {
     throw new CodexConfigError("Codex network exceeds current work authority")
   }
   if (!config.isolate) throw new CodexConfigError("Codex isolation is required under current work authority")

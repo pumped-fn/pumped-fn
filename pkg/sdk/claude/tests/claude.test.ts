@@ -1,10 +1,13 @@
 import { PassThrough } from "node:stream"
 import { EventEmitter } from "node:events"
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "node:child_process"
 import { createScope, flow, preset, typed, type Lite } from "@pumped-fn/lite"
 import { complete, model, type Model, type ModelRequest } from "@pumped-fn/sdk"
 import * as session from "@pumped-fn/sdk/session"
 import { expect, expectTypeOf, it } from "vitest"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import * as claudeModule from "../src/index"
 import {
   claude,
@@ -459,6 +462,48 @@ it("rejects managed Claude roots outside current work authority before spawning"
   expect(harness.options).toBeUndefined()
   await ctx.close()
   await scope.dispose()
+})
+
+it("rejects a Claude root that escapes through a symlink", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pumped-claude-symlink-"))
+  const allowed = join(root, "allowed")
+  const outside = join(root, "outside")
+  await mkdir(allowed)
+  await mkdir(outside)
+  const escape = join(allowed, "escape")
+  await symlink(outside, escape, "dir")
+  const authority = testAuthority([allowed], false, true)
+  const branch = branchRecord("main", authority)
+  const work = {
+    id: "work-1",
+    branchId: branch.id,
+    role: "task",
+    status: "working" as const,
+    policy: "all" as const,
+    attempt: 1,
+    authority,
+  }
+  const attempt = { workId: work.id, attempt: 1, snapshotEpoch: 0, status: "working" as const, startedAt: "now" }
+  const runtime = { authority, record: sessionProvenanceRecord(authority, branch, work, attempt) } as session.SessionRuntime
+  const harness = createHarness()
+  const scope = createScope({
+    presets: [preset(engine, harness.engine)],
+    tags: [claudeConfig(managedConfig({ cwd: escape }))],
+  })
+  const ctx = scope.createContext({ tags: [
+    session.current.authority(authority),
+    session.current.session(runtime),
+    session.current.work(work),
+    session.current.attempt(attempt),
+    session.current.branch(branch),
+    session.current.epoch(0),
+  ] })
+
+  await expect(ctx.resolve(claudeSession)).rejects.toThrow("Claude roots exceed current work authority")
+  expect(harness.options).toBeUndefined()
+  await ctx.close()
+  await scope.dispose()
+  await rm(root, { recursive: true })
 })
 
 it("requires a positive shutdown bound before the engine starts", async () => {

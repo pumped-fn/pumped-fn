@@ -469,7 +469,7 @@ function assertClaudeProvenance(
   }
   if (
     authority.fingerprint !== work.authority.fingerprint
-    || runtime.authority.fingerprint !== authority.fingerprint
+    || !authorityWithin(runtime.authority, authority)
     || attempt.workId !== work.id
     || work.attempt !== attempt.attempt
     || attempt.status !== "working"
@@ -482,6 +482,19 @@ function assertClaudeProvenance(
     || epoch !== attempt.snapshotEpoch
   ) {
     throw new ClaudeConfigError("Claude session provenance does not match the active attempt")
+  }
+}
+
+function authorityWithin(parent: session.Authority, child: session.Authority): boolean {
+  try {
+    return session.narrowAuthority(parent, {
+      roots: child.roots,
+      permissions: child.permissions,
+      tools: child.tools,
+      sandbox: child.sandbox,
+    }).fingerprint === child.fingerprint
+  } catch {
+    return false
   }
 }
 

@@ -185,7 +185,7 @@ function assertPiAuthority(
     !validAuthority(authority)
     || !validAuthority(runtime.authority)
     || !validAuthority(work.authority)
-    || !authorityMatches(runtime.authority, authority)
+    || !authorityWithin(runtime.authority, authority)
     || !authorityMatches(work.authority, authority)
     || !authorityMatches(runtime.record.authorityConstraints, runtime.authority)
     || runtime.record.authorityFingerprint !== runtime.authority.fingerprint
@@ -229,6 +229,19 @@ function validAuthority(value: session.Authority): boolean {
 function authorityMatches(left: session.AuthorityInput, right: session.AuthorityInput): boolean {
   try {
     return JSON.stringify(session.createAuthority(left)) === JSON.stringify(session.createAuthority(right))
+  } catch {
+    return false
+  }
+}
+
+function authorityWithin(parent: session.Authority, child: session.Authority): boolean {
+  try {
+    return session.narrowAuthority(parent, {
+      roots: child.roots,
+      permissions: child.permissions,
+      tools: child.tools,
+      sandbox: child.sandbox,
+    }).fingerprint === child.fingerprint
   } catch {
     return false
   }

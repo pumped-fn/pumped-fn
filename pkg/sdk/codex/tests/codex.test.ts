@@ -191,6 +191,20 @@ it("rejects CLI roots and capabilities outside current work authority before sta
   }
 })
 
+it("rejects a forged Codex authority body before spawning", async () => {
+  const allowed = join(tmpdir(), "pumped-codex-forged-authority")
+  const authority = workAuthority([allowed])
+  const forged = { ...authority, tenant: "forged" } as session.Authority
+  const scope = createScope({
+    tags: [codexConfig({ auth: { kind: "global" }, command: "must-not-start", cwd: allowed })],
+  })
+  const ctx = scope.createContext({ tags: [session.current.authority(forged)] })
+
+  await expect(ctx.exec({ flow: codexRun, input: { prompt: "blocked" } })).rejects.toThrow("Codex authority fingerprint is invalid")
+  await ctx.close()
+  await scope.dispose()
+})
+
 it("rejects a relative CLI root before starting its command", async () => {
   const scope = createScope({
     tags: [codexConfig({
@@ -283,6 +297,14 @@ it("binds CLI authority to the current work and passes canonical roots", async (
     attempt: 1,
     authority: narrow,
   }
+  const runtime = {
+    authority: broad,
+    record: {
+      authorityFingerprint: broad.fingerprint,
+      authorityConstraints: broad,
+      work: [work],
+    },
+  } as session.SessionRuntime
   const scope = createScope({
     tags: [codexConfig({
       auth: { kind: "global" },
@@ -290,13 +312,31 @@ it("binds CLI authority to the current work and passes canonical roots", async (
       cwd: alias,
     })],
   })
-  const ctx = scope.createContext({ tags: [session.current.authority(broad), session.current.work(work)] })
+  const ctx = scope.createContext({ tags: [session.current.authority(broad), session.current.session(runtime), session.current.work(work)] })
 
   await expect(ctx.exec({ flow: codexRun, input: { prompt: "blocked" } })).rejects.toThrow(
     "Codex authority does not match current work",
   )
   await ctx.close()
   await scope.dispose()
+
+  const forgedScope = createScope({
+    tags: [codexConfig({
+      auth: { kind: "global" },
+      command: "must-not-start",
+      cwd: alias,
+    })],
+  })
+  const forgedContext = forgedScope.createContext({ tags: [
+    session.current.authority(broad),
+    session.current.session(runtime),
+    session.current.work({ ...work, authority: broad }),
+  ] })
+  await expect(forgedContext.exec({ flow: codexRun, input: { prompt: "blocked" } })).rejects.toThrow(
+    "Codex session provenance does not match the active work",
+  )
+  await forgedContext.close()
+  await forgedScope.dispose()
 
   const allowed = createScope({
     tags: [codexConfig({
