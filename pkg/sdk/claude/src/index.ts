@@ -1,4 +1,4 @@
-import { isAbsolute } from "node:path"
+import { isAbsolute, resolve } from "node:path"
 import { createInterface } from "node:readline"
 import { spawn } from "node:child_process"
 import { atom, controller, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
@@ -82,14 +82,18 @@ export const claudeSession = resource({
   name: "claude.session",
   ownership: "boundary",
   deps: {
+    authority: tags.optional(session.current.authority),
     config: tags.required(claudeConfig),
     clock,
     engine,
     environment,
     lineReader,
+    work: tags.optional(session.current.work),
   },
-  factory: (ctx, { clock, config, engine, environment, lineReader }) => {
-    const resolved = resolveConfig(config, environment)
+  factory: (ctx, { authority, clock, config, engine, environment, lineReader, work }) => {
+    const boundAuthority = bindClaudeAuthority(authority, work)
+    const effectiveConfig = boundAuthority ? authorizeClaudeConfig(config, boundAuthority) : config
+    const resolved = resolveConfig(effectiveConfig, environment)
     const child = engine(resolved.command, [...resolved.args], {
       cwd: resolved.cwd,
       env: resolved.env,
@@ -241,27 +245,34 @@ export const claudeLeases = resource({
   name: "claude.leases",
   ownership: "boundary",
   deps: {
+    authority: tags.optional(session.current.authority),
     config: tags.required(claudeConfig),
     clock,
     engine,
     environment,
     lineReader,
+    work: tags.optional(session.current.work),
   },
-  factory: (ctx, { clock, config, engine, environment, lineReader }): ClaudeLeaseManager => {
+  factory: (ctx, { authority, clock, config, engine, environment, lineReader, work }): ClaudeLeaseManager => {
+    const boundAuthority = bindClaudeAuthority(authority, work)
+    const effectiveConfig = boundAuthority ? authorizeClaudeConfig(config, boundAuthority) : config
     const leases = new Map<string, ReturnType<typeof createManagedLease>>()
     let next = 0
     const lease = (sessionId: string) => {
       const existing = leases.get(sessionId)
       if (existing) return existing
-      const created = createManagedLease(config, { clock, engine, environment, lineReader })
+      const created = createManagedLease(effectiveConfig, { clock, engine, environment, lineReader })
       leases.set(sessionId, created)
       return created
     }
     const release = async (sessionId: string) => {
       const current = leases.get(sessionId)
       if (!current) return
-      leases.delete(sessionId)
-      await current.close()
+      try {
+        await current.close()
+      } finally {
+        if (leases.get(sessionId) === current) leases.delete(sessionId)
+      }
     }
     ctx.cleanup(async (active) => {
       const current = [...active.entries()]
@@ -280,14 +291,29 @@ export const claudeAttempt: agent.Attempt = flow({
   name: "claude.attempt",
   parse: typed<ModelRequest>(),
   deps: {
+    attempt: tags.optional(session.current.attempt),
+    authority: tags.optional(session.current.authority),
     branch: tags.optional(session.current.branch),
+    config: tags.optional(claudeConfig),
     leases: claudeLeases,
     record: tags.optional(session.record),
+    runtime: tags.optional(session.current.session),
+    work: tags.optional(session.current.work),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async function* (ctx, { branch, leases, record }) {
+  factory: async function* (ctx, { attempt, authority, branch, config, leases, record, runtime, work }) {
+    if ((work || attempt) && (!runtime || !work || !attempt || !branch || !authority)) {
+      throw new ClaudeConfigError("Claude session tags must be provided as one bound tuple")
+    }
+    const boundAuthority = bindClaudeAuthority(authority, work)
+    if (boundAuthority) {
+      if (!config) throw new ClaudeConfigError("Claude session authority requires config")
+      authorizeClaudeConfig(config, boundAuthority)
+    }
     const sessionId = record
-      ? branch ? `${record.id}:${branch.id}` : record.id
+      ? branch
+        ? `${record.id}:${branch.id}`
+        : record.id
       : leases.transient()
     const invocation = leases.prompt(sessionId, formatModelPrompt(ctx.input), ctx.signal)
     let completed = false
@@ -307,9 +333,16 @@ export const claudeAttemptBinding = agent.impl.attempt(claudeAttempt)
 export const claudeRun = flow({
   name: "claude.run",
   parse: typed<PromptInput>(),
-  deps: { session: claudeSession },
+  deps: {
+    authority: tags.optional(session.current.authority),
+    session: claudeSession,
+    work: tags.optional(session.current.work),
+  },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: (ctx, { session }) => session.prompt(ctx.input.prompt, ctx.signal),
+  factory: (ctx, { authority, session, work }) => {
+    bindClaudeAuthority(authority, work)
+    return session.prompt(ctx.input.prompt, ctx.signal)
+  },
 })
 
 export const claudeTurn = flow({
@@ -361,6 +394,31 @@ function resolveConfig(config: ClaudeConfig, environment: NodeJS.ProcessEnv) {
     cwd: config.cwd,
     env,
   }
+}
+
+function bindClaudeAuthority(
+  authority: session.Authority | undefined,
+  work: session.WorkRecord | undefined,
+): session.Authority | undefined {
+  if (!work) return authority
+  if (!authority || authority.fingerprint !== work.authority.fingerprint) {
+    throw new ClaudeConfigError("Claude authority does not match current work")
+  }
+  return work.authority
+}
+
+function authorizeClaudeConfig(config: ClaudeConfig, authority: session.Authority): ClaudeConfig {
+  if (!authority.sandbox.network) throw new ClaudeConfigError("Claude network exceeds current work authority")
+  const roots = [config.cwd, ...config.roots]
+  if (roots.some((root) => !isAbsolute(root))) throw new ClaudeConfigError("Claude authority roots must be absolute")
+  if (roots.some((root) => !authority.sandbox.roots.some((allowed) => within(resolve(root), resolve(allowed))))) {
+    throw new ClaudeConfigError("Claude roots exceed current work authority")
+  }
+  return config
+}
+
+function within(path: string, root: string): boolean {
+  return root === "/" || path === root || path.startsWith(`${root}/`)
 }
 
 function parseEvent(line: string): { type: string; result: string; is_error: boolean } {

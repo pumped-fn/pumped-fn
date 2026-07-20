@@ -170,6 +170,7 @@ export const acp = resource({
     const sessions = new Map<string, string[]>()
     const eventStreams = new Map<string, EventQueue<agent.ModelEvent>>()
     const continuations = new Map<string, string | Promise<string>>()
+    const authorities = new Map<string, session.Authority>()
     const metadata = new Map<string, { agentName: string; round: number }>()
     const child = spawn(effectiveConfig.command ?? "codex-acp", [...(effectiveConfig.args ?? [])], {
       cwd: effectiveConfig.cwd,
@@ -206,8 +207,9 @@ export const acp = resource({
         }
       })
       .onRequest("session/request_permission", async ({ params: request }: { params: RequestPermissionRequest }): Promise<RequestPermissionResponse> => {
+        const authority = authorities.get(request.sessionId)
         const granted = request.options.find((option) => option.kind === "allow_once" || option.kind === "allow_always")
-        if (effectiveConfig.permission === "grant" && granted) {
+        if (effectiveConfig.permission === "grant" && authority && granted && permissionAllowed(request, authority)) {
           eventStreams.get(request.sessionId)?.push({ type: "provider_status", status: "permission:selected" })
           return { outcome: { outcome: "selected", optionId: granted.optionId } }
         }
@@ -225,6 +227,7 @@ export const acp = resource({
       sessions.clear()
       eventStreams.clear()
       continuations.clear()
+      authorities.clear()
       metadata.clear()
       let connectionFailure: unknown
       const transportClosed = connection.closed.catch((error) => {
@@ -273,7 +276,7 @@ export const acp = resource({
       protocolVersion: PROTOCOL_VERSION,
       clientCapabilities: {},
     })
-    return { connection, sessions, streams: eventStreams, continuations, metadata, terminate: close }
+    return { authorities, connection, sessions, streams: eventStreams, continuations, metadata, terminate: close }
   },
 })
 
@@ -300,6 +303,7 @@ export const codexAcpPrompt = flow({
     const sessionId = await createAcpSession(acp.connection.agent, effectiveConfig, signal)
     const remote = startRemoteInvocation(runtime, work, attempt, sessionId)
     const chunks: string[] = []
+    if (boundAuthority) acp.authorities.set(sessionId, boundAuthority)
     acp.sessions.set(sessionId, chunks)
     acp.metadata.set(sessionId, { agentName: ctx.input.agentName, round: ctx.input.round })
     let cancellation: Promise<void> | undefined
@@ -320,6 +324,7 @@ export const codexAcpPrompt = flow({
       signal.removeEventListener("abort", cancel)
       if (signal.aborted) cancel()
       acp.sessions.delete(sessionId)
+      acp.authorities.delete(sessionId)
       acp.metadata.delete(sessionId)
       if (signal.aborted) {
         const stopped = await bounded(Promise.allSettled([
@@ -365,7 +370,10 @@ export const codexAcpAttempt: agent.Attempt = flow({
     signal.throwIfAborted()
     const boundAuthority = bindSessionAuthority(runtime, work, attempt, authority)
     const effectiveConfig = boundAuthority ? authorizeAcpConfig(config, boundAuthority) : config
-    const continuationKey = record && branch ? `codex-acp:${record.id}:${branch.id}` : undefined
+    const authorityFingerprint = boundAuthority?.fingerprint ?? branch?.authorityFingerprint ?? record?.authorityFingerprint
+    const continuationKey = record && branch && authorityFingerprint
+      ? `codex-acp:${record.id}:${branch.id}:${authorityFingerprint}`
+      : undefined
     const createSession = () => createAcpSession(acp.connection.agent, effectiveConfig, signal)
     let sessionId: string
     if (continuationKey) {
@@ -411,6 +419,7 @@ export const codexAcpAttempt: agent.Attempt = flow({
     const metadata = { agentName: ctx.input.agentName, round: ctx.input.round }
     acp.sessions.set(sessionId, chunks)
     acp.streams.set(sessionId, stream)
+    if (boundAuthority) acp.authorities.set(sessionId, boundAuthority)
     acp.metadata.set(sessionId, metadata)
     let cancellation: Promise<void> | undefined
     let promptStatus: "completed" | "failed" | undefined
@@ -442,6 +451,7 @@ export const codexAcpAttempt: agent.Attempt = flow({
       const release = () => {
         if (acp.sessions.get(sessionId) === chunks) acp.sessions.delete(sessionId)
         if (acp.streams.get(sessionId) === stream) acp.streams.delete(sessionId)
+        if (boundAuthority && acp.authorities.get(sessionId) === boundAuthority) acp.authorities.delete(sessionId)
         if (acp.metadata.get(sessionId) === metadata) acp.metadata.delete(sessionId)
       }
       const completion = Promise.allSettled([
@@ -535,6 +545,12 @@ function bindSessionAuthority(
   attempt: session.AttemptRecord | undefined,
   authority: session.Authority | undefined,
 ): session.Authority | undefined {
+  if (
+    (work && (!runtime || !attempt || !authority))
+    || (attempt && (!runtime || !work || !authority))
+  ) {
+    throw new CodexConfigError("Codex session tags must be provided as one bound tuple")
+  }
   if (!work) return authority
   if (!runtime || !attempt) throw new CodexConfigError("Codex session tags must be provided as one bound tuple")
   return bindAuthority(authority, work)
@@ -601,6 +617,9 @@ function assertCliAuthority(config: CodexConfig, authority: session.Authority): 
   if (roots.some((root) => !isAbsolute(root))) throw new CodexConfigError("Codex authority roots must be absolute")
   assertRoots("Codex", roots, authority)
   const sandbox = config.sandbox ?? "read-only"
+  if (sandbox === "danger-full-access") {
+    throw new CodexConfigError("Codex danger-full-access exceeds current work authority")
+  }
   const write = sandbox !== "read-only"
     || isolate?.writable === true
     || isolate?.home !== undefined
@@ -620,6 +639,15 @@ function assertAcpAuthority(config: CodexAcpConfig, authority: session.Authority
   if (config.permission === "grant" && !authority.sandbox.network) {
     throw new CodexConfigError("ACP network exceeds current work authority")
   }
+}
+
+function permissionAllowed(request: RequestPermissionRequest, authority: session.Authority): boolean {
+  const title = request.toolCall.title ?? ""
+  const kind = request.toolCall.kind ?? ""
+  return authority.permissions.includes(title)
+    || authority.permissions.includes(kind)
+    || authority.tools.includes(title)
+    || authority.tools.includes(kind)
 }
 
 function assertRoots(provider: "Codex" | "ACP", roots: readonly string[], authority: session.Authority): void {

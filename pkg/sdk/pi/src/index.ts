@@ -24,6 +24,7 @@ import {
   type ModelResponse,
 } from "@pumped-fn/sdk"
 import * as agent from "@pumped-fn/sdk/agent"
+import * as session from "@pumped-fn/sdk/session"
 
 /** Selects a Pi provider, model, thinking level, and API-key environment variable. */
 export interface PiConfig {
@@ -76,14 +77,21 @@ export const piAttempt: agent.Attempt = flow({
   name: "pi.attempt",
   parse: typed<ModelRequest>(),
   deps: {
+    attempt: tags.optional(session.current.attempt),
+    authority: tags.optional(session.current.authority),
+    branch: tags.optional(session.current.branch),
     clock,
     config: tags.required(piConfig),
     environment,
+    epoch: tags.optional(session.current.epoch),
     models,
+    runtime: tags.optional(session.current.session),
+    work: tags.optional(session.current.work),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async function* (ctx, { clock, config, environment, models }) {
+  factory: async function* (ctx, { attempt, authority, branch, clock, config, environment, epoch, models, runtime, work }) {
     const signal = ctx.signal
+    assertPiAuthority(config, authority, runtime, work, attempt, branch, epoch)
     const selected = requireModel(models, config)
     if (config.thinking && !getSupportedThinkingLevels(selected).includes(config.thinking)) {
       throw new PiProviderError(
@@ -157,6 +165,28 @@ function requireModel(models: Models, config: PiConfig): PiModel<Api> {
     config.provider,
     config.modelId,
   )
+}
+
+function assertPiAuthority(
+  config: PiConfig,
+  authority: session.Authority | undefined,
+  runtime: session.SessionRuntime | undefined,
+  work: session.WorkRecord | undefined,
+  attempt: session.AttemptRecord | undefined,
+  branch: session.BranchRecord | undefined,
+  epoch: number | undefined,
+): void {
+  if (!authority && !runtime && !work && !attempt && !branch && epoch === undefined) return
+  if (!authority || !runtime || !work || !attempt || !branch || epoch === undefined) {
+    throw new PiProviderError("Pi attempt requires complete session provenance", config.provider, config.modelId)
+  }
+  if (!authority.sandbox.network) throw new PiProviderError("Pi requires network authority", config.provider, config.modelId)
+  if (runtime.authority.fingerprint !== authority.fingerprint || work.authority.fingerprint !== authority.fingerprint) {
+    throw new PiProviderError("Pi session authority does not match work provenance", config.provider, config.modelId)
+  }
+  if (attempt.workId !== work.id || branch.id !== work.branchId || epoch !== attempt.snapshotEpoch) {
+    throw new PiProviderError("Pi session provenance does not match the active attempt", config.provider, config.modelId)
+  }
 }
 
 function requireEnvironment(environment: NodeJS.ProcessEnv, name: string, config: PiConfig): string {

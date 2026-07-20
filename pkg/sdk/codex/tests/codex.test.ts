@@ -151,6 +151,10 @@ it("rejects CLI roots and capabilities outside current work authority before sta
       message: "Codex write exceeds current work authority",
     },
     {
+      config: { auth: { kind: "global" }, command: "must-not-start", cwd: allowed, sandbox: "danger-full-access" },
+      message: "Codex danger-full-access exceeds current work authority",
+    },
+    {
       config: { auth: { kind: "global" }, command: "must-not-start", cwd: allowed, isolate: { network: true } },
       message: "Codex network exceeds current work authority",
     },

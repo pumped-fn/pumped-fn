@@ -209,7 +209,7 @@ describe("public contract checker", () => {
     assert.equal(accepted.output.metrics.package_export_removal_gap_count, 0);
   });
 
-  it("uses a consumed base changeset as export-removal evidence", () => {
+  it("uses a consumed base changeset as export-removal evidence without satisfying the current changeset gate", () => {
     const directory = fixture("valid", { legacyExport: true });
     const packagePath = join(directory, "pkg/core/demo/package.json");
     const manifest = JSON.parse(readFileSync(packagePath, "utf8"));
@@ -219,7 +219,22 @@ describe("public contract checker", () => {
     rmSync(join(directory, ".changeset/demo.md"));
     writeFileSync(join(directory, "changed-files.json"), `${JSON.stringify(["pkg/core/demo/package.json"])}\n`);
     const result = execute(directory);
-    assert.equal(result.status, 0);
+    assert.equal(result.status, 1);
+    assert.equal(result.output.metrics.changed_public_source_package_without_changeset_count, 1);
     assert.equal(result.output.metrics.package_export_removal_gap_count, 0);
+  });
+
+  it("requires a changeset for manifest-only package changes", () => {
+    const directory = fixture("valid");
+    rmSync(join(directory, ".changeset/demo.md"));
+    writeFileSync(join(directory, "changed-files.json"), `${JSON.stringify(["pkg/core/demo/package.json"])}\n`);
+    const result = execute(directory);
+    assert.equal(result.status, 1);
+    assert.equal(result.output.metrics.changed_public_source_package_count, 1);
+    assert.equal(result.output.metrics.changed_public_source_package_without_changeset_count, 1);
+    assert.deepEqual(result.output.details.changed_public_source_packages_without_changeset, [{
+      package: "@fixture/demo",
+      path: "pkg/core/demo",
+    }]);
   });
 });

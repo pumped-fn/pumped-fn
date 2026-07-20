@@ -427,6 +427,20 @@ it.each([
   await scope.dispose()
 })
 
+it("rejects managed Claude roots outside current work authority before spawning", async () => {
+  const harness = createHarness()
+  const scope = createScope({
+    presets: [preset(engine, harness.engine)],
+    tags: [claudeConfig(managedConfig())],
+  })
+  const ctx = scope.createContext({ tags: [session.current.authority(testAuthority([], false, true))] })
+
+  await expect(ctx.resolve(claudeSession)).rejects.toThrow("Claude roots exceed current work authority")
+  expect(harness.options).toBeUndefined()
+  await ctx.close()
+  await scope.dispose()
+})
+
 it("requires a positive shutdown bound before the engine starts", async () => {
   const harness = createHarness()
   const scope = createScope({
@@ -617,13 +631,13 @@ function createClock() {
   }
 }
 
-function testAuthority(): session.Authority {
+function testAuthority(roots: readonly string[] = [], write = false, network = false): session.Authority {
   return session.createAuthority({
     tenant: "test",
-    roots: [],
+    roots,
     permissions: [],
     tools: [],
-    sandbox: { roots: [], commands: [], write: false, network: false },
+    sandbox: { roots, commands: [], write, network },
   })
 }
 

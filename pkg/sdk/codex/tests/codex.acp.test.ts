@@ -276,8 +276,8 @@ it("continues the same ACP session for the same SDK session and branch", async (
 
   await expect(invoke()).resolves.toMatchObject({ content: "session-0", stop: true })
   await expect(invoke()).resolves.toMatchObject({ content: "session-0", stop: true })
-  expect(boundary.continuations).toEqual(new Map([["codex-acp:sdk-session:main", "session-0"]]))
-  expect(runtime.record.providerContinuations).toEqual({ "codex-acp:sdk-session:main": "session-0" })
+  expect(boundary.continuations).toEqual(new Map([[continuationKey(record, branch), "session-0"]]))
+  expect(runtime.record.providerContinuations).toEqual({ [continuationKey(record, branch)]: "session-0" })
 
   await host.close()
   await scope.dispose()
@@ -305,7 +305,7 @@ it("atomically reserves the first continuation for concurrent prompts", async ()
   expect(results.filter((result) => result.status === "rejected")).toMatchObject([
     { reason: { name: "CodexConcurrencyError" } },
   ])
-  expect(boundary.continuations).toEqual(new Map([["codex-acp:sdk-session:main", "session-0"]]))
+  expect(boundary.continuations).toEqual(new Map([[continuationKey(record, branch), "session-0"]]))
 
   await ctx.close()
   await scope.dispose()
@@ -335,10 +335,10 @@ it("does not publish a late continuation after the session starts finishing", as
   })
   const events = collect(stream).catch((error: unknown) => error)
 
-  for (let attempt = 0; attempt < 100 && !boundary.continuations.has("codex-acp:sdk-session:main"); attempt++) {
+  for (let attempt = 0; attempt < 100 && !boundary.continuations.has(continuationKey(record, branch)); attempt++) {
     await new Promise<void>((resolve) => setTimeout(resolve, 1))
   }
-  expect(boundary.continuations.get("codex-acp:sdk-session:main")).toBeInstanceOf(Promise)
+  expect(boundary.continuations.get(continuationKey(record, branch))).toBeInstanceOf(Promise)
   controller.abort()
   await runtime.finishWith(async (_record, expectedVersion) => expectedVersion + 1)
 
@@ -417,7 +417,7 @@ it("releases timed-out state and ignores late settlement after replacement", asy
     done: false,
     value: { type: "provider_status", status: "started" },
   })
-  expect(runtime.record.providerContinuations).toEqual({ "codex-acp:sdk-session:main": "recovering-session-0" })
+  expect(runtime.record.providerContinuations).toEqual({ [continuationKey(record, branch)]: "recovering-session-0" })
   const result = stream.result.catch(() => undefined)
   const stopped = iterator.return?.()
   await lifecycle.pending(1)
@@ -440,9 +440,9 @@ it("releases timed-out state and ignores late settlement after replacement", asy
     value: { type: "provider_status", status: "started" },
   })
   await new Promise<void>((resolve) => setImmediate(resolve))
-  expect(runtime.record.providerContinuations).toEqual({ "codex-acp:sdk-session:main": "recovering-session-0" })
+  expect(runtime.record.providerContinuations).toEqual({ [continuationKey(record, branch)]: "recovering-session-0" })
   expect(replacementBoundary.continuations).toEqual(new Map([
-    ["codex-acp:sdk-session:main", "recovering-session-0"],
+    [continuationKey(record, branch), "recovering-session-0"],
   ]))
   expect(replacementBoundary.sessions.has("recovering-session-0")).toBe(true)
   expect(replacementBoundary.streams.has("recovering-session-0")).toBe(true)
@@ -991,6 +991,10 @@ function sessionRecord(id: string, branch: session.BranchRecord): session.Sessio
     providerContinuations: {},
     nextEventSequence: 0,
   }
+}
+
+function continuationKey(record: session.SessionRecord, branch: session.BranchRecord): string {
+  return `codex-acp:${record.id}:${branch.id}:${branch.authorityFingerprint}`
 }
 
 function testAuthority(roots: readonly string[] = [], write = false, network = false): session.Authority {

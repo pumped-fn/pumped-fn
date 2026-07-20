@@ -199,12 +199,12 @@ const changedFiles = changedFilesPath
       .filter(Boolean);
 const packagesByPath = new Map(packageDirectories.map((entry) => [fromRoot(entry.directory), entry]));
 const changedPackages = [...new Set(changedFiles.flatMap((path) => {
-  const match = normalize(path).match(/^(pkg\/[^/]+\/[^/]+)\/src\//u);
+  const match = normalize(path).match(/^(pkg\/[^/]+\/[^/]+)\/(?:src\/|package\.json$)/u);
   return match && packagesByPath.has(match[1]) ? [match[1]] : [];
 }))].sort();
 const changedWithoutChangeset = changedPackages.flatMap((path) => {
   const { manifest } = packagesByPath.get(path);
-  return changesets.some((entry) => entry.package === manifest.name)
+  return changesets.some((entry) => entry.package === manifest.name && !entry.recovered)
     ? []
     : [{ package: manifest.name, path }];
 });

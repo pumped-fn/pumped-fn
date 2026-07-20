@@ -103,6 +103,97 @@ describe("session review regressions", () => {
     await scope.dispose()
   })
 
+  it("binds tool permits to contained authority", async () => {
+    const bound = authorityValue()
+    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+    const identity = {
+      id: "tool",
+      version: "1",
+      schemaDigest: "schema",
+      validationEngine: "validator",
+      readiness: "ready",
+      flow: "tool.flow",
+    }
+    const broader = createAuthority({
+      tenant: "tenant-a",
+      roots: ["/"],
+      permissions: [],
+      tools: [],
+      sandbox: { roots: ["/"], commands: [], write: false, network: false },
+    })
+
+    expect(() => runtime.tools.permit(identity, broader)).toThrow("Tool permit authority exceeds its parent")
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("fences lifecycle mutators during deactivation", async () => {
+    const bound = authorityValue()
+    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+
+    await runtime.deactivate()
+    expect(() => runtime.tools.revoke(1)).toThrow("Session activation is deactivated")
+    expect(() => runtime.controls.fence("work", 1, 1)).toThrow("Session activation is deactivated")
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("rejects events with invalid work, attempt, branch, or invocation lineage", async () => {
+    const bound = authorityValue()
+    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+    const active = runtime.work.admit({ id: "work", branchId: "main", role: "review", policy: "all" })
+    const event = {
+      workId: "work",
+      attempt: active.record.attempt,
+      branchId: "main",
+      snapshotEpoch: active.record.snapshotEpoch,
+      type: "work.observed",
+    }
+
+    expect(() => runtime.emit({ ...event, workId: "missing" })).toThrow("Work missing does not exist")
+    expect(() => runtime.emit({ ...event, branchId: "missing" })).toThrow("Branch missing does not exist")
+    expect(() => runtime.emit({ ...event, attempt: 2 })).toThrow("Attempt work:2 is not current")
+    expect(() => runtime.emit({ ...event, snapshotEpoch: active.record.snapshotEpoch + 1 })).toThrow(
+      "Attempt work:1 snapshot epoch does not match",
+    )
+    expect(() => runtime.emit({ ...event, invocationId: "missing" })).toThrow(
+      "Invocation missing does not belong to attempt work:1",
+    )
+
+    runtime.work.settle("work", active.record.attempt, { status: "completed" })
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("allows a failed finish commit to retry and enforces sequential versions", async () => {
+    const bound = authorityValue()
+    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+
+    await expect(runtime.finishWith(async () => {
+      throw new Error("commit failed")
+    })).rejects.toThrow("commit failed")
+    expect(runtime.status).toBe("open")
+    await expect(runtime.finishWith(async () => 4)).rejects.toThrow("Session completion version must increase by one")
+    expect(runtime.status).toBe("open")
+    await expect(runtime.finishWith(async (_record, expectedVersion) => expectedVersion + 1)).resolves.toMatchObject({
+      status: "finished",
+      version: 1,
+    })
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
   it("does not let terminal mutators overwrite an abandoned session", async () => {
     const bound = authorityValue()
     const abandoned = Object.freeze({ ...initial(bound), status: "abandoned" as const })
@@ -118,6 +209,10 @@ describe("session review regressions", () => {
       snapshotEpoch: runtime.record.nextEventSequence,
       type: "late",
     })).toThrow("Session session-review is abandoned")
+    await expect(runtime.finishWith(async (_record, expectedVersion) => expectedVersion + 1)).rejects.toThrow(
+      "Session session-review is abandoned",
+    )
+    expect(runtime.status).toBe("abandoned")
     expect(runtime.record).toStrictEqual(abandoned)
 
     await ctx.close()

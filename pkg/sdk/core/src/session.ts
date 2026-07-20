@@ -913,9 +913,11 @@ class Runtime implements SessionRuntime {
     this.tools = Object.freeze({
       permit: (identity: ToolIdentity, authority: Authority = this.authority, epoch = this.#record.nextEventSequence) => {
         this.assertOpenMutation()
+        const permitted = validatedAuthority(authority, "Tool permit authority")
+        assertAuthorityWithin(permitted, this.authority, "Tool permit authority")
         const permit = Object.freeze({
           identity,
-          authorityFingerprint: authority.fingerprint,
+          authorityFingerprint: permitted.fingerprint,
           epoch,
         })
         this.#permits.set(toolPermitKey(identity, permit.authorityFingerprint, permit.epoch), permit)
@@ -929,6 +931,7 @@ class Runtime implements SessionRuntime {
         return permit
       },
       revoke: (epoch: number) => {
+        this.assertOpenMutation()
         for (const [key, permit] of this.#permits) {
           if (permit.epoch === epoch) this.#permits.delete(key)
         }
@@ -976,6 +979,7 @@ class Runtime implements SessionRuntime {
           && (!fence || (event.attempt === fence.attempt && event.expectedEpoch === fence.epoch)))
       },
       fence: (workId: WorkId, attempt: number, epoch: number) => {
+        this.assertOpenMutation()
         this.#fences.set(workId, { attempt, epoch })
         this.#controls = this.#controls.filter((event) => event.workId !== workId
           || (event.attempt === attempt && event.expectedEpoch === epoch))
@@ -1116,6 +1120,7 @@ class Runtime implements SessionRuntime {
 
   completeFinish(version: number): void {
     if (!this.#completionReady) throw new Error("Session completion is not authorized")
+    if (version !== this.#record.version + 1) throw new Error("Session completion version must increase by one")
     this.#completionReady = false
     this.#status = "finished"
     this.#record = Object.freeze({ ...this.#record, status: "finished", version })
@@ -1130,8 +1135,12 @@ class Runtime implements SessionRuntime {
       (invocation) => invocation.status === "working" || invocation.status === "quarantined",
     )
     if (live) return Promise.reject(new Error(`Invocation ${live.id} is still ${live.status}`))
-    this.#completion = this.finishNow(commit)
-    return this.#completion
+    const completion = this.finishNow(commit)
+    this.#completion = completion
+    void completion.catch(() => {
+      if (this.#completion === completion) this.#completion = undefined
+    })
+    return completion
   }
 
   eventsFor(workId: WorkId): readonly SessionEvent[] {
@@ -1140,6 +1149,7 @@ class Runtime implements SessionRuntime {
 
   emit(input: SessionEventInput): SessionEvent {
     this.assertOpenMutation()
+    this.assertEventLineage(input)
     return this.#emit(input)
   }
 
@@ -1336,16 +1346,29 @@ class Runtime implements SessionRuntime {
   private async finishNow(
     commit: (record: SessionRecord, expectedVersion: number) => Promise<number>,
   ): Promise<SessionRecord> {
-    await this.beginFinish()
-    const expectedVersion = this.#record.version
-    const version = await commit(this.snapshot("finished"), expectedVersion)
-    this.#completionReady = true
+    let started = false
     try {
-      this.completeFinish(version)
-    } finally {
+      const joining = this.beginFinish()
+      started = this.#status === "finishing"
+      await joining
+      const expectedVersion = this.#record.version
+      const version = await commit(this.snapshot("finished"), expectedVersion)
+      this.#completionReady = true
+      try {
+        this.completeFinish(version)
+      } finally {
+        this.#completionReady = false
+      }
+      return this.#record
+    } catch (error) {
       this.#completionReady = false
+      if (started) {
+        this.#finish = undefined
+        this.#status = "open"
+        this.#record = this.snapshot("open")
+      }
+      throw error
     }
-    return this.#record
   }
 
   private async joinAttempts(active: readonly {
@@ -1432,7 +1455,30 @@ class Runtime implements SessionRuntime {
     return `${workId}:${attempt}`
   }
 
+  private assertEventLineage(input: SessionEventInput): void {
+    this.branch(input.branchId)
+    if (input.workId === "unbound" && input.attempt === 0) return
+    const work = this.workRecord(input.workId)
+    if (work.branchId !== input.branchId) throw new Error(`Work ${work.id} is not on branch ${input.branchId}`)
+    if (work.attempt !== input.attempt) throw new Error(`Attempt ${input.workId}:${input.attempt} is not current`)
+    const attempt = this.#record.attempts.find((item) => item.workId === input.workId && item.attempt === input.attempt)
+    if (attempt) {
+      if (attempt.snapshotEpoch !== input.snapshotEpoch) {
+        throw new Error(`Attempt ${input.workId}:${input.attempt} snapshot epoch does not match`)
+      }
+    } else if (input.type !== "work.woken" || work.status !== "ready" || input.snapshotEpoch !== this.#record.nextEventSequence) {
+      throw new Error(`Attempt ${input.workId}:${input.attempt} does not exist`)
+    }
+    if (input.invocationId !== undefined) {
+      const invocation = this.#record.invocations.find((item) => item.id === input.invocationId)
+      if (!invocation || invocation.workId !== input.workId || invocation.attempt !== input.attempt) {
+        throw new Error(`Invocation ${input.invocationId} does not belong to attempt ${input.workId}:${input.attempt}`)
+      }
+    }
+  }
+
   private assertOpenMutation(): void {
+    if (this.#activation !== "active") throw new Error(`Session activation is ${this.#activation}`)
     if (this.#status !== "open") throw new Error(`Session ${this.#record.id} is ${this.#status}`)
   }
 }

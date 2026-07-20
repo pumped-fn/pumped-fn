@@ -8,6 +8,7 @@ import type {
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai"
 import { createScope, preset } from "@pumped-fn/lite"
 import { type Model, type ModelRequest } from "@pumped-fn/sdk"
+import * as session from "@pumped-fn/sdk/session"
 import { expect, expectTypeOf, it } from "vitest"
 import { models, piAttempt, piConfig, piTurn, supportedModels } from "../src/index"
 
@@ -87,6 +88,25 @@ function request(): ModelRequest {
     round: 0,
   }
 }
+
+it("requires session provenance before using a bound provider", async () => {
+  const authority = session.createAuthority({
+    tenant: "pi-test",
+    roots: [],
+    permissions: [],
+    tools: [],
+    sandbox: { roots: [], commands: [], write: false, network: true },
+  })
+  const scope = createScope({
+    presets: [preset(models, collection())],
+    tags: [piConfig({ provider: "test", modelId: "test-model" })],
+  })
+  const ctx = scope.createContext({ tags: [session.current.authority(authority)] })
+
+  await expect(ctx.exec({ flow: piAttempt, input: request() })).rejects.toThrow("complete session provenance")
+  await ctx.close()
+  await scope.dispose()
+})
 
 it("maps native pi-ai tool calls", async () => {
   const scope = createScope({
