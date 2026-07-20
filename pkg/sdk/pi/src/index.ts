@@ -181,11 +181,56 @@ function assertPiAuthority(
     throw new PiProviderError("Pi attempt requires complete session provenance", config.provider, config.modelId)
   }
   if (!authority.sandbox.network) throw new PiProviderError("Pi requires network authority", config.provider, config.modelId)
-  if (runtime.authority.fingerprint !== authority.fingerprint || work.authority.fingerprint !== authority.fingerprint) {
+  if (
+    !validAuthority(authority)
+    || !validAuthority(runtime.authority)
+    || !validAuthority(work.authority)
+    || !authorityMatches(runtime.authority, authority)
+    || !authorityMatches(work.authority, authority)
+    || !authorityMatches(runtime.record.authorityConstraints, runtime.authority)
+    || runtime.record.authorityFingerprint !== runtime.authority.fingerprint
+  ) {
     throw new PiProviderError("Pi session authority does not match work provenance", config.provider, config.modelId)
   }
-  if (attempt.workId !== work.id || branch.id !== work.branchId || epoch !== attempt.snapshotEpoch) {
+  const recordedBranch = runtime.record.branches.find((value) => value.id === branch.id)
+  const recordedWork = runtime.record.work.find((value) => value.id === work.id)
+  const recordedAttempt = runtime.record.attempts.find((value) => value.workId === attempt.workId
+    && value.attempt === attempt.attempt
+    && value.snapshotEpoch === attempt.snapshotEpoch)
+  if (
+    !recordedBranch
+    || !recordedWork
+    || !recordedAttempt
+    || !authorityMatches(recordedBranch.authority, branch.authority)
+    || recordedBranch.authorityFingerprint !== branch.authorityFingerprint
+    || !authorityMatches(recordedWork.authority, work.authority)
+    || recordedWork.branchId !== branch.id
+    || work.attempt !== attempt.attempt
+    || recordedAttempt.workId !== work.id
+    || recordedAttempt.snapshotEpoch !== attempt.snapshotEpoch
+    || attempt.status !== "working"
+    || recordedAttempt.status !== "working"
+    || attempt.workId !== work.id
+    || branch.id !== work.branchId
+    || epoch !== attempt.snapshotEpoch
+  ) {
     throw new PiProviderError("Pi session provenance does not match the active attempt", config.provider, config.modelId)
+  }
+}
+
+function validAuthority(value: session.Authority): boolean {
+  try {
+    return session.createAuthority(value).fingerprint === value.fingerprint
+  } catch {
+    return false
+  }
+}
+
+function authorityMatches(left: session.AuthorityInput, right: session.AuthorityInput): boolean {
+  try {
+    return JSON.stringify(session.createAuthority(left)) === JSON.stringify(session.createAuthority(right))
+  } catch {
+    return false
   }
 }
 

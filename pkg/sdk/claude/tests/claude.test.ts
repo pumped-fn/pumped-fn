@@ -272,10 +272,10 @@ it("isolates managed leases by branch within one logical session", async () => {
   const shared = { ...record, branches: [left, right], currentBranchId: left.id }
   const scope = createScope({ presets: [preset(claudeLeases, leases)] })
   const leftContext = scope.createContext({
-    tags: [session.record(shared), session.current.branch(left)],
+    tags: [session.record(shared), ...provenanceTags(left)],
   })
   const rightContext = scope.createContext({
-    tags: [session.record(shared), session.current.branch(right)],
+    tags: [session.record(shared), ...provenanceTags(right)],
   })
   const leftStream = leftContext.execStream({
     flow: claudeAttempt,
@@ -433,7 +433,27 @@ it("rejects managed Claude roots outside current work authority before spawning"
     presets: [preset(engine, harness.engine)],
     tags: [claudeConfig(managedConfig())],
   })
-  const ctx = scope.createContext({ tags: [session.current.authority(testAuthority([], false, true))] })
+  const authority = testAuthority([], false, true)
+  const branch = branchRecord("main", authority)
+  const work = {
+    id: "work-1",
+    branchId: branch.id,
+    role: "task",
+    status: "working" as const,
+    policy: "all" as const,
+    attempt: 1,
+    authority,
+  }
+  const attempt = { workId: work.id, attempt: 1, snapshotEpoch: 0, status: "working" as const, startedAt: "now" }
+  const runtime = { authority, record: sessionProvenanceRecord(authority, branch, work, attempt) } as session.SessionRuntime
+  const ctx = scope.createContext({ tags: [
+    session.current.authority(authority),
+    session.current.session(runtime),
+    session.current.work(work),
+    session.current.attempt(attempt),
+    session.current.branch(branch),
+    session.current.epoch(0),
+  ] })
 
   await expect(ctx.resolve(claudeSession)).rejects.toThrow("Claude roots exceed current work authority")
   expect(harness.options).toBeUndefined()
@@ -641,6 +661,35 @@ function testAuthority(roots: readonly string[] = [], write = false, network = f
   })
 }
 
+function provenanceTags(branch: session.BranchRecord): readonly [
+  ReturnType<typeof session.current.session>,
+  ReturnType<typeof session.current.work>,
+  ReturnType<typeof session.current.attempt>,
+  ReturnType<typeof session.current.branch>,
+  ReturnType<typeof session.current.authority>,
+  ReturnType<typeof session.current.epoch>,
+] {
+  const work = {
+    id: `${branch.id}-work`,
+    branchId: branch.id,
+    role: "task",
+    status: "working" as const,
+    policy: "all" as const,
+    attempt: 1,
+    authority: branch.authority,
+  }
+  const attempt = { workId: work.id, attempt: 1, snapshotEpoch: 0, status: "working" as const, startedAt: "now" }
+  const runtime = { authority: branch.authority, record: sessionProvenanceRecord(branch.authority, branch, work, attempt) } as session.SessionRuntime
+  return [
+    session.current.session(runtime),
+    session.current.work(work),
+    session.current.attempt(attempt),
+    session.current.branch(branch),
+    session.current.authority(branch.authority),
+    session.current.epoch(0),
+  ]
+}
+
 function branchRecord(id = "main", authority = testAuthority()): session.BranchRecord {
   return {
     id,
@@ -672,6 +721,23 @@ function sessionRecord(id: string): session.SessionRecord {
     schedules: [],
     providerContinuations: {},
     nextEventSequence: 0,
+  }
+}
+
+function sessionProvenanceRecord(
+  authority: session.Authority,
+  branch: session.BranchRecord,
+  work: session.WorkRecord,
+  attempt: session.AttemptRecord,
+): session.SessionRecord {
+  return {
+    ...sessionRecord(`runtime-${branch.id}`),
+    authorityFingerprint: authority.fingerprint,
+    authorityConstraints: authority,
+    currentBranchId: branch.id,
+    branches: [branch],
+    work: [work],
+    attempts: [attempt],
   }
 }
 

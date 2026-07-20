@@ -173,6 +173,32 @@ describe("session review regressions", () => {
     await scope.dispose()
   })
 
+  it("rejects invocation lineage on unbound events", async () => {
+    const bound = authorityValue()
+    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+
+    expect(runtime.emit({
+      workId: "unbound",
+      attempt: 0,
+      branchId: "main",
+      snapshotEpoch: 0,
+      type: "agent_role_start",
+    })).toMatchObject({ workId: "unbound", attempt: 0 })
+    expect(() => runtime.emit({
+      workId: "unbound",
+      attempt: 0,
+      branchId: "main",
+      snapshotEpoch: 0,
+      type: "agent_model_start",
+      invocationId: "ghost",
+    })).toThrow("Unbound events cannot reference an invocation")
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
   it("allows a failed finish commit to retry and enforces sequential versions", async () => {
     const bound = authorityValue()
     const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })

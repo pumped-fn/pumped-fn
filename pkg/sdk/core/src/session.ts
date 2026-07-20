@@ -1457,7 +1457,10 @@ class Runtime implements SessionRuntime {
 
   private assertEventLineage(input: SessionEventInput): void {
     this.branch(input.branchId)
-    if (input.workId === "unbound" && input.attempt === 0) return
+    if (input.workId === "unbound" && input.attempt === 0) {
+      if (input.invocationId !== undefined) throw new Error("Unbound events cannot reference an invocation")
+      return
+    }
     const work = this.workRecord(input.workId)
     if (work.branchId !== input.branchId) throw new Error(`Work ${work.id} is not on branch ${input.branchId}`)
     if (work.attempt !== input.attempt) throw new Error(`Attempt ${input.workId}:${input.attempt} is not current`)

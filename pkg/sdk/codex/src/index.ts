@@ -208,7 +208,7 @@ export const acp = resource({
       })
       .onRequest("session/request_permission", async ({ params: request }: { params: RequestPermissionRequest }): Promise<RequestPermissionResponse> => {
         const authority = authorities.get(request.sessionId)
-        const granted = request.options.find((option) => option.kind === "allow_once" || option.kind === "allow_always")
+        const granted = request.options.find((option) => option.kind === "allow_once")
         if (effectiveConfig.permission === "grant" && authority && granted && permissionAllowed(request, authority)) {
           eventStreams.get(request.sessionId)?.push({ type: "provider_status", status: "permission:selected" })
           return { outcome: { outcome: "selected", optionId: granted.optionId } }
@@ -532,6 +532,12 @@ function bindAuthority(
   authority: session.Authority | undefined,
   work: session.WorkRecord | undefined,
 ): session.Authority | undefined {
+  if (authority && session.authorityFingerprint(authority) !== authority.fingerprint) {
+    throw new CodexConfigError("Codex authority fingerprint is invalid")
+  }
+  if (work && session.authorityFingerprint(work.authority) !== work.authority.fingerprint) {
+    throw new CodexConfigError("Codex work authority fingerprint is invalid")
+  }
   if (!work) return authority
   if (!authority || authority.fingerprint !== work.authority.fingerprint) {
     throw new CodexConfigError("Codex authority does not match current work")
@@ -629,6 +635,7 @@ function assertCliAuthority(config: CodexConfig, authority: session.Authority): 
   if ((sandbox === "danger-full-access" || isolate?.network === true) && !authority.sandbox.network) {
     throw new CodexConfigError("Codex network exceeds current work authority")
   }
+  if (!config.isolate) throw new CodexConfigError("Codex isolation is required under current work authority")
 }
 
 function assertAcpAuthority(config: CodexAcpConfig, authority: session.Authority): void {

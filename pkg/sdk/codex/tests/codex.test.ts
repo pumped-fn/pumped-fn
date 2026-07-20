@@ -127,7 +127,7 @@ it("runs the CLI from its configured absolute root", async () => {
       cwd: root,
     })],
   })
-  const ctx = scope.createContext({ tags: [session.current.authority(workAuthority([root], true))] })
+  const ctx = scope.createContext()
 
   await ctx.exec({ flow: codexRun, input: { prompt: "probe" } })
   await expect(readFile(join(root, "cwd.txt"), "utf8")).resolves.toBe(root)
@@ -153,6 +153,10 @@ it("rejects CLI roots and capabilities outside current work authority before sta
     {
       config: { auth: { kind: "global" }, command: "must-not-start", cwd: allowed, sandbox: "danger-full-access" },
       message: "Codex danger-full-access exceeds current work authority",
+    },
+    {
+      config: { auth: { kind: "global" }, command: "must-not-start", cwd: allowed },
+      message: "Codex isolation is required under current work authority",
     },
     {
       config: { auth: { kind: "global" }, command: "must-not-start", cwd: allowed, isolate: { network: true } },
@@ -301,7 +305,7 @@ it("binds CLI authority to the current work and passes canonical roots", async (
       cwd: alias,
     })],
   })
-  const allowedContext = allowed.createContext({ tags: [session.current.authority(narrow)] })
+  const allowedContext = allowed.createContext()
   await allowedContext.exec({ flow: codexRun, input: { prompt: "canonical" } })
   await expect(readFile(join(root, "cwd.txt"), "utf8")).resolves.toBe(root)
   await allowedContext.close()

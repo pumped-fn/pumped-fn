@@ -1,4 +1,5 @@
-import { isAbsolute, resolve } from "node:path"
+import { existsSync, realpathSync } from "node:fs"
+import { basename, dirname, isAbsolute, resolve } from "node:path"
 import { createInterface } from "node:readline"
 import { spawn } from "node:child_process"
 import { atom, controller, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
@@ -83,14 +84,19 @@ export const claudeSession = resource({
   ownership: "boundary",
   deps: {
     authority: tags.optional(session.current.authority),
+    attempt: tags.optional(session.current.attempt),
+    branch: tags.optional(session.current.branch),
     config: tags.required(claudeConfig),
     clock,
     engine,
     environment,
+    epoch: tags.optional(session.current.epoch),
     lineReader,
+    runtime: tags.optional(session.current.session),
     work: tags.optional(session.current.work),
   },
-  factory: (ctx, { authority, clock, config, engine, environment, lineReader, work }) => {
+  factory: (ctx, { attempt, authority, branch, clock, config, engine, environment, epoch, lineReader, runtime, work }) => {
+    assertClaudeProvenance(runtime, work, attempt, branch, authority, epoch)
     const boundAuthority = bindClaudeAuthority(authority, work)
     const effectiveConfig = boundAuthority ? authorizeClaudeConfig(config, boundAuthority) : config
     const resolved = resolveConfig(effectiveConfig, environment)
@@ -232,6 +238,7 @@ export const claudeSession = resource({
 
 /** Manages reusable and transient Claude sessions keyed by session identity. */
 export interface ClaudeLeaseManager {
+  identity?(sessionId: string, authority?: session.Authority, work?: session.WorkRecord): string
   prompt(
     sessionId: string,
     prompt: string,
@@ -246,14 +253,19 @@ export const claudeLeases = resource({
   ownership: "boundary",
   deps: {
     authority: tags.optional(session.current.authority),
+    attempt: tags.optional(session.current.attempt),
+    branch: tags.optional(session.current.branch),
     config: tags.required(claudeConfig),
     clock,
     engine,
     environment,
+    epoch: tags.optional(session.current.epoch),
     lineReader,
+    runtime: tags.optional(session.current.session),
     work: tags.optional(session.current.work),
   },
-  factory: (ctx, { authority, clock, config, engine, environment, lineReader, work }): ClaudeLeaseManager => {
+  factory: (ctx, { attempt, authority, branch, clock, config, engine, environment, epoch, lineReader, runtime, work }): ClaudeLeaseManager => {
+    assertClaudeProvenance(runtime, work, attempt, branch, authority, epoch)
     const boundAuthority = bindClaudeAuthority(authority, work)
     const effectiveConfig = boundAuthority ? authorizeClaudeConfig(config, boundAuthority) : config
     const leases = new Map<string, ReturnType<typeof createManagedLease>>()
@@ -280,6 +292,9 @@ export const claudeLeases = resource({
       await Promise.all(current.map(([, value]) => value.close()))
     }, leases)
     return {
+      identity: (sessionId, identityAuthority, identityWork) => identityAuthority && identityWork
+        ? `${sessionId}:${identityWork.id}:${identityAuthority.fingerprint}`
+        : sessionId,
       prompt: (sessionId, prompt, signal) => lease(sessionId).prompt(prompt, signal),
       release,
       transient: () => `transient-${next++}`,
@@ -295,27 +310,26 @@ export const claudeAttempt: agent.Attempt = flow({
     authority: tags.optional(session.current.authority),
     branch: tags.optional(session.current.branch),
     config: tags.optional(claudeConfig),
+    epoch: tags.optional(session.current.epoch),
     leases: claudeLeases,
     record: tags.optional(session.record),
     runtime: tags.optional(session.current.session),
     work: tags.optional(session.current.work),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async function* (ctx, { attempt, authority, branch, config, leases, record, runtime, work }) {
-    if ((work || attempt) && (!runtime || !work || !attempt || !branch || !authority)) {
-      throw new ClaudeConfigError("Claude session tags must be provided as one bound tuple")
-    }
+  factory: async function* (ctx, { attempt, authority, branch, config, epoch, leases, record, runtime, work }) {
+    assertClaudeProvenance(runtime, work, attempt, branch, authority, epoch)
     const boundAuthority = bindClaudeAuthority(authority, work)
     if (boundAuthority) {
-      if (!config) throw new ClaudeConfigError("Claude session authority requires config")
-      authorizeClaudeConfig(config, boundAuthority)
+      if (config) authorizeClaudeConfig(config, boundAuthority)
     }
     const sessionId = record
       ? branch
         ? `${record.id}:${branch.id}`
         : record.id
       : leases.transient()
-    const invocation = leases.prompt(sessionId, formatModelPrompt(ctx.input), ctx.signal)
+    const leaseId = leases.identity?.(sessionId, boundAuthority, work) ?? sessionId
+    const invocation = leases.prompt(leaseId, formatModelPrompt(ctx.input), ctx.signal)
     let completed = false
     try {
       for await (const event of invocation.events) yield event
@@ -323,7 +337,7 @@ export const claudeAttempt: agent.Attempt = flow({
       completed = true
       return result
     } finally {
-      if (!completed || !record) await leases.release(sessionId)
+      if (!completed || !record) await leases.release(leaseId)
     }
   },
 })
@@ -334,12 +348,17 @@ export const claudeRun = flow({
   name: "claude.run",
   parse: typed<PromptInput>(),
   deps: {
+    attempt: tags.optional(session.current.attempt),
     authority: tags.optional(session.current.authority),
+    branch: tags.optional(session.current.branch),
+    epoch: tags.optional(session.current.epoch),
+    runtime: tags.optional(session.current.session),
     session: claudeSession,
     work: tags.optional(session.current.work),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: (ctx, { authority, session, work }) => {
+  factory: (ctx, { attempt, authority, branch, epoch, runtime, session, work }) => {
+    assertClaudeProvenance(runtime, work, attempt, branch, authority, epoch)
     bindClaudeAuthority(authority, work)
     return session.prompt(ctx.input.prompt, ctx.signal)
   },
@@ -400,6 +419,12 @@ function bindClaudeAuthority(
   authority: session.Authority | undefined,
   work: session.WorkRecord | undefined,
 ): session.Authority | undefined {
+  if (authority && session.authorityFingerprint(authority) !== authority.fingerprint) {
+    throw new ClaudeConfigError("Claude authority fingerprint is invalid")
+  }
+  if (work && session.authorityFingerprint(work.authority) !== work.authority.fingerprint) {
+    throw new ClaudeConfigError("Claude work authority fingerprint is invalid")
+  }
   if (!work) return authority
   if (!authority || authority.fingerprint !== work.authority.fingerprint) {
     throw new ClaudeConfigError("Claude authority does not match current work")
@@ -407,18 +432,85 @@ function bindClaudeAuthority(
   return work.authority
 }
 
+function assertClaudeProvenance(
+  runtime: session.SessionRuntime | undefined,
+  work: session.WorkRecord | undefined,
+  attempt: session.AttemptRecord | undefined,
+  branch: session.BranchRecord | undefined,
+  authority: session.Authority | undefined,
+  epoch: number | undefined,
+): void {
+  const present = runtime !== undefined
+    || work !== undefined
+    || attempt !== undefined
+    || branch !== undefined
+    || authority !== undefined
+    || epoch !== undefined
+  if (!present) return
+  if (!runtime || !work || !attempt || !branch || !authority || epoch === undefined) {
+    throw new ClaudeConfigError("Claude session tags must be provided as one bound tuple")
+  }
+  if (
+    session.authorityFingerprint(authority) !== authority.fingerprint
+    || session.authorityFingerprint(runtime.authority) !== runtime.authority.fingerprint
+    || session.authorityFingerprint(work.authority) !== work.authority.fingerprint
+    || session.authorityFingerprint(runtime.record.authorityConstraints) !== runtime.record.authorityFingerprint
+    || runtime.record.authorityFingerprint !== runtime.authority.fingerprint
+  ) {
+    throw new ClaudeConfigError("Claude session authority fingerprint is invalid")
+  }
+  const recordedWork = runtime.record.work.find((value) => value.id === work.id)
+  const recordedBranch = runtime.record.branches.find((value) => value.id === branch.id)
+  const recordedAttempt = runtime.record.attempts.find((value) => value.workId === attempt.workId
+    && value.attempt === attempt.attempt
+    && value.snapshotEpoch === attempt.snapshotEpoch)
+  if (!recordedWork || !recordedBranch || !recordedAttempt) {
+    throw new ClaudeConfigError("Claude session provenance does not match the active attempt")
+  }
+  if (
+    authority.fingerprint !== work.authority.fingerprint
+    || runtime.authority.fingerprint !== authority.fingerprint
+    || attempt.workId !== work.id
+    || work.attempt !== attempt.attempt
+    || attempt.status !== "working"
+    || branch.id !== work.branchId
+    || recordedWork.branchId !== branch.id
+    || recordedWork.authority.fingerprint !== work.authority.fingerprint
+    || recordedBranch.authorityFingerprint !== branch.authorityFingerprint
+    || recordedAttempt.snapshotEpoch !== attempt.snapshotEpoch
+    || recordedAttempt.status !== "working"
+    || epoch !== attempt.snapshotEpoch
+  ) {
+    throw new ClaudeConfigError("Claude session provenance does not match the active attempt")
+  }
+}
+
 function authorizeClaudeConfig(config: ClaudeConfig, authority: session.Authority): ClaudeConfig {
   if (!authority.sandbox.network) throw new ClaudeConfigError("Claude network exceeds current work authority")
   const roots = [config.cwd, ...config.roots]
   if (roots.some((root) => !isAbsolute(root))) throw new ClaudeConfigError("Claude authority roots must be absolute")
-  if (roots.some((root) => !authority.sandbox.roots.some((allowed) => within(resolve(root), resolve(allowed))))) {
+  const canonicalRoots = roots.map(canonicalPath)
+  const allowedRoots = authority.sandbox.roots.map(canonicalPath)
+  if (canonicalRoots.some((root) => !allowedRoots.some((allowed) => within(root, allowed)))) {
     throw new ClaudeConfigError("Claude roots exceed current work authority")
   }
-  return config
+  return { ...config, cwd: canonicalRoots[0]!, roots: canonicalRoots.slice(1) }
 }
 
 function within(path: string, root: string): boolean {
   return root === "/" || path === root || path.startsWith(`${root}/`)
+}
+
+function canonicalPath(path: string): string {
+  let current = resolve(path)
+  const remainder: string[] = []
+  while (!existsSync(current)) {
+    const parent = dirname(current)
+    if (parent === current) throw new ClaudeConfigError(`Claude root ${path} cannot be resolved`)
+    remainder.unshift(basename(current))
+    current = parent
+  }
+  return resolve(realpathSync(current), ...remainder)
 }
 
 function parseEvent(line: string): { type: string; result: string; is_error: boolean } {
