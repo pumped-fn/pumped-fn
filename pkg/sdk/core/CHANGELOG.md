@@ -1,17 +1,4 @@
-# @pumped-fn/agent-sdk
-
-## 3.0.0
-
-### Major Changes
-
-- Replace the Agent facade and material session with resource-backed role, tool, session, work, and attempt primitives. Keep the scalar Model seam and move agent, session, validation, and sandbox contracts to canonical subpaths.
-
-## Unreleased
-
-### Major Changes
-
-- Remove `claudeCliWorker`, `codexCliWorker`, `claudeHarness`, `codexHarness`, and their provider-specific option types. Provider packages now own stable module-level handles and config tags. Add `formatModelPrompt` and `parseModelResponse` as reference-level building blocks.
-- Validate tagged and loaded session records recursively before activation. Remove the public raw memory writer, bind commit and accept results to their source and normalized evidence, and keep quarantined invocations as a finish fence.
+# @pumped-fn/sdk
 
 ## 2.0.0
 

@@ -1,14 +1,5 @@
 # @pumped-fn/sdk-codex
 
-## Unreleased
-
-### Major Changes
-
-- Replace the `codex(options)` factory and re-exported core harness constructors with stable CLI handles and config tags. Add the `codexAcp` model and its scope-owned ACP connection resource.
-- Add provider-neutral CLI and ACP attempt bindings with normalized stream events, atomically reserved branch-scoped ACP continuation, isolated correlation, bounded consumer-stop, and selected-session cancellation. Scalar turns drain the same attempt paths.
-- Require an absolute CLI working directory in `CodexConfig` and pass it to every `codex exec` process.
-- Bind canonical, symlink-resolved CLI and ACP roots, write access, and network access to current SDK work authority before execution. Allowlist harmless CLI extra arguments and reject authority-bearing flags in split and equals forms. ACP cancellation timeout terminates and replaces its transport; failed termination quarantines the live session invocation and fences finish.
-
 ## 2.0.0
 
 ### Major Changes

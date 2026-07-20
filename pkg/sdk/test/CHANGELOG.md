@@ -1,11 +1,5 @@
 # @pumped-fn/sdk-test
 
-## 3.0.0
-
-### Major Changes
-
-- Keep existing test exports and add provider-attempt and session-store helpers for the resource-native session kernel. Session tests compose their own scope and current-owned session context explicitly.
-
 ## 2.0.0
 
 ### Minor Changes
