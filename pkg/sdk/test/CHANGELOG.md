@@ -1,4 +1,4 @@
-# @pumped-fn/agent-sdk-test
+# @pumped-fn/sdk-test
 
 ## 2.0.0
 

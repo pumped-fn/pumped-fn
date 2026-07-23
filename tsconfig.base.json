@@ -78,6 +78,9 @@
       "@pumped-fn/sdk": [
         "./pkg/sdk/core/src/index.ts"
       ],
+      "@pumped-fn/sdk/*": [
+        "./pkg/sdk/core/src/*"
+      ],
       "@pumped-fn/sdk-claude": [
         "./pkg/sdk/claude/src/index.ts"
       ],

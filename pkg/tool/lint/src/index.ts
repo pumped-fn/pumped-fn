@@ -11,6 +11,7 @@ export type RuleId =
   | "pumped/no-explicit-atom-type-argument"
   | "pumped/no-handle-spread"
   | "pumped/no-handle-factory"
+  | "pumped/no-hidden-exec-dependencies"
   | "pumped/no-hidden-exec-params"
   | "pumped/no-implicit-tag-read"
   | "pumped/no-internal-example-label"
@@ -35,6 +36,7 @@ export type RuleId =
 
 export type Severity = "error" | "warn"
 
+/** A source diagnostic emitted by the Pumped lint scanner. */
 export interface Diagnostic {
   ruleId: RuleId
   severity: Severity
@@ -44,6 +46,7 @@ export interface Diagnostic {
   message: string
 }
 
+/** The diagnostics and file count produced by one scan. */
 export interface ScanResult {
   diagnostics: Diagnostic[]
   filesScanned: number
@@ -136,7 +139,7 @@ function applyRuleOptions(diagnostics: Diagnostic[], options?: ScanOptions): Dia
 }
 
 type Imports = {
-  createScope: Set<string>
+  createScope: Map<string, number>
   controller: Map<string, number>
   creatorImportEnds: Map<string, number>
   creatorKinds: Map<string, CreatorKind>
@@ -187,6 +190,7 @@ const ctxArgumentMessage = "ctx is a receiver, never an argument; reify the cont
 const exportedScopeGlueMessage = "exported scope/ctx-taking functions are shared glue; roots stay inline, reuse lives in the graph."
 const scopeReachMessage = "graph nodes never reach the scope or create execution contexts; boundaries live at composition roots."
 const unattributedAwaitMessage = "awaited foreign call outside a declared span; move it into a step-tagged flow or reach it through a port flow."
+const hiddenExecDependenciesMessage = "inline execution callbacks never close over runtime values; declare graph values in deps and receive execution values through params."
 const hiddenExecParamsMessage = "ctx.exec function uses execution input that is missing from params; pass the real arguments through params and omit or redact sensitive telemetry with runtime tags."
 const graphMachineryMethods = new Set(["exec", "execStream", "prepare"])
 
@@ -326,7 +330,7 @@ function addTextDiagnostics(source: string, filePath: string, diagnostics: Diagn
 
 function collectImports(sourceFile: ts.SourceFile): Imports {
   const imports: Imports = {
-    createScope: new Set(),
+    createScope: new Map(),
     controller: new Map(),
     creatorImportEnds: new Map(),
     creatorKinds: new Map(),
@@ -386,7 +390,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       const imported = (specifier.propertyName ?? specifier.name).text
       const local = specifier.name.text
       if (moduleName === "@pumped-fn/lite" && imported === "createScope") {
-        imports.createScope.add(local)
+        imports.createScope.set(local, specifier.name.getEnd())
       }
       if (moduleName === "@pumped-fn/lite" && imported === "controller") {
         imports.controller.set(local, specifier.name.getEnd())
@@ -504,8 +508,140 @@ function isFlowCall(expression: ts.Expression, imports: Imports): boolean {
 }
 
 function isCreateScopeCall(expression: ts.Expression, imports: Imports): boolean {
-  if (ts.isIdentifier(expression)) return imports.createScope.has(expression.text)
-  return isNamespaceCall(expression, imports.liteNamespaces, "createScope")
+  const sourceFile = expression.getSourceFile()
+  if (ts.isIdentifier(expression)) return importedCallee(expression, imports.createScope)
+  if (
+    !ts.isPropertyAccessExpression(expression)
+    || expression.name.text !== "createScope"
+    || !ts.isIdentifier(expression.expression)
+  ) return false
+  const namespace = expression.expression
+  const importEnd = imports.liteNamespaceImportEnds.get(namespace.text)
+  return importEnd !== undefined && !shadowsName(namespace, sourceFile, namespace.text, importEnd)
+}
+
+function visibleVariableBinding(
+  expression: ts.Identifier,
+  sourceFile: ts.SourceFile,
+  candidates: ts.VariableDeclaration[],
+): ts.VariableDeclaration | undefined {
+  const position = expression.getStart(sourceFile)
+  return candidates
+    .filter((candidate) => {
+      const scope = variableBindingScope(candidate, sourceFile)
+      return candidate.getEnd() <= position
+        && scope.getStart(sourceFile) <= position
+        && position < scope.getEnd()
+        && !shadowsName(expression, scope, expression.text, candidate.getEnd(), candidate)
+    })
+    .sort((left, right) => right.getStart(sourceFile) - left.getStart(sourceFile))[0]
+}
+
+function visibleVariableDeclaration(
+  expression: ts.Identifier,
+  sourceFile: ts.SourceFile,
+): ts.VariableDeclaration | undefined {
+  const candidates: ts.VariableDeclaration[] = []
+  function walk(node: ts.Node): void {
+    if (
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === expression.text
+    ) candidates.push(node)
+    ts.forEachChild(node, walk)
+  }
+  walk(sourceFile)
+  return visibleVariableBinding(expression, sourceFile, candidates)
+}
+
+function immutableVariableInitializer(
+  expression: ts.Expression,
+  sourceFile: ts.SourceFile,
+  seen = new Set<ts.VariableDeclaration>(),
+): { initializer: ts.Expression; seen: Set<ts.VariableDeclaration> } | null {
+  const value = unwrapExpression(expression)
+  if (!ts.isIdentifier(value)) return null
+  const declaration = visibleVariableDeclaration(value, sourceFile)
+  if (
+    !declaration
+    || seen.has(declaration)
+    || !declaration.initializer
+    || !ts.isVariableDeclarationList(declaration.parent)
+    || !(declaration.parent.flags & ts.NodeFlags.Const)
+  ) return null
+  const nextSeen = new Set(seen)
+  nextSeen.add(declaration)
+  return { initializer: declaration.initializer, seen: nextSeen }
+}
+
+function isCreateScopeValue(
+  expression: ts.Expression,
+  sourceFile: ts.SourceFile,
+  imports: Imports,
+  seen = new Set<ts.VariableDeclaration>(),
+): boolean {
+  const value = unwrapExpression(expression)
+  if (ts.isCallExpression(value)) {
+    return isCreateScopeCall(unwrapExpression(value.expression), imports)
+  }
+  const binding = immutableVariableInitializer(value, sourceFile, seen)
+  return binding !== null && isCreateScopeValue(binding.initializer, sourceFile, imports, binding.seen)
+}
+
+function isCreateContextValue(
+  expression: ts.Expression,
+  sourceFile: ts.SourceFile,
+  imports: Imports,
+  seen = new Set<ts.VariableDeclaration>(),
+): boolean {
+  const value = unwrapExpression(expression)
+  if (ts.isCallExpression(value)) {
+    const callee = unwrapExpression(value.expression)
+    if (
+      ts.isPropertyAccessExpression(callee)
+      && callee.name.text === "createContext"
+    ) return isCreateScopeValue(callee.expression, sourceFile, imports)
+  }
+  const binding = immutableVariableInitializer(value, sourceFile, seen)
+  return binding !== null && isCreateContextValue(binding.initializer, sourceFile, imports, binding.seen)
+}
+
+function containsRuntimeValue(node: ts.Node, matches: (expression: ts.Expression) => boolean): boolean {
+  function matchesReference(expression: ts.Expression): boolean {
+    return (!ts.isIdentifier(expression) || referencePath(expression) !== null) && matches(expression)
+  }
+  let found = ts.isExpression(node) && matchesReference(node)
+  function walk(child: ts.Node): void {
+    if (found || ts.isTypeNode(child)) return
+    if (ts.isPropertyAccessExpression(child)) {
+      found = matchesReference(child) || containsRuntimeValue(child.expression, matches)
+      return
+    }
+    if (ts.isPropertyAssignment(child)) {
+      if (ts.isComputedPropertyName(child.name)) walk(child.name.expression)
+      if (!found) walk(child.initializer)
+      return
+    }
+    if (ts.isShorthandPropertyAssignment(child)) {
+      found = matchesReference(child.name)
+      return
+    }
+    if (
+      ts.isVariableDeclaration(child)
+      || ts.isParameter(child)
+      || ts.isBindingElement(child)
+    ) {
+      if (child.initializer) walk(child.initializer)
+      return
+    }
+    if (ts.isExpression(child) && matchesReference(child)) {
+      found = true
+      return
+    }
+    ts.forEachChild(child, walk)
+  }
+  if (!found) ts.forEachChild(node, walk)
+  return found
 }
 
 function returnsCreateScope(node: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression, imports: Imports): boolean {
@@ -739,6 +875,16 @@ function effectiveObjectElement(
   return undefined
 }
 
+function objectContainsProperty(object: ts.ObjectLiteralExpression, name: string): boolean {
+  return object.properties.some((property) => {
+    if (ts.isSpreadAssignment(property)) {
+      const spread = unwrapExpression(property.expression)
+      return ts.isObjectLiteralExpression(spread) && objectContainsProperty(spread, name)
+    }
+    return propertyNameText(property.name) === name
+  })
+}
+
 function effectiveObjectElements(object: ts.ObjectLiteralExpression): ts.ObjectLiteralElementLike[] {
   const elements: ts.ObjectLiteralElementLike[] = []
   function walk(
@@ -771,7 +917,11 @@ function objectProperty(object: ts.ObjectLiteralExpression, name: string): ts.Pr
   return property && ts.isPropertyAssignment(property) ? property : null
 }
 
-type InlineExecFunction = ts.ArrowFunction | ts.FunctionExpression | ts.MethodDeclaration
+type InlineExecFunction =
+  | ts.ArrowFunction
+  | ts.FunctionDeclaration
+  | ts.FunctionExpression
+  | ts.MethodDeclaration
 
 function unwrapExpression(expression: ts.Expression): ts.Expression {
   let current = expression
@@ -793,6 +943,33 @@ function objectFunction(object: ts.ObjectLiteralExpression, name: string): Inlin
   if (!property || !ts.isPropertyAssignment(property)) return null
   const initializer = unwrapExpression(property.initializer)
   if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) return initializer
+  return null
+}
+
+function resolveLocalFunction(expression: ts.Expression, sourceFile: ts.SourceFile): InlineExecFunction | null {
+  const value = unwrapExpression(expression)
+  if (ts.isArrowFunction(value) || ts.isFunctionExpression(value)) return value
+  if (!ts.isIdentifier(value)) return null
+  const name = value.text
+  const variables: ts.VariableDeclaration[] = []
+  function walk(node: ts.Node): void {
+    if (
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === name
+    ) variables.push(node)
+    ts.forEachChild(node, walk)
+  }
+  walk(sourceFile)
+  const variable = visibleVariableBinding(value, sourceFile, variables)
+  if (
+    variable?.initializer
+    && ts.isVariableDeclarationList(variable.parent)
+    && variable.parent.flags & ts.NodeFlags.Const
+  ) {
+    const initializer = unwrapExpression(variable.initializer)
+    if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) return initializer
+  }
   return null
 }
 
@@ -1361,8 +1538,8 @@ function localBindingsBefore(
 function parameterNames(fn: InlineExecFunction): Set<string> {
   const names = new Set<string>()
   for (const parameter of fn.parameters) collectBindingNames(parameter.name, names)
-  if (ts.isFunctionExpression(fn) && fn.name) names.add(fn.name.text)
-  if (ts.isFunctionExpression(fn) || ts.isMethodDeclaration(fn)) names.add("arguments")
+  if ((ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn)) && fn.name) names.add(fn.name.text)
+  if (ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn) || ts.isMethodDeclaration(fn)) names.add("arguments")
   return names
 }
 
@@ -1604,6 +1781,27 @@ function capturedPaths(
   }
   if (fn.body) roots.push(fn.body)
   return referencedPaths(roots, fn, candidates, bindings, ctxName, parameterNames(fn))
+}
+
+function hasVisibleValueBinding(node: ts.Node, name: string): boolean {
+  if (shadowsName(node, node.getSourceFile(), name)) return true
+  return node.getSourceFile().statements.some((statement) => {
+    if (!ts.isImportDeclaration(statement)) return false
+    const clause = statement.importClause
+    if (!clause) return false
+    if (clause.name?.text === name) return true
+    if (!clause.namedBindings) return false
+    if (ts.isNamespaceImport(clause.namedBindings)) return clause.namedBindings.name.text === name
+    return clause.namedBindings.elements.some((element) => element.name.text === name)
+  })
+}
+
+function strictCapturedPaths(fn: InlineExecFunction): string[] {
+  const candidates = collectIdentifierReferences(fn)
+  if (!hasVisibleValueBinding(fn, "Promise")) candidates.delete("Promise")
+  return [...capturedPaths(fn, candidates, new Map(), "").values()]
+    .map((path) => path.display)
+    .sort()
 }
 
 function suppliedPaths(
@@ -1894,7 +2092,13 @@ function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports)
   )
 }
 
-function shadowsName(node: ts.Node, boundary: ts.Node, name: string, afterPosition = -1): boolean {
+function shadowsName(
+  node: ts.Node,
+  boundary: ts.Node,
+  name: string,
+  afterPosition = -1,
+  binding?: ts.VariableDeclaration,
+): boolean {
   const sourceFile = node.getSourceFile()
   let current: ts.Node | undefined = node.parent
   while (current && current !== boundary) {
@@ -1913,6 +2117,7 @@ function shadowsName(node: ts.Node, boundary: ts.Node, name: string, afterPositi
     if (
       ts.isCatchClause(current)
       && current.variableDeclaration !== undefined
+      && current.variableDeclaration !== binding
       && bindingNameHas(current.variableDeclaration.name, name)
     ) {
       return true
@@ -1921,7 +2126,9 @@ function shadowsName(node: ts.Node, boundary: ts.Node, name: string, afterPositi
       (ts.isForStatement(current) || ts.isForOfStatement(current) || ts.isForInStatement(current))
       && current.initializer !== undefined
       && ts.isVariableDeclarationList(current.initializer)
-      && current.initializer.declarations.some((declaration) => bindingNameHas(declaration.name, name))
+      && current.initializer.declarations.some((declaration) =>
+        declaration !== binding && bindingNameHas(declaration.name, name)
+      )
     ) {
       return true
     }
@@ -2003,6 +2210,17 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       && staticElementName(callee.argumentExpression) === "exec"
     ) return callee.expression
     return null
+  }
+
+  function scopeRunReceiver(call: ts.CallExpression): ts.Expression | null {
+    const callee = unwrapExpression(call.expression)
+    const receiver = ts.isPropertyAccessExpression(callee) && callee.name.text === "run"
+      ? callee.expression
+      : ts.isElementAccessExpression(callee) && staticElementName(callee.argumentExpression) === "run"
+        ? callee.expression
+        : null
+    if (!receiver) return null
+    return isCreateScopeValue(receiver, sourceFile, imports) ? receiver : null
   }
 
   function executionContextAt(
@@ -2153,8 +2371,99 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     )
   }
 
+  function checkHiddenExecDependencies(call: ts.CallExpression): void {
+    const context = executionContextAt(call)
+    const scopeReceiver = scopeRunReceiver(call)
+    if (!context && !scopeReceiver) return
+    const argument = call.arguments[0]
+    const options = argument && unwrapExpression(argument)
+    if (!options || !ts.isObjectLiteralExpression(options)) return
+    const fnElement = effectiveObjectElement(options, "fn")
+    if (fnElement === undefined) return
+    if (
+      fnElement === null
+      && !objectContainsProperty(options, "fn")
+      && objectContainsProperty(options, "flow")
+    ) return
+    const receiver = scopeReceiver ? "scope.run" : "ctx.exec"
+    if (fnElement === null) {
+      pushNodeDiagnostic(
+        diagnostics,
+        sourceFile,
+        filePath,
+        "pumped/no-hidden-exec-dependencies",
+        options,
+        `${receiver} callback cannot be determined after an opaque spread or computed overwrite; use explicit inspectable options.`,
+      )
+      return
+    }
+    if (fnElement === undefined) return
+    const missing = ["name", "params"].filter((name) => !effectiveObjectElement(options, name))
+    if (missing.length > 0) {
+      pushNodeDiagnostic(
+        diagnostics,
+        sourceFile,
+        filePath,
+        "pumped/no-hidden-exec-dependencies",
+        options,
+        `${receiver} inline options require name and params; missing "${missing.join(", ")}".`,
+      )
+    }
+    const fnExpression = ts.isPropertyAssignment(fnElement)
+      ? fnElement.initializer
+      : ts.isShorthandPropertyAssignment(fnElement)
+        ? fnElement.name
+        : null
+    const fn = ts.isMethodDeclaration(fnElement)
+      ? fnElement
+      : fnExpression
+        ? resolveLocalFunction(fnExpression, sourceFile)
+        : null
+    if (!fn) {
+      pushNodeDiagnostic(
+        diagnostics,
+        sourceFile,
+        filePath,
+        "pumped/no-hidden-exec-dependencies",
+        fnElement,
+        `${receiver} callback "${fnElement.getText(sourceFile)}" cannot be inspected; use an immutable local const or inline callback.`,
+      )
+      return
+    }
+    const captures = strictCapturedPaths(fn)
+    if (captures.length > 0) {
+      pushNodeDiagnostic(
+        diagnostics,
+        sourceFile,
+        filePath,
+        "pumped/no-hidden-exec-dependencies",
+        fn,
+        `${hiddenExecDependenciesMessage} Hidden: ${captures.join(", ")}.`,
+      )
+    }
+    const params = objectProperty(options, "params")
+    if (!params) return
+    const paramsValue = unwrapExpression(params.initializer)
+    if (containsRuntimeValue(paramsValue, (value) => isCreateScopeValue(value, sourceFile, imports))) {
+      pushNodeDiagnostic(
+        diagnostics,
+        sourceFile,
+        filePath,
+        "pumped/no-scope-argument",
+        params,
+        "Do not pass scope through inline execution params; declare the operation dependencies in deps.",
+      )
+    }
+    if (containsRuntimeValue(paramsValue, (value) => isCreateContextValue(value, sourceFile, imports))) {
+      pushCtxDiagnostic(params)
+    }
+  }
+
   function visit(node: ts.Node): void {
-    if (ts.isCallExpression(node)) checkHiddenExecParams(node)
+    if (ts.isCallExpression(node)) {
+      checkHiddenExecParams(node)
+      checkHiddenExecDependencies(node)
+    }
     if (ts.isBlock(node)) {
       for (const declaration of immediateReturnBindings(node)) {
         pushNodeDiagnostic(

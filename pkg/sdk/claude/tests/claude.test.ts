@@ -1,36 +1,55 @@
 import { PassThrough } from "node:stream"
 import { EventEmitter } from "node:events"
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "node:child_process"
 import { createScope, flow, preset, typed, type Lite } from "@pumped-fn/lite"
-import { abortSignal, agent, model, type Model, type ModelRequest, type PromptInput } from "@pumped-fn/sdk"
+import { complete, model, type Model, type ModelRequest } from "@pumped-fn/sdk"
+import * as session from "@pumped-fn/sdk/session"
 import { expect, expectTypeOf, it } from "vitest"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import * as claudeModule from "../src/index"
 import {
   claude,
+  claudeAttempt,
   claudeConfig,
+  claudeLeases,
   claudeRun,
   claudeSession,
   claudeTurn,
   clock,
   engine,
   ClaudeShutdownError,
+  type ClaudeLeaseManager,
 } from "../src/index"
 
 const fake = flow({
   name: "claude.fake",
-  parse: typed<PromptInput>(),
-  factory: (ctx) => JSON.stringify({ content: `provider=claude prompt=${ctx.input.prompt.includes("Agent: planner")}`, stop: true }),
+  parse: typed<ModelRequest>(),
+  factory: async function* (ctx) {
+    return { content: `provider=claude prompt=${ctx.input.agentName === "planner"}`, stop: true }
+  },
 })
 
+const request: ModelRequest = {
+  agentName: "planner",
+  instructions: "Plan.",
+  messages: [{ role: "user", content: "plan" }],
+  tools: [],
+  skills: [],
+  loadedSkills: [],
+  subagents: [],
+  round: 0,
+}
+
 it("provides Claude through stable module handles", async () => {
-  const target = agent({ name: "planner" })
   const scope = createScope({
-    presets: [preset(claudeModule.run, fake)],
+    presets: [preset(claudeAttempt, fake)],
     tags: [claudeModule.provider, claudeModule.config(managedConfig())],
   })
   const ctx = scope.createContext()
 
-  await expect(ctx.exec({ flow: target.turn, input: { prompt: "plan" } })).resolves.toMatchObject({
+  await expect(ctx.exec({ flow: complete, input: request })).resolves.toMatchObject({
     content: "provider=claude prompt=true",
   })
   expectTypeOf(claudeModule.turn).toMatchTypeOf<Model>()
@@ -40,22 +59,21 @@ it("provides Claude through stable module handles", async () => {
 })
 
 it("can replace the model tag per context", async () => {
-  const target = agent({ name: "planner" })
   const replacement: Model = flow({
     parse: typed<ModelRequest>(),
     factory: () => ({ content: "provider=fake", stop: true }),
   })
   const scope = createScope({
-    presets: [preset(claudeRun, fake)],
+    presets: [preset(claudeAttempt, fake)],
     tags: [claude, claudeConfig(managedConfig())],
   })
   const claudeCtx = scope.createContext()
   const fakeCtx = scope.createContext({ tags: [model(replacement)] })
 
-  await expect(claudeCtx.exec({ flow: target.turn, input: { prompt: "plan" } })).resolves.toMatchObject({
+  await expect(claudeCtx.exec({ flow: complete, input: request })).resolves.toMatchObject({
     content: "provider=claude prompt=true",
   })
-  await expect(fakeCtx.exec({ flow: target.turn, input: { prompt: "plan" } })).resolves.toMatchObject({
+  await expect(fakeCtx.exec({ flow: complete, input: request })).resolves.toMatchObject({
     content: "provider=fake",
   })
 
@@ -73,10 +91,221 @@ it("exposes aligned package-module handles without a facade", () => {
   expectTypeOf(claudeModule.engine).not.toBeAny()
 })
 
-it("exposes the static turn to run to boundary to engine graph", () => {
-  expect(claudeTurn.deps).toMatchObject({ run: { flow: claudeRun } })
+it("exposes the canonical turn to attempt graph and retained scalar compatibility graph", () => {
+  expect(claudeTurn.deps).toMatchObject({ attempt: { flow: claudeAttempt } })
+  expect(claudeAttempt.deps).toMatchObject({ leases: claudeLeases })
   expect(claudeRun.deps).toMatchObject({ session: claudeSession })
   expect(claudeSession.deps).toMatchObject({ engine })
+})
+
+it("normalizes a managed lease stream and releases its transient process", async () => {
+  const released: string[] = []
+  const leases: ClaudeLeaseManager = {
+    prompt: (sessionId) => ({
+      events: (async function* () {
+        yield { type: "provider_status", status: "started" } as const
+        yield { type: "reasoning_delta", content: "check" } as const
+        yield { type: "content_delta", content: "done" } as const
+        yield { type: "provider_status", status: "completed" } as const
+      })(),
+      result: Promise.resolve(JSON.stringify({ content: "done", stop: true })),
+    }),
+    release: async (sessionId) => {
+      released.push(sessionId)
+    },
+    transient: () => "transient-test",
+  }
+  const scope = createScope({ presets: [preset(claudeLeases, leases)] })
+  const ctx = scope.createContext()
+  const stream = ctx.execStream({ flow: claudeAttempt, input: {
+    agentName: "planner",
+    instructions: "Plan.",
+    messages: [],
+    tools: [],
+    skills: [],
+    loadedSkills: [],
+    subagents: [],
+    round: 0,
+  } })
+  const normalized = []
+
+  for await (const event of stream) normalized.push(event)
+
+  expect(normalized).toEqual([
+    { type: "provider_status", status: "started" },
+    { type: "reasoning_delta", content: "check" },
+    { type: "content_delta", content: "done" },
+    { type: "provider_status", status: "completed" },
+  ])
+  await expect(stream.result).resolves.toEqual({ content: "done", stop: true })
+  await expect(ctx.exec({ flow: claudeTurn, input: request })).resolves.toEqual({ content: "done", stop: true })
+  expect(released).toEqual(["transient-test", "transient-test"])
+
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("cancels a managed Claude lease when its stream consumer returns", async () => {
+  const harness = createHarness()
+  const scope = createScope({
+    presets: [preset(engine, harness.engine)],
+    tags: [claudeConfig(managedConfig())],
+  })
+  const ctx = scope.createContext({ tags: [session.record(sessionRecord("consumer"))] })
+  const stream = ctx.execStream({ flow: claudeAttempt, input: request })
+  const iterator = stream[Symbol.asyncIterator]()
+
+  await expect(iterator.next()).resolves.toEqual({
+    done: false,
+    value: { type: "provider_status", status: "started" },
+  })
+  await harness.writes(1)
+  const result = stream.result.catch(() => undefined)
+  await expect(iterator.return?.()).resolves.toMatchObject({ done: true })
+  await result
+  expect(harness.signals).toEqual(["SIGINT"])
+  expect(harness.live).toBe(false)
+
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("releases only the aborted logical session lease", async () => {
+  const controller = new AbortController()
+  const released: string[] = []
+  let start: () => void = () => undefined
+  const started = new Promise<void>((resolve) => {
+    start = resolve
+  })
+  const leases: ClaudeLeaseManager = {
+    prompt: (sessionId, _prompt, signal) => sessionId === "blocked"
+      ? {
+          events: (async function* () {
+            const aborted = new Promise<void>((_resolve, reject) => {
+              signal?.addEventListener("abort", () => reject(signal.reason), { once: true })
+            })
+            start()
+            yield { type: "provider_status", status: "started" } as const
+            await aborted
+          })(),
+          result: new Promise<string>(() => undefined),
+        }
+      : {
+          events: (async function* () {
+            yield { type: "provider_status", status: "started" } as const
+            yield { type: "content_delta", content: "completed" } as const
+            yield { type: "provider_status", status: "completed" } as const
+          })(),
+          result: Promise.resolve(JSON.stringify({ content: "completed", stop: true })),
+        },
+    release: async (sessionId) => {
+      released.push(sessionId)
+    },
+    transient: () => "unused",
+  }
+  const scope = createScope({ presets: [preset(claudeLeases, leases)] })
+  const blocked = scope.createContext({
+    tags: [session.record(sessionRecord("blocked"))],
+  })
+  const completed = scope.createContext({ tags: [session.record(sessionRecord("completed"))] })
+  const first = blocked.execStream({ flow: claudeAttempt, input: request, signal: controller.signal })
+  const second = completed.execStream({ flow: claudeAttempt, input: request })
+  const firstEvents = collect(first).catch((error: unknown) => error)
+  const secondEvents = collect(second)
+
+  await started
+  controller.abort()
+
+  await expect(first.result).rejects.toMatchObject({ name: "AbortError" })
+  await expect(firstEvents).resolves.toMatchObject({ name: "AbortError" })
+  await expect(second.result).resolves.toMatchObject({ content: "completed", stop: true })
+  await expect(secondEvents).resolves.toEqual([
+    { type: "provider_status", status: "started" },
+    { type: "content_delta", content: "completed" },
+    { type: "provider_status", status: "completed" },
+  ])
+  expect(released).toEqual(["blocked"])
+
+  await blocked.close()
+  await completed.close()
+  await scope.dispose()
+})
+
+it("isolates managed leases by branch within one logical session", async () => {
+  const controller = new AbortController()
+  const released: string[] = []
+  const prompted: string[] = []
+  let start: () => void = () => undefined
+  const started = new Promise<void>((resolve) => {
+    start = resolve
+  })
+  const leases: ClaudeLeaseManager = {
+    prompt: (sessionId, prompt, signal) => {
+      prompted.push(sessionId)
+      return prompt.includes("Agent: left")
+        ? {
+            events: (async function* () {
+              const aborted = new Promise<void>((_resolve, reject) => {
+                signal?.addEventListener("abort", () => reject(signal.reason), { once: true })
+              })
+              start()
+              yield { type: "provider_status", status: "started" } as const
+              await aborted
+            })(),
+            result: new Promise<string>(() => undefined),
+          }
+        : {
+            events: (async function* () {
+              yield { type: "provider_status", status: "started" } as const
+              yield { type: "content_delta", content: "right" } as const
+              yield { type: "provider_status", status: "completed" } as const
+            })(),
+            result: Promise.resolve(JSON.stringify({ content: "right", stop: true })),
+          }
+    },
+    release: async (sessionId) => {
+      released.push(sessionId)
+    },
+    transient: () => "unused",
+  }
+  const record = sessionRecord("shared")
+  const authority = record.authorityConstraints
+  const left = branchRecord("left", authority)
+  const right = branchRecord("right", authority)
+  const shared = { ...record, branches: [left, right], currentBranchId: left.id }
+  const scope = createScope({ presets: [preset(claudeLeases, leases)] })
+  const leftContext = scope.createContext({
+    tags: [session.record(shared), ...provenanceTags(left)],
+  })
+  const rightContext = scope.createContext({
+    tags: [session.record(shared), ...provenanceTags(right)],
+  })
+  const leftStream = leftContext.execStream({
+    flow: claudeAttempt,
+    input: { ...request, agentName: "left" },
+    signal: controller.signal,
+  })
+  const rightStream = rightContext.execStream({ flow: claudeAttempt, input: { ...request, agentName: "right" } })
+  const leftEvents = collect(leftStream).catch((error: unknown) => error)
+  const rightEvents = collect(rightStream)
+
+  await started
+  controller.abort()
+
+  await expect(leftStream.result).rejects.toMatchObject({ name: "AbortError" })
+  await expect(leftEvents).resolves.toMatchObject({ name: "AbortError" })
+  await expect(rightStream.result).resolves.toEqual({ content: "right", stop: true })
+  await expect(rightEvents).resolves.toEqual([
+    { type: "provider_status", status: "started" },
+    { type: "content_delta", content: "right" },
+    { type: "provider_status", status: "completed" },
+  ])
+  expect(prompted).toEqual(["shared:left", "shared:right"])
+  expect(released).toEqual(["shared:left"])
+
+  await leftContext.close()
+  await rightContext.close()
+  await scope.dispose()
 })
 
 it("runs sequential stream-json prompts through a scope-owned engine", async () => {
@@ -119,6 +348,27 @@ it("runs sequential stream-json prompts through a scope-owned engine", async () 
   expect(harness.live).toBe(false)
 })
 
+it("poisons a managed lease before child failure settles queued prompts", async () => {
+  const harness = createHarness()
+  const scope = createScope({
+    presets: [preset(engine, harness.engine)],
+    tags: [claudeConfig(managedConfig())],
+  })
+  const ctx = scope.createContext()
+  const leases = await ctx.resolve(claudeLeases)
+  const first = leases.prompt("shared", "first")
+  const queued = leases.prompt("shared", "must-not-start")
+  await harness.writes(1)
+
+  harness.fail(new Error("Claude child failed"))
+
+  await expect(first.result).rejects.toThrow("Claude child failed")
+  await expect(queued.result).rejects.toThrow("Claude session is closed")
+  expect(harness.prompts).toEqual(["first"])
+  await ctx.close()
+  await scope.dispose()
+})
+
 it("interrupts an active prompt and awaits child close", async () => {
   const harness = createHarness({ closeOnEnd: false, closeOnInterrupt: false })
   const controller = new AbortController()
@@ -126,9 +376,9 @@ it("interrupts an active prompt and awaits child close", async () => {
     presets: [preset(engine, harness.engine)],
     tags: [claudeConfig(managedConfig())],
   })
-  const ctx = scope.createContext({ tags: [abortSignal(controller.signal)] })
-  const prompt = ctx.exec({ flow: claudeRun, input: { prompt: "wait" } })
-  const queued = ctx.exec({ flow: claudeRun, input: { prompt: "must-not-start" } })
+  const ctx = scope.createContext()
+  const prompt = ctx.exec({ flow: claudeRun, input: { prompt: "wait" }, signal: controller.signal })
+  const queued = ctx.exec({ flow: claudeRun, input: { prompt: "must-not-start" }, signal: controller.signal })
   await harness.writes(1)
 
   controller.abort()
@@ -178,6 +428,82 @@ it.each([
 
   await ctx.close()
   await scope.dispose()
+})
+
+it("rejects managed Claude roots outside current work authority before spawning", async () => {
+  const harness = createHarness()
+  const scope = createScope({
+    presets: [preset(engine, harness.engine)],
+    tags: [claudeConfig(managedConfig())],
+  })
+  const authority = testAuthority([], false, true)
+  const branch = branchRecord("main", authority)
+  const work = {
+    id: "work-1",
+    branchId: branch.id,
+    role: "task",
+    status: "working" as const,
+    policy: "all" as const,
+    attempt: 1,
+    authority,
+  }
+  const attempt = { workId: work.id, attempt: 1, snapshotEpoch: 0, status: "working" as const, startedAt: "now" }
+  const runtime = { authority, record: sessionProvenanceRecord(authority, branch, work, attempt) } as session.SessionRuntime
+  const ctx = scope.createContext({ tags: [
+    session.current.authority(authority),
+    session.current.session(runtime),
+    session.current.work(work),
+    session.current.attempt(attempt),
+    session.current.branch(branch),
+    session.current.epoch(0),
+  ] })
+
+  await expect(ctx.resolve(claudeSession)).rejects.toThrow("Claude roots exceed current work authority")
+  expect(harness.options).toBeUndefined()
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("rejects a Claude root that escapes through a symlink", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pumped-claude-symlink-"))
+  const allowed = join(root, "allowed")
+  const outside = join(root, "outside")
+  await mkdir(allowed)
+  await mkdir(outside)
+  const escape = join(allowed, "escape")
+  await symlink(outside, escape, "dir")
+  const authority = testAuthority([allowed], false, true)
+  const branch = branchRecord("main", authority)
+  const work = {
+    id: "work-1",
+    branchId: branch.id,
+    role: "task",
+    status: "working" as const,
+    policy: "all" as const,
+    attempt: 1,
+    authority,
+  }
+  const attempt = { workId: work.id, attempt: 1, snapshotEpoch: 0, status: "working" as const, startedAt: "now" }
+  const runtime = { authority, record: sessionProvenanceRecord(authority, branch, work, attempt) } as session.SessionRuntime
+  const harness = createHarness()
+  const scope = createScope({
+    presets: [preset(engine, harness.engine)],
+    tags: [claudeConfig(managedConfig({ cwd: escape }))],
+  })
+  const ctx = scope.createContext({ tags: [
+    session.current.authority(authority),
+    session.current.session(runtime),
+    session.current.work(work),
+    session.current.attempt(attempt),
+    session.current.branch(branch),
+    session.current.epoch(0),
+  ] })
+
+  await expect(ctx.resolve(claudeSession)).rejects.toThrow("Claude roots exceed current work authority")
+  expect(harness.options).toBeUndefined()
+  await ctx.close()
+  await scope.dispose()
+  await rm(root, { recursive: true })
 })
 
 it("requires a positive shutdown bound before the engine starts", async () => {
@@ -318,6 +644,11 @@ function createHarness(options: { closeOnEnd?: boolean; closeOnInterrupt?: boole
     result(value: string) {
       output.write(`${JSON.stringify({ type: "result", result: value, is_error: false })}\n`)
     },
+    fail(reason: Error) {
+      if (!live) return
+      live = false
+      child.emit("error", reason)
+    },
     close,
     async writes(count: number) {
       while (prompts.length < count) await new Promise((resolve) => setImmediate(resolve))
@@ -363,4 +694,100 @@ function createClock() {
       await new Promise((resolve) => setImmediate(resolve))
     },
   }
+}
+
+function testAuthority(roots: readonly string[] = [], write = false, network = false): session.Authority {
+  return session.createAuthority({
+    tenant: "test",
+    roots,
+    permissions: [],
+    tools: [],
+    sandbox: { roots, commands: [], write, network },
+  })
+}
+
+function provenanceTags(branch: session.BranchRecord): readonly [
+  ReturnType<typeof session.current.session>,
+  ReturnType<typeof session.current.work>,
+  ReturnType<typeof session.current.attempt>,
+  ReturnType<typeof session.current.branch>,
+  ReturnType<typeof session.current.authority>,
+  ReturnType<typeof session.current.epoch>,
+] {
+  const work = {
+    id: `${branch.id}-work`,
+    branchId: branch.id,
+    role: "task",
+    status: "working" as const,
+    policy: "all" as const,
+    attempt: 1,
+    authority: branch.authority,
+  }
+  const attempt = { workId: work.id, attempt: 1, snapshotEpoch: 0, status: "working" as const, startedAt: "now" }
+  const runtime = { authority: branch.authority, record: sessionProvenanceRecord(branch.authority, branch, work, attempt) } as session.SessionRuntime
+  return [
+    session.current.session(runtime),
+    session.current.work(work),
+    session.current.attempt(attempt),
+    session.current.branch(branch),
+    session.current.authority(branch.authority),
+    session.current.epoch(0),
+  ]
+}
+
+function branchRecord(id = "main", authority = testAuthority()): session.BranchRecord {
+  return {
+    id,
+    version: 0,
+    createdBy: "root",
+    authorityFingerprint: authority.fingerprint,
+    authority,
+    evidence: [],
+  }
+}
+
+function sessionRecord(id: string): session.SessionRecord {
+  const branch = branchRecord()
+  const authority = branch.authority
+  return {
+    id,
+    version: 0,
+    schemaVersion: 1,
+    status: "open",
+    authorityFingerprint: authority.fingerprint,
+    authorityConstraints: authority,
+    currentBranchId: branch.id,
+    branches: [branch],
+    work: [],
+    attempts: [],
+    invocations: [],
+    artifacts: [],
+    memory: [],
+    schedules: [],
+    providerContinuations: {},
+    nextEventSequence: 0,
+  }
+}
+
+function sessionProvenanceRecord(
+  authority: session.Authority,
+  branch: session.BranchRecord,
+  work: session.WorkRecord,
+  attempt: session.AttemptRecord,
+): session.SessionRecord {
+  return {
+    ...sessionRecord(`runtime-${branch.id}`),
+    authorityFingerprint: authority.fingerprint,
+    authorityConstraints: authority,
+    currentBranchId: branch.id,
+    branches: [branch],
+    work: [work],
+    attempts: [attempt],
+  }
+}
+
+async function collect<T>(stream: AsyncIterable<T>): Promise<T[]> {
+  const values: T[] = []
+  for await (const value of stream) values.push(value)
+  return values
 }

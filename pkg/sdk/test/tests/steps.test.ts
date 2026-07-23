@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
+import { controller, createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
 import {
   abortSignal,
   workflowRun,
@@ -31,10 +31,10 @@ describe("workflow steps", () => {
       name: "memo-root",
       parse: typed<number>(),
       tags: [step({ workflow: true })],
-      deps: { workflow: tags.required(workflowRuntime) },
-      factory: async (ctx, { workflow }) => {
+      deps: { worker: controller(worker), workflow: tags.required(workflowRuntime) },
+      factory: async (ctx, { worker, workflow }) => {
         expect(workflow.taskId).toBe("task-a")
-        return ctx.exec({ flow: worker, input: ctx.input })
+        return worker.exec({ input: ctx.input })
       },
     })
 
@@ -99,9 +99,10 @@ describe("workflow steps", () => {
     const root = flow({
       name: "approval-root",
       tags: [step({ workflow: true })],
-      factory: async (ctx) => {
-        const first = await ctx.exec({ flow: expensive })
-        const decision = await ctx.exec({ flow: approve })
+      deps: { approve: controller(approve), expensive: controller(expensive) },
+      factory: async (_ctx, { approve, expensive }) => {
+        const first = await expensive.exec()
+        const decision = await approve.exec()
         return `${first}:${decision}`
       },
     })

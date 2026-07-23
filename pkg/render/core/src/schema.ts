@@ -27,20 +27,24 @@ type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B 
 type Assert<T extends true> = T
 type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) extends (x: infer I) => void ? I : never
 
+/** Defines the node discriminator and carried value type shared by every schema node. */
 interface BaseSchema {
   readonly node: "leaf" | "array" | "object"
   readonly _type: (value: never) => unknown
 }
+/** Describes a scalar schema node and its runtime value kind. */
 interface LeafSchema<T> extends BaseSchema {
   readonly node: "leaf"
   readonly kind: ValueKind
   readonly _type: (value: T) => T
 }
+/** Describes an array schema whose values follow one item schema. */
 interface ArraySchema<I extends BaseSchema> extends BaseSchema {
   readonly node: "array"
   readonly item: I
   readonly _type: (value: Infer<I>[]) => Infer<I>[]
 }
+/** Describes an object schema whose fields each carry a schema node. */
 interface ObjectSchema<F extends Record<string, BaseSchema>> extends BaseSchema {
   readonly node: "object"
   readonly fields: F

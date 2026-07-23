@@ -93,7 +93,7 @@ const logger = resource({
   factory: (ctx, { value }) => {
     const current = normalize(value)
     if (value === rootRuntime(ctx.scope)) {
-      ctx.cleanup(() => flush(current))
+      ctx.cleanup((target) => flush(target), current)
     } else {
       registerContextClose(ctx, value, current)
     }
@@ -185,7 +185,7 @@ function registerContextClose(
   }
   if (!values.has(value)) {
     values.add(value)
-    owner.onClose(() => close(current))
+    owner.onClose((_result, target) => close(target), current)
   }
 }
 

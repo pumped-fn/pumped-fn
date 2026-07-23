@@ -39,7 +39,7 @@
   },
   "peerDependencies": {
     "@hono/node-server": "^2.0.0",
-    "@pumped-fn/lite": "^3.1.0",
+    "@pumped-fn/lite": "^3.1.0 || ^4.0.0 || ^5.0.0 || ^6.0.0",
     "@pumped-fn/lite-hono": "^0.2.0",
     "hono": "^4.12.0",
     "vite": "^8.0.0"

@@ -1,13 +1,17 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import process from "node:process";
 
 const root = process.cwd();
-const initialBase = process.argv[2] ?? process.env.BASE_REF ?? "origin/main";
-const base = initialBase.match(/^0+$/) ? "origin/main" : initialBase;
+const base = process.argv[2] ?? process.env.BASE_REF;
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+
+if (!base || base.match(/^0+$/)) {
+  process.stderr.write("Usage: node scripts/check-changed-packages.mjs <base-ref> or set BASE_REF\n");
+  process.exit(2);
+}
 
 const files = changedFiles(base);
 const packageDirs = [
@@ -18,6 +22,30 @@ const packageDirs = [
       .map((value) => value.slice(0, -1)),
   ),
 ].sort();
+
+const currentPackages = currentPackageInventory();
+const currentPackagesByName = new Map(currentPackages.map((pkg) => [pkg.name, pkg]));
+const basePackages = basePackageInventory();
+const retiredPackages = new Set(readdirSync(join(root, ".changeset"), { withFileTypes: true })
+  .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+  .flatMap((entry) =>
+    [...readFileSync(join(root, ".changeset", entry.name), "utf8")
+      .matchAll(/^Retires:\s*["']?([^"'\s]+)["']?\s*$/gimu)]
+      .map((match) => match[1])
+  ));
+const deletedPackages = basePackages.filter((pkg) => !currentPackagesByName.has(pkg.name));
+const missingRetirements = deletedPackages.filter((pkg) => !retiredPackages.has(pkg.name));
+
+if (missingRetirements.length > 0) {
+  throw new Error(`Deleted public packages require explicit retirement evidence: ${missingRetirements
+    .map(({ name }) => name)
+    .sort()
+    .join(", ")}`);
+}
+
+for (const { name, path } of deletedPackages) {
+  console.log(`Retired public package ${name} from ${path}.`);
+}
 
 const packages = packageDirs
   .map((path) => packageAt(path))
@@ -48,20 +76,12 @@ for (const pkg of packages) {
 }
 
 function changedFiles(ref) {
-  try {
-    return execFileSync("git", ["diff", "--name-only", `${ref}...HEAD`], {
-      cwd: root,
-      encoding: "utf8",
-    })
-      .split("\n")
-      .filter(Boolean);
-  } catch (error) {
-    if (ref === "origin/main") {
-      throw error;
-    }
-
-    return changedFiles("origin/main");
-  }
+  return execFileSync("git", ["diff", "--name-only", `${ref}...HEAD`], {
+    cwd: root,
+    encoding: "utf8",
+  })
+    .split("\n")
+    .filter(Boolean);
 }
 
 function packageAt(path) {
@@ -79,6 +99,31 @@ function packageAt(path) {
     private: pkg.private,
     path: dirname(file),
   };
+}
+
+function currentPackageInventory() {
+  return readdirSync(join(root, "pkg"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((lane) =>
+      readdirSync(join(root, "pkg", lane.name), { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => packageAt(`pkg/${lane.name}/${entry.name}`))
+    )
+    .filter((pkg) => pkg !== undefined && pkg.private !== true);
+}
+
+function basePackageInventory() {
+  return execFileSync("git", ["ls-tree", "-r", "--name-only", base, "--", "pkg"], {
+    cwd: root,
+    encoding: "utf8",
+  })
+    .split("\n")
+    .filter((path) => /^pkg\/[^/]+\/[^/]+\/package\.json$/u.test(path))
+    .map((file) => {
+      const pkg = JSON.parse(execFileSync("git", ["show", `${base}:${file}`], { cwd: root, encoding: "utf8" }));
+      return { ...pkg, path: dirname(file) };
+    })
+    .filter((pkg) => pkg.private !== true);
 }
 
 function published(name, version) {

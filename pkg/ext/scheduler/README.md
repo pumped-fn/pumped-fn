@@ -5,20 +5,30 @@ resolved value is a registration (`{ trigger, next, stop }`) against a pluggable
 This package does not import or ship a durable backend — only an in-process, non-persistent one for
 dev/test.
 
+## Migration to 1.0.0
+
+Install 1.0 with Lite 6:
+
+```bash
+npm install @pumped-fn/lite@^6.0.0 @pumped-fn/lite-extension-scheduler@^1.0.0
+```
+
 ## Contract
 
 ```ts
-interface Scheduler.Backend {
-  register(
-    spec: {
-      name: string
-      cadence: { cron: string } | { every: string }
-      overlap: "skip" | "queue"
-      catchUp: "skip" | "last" | "all"
-      onError?: (error: unknown, run: { key: string; scheduledAt: Date }) => void
-    },
-    tick: (run: { key: string; scheduledAt: Date }) => Promise<void>
-  ): { trigger(dedupKey?: string): Promise<void>; next(): Date | undefined; stop(): Promise<void> }
+declare namespace Scheduler {
+  interface Backend {
+    register(
+      spec: {
+        name: string
+        cadence: { cron: string } | { every: string }
+        overlap: "skip" | "queue"
+        catchUp: "skip" | "last" | "all"
+        onError?: (error: unknown, run: { key: string; scheduledAt: Date }) => void
+      },
+      tick: (run: { key: string; scheduledAt: Date }) => Promise<void>
+    ): { trigger(dedupKey?: string): Promise<void>; next(): Date | undefined; stop(): Promise<void> }
+  }
 }
 ```
 

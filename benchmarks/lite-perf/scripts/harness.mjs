@@ -300,10 +300,18 @@ export function sealObservation(body) {
 
 const require = createRequire(resolve(packageRoot, "package.json"));
 
+export function packageIdentity(name, path) {
+  const value = readJson(path);
+  return {
+    name,
+    version: value.version,
+    manifest_sha256: sha256File(path),
+  };
+}
+
 function packageRecord(name) {
   const path = require.resolve(`${name}/package.json`);
-  const value = readJson(path);
-  return { name, version: value.version, path, sha256: sha256File(path) };
+  return { identity: packageIdentity(name, path), path };
 }
 
 function cpuRecord() {
@@ -329,8 +337,9 @@ function browserRecord(lane) {
     required: true,
     browser: "chromium",
     provider: "playwright",
-    provider_version: playwrightPackage.version,
-    executable_path: executable,
+    provider_version: playwrightPackage.identity.version,
+    provider_manifest_sha256:
+      playwrightPackage.identity.manifest_sha256,
     executable_sha256: sha256File(executable),
   };
 }
@@ -347,12 +356,11 @@ export function collectEnvironment(
   const shared = {
     runtime: {
       node: process.version,
-      executable: process.execPath,
       executable_sha256: sha256File(process.execPath),
     },
     tool: {
-      vitest,
-      browser_provider: browserProvider,
+      vitest: vitest.identity,
+      browser_provider: browserProvider.identity,
       config_sha256: sha256File(configPath),
       harness_sha256: sha256File(fileURLToPath(import.meta.url)),
       observation_writer: {

@@ -1,6 +1,9 @@
-import { createScope, flow, typed } from "@pumped-fn/lite"
+import { controller, flow, typed } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
-import { agent, model, tool, type Model, type ModelRequest } from "@pumped-fn/sdk"
+import type { Model, ModelRequest } from "@pumped-fn/sdk"
+import * as agent from "@pumped-fn/sdk/agent"
+import * as session from "@pumped-fn/sdk/session"
+import * as validation from "@pumped-fn/sdk/validation"
 import { kit } from "@pumped-fn/sdk-test"
 import { normalizeAgentEntry } from "../src/runtime/agent"
 import { createServer } from "../src/runtime/serve"
@@ -16,31 +19,47 @@ const scripted: Model = flow({
   }),
 })
 
-const greeter = agent({
-  name: "greeter",
-  instructions: "Greet the caller.",
-  tags: [model(scripted)],
-  tools: [
-    tool({
-      description: "Looks something up",
-      flow: flow({
-        name: "lookup",
-        parse: typed<{ id: string }>(),
-        factory: (ctx) => ({ id: ctx.input.id }),
-      }),
-    }),
-  ],
+const authority = session.createAuthority({
+  tenant: "test",
+  roots: [],
+  permissions: [],
+  tools: [],
+  sandbox: { roots: [], commands: [], write: false, network: false },
 })
 
+const validator = validation.standard({
+  id: "test",
+  toJsonSchema: () => true,
+})
+
+const greeterEntry = flow({
+  name: "greeter",
+  parse: typed<agent.TurnInput>(),
+  deps: { session: session.session, run: controller(session.run) },
+  factory: (ctx, { run }) => run.exec({
+    input: {
+      work: { id: "greeter-work", branchId: "main", role: "greeter", policy: "all", authority: {} },
+      input: ctx.input,
+    },
+  }),
+})
+const greeter = {
+  name: "greeter",
+  turn: greeterEntry,
+  tools: [],
+  skills: [],
+  subagents: [],
+}
+
 describe("normalizeAgentEntry", () => {
-  it("extracts flow and metadata from an Agent struct", () => {
+  it("accepts an SDK 3 turn adapter with structural metadata", () => {
     const normalized = normalizeAgentEntry(greeter)
 
-    expect(normalized.flow).toBe(greeter.turn)
+    expect(normalized.flow).toBe(greeterEntry)
     expect(normalized.agent).toEqual({
       name: "greeter",
       description: undefined,
-      tools: ["lookup"],
+      tools: [],
       skills: [],
       subagents: [],
     })
@@ -53,10 +72,10 @@ describe("normalizeAgentEntry", () => {
 })
 
 describe("agents entry kind", () => {
-  it("mounts POST /agents/<name> and runs the turn flow", async () => {
+  it("mounts POST /agents/<name> and runs the session turn flow", async () => {
     const { extensions } = kit()
     const manifest: Manifest = {
-      app: { extensions },
+      app: { extensions, tags: sessionTags() },
       entries: [{ kind: "agents", name: "greeter", file: "virtual", ...normalizeAgentEntry(greeter) }],
     }
 
@@ -75,7 +94,7 @@ describe("agents entry kind", () => {
   it("is runnable through the CLI as `agent <name>`", async () => {
     const { extensions } = kit()
     const manifest: Manifest = {
-      app: { extensions },
+      app: { extensions, tags: sessionTags() },
       entries: [{ kind: "agents", name: "greeter", file: "virtual", ...normalizeAgentEntry(greeter) }],
     }
 
@@ -89,3 +108,47 @@ describe("agents entry kind", () => {
     expect(JSON.parse(lines[0]!).content).toBe("reply:hi")
   })
 })
+
+function sessionTags() {
+  return [
+    session.authority(authority),
+    session.record(sessionRecord()),
+    session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
+    agent.config.role({
+      name: "greeter",
+      version: "1",
+      instructions: "Greet the caller.",
+    }),
+    agent.impl.attempt(scripted),
+    session.execution.turn({ flow: agent.turn }),
+    validation.engine(validator),
+  ]
+}
+
+function sessionRecord(): session.SessionRecord {
+  return Object.freeze({
+    id: "greeter-session",
+    version: 0,
+    schemaVersion: 1,
+    status: "open",
+    authorityFingerprint: authority.fingerprint,
+    authorityConstraints: authority,
+    currentBranchId: "main",
+    branches: [{
+      id: "main",
+      version: 0,
+      createdBy: "bootstrap",
+      authorityFingerprint: authority.fingerprint,
+      authority,
+      evidence: [],
+    }],
+    work: [],
+    attempts: [],
+    invocations: [],
+    artifacts: [],
+    memory: [],
+    schedules: [],
+    providerContinuations: {},
+    nextEventSequence: 1,
+  })
+}

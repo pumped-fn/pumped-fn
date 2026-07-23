@@ -40,13 +40,14 @@ dispatching need **no type annotations**.
 
 ```ts
 import { action, defineRender, k } from "@pumped-fn/lite-render-core"
-import { flow, typed } from "@pumped-fn/lite"
+import { flow, resource, typed } from "@pumped-fn/lite"
 
 const cardSchema = k.object({ id: k.string, label: k.string, done: k.boolean })
 const boardSchema = k.object({ board: k.object({ cards: k.array(cardSchema), heading: k.string }) })
 
-// a @pumped-fn/lite resource (or lite-react scopedValue) whose value satisfies Infer<typeof boardSchema>
-const store = /* ... */
+const store = resource({
+  factory: () => ({ board: { cards: [], heading: "Tasks" } }),
+})
 const toggle = flow({ name: "toggle", parse: typed<{ id: string }>(), deps: { access: store }, factory: (ctx) => ctx.input.id })
 const actions = { toggle: action(toggle, k.object({ id: k.string })) }
 

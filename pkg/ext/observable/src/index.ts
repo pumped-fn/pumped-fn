@@ -157,7 +157,7 @@ function contextRuntime(
   }
   if (!values.has(value)) {
     values.add(value)
-    owner.onClose(() => close(current))
+    owner.onClose((_result, target) => close(target), current)
   }
   return current
 }

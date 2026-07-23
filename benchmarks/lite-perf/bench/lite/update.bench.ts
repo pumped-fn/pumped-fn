@@ -13,6 +13,7 @@ const { ctrl: c100 } = await resolvedController(() => 0)
 let listenerHits = 0
 for (let i = 0; i < 100; i++) c100.on("resolved", () => { listenerHits += i })
 let i100 = 0
+const increment = (value: number, amount = 1) => value + amount
 
 describe("controller.set — no dependents", () => {
   bench("set, 0 listeners", () => {
@@ -32,7 +33,7 @@ describe("controller.set — no dependents", () => {
   })
 
   bench("update(fn), 0 listeners", () => {
-    c0.update((v) => v + 1)
+    c0.update(increment)
   })
 })
 

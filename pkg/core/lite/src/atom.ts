@@ -20,7 +20,7 @@ export interface AtomConfig<T, D extends Record<string, Lite.Dependency>> {
  * const db = atom({
  *   factory: async (ctx) => {
  *     const pool = await createDatabase()
- *     ctx.cleanup(() => pool.end())
+ *     ctx.cleanup((pool) => pool.end(), pool)
  *     return pool
  *   }
  * })
@@ -103,7 +103,7 @@ export function isAtom(value: unknown): value is Lite.Atom<unknown> {
  *   deps: { config: controller(config, { resolve: true }) },
  *   factory: (ctx, { config }) => {
  *     const s = createServer(config.get().port)
- *     ctx.cleanup(() => s.close())
+ *     ctx.cleanup((server) => server.close(), s)
  *     return s
  *   },
  * })

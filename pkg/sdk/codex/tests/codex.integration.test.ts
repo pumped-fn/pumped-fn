@@ -5,7 +5,7 @@ import { codexAcpConfig, codexAcpTurn, codexConfig, codexTurn } from "../src/ind
 const integration = it.skipIf(process.env["PUMPED_INTEGRATION"] !== "1")
 
 integration("invokes the authenticated Codex CLI", async () => {
-  const scope = createScope({ tags: [codexConfig({ auth: { kind: "global" }, isolate: false })] })
+  const scope = createScope({ tags: [codexConfig({ auth: { kind: "global" }, cwd: process.cwd(), isolate: false })] })
   const ctx = scope.createContext()
 
   await expect(ctx.exec({

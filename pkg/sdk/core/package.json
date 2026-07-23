@@ -17,13 +17,54 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
+    },
+    "./agent": {
+      "import": {
+        "types": "./dist/agent.d.mts",
+        "default": "./dist/agent.mjs"
+      },
+      "require": {
+        "types": "./dist/agent.d.cts",
+        "default": "./dist/agent.cjs"
+      }
+    },
+    "./session": {
+      "import": {
+        "types": "./dist/session.d.mts",
+        "default": "./dist/session.mjs"
+      },
+      "require": {
+        "types": "./dist/session.d.cts",
+        "default": "./dist/session.cjs"
+      }
+    },
+    "./validation": {
+      "import": {
+        "types": "./dist/validation.d.mts",
+        "default": "./dist/validation.mjs"
+      },
+      "require": {
+        "types": "./dist/validation.d.cts",
+        "default": "./dist/validation.cjs"
+      }
+    },
+    "./sandbox": {
+      "import": {
+        "types": "./dist/sandbox.d.mts",
+        "default": "./dist/sandbox.mjs"
+      },
+      "require": {
+        "types": "./dist/sandbox.d.cts",
+        "default": "./dist/sandbox.cjs"
+      }
     }
   },
   "files": [
     "dist",
     "README.md",
     "PATTERNS.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "access": "public"
@@ -31,23 +72,27 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsgo --noEmit",
-    "test": "vitest run",
+    "test": "pnpm build && vitest run",
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^3.1.0"
+    "@pumped-fn/lite": "^6.0.0"
   },
   "dependencies": {
+    "@standard-schema/spec": "catalog:",
     "@pumped-fn/lite-extension-suspense": "workspace:^"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
+    "@valibot/to-json-schema": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "valibot": "catalog:",
     "vite": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "zod": "catalog:"
   },
   "license": "MIT",
   "repository": {

@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import test from "node:test";
 import {
   compareObservations,
   extractRows,
   hashObject,
   loadManifest,
+  packageIdentity,
   packageRoot,
   repoRoot,
   sha256,
@@ -73,13 +76,25 @@ function observation(lane, variant, pair, position, ratio) {
   const shared = {
     runtime: {
       node: "v1",
-      executable: "/node",
       executable_sha256: sha256("node"),
     },
     tool: {
-      vitest: "4.1.8",
+      vitest: {
+        name: "vitest",
+        version: "4.1.8",
+        manifest_sha256: sha256("vitest-package"),
+      },
+      browser_provider: {
+        name: "@vitest/browser-playwright",
+        version: "4.1.8",
+        manifest_sha256: sha256("browser-provider-package"),
+      },
       config_sha256: sha256("config"),
       harness_sha256: sha256("harness"),
+      observation_writer: {
+        path: "scripts/capture.mjs",
+        sha256: sha256("writer"),
+      },
     },
     platform: {
       platform: "linux",
@@ -103,6 +118,8 @@ function observation(lane, variant, pair, position, ratio) {
           provider: "playwright",
           browser: "chromium",
           executable_sha256: sha256("chromium"),
+          provider_version: "1.0.0",
+          provider_manifest_sha256: sha256("playwright-package"),
         };
   const rows = manifest.lanes[lane].rows.map((row) => {
     const value =
@@ -185,6 +202,27 @@ test("manifest fixes exact lanes, metrics, and representative rows", () => {
     ).metric,
     "p75"
   );
+});
+
+test("package identity ignores install roots and retains version and manifest bytes", () => {
+  const root = mkdtempSync(join(tmpdir(), "lite-perf-package-identity-"));
+  const left = join(root, "left", "package.json");
+  const right = join(root, "right", "package.json");
+  mkdirSync(join(root, "left"), { recursive: true });
+  mkdirSync(join(root, "right"), { recursive: true });
+  const manifest = `${JSON.stringify({ name: "tool", version: "1.0.0" }, null, 2)}\n`;
+  writeFileSync(left, manifest);
+  writeFileSync(right, manifest);
+
+  try {
+    assert.deepEqual(packageIdentity("tool", left), packageIdentity("tool", right));
+    writeFileSync(right, JSON.stringify({ name: "tool", version: "2.0.0" }));
+    assert.notDeepEqual(packageIdentity("tool", left), packageIdentity("tool", right));
+    writeFileSync(right, JSON.stringify({ name: "tool", version: "1.0.0" }));
+    assert.notDeepEqual(packageIdentity("tool", left), packageIdentity("tool", right));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("raw extraction returns every exact row", () => {
@@ -417,6 +455,105 @@ test("comparison rejects wrong order, environment drift, artifact drift, row gap
     /shared environments differ/
   );
 
+  const locationDrift = observations("lite-only");
+  locationDrift[9] = reseal({
+    ...locationDrift[9],
+    process: {
+      ...locationDrift[9].process,
+      command: ["/other/root/node", "/other/root/vitest.mjs"],
+      cwd: "/other/root",
+    },
+    raw_output: {
+      stdout: { path: "/other/root/stdout.log", sha256: sha256("stdout") },
+    },
+  });
+  assert.doesNotThrow(() =>
+    compareObservations(locationDrift, "lite-only", manifest)
+  );
+
+  const sharedMutations = [
+    (shared) => { shared.runtime.node = "v2"; },
+    (shared) => { shared.runtime.executable_sha256 = sha256("other-node"); },
+    (shared) => { shared.tool.vitest.name = "other-vitest"; },
+    (shared) => { shared.tool.vitest.version = "5.0.0"; },
+    (shared) => { shared.tool.vitest.manifest_sha256 = sha256("other-vitest"); },
+    (shared) => {
+      shared.tool.browser_provider.name = "other-browser-provider";
+    },
+    (shared) => { shared.tool.browser_provider.version = "5.0.0"; },
+    (shared) => {
+      shared.tool.browser_provider.manifest_sha256 = sha256("other-provider");
+    },
+    (shared) => { shared.tool.config_sha256 = sha256("other-config"); },
+    (shared) => { shared.tool.harness_sha256 = sha256("other-harness"); },
+    (shared) => {
+      shared.tool.observation_writer.path = "scripts/other-writer.mjs";
+    },
+    (shared) => {
+      shared.tool.observation_writer.sha256 = sha256("other-writer");
+    },
+    (shared) => { shared.lock.sha256 = sha256("other-lock"); },
+    (shared) => { shared.row_manifest.sha256 = sha256("other-rows"); },
+    (shared) => { shared.platform.platform = "other-platform"; },
+    (shared) => { shared.platform.arch = "other-arch"; },
+    (shared) => { shared.platform.machine = "other-machine"; },
+    (shared) => { shared.platform.kernel = "other-kernel"; },
+    (shared) => {
+      shared.cpu = { logical_count: 2, models: [{ model: "test", count: 2 }] };
+    },
+  ];
+  for (const mutate of sharedMutations) {
+    const drift = observations("lite-only");
+    const shared = structuredClone(drift[9].environment.shared);
+    mutate(shared);
+    drift[9] = reseal({
+      ...drift[9],
+      environment: {
+        ...drift[9].environment,
+        shared,
+        shared_fingerprint: hashObject(shared),
+        environment_fingerprint: hashObject({
+          shared,
+          browser: drift[9].environment.browser,
+        }),
+      },
+    });
+    assert.throws(
+      () => compareObservations(drift, "lite-only", manifest),
+      /shared environments differ/
+    );
+  }
+
+  const browserMutations = [
+    (browser) => { browser.browser = "other-browser"; },
+    (browser) => { browser.provider = "other-provider"; },
+    (browser) => { browser.provider_version = "2.0.0"; },
+    (browser) => {
+      browser.provider_manifest_sha256 = sha256("other-playwright");
+    },
+    (browser) => { browser.executable_sha256 = sha256("other-chromium"); },
+  ];
+  for (const mutate of browserMutations) {
+    const drift = observations("full");
+    const browser = structuredClone(drift[19].environment.browser);
+    mutate(browser);
+    drift[19] = reseal({
+      ...drift[19],
+      environment: {
+        ...drift[19].environment,
+        browser,
+        environment_fingerprint: hashObject({
+          shared: drift[19].environment.shared,
+          browser,
+        }),
+      },
+    });
+    assert.throws(
+      () => compareObservations(drift, "full", manifest),
+      /lite-react environments differ/
+    );
+  }
+
   const artifactDrift = observations("lite-only");
   const changedArtifact = structuredClone(artifactDrift[8].artifact);
   changedArtifact.modules[0].sha256 = sha256("drift");
@@ -427,6 +564,22 @@ test("comparison rejects wrong order, environment drift, artifact drift, row gap
   artifactDrift[8] = reseal({ ...artifactDrift[8], artifact: changedArtifact });
   assert.throws(
     () => compareObservations(artifactDrift, "lite-only", manifest),
+    /artifact identities differ/
+  );
+
+  const manifestDrift = observations("lite-only");
+  const changedManifest = structuredClone(manifestDrift[8].artifact);
+  changedManifest.package_manifests[0].sha256 = sha256("manifest-drift");
+  changedManifest.artifact_fingerprint = hashObject({
+    modules: changedManifest.modules,
+    package_manifests: changedManifest.package_manifests,
+  });
+  manifestDrift[8] = reseal({
+    ...manifestDrift[8],
+    artifact: changedManifest,
+  });
+  assert.throws(
+    () => compareObservations(manifestDrift, "lite-only", manifest),
     /artifact identities differ/
   );
 

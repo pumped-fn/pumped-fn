@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "majorReleasePackages": [
+    "@pumped-fn/lite",
+    "@pumped-fn/lite-react",
+    "@pumped-fn/sdk",
+    "@pumped-fn/sdk-claude",
+    "@pumped-fn/sdk-codex",
+    "@pumped-fn/sdk-pi",
+    "@pumped-fn/sdk-just-bash",
+    "@pumped-fn/sdk-test"
+  ],
+  "compatibilityBumps": {
+    "pre1Breaking": "major",
+    "stableBreaking": "major",
+    "widening": "patch"
+  }
+}

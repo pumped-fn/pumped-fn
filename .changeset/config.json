@@ -3,7 +3,16 @@
   "changelog": "@changesets/cli/changelog",
   "commit": false,
   "fixed": [],
-  "linked": [],
+  "linked": [
+    [
+      "@pumped-fn/sdk",
+      "@pumped-fn/sdk-claude",
+      "@pumped-fn/sdk-codex",
+      "@pumped-fn/sdk-pi",
+      "@pumped-fn/sdk-just-bash",
+      "@pumped-fn/sdk-test"
+    ]
+  ],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",

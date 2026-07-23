@@ -6,6 +6,14 @@ The extension is static composition. Runtime backend choice is a tag. Install
 `logging.extension()` to get automatic flow logs when requested, and resolve the `logging.logger`
 resource when application code needs explicit logs.
 
+## Migration to 1.0.0
+
+Install 1.0 with Lite 6:
+
+```bash
+npm install @pumped-fn/lite@^6.0.0 @pumped-fn/lite-extension-logging@^1.0.0
+```
+
 ```ts
 import { createScope, flow } from "@pumped-fn/lite"
 import { logging } from "@pumped-fn/lite-extension-logging"

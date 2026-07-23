@@ -314,21 +314,20 @@ async function bind<T>(
     apply(current, spec, ctrl, state, message)
   })
 
-  const offChange = ctrl.on("resolved", () => {
-    if (state.applying) return
-    const value = ctrl.get()
-    const encoded = encode(current, spec, value)
+  const offChange = ctrl.on("resolved", (runtime, definition, controller, boundState, boundKey) => {
+    if (boundState.applying) return
+    const next = controller.get()
+    const encoded = encode(runtime, definition, next)
     if (encoded === undefined) return
-    if (!state.writing && state.desired === undefined && sameValue(encoded, state.last)) return
-    state.desired = encoded
-    void flush(current, spec, ctrl, state, key)
-  })
+    if (!boundState.writing && boundState.desired === undefined && sameValue(encoded, boundState.last)) return
+    boundState.desired = encoded
+    void flush(runtime, definition, controller, boundState, boundKey)
+  }, current, spec, ctrl, state, key)
 
-  const close = () => {
-    offRemote()
-    offChange()
-  }
-  ctx.cleanup(close)
+  ctx.cleanup((remote, change) => {
+    remote()
+    change()
+  }, offRemote, offChange)
   ctx.data.set(bound, state)
 }
 

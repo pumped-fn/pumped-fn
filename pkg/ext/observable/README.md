@@ -6,6 +6,14 @@ The extension is static composition. Runtime backend choice is a tag. Install
 `observable.extension()` once in `createScope({ extensions })`, then pass sinks and policy with
 `observable.runtime(...)` at the scope, request context, or flow execution boundary.
 
+## Migration to 1.0.0
+
+Install 1.0 with Lite 6:
+
+```bash
+npm install @pumped-fn/lite@^6.0.0 @pumped-fn/lite-extension-observable@^1.0.0
+```
+
 ```ts
 import { createScope, flow } from "@pumped-fn/lite"
 import { observable } from "@pumped-fn/lite-extension-observable"

@@ -9,11 +9,14 @@ Put your app behind a scope, and it becomes fully testable, fully traceable, wit
 
 ```text
 createScope({ presets, tags, extensions })
-  -> scope-owned graph
-  -> execution context per request, job, action, or test
-  -> flows, resources, tags, and wrapped execution edges
-  -> module-level Model providers: Claude CLI, Codex CLI/ACP, or pi-ai
+  ├─ run / runStream -> owned execution context ─┐
+  │    └─ flow or named inline { deps, fn, params }  │
+  └─ createContext -> exec / execStream ─────────┴─ session.run -> agent.turn
+                                                               ├─ role + selected capability flows
+                                                               └─ provider + backend adapters
 ```
+
+Executing the entry flow activates its complete recursively declared dependency tree before the entry factory starts. Required tags are checked at runtime during activation. A missing provider, tool backend, validation engine, or session binding fails before semantic work begins. Tests replace the same graph edges at `createScope`; they do not mock the tree.
 
 ## Test without mocking modules
 
@@ -48,9 +51,7 @@ const scope = createScope({
   tags: [clock({ now: () => new Date() })],
 })
 
-const ctx = scope.createContext()
-await ctx.exec({ flow: saveInvoice, input: { id: "inv-1" } })
-await ctx.close()
+await scope.run({ flow: saveInvoice, input: { id: "inv-1" } })
 await scope.dispose()
 
 const calls: string[] = []
@@ -66,12 +67,10 @@ const testScope = createScope({
   tags: [clock({ now: () => new Date("2026-07-05T12:00:00.000Z") })],
 })
 
-const testCtx = testScope.createContext()
-const result = await testCtx.exec({ flow: saveInvoice, input: { id: "inv-1" } })
+const result = await testScope.run({ flow: saveInvoice, input: { id: "inv-1" } })
 
 if (result.id !== "inv-1" || calls.length !== 1) throw new Error("unexpected save")
 
-await testCtx.close()
 await testScope.dispose()
 ```
 
@@ -91,11 +90,8 @@ const greet = flow({
 })
 
 const scope = createScope()
-const ctx = scope.createContext()
+console.log(await scope.run({ flow: greet, input: { name: "Ada" } }))
 
-console.log(await ctx.exec({ flow: greet, input: { name: "Ada" } }))
-
-await ctx.close()
 await scope.dispose()
 ```
 
@@ -103,7 +99,9 @@ The core package has zero runtime dependencies and ~12 kB min+gzip.
 
 ## Mental model
 
-A `scope` is the composition and test boundary. `atom` values live in the scope. `flow` executions live in an execution context. `resource` values are owned by that context. `tag` values carry request facts and role choices. `preset` replaces an edge for tests or alternate roots. `extension` wraps resolution and execution. Streaming flows use `execStream`.
+A `scope` is the composition and test boundary. `scope.run` and `scope.runStream` own one temporary execution context. `scope.run({ name, fn, params })` declares a named one-off operation without a reusable flow handle; add `deps` only when it has graph dependencies. Use `createContext` with `exec` or `execStream` when several turns or flows share one lifetime. `atom` values live in the scope. `resource` values are owned by an execution context. `tag` values carry request facts and role choices. `preset` replaces an edge for tests or alternate roots. `extension` wraps resolution and execution.
+
+SDK applications use stable `session.run`, `agent.turn`, `agent.role`, and `agent.fromModel` definitions. Composition selects configuration and implementations through namespaced tags such as `agent.config.*`, `agent.impl.*`, and `session.execution.*`. Tool, skill, and subagent flows remain ordinary declared graph edges.
 
 ## Request context without AsyncLocalStorage
 
@@ -113,7 +111,7 @@ Read the full guide: [Request context without AsyncLocalStorage](docs/request-co
 
 ## OpenTelemetry spans without touching business code
 
-Extensions wrap graph execution. Install `observable.extension()` at the scope, pass an OpenTelemetry sink through runtime tags, and business flows stay ordinary TypeScript functions. Foreign SDK calls can still be named with `ctx.exec({ fn, params, name, tags })` so traces show the edge.
+Extensions wrap graph execution. Install `observable.extension()` at the scope, pass an OpenTelemetry sink through runtime tags, and business flows stay ordinary TypeScript functions. Foreign SDK calls can still be named with `ctx.exec({ name, params, fn, tags })`, adding `deps` when needed, so traces show the edge.
 
 Read the full guide: [OpenTelemetry spans without editing business functions](docs/observability.md).
 
@@ -158,6 +156,7 @@ Read the checklist: [How to review pumped-fn code](docs/code-review-guide.md).
 | Path | What it shows |
 | --- | --- |
 | `examples` | [Examples index](examples/README.md). |
+| `examples/issue-triage` | [GitHub issue triage with durable leases, per-delivery SDK sessions, repository/PostgreSQL/Victoria evidence, deterministic review, and idempotent publication.](examples/issue-triage/README.md) |
 | `examples/invoice-triage` | [Canonical Postgres-backed invoice import and triage with traced store, model, review, and reminder edges.](examples/invoice-triage/README.md) |
 
 ## Package inventory

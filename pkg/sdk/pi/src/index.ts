@@ -4,6 +4,7 @@ import {
   getSupportedThinkingLevels,
   validateToolCall,
   type AssistantMessage,
+  type AssistantMessageEvent,
   type Api,
   type Context,
   type Message as PiMessage,
@@ -13,10 +14,8 @@ import {
   type ToolCall as PiToolCall,
 } from "@earendil-works/pi-ai"
 import { builtinModels } from "@earendil-works/pi-ai/providers/all"
-import { atom, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
+import { atom, controller, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
 import {
-  abortSignal,
-  events,
   model,
   step,
   type Capability,
@@ -24,7 +23,10 @@ import {
   type ModelRequest,
   type ModelResponse,
 } from "@pumped-fn/sdk"
+import * as agent from "@pumped-fn/sdk/agent"
+import * as session from "@pumped-fn/sdk/session"
 
+/** Selects a Pi provider, model, thinking level, and API-key environment variable. */
 export interface PiConfig {
   provider: string
   modelId: string
@@ -59,7 +61,7 @@ export const models = resource({
   ownership: "boundary",
   factory: (ctx) => {
     const collection = builtinModels()
-    ctx.cleanup(() => collection.clearProviders())
+    ctx.cleanup((target) => target.clearProviders(), collection)
     return collection
   },
 })
@@ -71,19 +73,25 @@ export const supportedModels = flow({
   factory: (ctx, { models }) => models.getModels(ctx.input.provider),
 })
 
-export const piTurn = flow({
-  name: "pi.complete",
+export const piAttempt: agent.Attempt = flow({
+  name: "pi.attempt",
   parse: typed<ModelRequest>(),
   deps: {
-    buffer: events,
+    attempt: tags.optional(session.current.attempt),
+    authority: tags.optional(session.current.authority),
+    branch: tags.optional(session.current.branch),
     clock,
     config: tags.required(piConfig),
     environment,
+    epoch: tags.optional(session.current.epoch),
     models,
-    signal: tags.optional(abortSignal),
+    runtime: tags.optional(session.current.session),
+    work: tags.optional(session.current.work),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: async (ctx, { buffer, clock, config, environment, models, signal }) => {
+  factory: async function* (ctx, { attempt, authority, branch, clock, config, environment, epoch, models, runtime, work }) {
+    const signal = ctx.signal
+    assertPiAuthority(config, authority, runtime, work, attempt, branch, epoch)
     const selected = requireModel(models, config)
     if (config.thinking && !getSupportedThinkingLevels(selected).includes(config.thinking)) {
       throw new PiProviderError(
@@ -99,27 +107,54 @@ export const piTurn = flow({
       ...(tools.length ? { tools } : {}),
     }
     const apiKey = config.apiKeyEnv ? requireEnvironment(environment, config.apiKeyEnv, config) : undefined
-    const response = config.thinking
-      ? await models.completeSimple(selected, context, { reasoning: config.thinking, apiKey, signal })
-      : await models.complete(selected, context, { apiKey, signal })
-    if (response.stopReason === "error" || response.stopReason === "aborted") {
-      throw new PiProviderError(response.errorMessage ?? `pi-ai ${response.stopReason}`, config.provider, config.modelId)
+    const controller = new AbortController()
+    const abort = () => controller.abort(signal.reason)
+    signal.addEventListener("abort", abort, { once: true })
+    if (signal.aborted) abort()
+    const stream = config.thinking
+      ? models.streamSimple(selected, context, { reasoning: config.thinking, apiKey, signal: controller.signal })
+      : models.stream(selected, context, { apiKey, signal: controller.signal })
+    let response: AssistantMessage | undefined
+    let completed = false
+    try {
+      for await (const event of stream) {
+        const normalized = piEvent(event)
+        if (normalized) yield normalized
+        if (event.type === "done") response = event.message
+        if (event.type === "error") response = event.error
+      }
+      response ??= await stream.result()
+      if (response.stopReason === "error" || response.stopReason === "aborted") {
+        throw new PiProviderError(response.errorMessage ?? `pi-ai ${response.stopReason}`, config.provider, config.modelId)
+      }
+      completed = true
+      return responseOf(response, tools)
+    } finally {
+      signal.removeEventListener("abort", abort)
+      if (!completed) controller.abort(new DOMException("Pi attempt stream closed", "AbortError"))
     }
-    buffer.record({
-      type: "agent_model_end",
-      agentName: ctx.input.agentName,
-      round: ctx.input.round,
-      output: {
-        provider: config.provider,
-        modelId: config.modelId,
-        usage: response.usage,
-      },
-    })
-    return responseOf(response, tools)
   },
 })
 
+export const piAttemptBinding = agent.impl.attempt(piAttempt)
+
+export const piTurn = flow({
+  name: "pi.complete",
+  parse: typed<ModelRequest>(),
+  deps: { attempt: controller(piAttempt) },
+  factory: (ctx, { attempt }) => attempt.exec({ input: ctx.input }),
+})
+
 export const pi = model(piTurn)
+
+function piEvent(event: AssistantMessageEvent): agent.ModelEvent | undefined {
+  if (event.type === "start") return { type: "provider_status", status: "started" }
+  if (event.type === "text_delta") return { type: "content_delta", content: event.delta }
+  if (event.type === "thinking_delta") return { type: "reasoning_delta", content: event.delta }
+  if (event.type === "done") return { type: "provider_status", status: "completed" }
+  if (event.type === "error") return { type: "provider_status", status: event.reason }
+  return undefined
+}
 
 function requireModel(models: Models, config: PiConfig): PiModel<Api> {
   const selected = models.getModel(config.provider, config.modelId)
@@ -130,6 +165,86 @@ function requireModel(models: Models, config: PiConfig): PiModel<Api> {
     config.provider,
     config.modelId,
   )
+}
+
+function assertPiAuthority(
+  config: PiConfig,
+  authority: session.Authority | undefined,
+  runtime: session.SessionRuntime | undefined,
+  work: session.WorkRecord | undefined,
+  attempt: session.AttemptRecord | undefined,
+  branch: session.BranchRecord | undefined,
+  epoch: number | undefined,
+): void {
+  if (!authority && !runtime && !work && !attempt && !branch && epoch === undefined) return
+  if (!authority || !runtime || !work || !attempt || !branch || epoch === undefined) {
+    throw new PiProviderError("Pi attempt requires complete session provenance", config.provider, config.modelId)
+  }
+  if (!authority.sandbox.network) throw new PiProviderError("Pi requires network authority", config.provider, config.modelId)
+  if (
+    !validAuthority(authority)
+    || !validAuthority(runtime.authority)
+    || !validAuthority(work.authority)
+    || !authorityWithin(runtime.authority, authority)
+    || !authorityMatches(work.authority, authority)
+    || !authorityMatches(runtime.record.authorityConstraints, runtime.authority)
+    || runtime.record.authorityFingerprint !== runtime.authority.fingerprint
+  ) {
+    throw new PiProviderError("Pi session authority does not match work provenance", config.provider, config.modelId)
+  }
+  const recordedBranch = runtime.record.branches.find((value) => value.id === branch.id)
+  const recordedWork = runtime.record.work.find((value) => value.id === work.id)
+  const recordedAttempt = runtime.record.attempts.find((value) => value.workId === attempt.workId
+    && value.attempt === attempt.attempt
+    && value.snapshotEpoch === attempt.snapshotEpoch)
+  if (
+    !recordedBranch
+    || !recordedWork
+    || !recordedAttempt
+    || !authorityMatches(recordedBranch.authority, branch.authority)
+    || recordedBranch.authorityFingerprint !== branch.authorityFingerprint
+    || !authorityMatches(recordedWork.authority, work.authority)
+    || recordedWork.branchId !== branch.id
+    || work.attempt !== attempt.attempt
+    || recordedAttempt.workId !== work.id
+    || recordedAttempt.snapshotEpoch !== attempt.snapshotEpoch
+    || attempt.status !== "working"
+    || recordedAttempt.status !== "working"
+    || attempt.workId !== work.id
+    || branch.id !== work.branchId
+    || epoch !== attempt.snapshotEpoch
+  ) {
+    throw new PiProviderError("Pi session provenance does not match the active attempt", config.provider, config.modelId)
+  }
+}
+
+function validAuthority(value: session.Authority): boolean {
+  try {
+    return session.createAuthority(value).fingerprint === value.fingerprint
+  } catch {
+    return false
+  }
+}
+
+function authorityMatches(left: session.AuthorityInput, right: session.AuthorityInput): boolean {
+  try {
+    return JSON.stringify(session.createAuthority(left)) === JSON.stringify(session.createAuthority(right))
+  } catch {
+    return false
+  }
+}
+
+function authorityWithin(parent: session.Authority, child: session.Authority): boolean {
+  try {
+    return session.narrowAuthority(parent, {
+      roots: child.roots,
+      permissions: child.permissions,
+      tools: child.tools,
+      sandbox: child.sandbox,
+    }).fingerprint === child.fingerprint
+  } catch {
+    return false
+  }
 }
 
 function requireEnvironment(environment: NodeJS.ProcessEnv, name: string, config: PiConfig): string {
@@ -150,7 +265,13 @@ function capabilityTool(capability: Capability): Tool {
   return {
     name: capability.name,
     description: capability.description,
-    parameters: Type.Object({}, { additionalProperties: true }),
+    parameters: capability.inputSchema === undefined
+      ? Type.Object({}, { additionalProperties: true })
+      : Type.Unsafe(capability.inputSchema === true
+        ? {}
+        : capability.inputSchema === false
+          ? { not: {} }
+          : capability.inputSchema),
   }
 }
 

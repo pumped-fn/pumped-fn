@@ -135,6 +135,15 @@ function workflowText() {
     .join("\n")
 }
 
+function workflowJob(name) {
+  const content = read(".github/workflows/ci.yml")
+  const start = content.indexOf(`  ${name}:\n`)
+  if (start === -1) return ""
+  const remainder = content.slice(start + 1)
+  const next = remainder.search(/^  [a-zA-Z0-9_-]+:\n/m)
+  return next === -1 ? content.slice(start) : content.slice(start, start + 1 + next)
+}
+
 function scriptTargets() {
   return [...new Set([...packageScriptTargets(), ...workflowScriptTargets()])].sort()
 }
@@ -321,13 +330,72 @@ for (const target of scriptTargets()) {
   if (!scriptNameSet.has(target)) fail("missing_script_target", `A package script or workflow references scripts/${target}, but that file does not exist`)
 }
 for (const name of scriptNames) {
-  if (!scriptRows.includes(name)) fail("scripts_readme_missing_script", `scripts/${name} is absent from scripts/README.md`)
+  if (!name.endsWith(".test.mjs") && !scriptRows.includes(name)) fail("scripts_readme_missing_script", `scripts/${name} is absent from scripts/README.md`)
 }
 for (const name of scriptRows) {
   if (!scriptNameSet.has(name)) fail("scripts_readme_stale_script", `scripts/README.md lists ${name}, but scripts/${name} does not exist`)
 }
+if (!read("scripts/check-example-alignment.test.mjs").includes('import "./check-changed-packages.test.mjs"')) {
+  fail("script_surface_gap", "examples:test must execute changed-package move and deletion fixtures")
+}
 if (readJson("package.json").scripts["ci:changed-packages"] && !workflowText().includes("pnpm ci:changed-packages")) {
   fail("script_surface_gap", "package.json defines ci:changed-packages, but no workflow runs it")
+}
+
+const changesetJob = workflowJob("changeset")
+const changesetOrder = [
+  "ref: ${{ github.event.pull_request.head.sha || github.sha }}",
+  "- name: Check release policy",
+  "BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}",
+  "pnpm release-policy:test",
+  "pnpm release-policy:check -- --base \"$BASE_SHA\"",
+  "- name: Check for changeset",
+  "TITLE_SKIP_PATTERN='^(chore|docs|ci)(\\([^)]+\\))?!?:([[:space:]]|$)'",
+  '[[ "$PR_TITLE" =~ $TITLE_SKIP_PATTERN ]]',
+  "exit 0",
+  "pnpm changeset status --since=\"$BASE_SHA\"",
+].map((value) => changesetJob.indexOf(value))
+if (
+  changesetJob === ""
+  || changesetOrder.some((index) => index === -1)
+  || changesetOrder.some((index, position) => position > 0 && index <= changesetOrder[position - 1])
+  || !changesetJob.includes("[skip-changeset]")
+) {
+  fail("workflow_policy_gate_order", "Changeset CI must run both release-policy gates before title skips, and title skips may bypass only Changeset status")
+}
+
+const contractJob = workflowJob("contract")
+const contractOrder = [
+  "ref: ${{ github.event.pull_request.head.sha }}",
+  "CHECKOUT_HEAD=\"$(git rev-parse HEAD)\"",
+  "git diff --name-only \"$BASE_SHA...$CHECKOUT_HEAD\"",
+  "pnpm contract:test",
+  "pnpm contract:check -- --base \"$BASE_SHA\" --changed-files \"$CHANGED_FILES\" --pr-json \"$GITHUB_EVENT_PATH\" --expect-head \"$CHECKOUT_HEAD\"",
+  "pnpm inline-exec:test",
+  "pnpm inline-exec:check -- --expect-head \"$CHECKOUT_HEAD\"",
+].map((value) => contractJob.indexOf(value))
+if (
+  contractJob === ""
+  || contractOrder.some((index) => index === -1)
+  || contractOrder.some((index, position) => position > 0 && index <= contractOrder[position - 1])
+  || !contractJob.includes("if: github.event_name == 'pull_request'")
+  || !contractJob.includes("BASE_SHA: ${{ github.event.pull_request.base.sha }}")
+) {
+  fail("workflow_contract_gate_order", "Contract CI must bind changed files, the PR event snapshot, and both contract checks to the exact checkout head")
+}
+
+const changedPackagesJob = workflowJob("changed-packages")
+const changedPackagesOrder = [
+  "ref: ${{ github.event.pull_request.head.sha || github.sha }}",
+  "BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}",
+  "pnpm ci:changed-packages",
+].map((value) => changedPackagesJob.indexOf(value))
+if (
+  changedPackagesJob === ""
+  || changedPackagesOrder.some((index) => index === -1)
+  || changedPackagesOrder.some((index, position) => position > 0 && index <= changedPackagesOrder[position - 1])
+) {
+  fail("workflow_changed_package_provenance", "Changed-package CI must bind its exact checkout and comparison base to the triggering event")
 }
 
 const requiredPatternSections = [
@@ -365,11 +433,13 @@ const metrics = {
   pattern_contract_gap_count: failures.filter((failure) => failure.kind === "pattern_contract_gap").length,
   script_surface_gap_count: failures.filter((failure) => failure.kind.includes("script")).length,
   stale_markdown_example_ref_count: failures.filter((failure) => failure.kind === "stale_markdown_example_ref").length,
+  workflow_policy_gate_order_gap_count: failures.filter((failure) => failure.kind.startsWith("workflow_")).length,
   usage_drift_count: failures.filter((failure) =>
     failure.kind === "missing_canonical_shape"
     || failure.kind === "dependency_policy_mismatch"
     || failure.kind === "peer_dependency_policy_mismatch"
     || failure.kind === "pattern_contract_gap"
+    || failure.kind.startsWith("workflow_")
     || failure.kind.includes("script"),
   ).length,
 }

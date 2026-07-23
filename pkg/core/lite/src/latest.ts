@@ -1,5 +1,11 @@
 type Pending<T> = { resolve(result: IteratorResult<T, undefined>): void; reject(error: unknown): void }
-export type Latest<T> = AsyncIterable<T> & { push(value: T): void; fail(error: unknown): void; close(): void; onClose(fn: () => void): () => void }
+type CloseListener = { fn: (...args: any[]) => void; params: unknown[] }
+export type Latest<T> = AsyncIterable<T> & {
+  push(value: T): void
+  fail(error: unknown): void
+  close(): void
+  onClose<Args extends unknown[]>(fn: (...args: Args) => void, ...params: Args): () => void
+}
 const done: IteratorReturnResult<undefined> = { done: true, value: undefined }
 export function latest<T>(): Latest<T> {
   const pendings: Pending<T>[] = []
@@ -8,7 +14,7 @@ export function latest<T>(): Latest<T> {
   let error: unknown
   let hasError = false
   let closed = false
-  const closeFns = new Set<() => void>()
+  const closeFns = new Set<CloseListener>()
   const stream = { next, return: finish, push, fail, close, onClose, [Symbol.asyncIterator]: () => stream }
   return stream as Latest<T>
   function next(): Promise<IteratorResult<T, undefined>> {
@@ -63,15 +69,16 @@ export function latest<T>(): Latest<T> {
     const closing = pendings.splice(0)
     const fns = [...closeFns]
     closeFns.clear()
-    for (let i = 0; i < fns.length; i++) fns[i]!()
+    for (let i = 0; i < fns.length; i++) fns[i]!.fn(...fns[i]!.params)
     for (let i = 0; i < closing.length; i++) closing[i]!.resolve(done)
   }
-  function onClose(fn: () => void): () => void {
+  function onClose<Args extends unknown[]>(fn: (...args: Args) => void, ...params: Args): () => void {
+    const listener = { fn, params }
     if (closed) {
-      fn()
+      fn(...params)
       return () => {}
     }
-    closeFns.add(fn)
-    return () => closeFns.delete(fn)
+    closeFns.add(listener)
+    return () => closeFns.delete(listener)
   }
 }
