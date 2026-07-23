@@ -1,5 +1,11 @@
 # @pumped-fn/lite-lint
 
+## 1.2.0
+
+### Minor Changes
+
+- f8a656e: Add `pumped/no-hidden-exec-params` so inline `ctx.exec` functions record used flow input in `params`. Real arguments stay visible to extensions; logging and observable runtime tags own omission and redaction.
+
 ## 1.1.0
 
 ### Minor Changes
