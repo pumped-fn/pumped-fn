@@ -22,7 +22,7 @@ export const database = atom({
     const pool = new Pool({ connectionString: url })
     const db = drizzle(pool, { schema })
     await migrate(db, { migrationsFolder })
-    ctx.cleanup(() => pool.end())
+    ctx.cleanup((target) => target.end(), pool)
     return db as Database
   },
 })

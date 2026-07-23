@@ -1,4 +1,4 @@
-# @pumped-fn/agent-sdk-just-bash
+# @pumped-fn/sdk-just-bash
 
 ## 2.0.0
 

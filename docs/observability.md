@@ -50,9 +50,10 @@ For a foreign SDK call, name the edge with `ctx.exec`.
 import { step } from "@pumped-fn/sdk"
 
 await ctx.exec({
-  fn: () => notifier.send(message),
-  params: [],
   name: "notifier.send",
+  deps: { notifier },
+  params: [message],
+  fn: ({ notifier }, content) => notifier.send(content),
   tags: [step({ workflow: true, kind: "email" })],
 })
 ```

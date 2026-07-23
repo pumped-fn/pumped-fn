@@ -56,8 +56,28 @@ export namespace Lite {
     release<T>(atom: Atom<T>): Promise<void>
     dispose(): Promise<void>
     flush(): Promise<void>
+    run<Output, Input, Yield = never>(options: ExecFlowOptions<Output, Input, Yield> & {
+      deps?: never
+      fn?: never
+      params?: never
+    }): Promise<Output>
+    run<
+      const Args extends unknown[],
+      Result,
+    >(options: ExecOptions<Args, Result>): Promise<Awaited<Result>>
+    run<
+      const D extends Record<string, ExecutionDependency>,
+      const Args extends unknown[],
+      Result,
+    >(options: ExecDepsOptions<D, Args, Result>): Promise<Awaited<Result>>
+    runStream<Output, Yield, Input>(options: ExecFlowOptions<Output, Input, Yield>): FlowStream<Yield, Output>
     createContext(options?: CreateContextOptions): ExecutionContext
-    on(event: AtomState, atom: Atom<unknown>, listener: () => void): () => void
+    on<Args extends unknown[]>(
+      event: AtomState,
+      atom: Atom<unknown>,
+      listener: (...args: Args) => void,
+      ...params: Args
+    ): () => void
     changes<T>(atom: Atom<T>): AsyncIterable<T>
     changes<T>(atom: Atom<T>, options: ChangesOptions): AsyncIterable<AtomChange<T>>
     changes<T>(handle: SelectHandle<T>): AsyncIterable<T>
@@ -73,6 +93,7 @@ export namespace Lite {
   export interface CreateContextOptions {
     tags?: Tagged<any>[]
     parent?: ExecutionContext
+    signal?: AbortSignal
   }
 
   export interface ScopeOptions {
@@ -112,6 +133,7 @@ export namespace Lite {
   export interface FlowRunOptions {
     name?: string
     tags?: Tagged<any>[]
+    signal?: AbortSignal
   }
 
   export interface FlowControllerOptions<Input> extends FlowRunOptions {
@@ -143,6 +165,7 @@ export namespace Lite {
     readonly key: string | undefined
     readonly ready: Promise<void>
     exec(): Promise<Output>
+    execStream(): FlowStream<Yield, Output>
   }
 
   export interface FlowHandle<Output, Input, Yield = never> {
@@ -218,8 +241,15 @@ export namespace Lite {
   }
 
   export interface ResolveContext {
-    cleanup(fn: () => MaybePromise<void>): void
+    cleanup<Args extends unknown[]>(fn: (...args: Args) => MaybePromise<void>, ...params: Args): void
     invalidate(): void
+    /**
+     * Release the atom generation that created this context.
+     *
+     * During that generation's cleanup this settles without joining its own
+     * release. After replacement it cannot release the newer generation.
+     */
+    release(): Promise<void>
     readonly scope: Scope
     readonly data: ContextData
   }
@@ -235,32 +265,45 @@ export namespace Lite {
     readonly name: string | undefined
     readonly scope: Scope
     readonly parent: ExecutionContext | undefined
+    readonly signal: AbortSignal
     readonly data: ContextData
     resolve<T>(target: Atom<T>): Promise<T>
     resolve<T>(target: Resource<T>): Promise<T>
     release<T>(resource: Resource<T>): Promise<void>
     controller<T>(resource: Resource<T>): ResourceController<T>
     exec<Output, Input, Yield = never>(options: ExecFlowOptions<Output, Input, Yield>): Promise<Output>
-    exec<Output, Args extends unknown[]>(options: ExecFnOptions<Output, Args>): Promise<Output>
+    exec<
+      const Args extends unknown[],
+      Result,
+    >(options: ExecOptions<Args, Result>): Promise<Awaited<Result>>
+    exec<
+      const D extends Record<string, ExecutionDependency>,
+      const Args extends unknown[],
+      Result,
+    >(options: ExecDepsOptions<D, Args, Result>): Promise<Awaited<Result>>
     execStream<Output, Yield, Input>(options: ExecFlowOptions<Output, Input, Yield>): FlowStream<Yield, Output>
     changes<T>(atom: Atom<T>): AsyncIterable<T>
     changes<T>(atom: Atom<T>, options: ChangesOptions): AsyncIterable<AtomChange<T>>
     changes<T>(handle: SelectHandle<T>): AsyncIterable<T>
     resolveStream<T>(atom: Atom<AsyncIterable<T> | AsyncIterator<T>>): AsyncIterable<T>
-    onClose(fn: (result: CloseResult) => MaybePromise<void>): () => void
+    onClose<Args extends unknown[]>(
+      fn: (result: CloseResult, ...args: Args) => MaybePromise<void>,
+      ...params: Args
+    ): () => void
     close(result?: CloseResult): Promise<void>
     /** Throws a `FlowFault` carrying `fault`, tagged with the executing flow's name. */
     fail(fault: Fault): never
   }
 
   export interface ResourceContext extends ExecutionContext {
-    cleanup(fn: () => MaybePromise<void>): void
+    cleanup<Args extends unknown[]>(fn: (...args: Args) => MaybePromise<void>, ...params: Args): void
   }
 
   export type ExecFlowOptions<Output, Input, Yield = never> = {
     flow: Flow<Output, Input, any, Yield>
     name?: string
     tags?: Tagged<any>[]
+    signal?: AbortSignal
   } & (
     | ([NoInfer<Input>] extends [void | undefined | null]
         ? { input?: undefined | null; rawInput?: never }
@@ -268,12 +311,38 @@ export namespace Lite {
     | { rawInput: unknown; input?: never }
   )
 
-  export interface ExecFnOptions<Output, Args extends unknown[] = unknown[]> {
-    fn: (ctx: ExecutionContext, ...args: Args) => MaybePromise<Output>
+  export type ExecDepsOptions<
+    D extends Record<string, ExecutionDependency>,
+    Args extends unknown[],
+    Result,
+  > = {
+    name: string
+    deps: D
+    fn: (deps: InferDeps<D>, ...args: Args) => Result
     params: Args
-    name?: string
     tags?: Tagged<any>[]
-  }
+    signal?: AbortSignal
+    flow?: never
+  } & (Extract<
+    Awaited<Result>,
+    AsyncIterable<unknown> | { next: (...args: never[]) => unknown }
+  > extends never ? unknown : never)
+
+  export type ExecOptions<
+    Args extends unknown[],
+    Result,
+  > = {
+    name: string
+    deps?: never
+    fn: (...args: Args) => Result
+    params: Args
+    tags?: Tagged<any>[]
+    signal?: AbortSignal
+    flow?: never
+  } & (Extract<
+    Awaited<Result>,
+    AsyncIterable<unknown> | { next: (...args: never[]) => unknown }
+  > extends never ? unknown : never)
 
   export type ControllerEvent = 'resolving' | 'resolved' | '*'
   export type ResourceControllerEvent = AtomState | '*'
@@ -315,7 +384,7 @@ export namespace Lite {
      */
     update(fn: (prev: T) => T): void
     /** Subscribe to state changes */
-    on(event: ControllerEvent, listener: () => void): () => void
+    on<Args extends unknown[]>(event: ControllerEvent, listener: (...args: Args) => void, ...params: Args): () => void
   }
 
   /**
@@ -334,7 +403,11 @@ export namespace Lite {
     /** Owner-local release/reset */
     release(): Promise<void>
     /** Subscribe to resource state changes visible from this execution context */
-    on(event: ResourceControllerEvent, listener: () => void): () => void
+    on<Args extends unknown[]>(
+      event: ResourceControllerEvent,
+      listener: (...args: Args) => void,
+      ...params: Args
+    ): () => void
   }
 
   export interface SelectOptions<S> {
@@ -343,7 +416,7 @@ export namespace Lite {
 
   export interface SelectHandle<S> {
     get(): S
-    subscribe(listener: () => void): () => void
+    subscribe<Args extends unknown[]>(listener: (...args: Args) => void, ...params: Args): () => void
     dispose(): void
   }
 
@@ -620,16 +693,11 @@ export namespace Lite {
    */
   export type AnyResource = Resource<any>
 
-  /**
-   * Target type for wrapExec extension hook.
-   * Either a Flow or an inline function.
-   */
+  /** Target observed by the execution extension pipeline. */
   export type ExecTarget = Flow<unknown, unknown, any, unknown> | ExecTargetFn
 
-  /**
-   * Inline function that can be executed via ctx.exec.
-   */
-  export type ExecTargetFn = (ctx: ExecutionContext, ...args: any[]) => MaybePromise<unknown>
+  /** Inline operation identity observed by the execution extension pipeline. */
+  export type ExecTargetFn = (...args: any[]) => unknown
 
   /**
    * Utility types for type extraction and manipulation.

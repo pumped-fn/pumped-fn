@@ -21,11 +21,11 @@ Discovery is flat and convention-driven under `src/`:
   the flow.
 - `src/jobs/*.ts` — one file per recurring job, default export is a `scheduler.schedule({...})` atom
   from `@pumped-fn/lite-extension-scheduler` (not a plain flow — see "Jobs and scheduling" below).
-- `src/agents/*.ts` — one file per agent, default export is either an `@pumped-fn/sdk` `Agent`
-  struct (detected structurally by a `.turn` flow — the framework never imports `@pumped-fn/sdk`
-  types) or a plain flow. An agent is mounted as `POST /agents/<name>` on the HTTP server and as
-  `pumped agent <name> --json '...'` on the CLI, both executing `agent.turn` with the request/JSON
-  body as `rawInput`.
+- `src/agents/*.ts` — one file per agent, default export is either an application-owned structural
+  adapter `{ name, turn, tools?, skills?, subagents? }` or a plain flow. The framework does not import
+  SDK agent types. An agent is mounted as `POST /agents/<name>` on the HTTP server and as
+  `pumped agent <name> --json '...'` on the CLI. Structural adapters execute their `turn` flow;
+  plain flows execute directly.
 - `src/workflows/*.ts` — one file per workflow, default export is a flow. Each entry runs once at
   server boot in its own context tagged with `pumped.workflowRun({ taskId, runId })`; a workflow that
   returns ends its run. No durability/resume in this increment — see "Workflow tag" below.

@@ -141,7 +141,7 @@ describe("observable extension", () => {
     const load = flow({
       name: "load",
       factory: async (ctx) => {
-        return [await ctx.resolve(tx), await ctx.exec({ fn: function helper() { return "fn" }, params: [] })]
+        return [await ctx.resolve(tx), await ctx.exec({ name: "helper", fn: function helper() { return "fn" }, params: [] })]
       },
     })
     const scope = createScope({

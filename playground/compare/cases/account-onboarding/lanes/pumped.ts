@@ -22,11 +22,12 @@ export const database = resource({
   deps: { caseFixture: tags.required(caseFixture) },
   factory: async (ctx, { caseFixture }): Promise<Database> => {
     const connection = await ctx.exec({
-      fn: () => caseFixture.openDatabase(),
-      params: [],
+      deps: {},
+      fn: (_deps, target) => target.openDatabase(),
+      params: [caseFixture],
       name: "database.open",
     })
-    ctx.cleanup(() => connection.close())
+    ctx.cleanup((target = connection) => target.close(), connection)
     return connection
   },
 })
@@ -51,8 +52,9 @@ export const provision = flow({
       createdAt: clock.now(),
     }
     const result = await ctx.exec({
-      fn: (_ctx, input) => database.insertUser(input),
-      params: [user],
+      deps: {},
+      fn: (_deps, target, value) => target.insertUser(value),
+      params: [database, user],
       name: "database.insertUser",
     })
     if (result === "duplicate") ctx.fail({ kind: "duplicate-email", email: ctx.input.email })
@@ -74,17 +76,18 @@ export async function startPumped(fixture: Fixture, trace?: Trace): Promise<Awai
 
   return {
     async provision(input: ProvisionInput, facts: RequestFacts): Promise<Outcome> {
-      const ctx = scope.createContext({
-        parent: root,
-        tags: [actorId(facts.actorId), requestId(facts.requestId)],
-      })
       try {
-        return { ok: true, user: await ctx.exec({ flow: provision, input }) }
+        return {
+          ok: true,
+          user: await root.exec({
+            flow: provision,
+            input,
+            tags: [actorId(facts.actorId), requestId(facts.requestId)],
+          }),
+        }
       } catch (error) {
         if (isFault(provision, error)) return { ok: false, error: error.fault }
         throw error
-      } finally {
-        await ctx.close()
       }
     },
     async close() {

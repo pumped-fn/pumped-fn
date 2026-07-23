@@ -12,6 +12,12 @@ function diagnostics(source: string, filePath = "src/example.ts", options?: Scan
   return scanText(source, filePath, options)
 }
 
+function hiddenExecParamIds(source: string, filePath = "src/example.ts") {
+  return diagnostics(source, filePath)
+    .filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-params")
+    .map((diagnostic) => diagnostic.ruleId)
+}
+
 describe("lite lint scanner", () => {
   it("accepts graph code that enters through definitions and public exec APIs", () => {
     expect(ids(`
@@ -1605,8 +1611,413 @@ describe("lite lint scanner", () => {
     `, "tests/example.test.ts")).toBe(0)
   })
 
+  it("rejects graph and runtime captures in ctx exec callbacks", () => {
+    const hidden = diagnostics(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const message = ctx.input.message
+          return ctx.exec({
+            name: "client.send",
+            params: [client, message],
+            fn: () => client.send(message),
+          })
+        },
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
+
+    expect(hidden).toHaveLength(1)
+    expect(hidden[0]?.message).toContain("Hidden: client, message.")
+  })
+
+  it("allows ctx exec callbacks that receive declared deps and params", () => {
+    expect(diagnostics(`
+      import { flow, resource } from "@pumped-fn/lite"
+
+      const client = resource({ factory: () => ({ send: (value: string) => value }) })
+      const send = flow({
+        factory: (ctx) => ctx.exec({
+          name: "client.send",
+          deps: { client },
+          params: [ctx.input.message],
+          fn: ({ client }, message) => client.send(message),
+        }),
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")).toEqual([])
+  })
+
+  it("applies the inline capture contract to scope run", () => {
+    const hidden = diagnostics(`
+      import { createScope, resource } from "@pumped-fn/lite"
+
+      const client = resource({ factory: () => ({ send: (value: string) => value }) })
+      const message = "hello"
+      const scope = createScope()
+      scope.run({
+        name: "send-once",
+        deps: { client },
+        params: [],
+        fn: ({ client }) => client.send(message),
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
+
+    expect(hidden).toHaveLength(1)
+    expect(hidden[0]?.message).toContain("Hidden: message.")
+    expect(diagnostics(`
+      import { createScope, resource } from "@pumped-fn/lite"
+
+      const client = resource({ factory: () => ({ send: (value: string) => value }) })
+      const message = "hello"
+      const scope = createScope()
+      scope.run({
+        name: "send-once",
+        deps: { client },
+        params: [message],
+        fn: ({ client }, value) => client.send(value),
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")).toEqual([])
+  })
+
+  it("requires inspectable named inline operations", () => {
+    const messages = diagnostics(`
+      import { createScope, flow } from "@pumped-fn/lite"
+      import { importedCallback } from "./callback"
+
+      const operation = flow({
+        factory: (ctx) => ctx.exec({ fn: () => "ctx" }),
+      })
+      const scope = createScope()
+      scope.run({ name: "imported", params: [], fn: importedCallback })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
+      .map((diagnostic) => diagnostic.message)
+
+    expect(messages).toEqual([
+      'ctx.exec inline options require name and params; missing "name, params".',
+      'scope.run callback "fn: importedCallback" cannot be inspected; use an immutable local const or inline callback.',
+    ])
+  })
+
+  it("fails closed when later option fields can replace fn", () => {
+    const messages = diagnostics(`
+      import { flow } from "@pumped-fn/lite"
+
+      declare const overrides: object
+      const operation = flow({
+        factory: (ctx) => Promise.all([
+          ctx.exec({
+            fn: () => ctx.input.secret,
+            name: "spread",
+            params: [ctx.input.secret],
+            ...overrides,
+          }),
+          ctx.exec({
+            fn: () => ctx.input.secret,
+            name: "computed",
+            params: [ctx.input.secret],
+            [ctx.input.key]: true,
+          }),
+          ctx.exec({
+            ...overrides,
+            fn: (value) => value,
+            name: "explicit",
+            params: [ctx.input.secret],
+          }),
+        ]),
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
+      .map((diagnostic) => diagnostic.message)
+
+    expect(messages).toEqual([
+      "ctx.exec callback cannot be determined after an opaque spread or computed overwrite; use explicit inspectable options.",
+      "ctx.exec callback cannot be determined after an opaque spread or computed overwrite; use explicit inspectable options.",
+    ])
+  })
+
+  it("keeps explicit flow forms valid across opaque option spreads", () => {
+    expect(diagnostics(`
+      import { createScope, flow } from "@pumped-fn/lite"
+
+      declare const overrides: object
+      const child = flow({ factory: (ctx) => ctx.input })
+      const parent = flow({
+        factory: (ctx) => ctx.exec({
+          flow: child,
+          input: ctx.input,
+          ...overrides,
+        }),
+      })
+      const scope = createScope()
+      scope.run({
+        flow: child,
+        input: "value",
+        ...overrides,
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")).toEqual([])
+
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      declare const overrides: object
+      const scope = createScope()
+      scope.run({ name: "unknown", params: [], ...overrides })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
+      .map((diagnostic) => diagnostic.message)).toEqual([
+      "scope.run callback cannot be determined after an opaque spread or computed overwrite; use explicit inspectable options.",
+    ])
+  })
+
+  it("only resolves immutable callback bindings", () => {
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const callback = (value: string) => value.toUpperCase()
+      const scope = createScope()
+      scope.run({ name: "stable", params: ["ok"], fn: callback })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")).toEqual([])
+
+    const messages = diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      let callback = (value: string) => value
+      const scope = createScope()
+      scope.run({ name: "mutable", params: [], fn: callback })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
+      .map((diagnostic) => diagnostic.message)
+
+    expect(messages).toEqual([
+      'scope.run callback "fn: callback" cannot be inspected; use an immutable local const or inline callback.',
+    ])
+  })
+
+  it("does not resolve an ended loop callback binding", () => {
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const secret = "hidden"
+      const callback = (value: string) => value
+      for (const callback = () => secret; false;) void callback
+      const scope = createScope()
+      scope.run({ name: "outside", params: ["ok"], fn: callback })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")).toEqual([])
+  })
+
+  it("resolves a live immutable loop callback binding", () => {
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const scope = createScope()
+      for (const callback = (value: string) => value; false;) {
+        scope.run({ name: "inside", params: ["ok"], fn: callback })
+      }
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")).toEqual([])
+  })
+
+  it("prefers nearer immutable callbacks over outer bindings", () => {
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const scope = createScope()
+      for (const callback = () => "outer"; false;) {
+        for (const callback = (value: string) => value; false;) {
+          scope.run({ name: "loop", params: ["ok"], fn: callback })
+        }
+      }
+      function use(callback: unknown) {
+        {
+          const callback = (value: string) => value
+          scope.run({ name: "parameter", params: ["ok"], fn: callback })
+        }
+      }
+      try {
+        use(undefined)
+      } catch (callback) {
+        {
+          const callback = (value: string) => value
+          scope.run({ name: "catch", params: ["ok"], fn: callback })
+        }
+      }
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")).toEqual([])
+  })
+
+  it("does not resolve mutable function declaration callbacks", () => {
+    const messages = diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const secret = "hidden"
+      function initiallyHidden() { return secret }
+      initiallyHidden = () => "safe"
+      function initiallySafe() { return "safe" }
+      initiallySafe = () => secret
+      const scope = createScope()
+      scope.run({ name: "hidden-then-safe", params: [], fn: initiallyHidden })
+      scope.run({ name: "safe-then-hidden", params: [], fn: initiallySafe })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")
+      .map((diagnostic) => diagnostic.message)
+
+    expect(messages).toEqual([
+      'scope.run callback "fn: initiallyHidden" cannot be inspected; use an immutable local const or inline callback.',
+      'scope.run callback "fn: initiallySafe" cannot be inspected; use an immutable local const or inline callback.',
+    ])
+  })
+
+  it("rejects scope and contexts passed through inline params", () => {
+    const found = diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const scope = createScope()
+      const ctx = scope.createContext()
+      void scope.run({ name: "scope", params: [scope], fn: (value) => value })
+      void scope.run({ name: "ctx", params: [{ ctx }], fn: (value) => value })
+      void scope.run({
+        name: "property-names",
+        params: [{ scope: "request", ctx: "request" }, { scope: "request" }.scope],
+        fn: (request, scopeName) => request.scope + request.ctx + scopeName,
+      })
+    `).filter((diagnostic) =>
+      diagnostic.ruleId === "pumped/no-scope-argument"
+      || diagnostic.ruleId === "pumped/no-ctx-argument"
+    )
+
+    expect(found.map((diagnostic) => diagnostic.ruleId)).toEqual([
+      "pumped/no-scope-argument",
+      "pumped/no-ctx-argument",
+    ])
+  })
+
+  it("follows immutable scope and context chains", () => {
+    const found = diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const scope = createScope()
+      const runner = scope
+      const passed = scope
+      const ctx = passed.createContext()
+      const context = ctx
+      void runner.run({
+        name: "immutable",
+        params: [passed, context],
+        fn: (scope, context) => [scope, context],
+      })
+    `).filter((diagnostic) =>
+      diagnostic.ruleId === "pumped/no-scope-argument"
+      || diagnostic.ruleId === "pumped/no-ctx-argument"
+    )
+
+    expect(found.map((diagnostic) => diagnostic.ruleId)).toEqual([
+      "pumped/no-scope-argument",
+      "pumped/no-ctx-argument",
+    ])
+  })
+
+  it("does not follow an ended loop scope binding", () => {
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const passed = { dispose: async () => {} }
+      for (const passed = createScope(); false;) void passed
+      const runner = createScope()
+      void runner.run({ name: "outside", params: [passed], fn: (value) => value })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-argument")).toEqual([])
+  })
+
+  it("follows live loop scope and context bindings", () => {
+    const found = diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const runner = createScope()
+      for (
+        const passed = createScope(), context = passed.createContext();
+        false;
+      ) {
+        runner.run({
+          name: "inside",
+          params: [passed, context],
+          fn: (scope, ctx) => [scope, ctx],
+        })
+      }
+    `).filter((diagnostic) =>
+      diagnostic.ruleId === "pumped/no-scope-argument"
+      || diagnostic.ruleId === "pumped/no-ctx-argument"
+    )
+
+    expect(found.map((diagnostic) => diagnostic.ruleId)).toEqual([
+      "pumped/no-scope-argument",
+      "pumped/no-ctx-argument",
+    ])
+  })
+
+  it("prefers nearer scope bindings over outer bindings", () => {
+    const found = diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const runner = createScope()
+      for (const passed = { dispose: async () => {} }; false;) {
+        for (const passed = createScope(); false;) {
+          runner.run({ name: "loop", params: [passed], fn: (value) => value })
+        }
+      }
+      function use(passed: unknown) {
+        {
+          const passed = createScope()
+          runner.run({ name: "parameter", params: [passed], fn: (value) => value })
+        }
+      }
+      try {
+        use(undefined)
+      } catch (passed) {
+        {
+          const passed = createScope()
+          runner.run({ name: "catch", params: [passed], fn: (value) => value })
+        }
+      }
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-scope-argument")
+
+    expect(found).toHaveLength(3)
+  })
+
+  it("does not follow mutable or cyclic scope aliases", () => {
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const runner = createScope()
+      let passed = createScope()
+      let ctx = passed.createContext()
+      const first = second
+      const second = first
+      void runner.run({
+        name: "mutable",
+        params: [passed, ctx, first],
+        fn: (scope, context, cycle) => [scope, context, cycle],
+      })
+      void passed.run({ name: "untracked", params: [], fn: () => "ok" })
+    `).filter((diagnostic) =>
+      diagnostic.ruleId === "pumped/no-scope-argument"
+      || diagnostic.ruleId === "pumped/no-ctx-argument"
+      || diagnostic.ruleId === "pumped/no-hidden-exec-dependencies"
+    )).toEqual([])
+  })
+
+  it("keeps property names shadowed bindings and Promise out of capture reports", () => {
+    expect(diagnostics(`
+      import { createScope } from "@pumped-fn/lite"
+
+      const scope = createScope()
+      scope.run({
+        name: "valid",
+        params: [{ request: "ok" }],
+        fn: ({ request }) => {
+          const client = { request: () => request }
+          return Promise.resolve(client.request())
+        },
+      })
+    `).filter((diagnostic) => diagnostic.ruleId === "pumped/no-hidden-exec-dependencies")).toEqual([])
+  })
+
   it("does not flag the sanctioned ctx.exec({ fn }) form", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1618,7 +2029,7 @@ describe("lite lint scanner", () => {
   })
 
   it("finds ctx.exec functions that hide flow input from params", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1637,7 +2048,7 @@ describe("lite lint scanner", () => {
   })
 
   it("finds direct ctx input closed over by ctx.exec functions", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1653,7 +2064,7 @@ describe("lite lint scanner", () => {
   })
 
   it("allows captured values when params records the real input", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1672,7 +2083,7 @@ describe("lite lint scanner", () => {
   })
 
   it("allows real ctx.exec inputs in params and true zero-argument calls", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1698,7 +2109,7 @@ describe("lite lint scanner", () => {
   })
 
   it("does not treat the variable receiving ctx.exec output as an input capture", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1717,7 +2128,7 @@ describe("lite lint scanner", () => {
   })
 
   it("does not treat an earlier block-local binding as visible exec input", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1739,7 +2150,7 @@ describe("lite lint scanner", () => {
   })
 
   it("keeps unrelated ctx input paths distinct", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1755,7 +2166,7 @@ describe("lite lint scanner", () => {
   })
 
   it("does not treat property names as captures", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1775,7 +2186,7 @@ describe("lite lint scanner", () => {
   })
 
   it("ignores exec calls on a shadowed ctx receiver", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1794,7 +2205,7 @@ describe("lite lint scanner", () => {
   })
 
   it("does not retain ended loop or catch bindings as visible inputs", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1820,7 +2231,7 @@ describe("lite lint scanner", () => {
   })
 
   it("scans method shorthand exec functions", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1838,7 +2249,7 @@ describe("lite lint scanner", () => {
   })
 
   it("scans exec function parameter initializers", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1854,7 +2265,7 @@ describe("lite lint scanner", () => {
   })
 
   it("does not treat discarded or function-wrapped params values as supplied", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1880,7 +2291,7 @@ describe("lite lint scanner", () => {
   })
 
   it("finds captures local to a callback containing ctx.exec", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1899,7 +2310,7 @@ describe("lite lint scanner", () => {
   })
 
   it("keeps wrapped ctx input paths distinct", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1920,7 +2331,7 @@ describe("lite lint scanner", () => {
   })
 
   it("scans parenthesized and asserted inline functions", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1943,7 +2354,7 @@ describe("lite lint scanner", () => {
   })
 
   it("keeps a local capture that shadows a dependency", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1963,7 +2374,7 @@ describe("lite lint scanner", () => {
   })
 
   it("matches immutable ctx aliases to their source path", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -1982,7 +2393,7 @@ describe("lite lint scanner", () => {
   })
 
   it("ignores type-only references to execution input", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2004,7 +2415,7 @@ describe("lite lint scanner", () => {
   })
 
   it("normalizes equivalent dot and bracket paths", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2020,7 +2431,7 @@ describe("lite lint scanner", () => {
   })
 
   it("scans computed destructuring keys in exec parameters", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2039,7 +2450,7 @@ describe("lite lint scanner", () => {
   })
 
   it("ignores static renamed destructuring keys", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2062,7 +2473,7 @@ describe("lite lint scanner", () => {
   })
 
   it("distinguishes computed member paths from static bracket-like keys", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2079,7 +2490,7 @@ describe("lite lint scanner", () => {
   })
 
   it("scans method and transparently wrapped unit factories", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2100,7 +2511,7 @@ describe("lite lint scanner", () => {
   })
 
   it("scans transparent wrappers around ctx exec options and params", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow, type ExecutionContext } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2120,7 +2531,7 @@ describe("lite lint scanner", () => {
   })
 
   it("ignores named function self bindings and hoisted local functions", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const send = flow({
@@ -2143,7 +2554,7 @@ describe("lite lint scanner", () => {
   })
 
   it("ignores immutable aliases of declared dependencies", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2158,7 +2569,7 @@ describe("lite lint scanner", () => {
   })
 
   it("matches static destructured ctx aliases to source paths", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2176,7 +2587,7 @@ describe("lite lint scanner", () => {
   })
 
   it("scans runtime class heritage expressions", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const make = flow({
@@ -2189,7 +2600,7 @@ describe("lite lint scanner", () => {
   })
 
   it("ignores JSX intrinsic and attribute names but scans component values", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const render = flow({
@@ -2207,7 +2618,7 @@ describe("lite lint scanner", () => {
   })
 
   it("requires member call receivers instead of unbound method values", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const send = flow({
@@ -2223,7 +2634,7 @@ describe("lite lint scanner", () => {
   })
 
   it("finds captures from containing method parameters", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2239,7 +2650,7 @@ describe("lite lint scanner", () => {
   })
 
   it("follows value-preserving literal spreads in params", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2257,7 +2668,7 @@ describe("lite lint scanner", () => {
   })
 
   it("does not equate separately evaluated computed member paths", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client, nextKey } from "./ports"
 
@@ -2272,7 +2683,7 @@ describe("lite lint scanner", () => {
   })
 
   it("requires receivers for bracketed wrapped and tagged member invocations", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const send = flow({
@@ -2293,7 +2704,7 @@ describe("lite lint scanner", () => {
   })
 
   it("matches literal-computed destructuring and negative numeric keys", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2311,7 +2722,7 @@ describe("lite lint scanner", () => {
   })
 
   it("ignores JSX namespace accessor and enum member names", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const render = flow({
@@ -2333,7 +2744,7 @@ describe("lite lint scanner", () => {
   })
 
   it("scans transparently wrapped creator configs", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2348,7 +2759,7 @@ describe("lite lint scanner", () => {
   })
 
   it("finds later outer bindings captured by deferred nested functions", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2364,7 +2775,7 @@ describe("lite lint scanner", () => {
   })
 
   it("ignores containing function and class declarations that shadow inputs", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const send = flow({
@@ -2386,7 +2797,7 @@ describe("lite lint scanner", () => {
   })
 
   it("ignores named class expression self bindings", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const send = flow({
@@ -2402,7 +2813,7 @@ describe("lite lint scanner", () => {
   })
 
   it("selects the nearest visible binding independent of traversal order", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2424,7 +2835,7 @@ describe("lite lint scanner", () => {
   })
 
   it("scans executions through inline exec function contexts", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2456,7 +2867,7 @@ describe("lite lint scanner", () => {
   })
 
   it("keeps ancestor execution contexts in nested edge provenance", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2487,7 +2898,7 @@ describe("lite lint scanner", () => {
   })
 
   it("scans static-computed factory and exec option names", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2502,7 +2913,7 @@ describe("lite lint scanner", () => {
   })
 
   it("preserves member receivers through generic instantiation wrappers", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const send = flow({
@@ -2518,7 +2929,7 @@ describe("lite lint scanner", () => {
   })
 
   it("scans effective options through inline literal spreads", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2549,7 +2960,7 @@ describe("lite lint scanner", () => {
   })
 
   it("tracks object property overwrites in params", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client, override } from "./ports"
 
@@ -2572,7 +2983,7 @@ describe("lite lint scanner", () => {
   })
 
   it("tracks dynamic property overwrites in params", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2600,7 +3011,7 @@ describe("lite lint scanner", () => {
   })
 
   it("ignores runtime enum bindings that shadow input aliases", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const send = flow({
@@ -2616,7 +3027,7 @@ describe("lite lint scanner", () => {
   })
 
   it("uses one lexical scope for unbraced switch clauses", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2636,7 +3047,7 @@ describe("lite lint scanner", () => {
   })
 
   it("finds later bindings captured by deferred instance fields", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
       import { client } from "./ports"
 
@@ -2654,7 +3065,7 @@ describe("lite lint scanner", () => {
   })
 
   it("ignores meta-property names when collecting captures", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const inspect = flow({
@@ -2673,7 +3084,7 @@ describe("lite lint scanner", () => {
   })
 
   it("honors later lexical declarations inside deferred closures", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const inspect = flow({
@@ -2735,7 +3146,7 @@ describe("lite lint scanner", () => {
   })
 
   it("does not suppress captures that share enclosing declaration names", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const send = flow({
@@ -2864,7 +3275,7 @@ describe("lite lint scanner", () => {
   })
 
   it("respects setter parameter shadowing", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       declare function sink(value: unknown): unknown
@@ -2889,7 +3300,7 @@ describe("lite lint scanner", () => {
   })
 
   it("excludes destructured bindings initialized by the exec call", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const inspect = flow({
@@ -2915,7 +3326,7 @@ describe("lite lint scanner", () => {
   })
 
   it("scans defaults nested in exec parameter bindings", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const inspect = flow({
@@ -2937,7 +3348,7 @@ describe("lite lint scanner", () => {
   })
 
   it("requires member receivers for writes updates and deletes", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const mutate = flow({
@@ -2968,7 +3379,7 @@ describe("lite lint scanner", () => {
   })
 
   it("respects implicit arguments bindings in non-arrow exec functions", () => {
-    expect(ids(`
+    expect(hiddenExecParamIds(`
       import { flow } from "@pumped-fn/lite"
 
       const inspect = flow({

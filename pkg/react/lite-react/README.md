@@ -7,10 +7,12 @@ subscribe to atoms, selected slices, resources, and scoped values. Event handler
 `useFlow`, through the provider-owned execution context. Forms and nested UI state can live in execution-scoped resources instead
 of local component mirrors.
 
-## Install
+## Migration to 3.0.0
+
+Install 3.0 with Lite 6:
 
 ```bash
-npm install @pumped-fn/lite @pumped-fn/lite-react
+npm install @pumped-fn/lite@^6.0.0 @pumped-fn/lite-react@^3.0.0
 ```
 
 ## The Rule
@@ -199,12 +201,16 @@ When a newer execution starts, the older completion cannot update hook state or 
 Submit flows should compose graph state inside the graph instead of mapping browser events in React:
 
 ```tsx
-const submit = useFlow(submitLogin)
+function LoginForm() {
+  const submit = useFlow(submitLogin)
 
-<form onSubmit={(event) => {
-  event.preventDefault()
-  submit.execute()
-}} />
+  return (
+    <form onSubmit={(event) => {
+      event.preventDefault()
+      submit.execute()
+    }} />
+  )
+}
 ```
 
 ## Execution-Scoped Resources
@@ -333,9 +339,11 @@ fields into local component state. Do not use controllers as the form/resource s
 
 ## Nested Boundaries
 
-Nested `ExecutionContextProvider` instances are useful for modals, editors, side panels, and per-card
-forms. Current-owned scoped values reset with the nested boundary. Boundary-owned resources can be shared
-across the broader provider when that is the user expectation.
+Nested managed `ExecutionContextProvider` instances are useful for modals, editors, side panels, and
+per-card forms. Every managed provider creates an explicit execution boundary, so both boundary-owned
+and current-owned resources reset with the nested provider. Work started through `ctx.exec()` inside one
+provider still shares that provider's boundary-owned resources. A provider given an explicit `ctx` uses
+that context as-is and does not create another boundary.
 
 Use boundary tags to describe the nested owner:
 

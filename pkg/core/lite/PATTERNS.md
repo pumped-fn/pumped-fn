@@ -8,17 +8,22 @@ see `pkg/core/lite/dist/index.d.mts`.
 
 Before adding helpers around the graph, keep ownership at the real boundary: composition roots and tests
 own `createScope({ presets, tags, extensions })`; product work enters through atoms, flows, resources,
-tags, controllers, flow handles, or `ctx.exec`; transport atoms wrap raw ambient IO; capability atoms
+tags, controllers, flow handles, `scope.run*`, or `ctx.exec*`; transport atoms wrap raw ambient IO; capability atoms
 depend on transports; feature nodes depend on capabilities. For review rules, see the
 [code review guide](../../../docs/code-review-guide.md).
 
-For foreign integration, wrap the client in an adapter atom (the substitution seam) and instrument each call with `ctx.exec({ fn: () => client.method(args), name: "client.method", tags })` — one named, tag-able edge per call. `fn`-exec is the one way to trace a specific call; a flow is the one way for a capability that is a graph node.
+For foreign integration, wrap the client in an adapter atom (the substitution seam) and instrument each call with `ctx.exec({ name: "client.method", deps: { client }, params: [args], fn: ({ client }, input) => client.method(input), tags })` — one named, tag-able edge per call. Inline execution traces a specific call; a flow defines a reusable graph capability.
 
 ## A. Fundamental Usage
 
 ### Request Lifecycle
 
-Model a request boundary with cleanup and shared context.
+Use `scope.run*` when one execution owns the boundary. Use `createContext` with `ctx.exec*` when several
+executions share resources, tags, and cancellation.
+
+A named one-off composition-root operation may use `scope.run({ name, fn, params })`. Add `deps`
+only for graph values and put runtime values in `params`. Define a flow when the operation is reusable
+or streaming.
 
 ```mermaid
 sequenceDiagram
@@ -28,18 +33,23 @@ sequenceDiagram
     participant Flow
 
     App->>Scope: createScope()
-    App->>Scope: scope.createContext({ tags })
-    Scope-->>App: ctx
-
-    App->>Ctx: ctx.exec({ flow, input, tags })
-    Ctx->>Flow: factory(childCtx, deps)
-    Flow-->>Ctx: output
-    Ctx->>Ctx: childCtx.close(result)
-    Ctx-->>App: output
-
-    App->>Ctx: ctx.onClose(result => cleanup)
-    App->>Ctx: ctx.close(result?)
-    Ctx->>Ctx: run onClose(CloseResult) LIFO
+    alt one execution
+        App->>Scope: scope.run({ flow, input, tags })
+        Scope->>Ctx: create owned context
+        Ctx->>Flow: factory(childCtx, deps)
+        Flow-->>Ctx: output
+        Ctx->>Ctx: close(CloseResult)
+        Ctx-->>App: output
+    else managed lifetime
+        App->>Scope: scope.createContext({ tags })
+        Scope-->>App: ctx
+        App->>Ctx: ctx.exec({ flow, input, tags })
+        Ctx->>Flow: factory(childCtx, deps)
+        Flow-->>Ctx: output
+        Ctx-->>App: output
+        App->>Ctx: ctx.close(result?)
+        Ctx->>Ctx: run onClose(CloseResult) LIFO
+    end
 ```
 
 ### Extensions Pipeline
@@ -127,8 +137,9 @@ const settlePayment = flow({
 > **Note:** Use `controller(flow, { name, tags, key })` only to preconfigure child-flow execution defaults. Do not mix flow controller options with atom/resource controller options: flows never accept `resolve`, `watch`, or `eq`; atoms and resources never accept flow execution defaults.
 
 `prepare()` creates an invocation object for resumability, loops, fanout, policy checks, or retries.
-`step.ready` is an optional prep point; `step.exec()` awaits readiness internally, then delegates to the
-captured parent `ctx.exec({ flow, ...options })`.
+`step.ready` activates the child's declared dependency tree in an isolated tagged lifetime without
+running the child factory or `wrapExec`. `step.exec()` or `step.execStream()` awaits readiness, executes
+once through the normal extension pipeline, then closes that lifetime.
 
 ```mermaid
 sequenceDiagram
@@ -141,16 +152,17 @@ sequenceDiagram
 
     Parent->>Handle: prepare({ key, input })
     Handle-->>Parent: invocation
-    Note over Handle,Ext: no child ctx, no parse, no wrapExec, no OTEL span
+    Handle->>Ctx: create isolated tagged lifetime
+    Ctx->>Flow: activate declared deps and resources
+    Note over Flow,Ext: no factory, parse, wrapExec, or OTEL span
     Parent->>Handle: invocation.exec()
-    Handle->>Ctx: ctx.exec({ flow, input, name, tags })
     Ctx->>Child: create child context
     Child->>Ext: wrapExec(next, flow, childCtx)
     Ext->>Flow: next() resolves deps + factory
     Flow-->>Parent: output
 ```
 
-> **Note:** Extension authors should not need a second hook or wrapper-specific span logic. Normal `wrapExec` must still see one child execution per child-flow `exec()` call; sequential and parallel child flow work should remain visible through ordinary child span parentage and timing.
+> **Note:** Extension authors do not need a readiness hook or wrapper-specific span logic. Normal `wrapExec` still sees one child execution per `exec()` or `execStream()` call; dependency resolution remains visible through the resolve pipeline.
 
 ### Scoped Isolation + Testing
 
@@ -181,6 +193,9 @@ Choose ownership by use case:
 | `boundary` | One request, job, or UI boundary shares the value and closes it together. | request loggers, trace data, per-request clients, UI sessions |
 | `current` | One action or editor gets a private pocket. Nested `ctx.exec()` children can use it; sibling actions and nested explicit boundaries reset. | transactions, action audit buffers, form drafts, modal/editor state |
 
+Boundary lookup stops at the nearest explicit context. Nested flow executions share that context's value;
+`createContext({ parent })` starts another boundary even if the parent resolved the same resource first.
+
 ```ts
 import { createScope, resource } from "@pumped-fn/lite"
 
@@ -202,8 +217,8 @@ const tx = resource({
       },
     }
 
-    ctx.onClose((result) => result.ok ? tx.commit() : tx.rollback())
-    ctx.cleanup(() => tx.release())
+    ctx.onClose((result, target) => result.ok ? target.commit() : target.rollback(), tx)
+    ctx.cleanup((target) => target.release(), tx)
     return tx
   },
 })
@@ -285,7 +300,7 @@ sequenceDiagram
     Note right of Ctrl: apply value, skip factory, cleanups NOT run
     Ctrl->>Ctrl: emit 'resolved'
 
-    App->>Ctrl: ctrl.update(v => v + 1)
+    App->>Ctrl: ctrl.update((v) => v + 1)
     Note right of Ctrl: apply fn(prev), skip factory, cleanups NOT run
     Ctrl->>Ctrl: emit 'resolved'
 
@@ -377,7 +392,7 @@ sequenceDiagram
     App->>Scope: resolve(userService)
     Scope-->>App: { getUser, updateUser }
 
-    App->>Ctx: ctx.exec({ fn: svc.getUser, params: [userId] })
+    App->>Ctx: ctx.exec({ name, deps: { svc }, params: [userId], fn })
     Ctx->>Child: create child context
     Child->>Svc: getUser(childCtx, userId)
     Svc-->>Child: user
@@ -435,9 +450,10 @@ sequenceDiagram
     participant App
     participant Ctx as ExecutionContext
 
-    App->>Ctx: ctx.exec({ name, fn, params, tags })
+    App->>Ctx: ctx.exec({ name, params, fn, tags })
     Ctx->>Ctx: create childCtx (name + tags)
-    Ctx->>Ctx: fn(childCtx, ...params)
+    Ctx->>Ctx: resolve deps when present
+    Ctx->>Ctx: fn(deps, ...params) or fn(...params)
     Ctx->>Ctx: childCtx.close(result)
     Ctx-->>App: output
     Note right of Ctx: name makes sub-executions observable by extensions

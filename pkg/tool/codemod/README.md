@@ -95,37 +95,41 @@ Options:
 
 ### Basic Migration
 
-```bash
-# Before
+Before:
+
+```ts
 import { provide, derive } from '@pumped-fn/core-next';
 
-const userAtom = provide((ctl) => ({ name: 'Alice' }));
-const nameAtom = derive([userAtom], (user) => user.name);
+const user = provide(() => ({ name: 'Alice' }));
+const name = derive([user], ([value]) => value.name);
+```
 
-// After
+After:
+
+```ts
 import { atom } from '@pumped-fn/lite';
 
-const userAtom = atom({ factory: (ctx) => ({ name: 'Alice' }) });
-const nameAtom = atom({ deps: { userAtom }, factory: ({ userAtom }) => userAtom.name });
+const user = atom({ factory: () => ({ name: 'Alice' }) });
+const name = atom({
+  deps: { user },
+  factory: (_ctx, { user }) => user.name,
+});
 ```
 
 ### Controller Migration
 
-```bash
-# Before
-import { executor } from '@pumped-fn/core-next';
+The codemod replaces `.lazy` and `.reactive` accessor references with `controller(executor)`. It does not
+turn an executor factory into a Lite flow. Review the generated controller call and define a flow manually
+when the old code represented reusable execution:
 
-const fetchUser = executor.lazy(async (ctl, id: string) => {
-  const response = await fetch(`/api/users/${id}`);
-  return response.json();
-});
+```ts
+import { flow, typed } from '@pumped-fn/lite';
 
-// After
-import { controller } from '@pumped-fn/lite';
-
-const fetchUser = controller(async (ctx, id: string) => {
-  const response = await fetch(`/api/users/${id}`);
-  return response.json();
+const fetchUser = flow({
+  name: 'fetch-user',
+  parse: typed<{ id: string }>(),
+  deps: { http },
+  factory: (ctx, { http }) => http.get(`/api/users/${ctx.input.id}`),
 });
 ```
 

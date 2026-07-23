@@ -1,0 +1,11 @@
+{
+  "name": "@fixture/missing-docs",
+  "version": "1.0.0",
+  "exports": {
+    ".": {
+      "types": "./targets/index.d.mts",
+      "default": "./targets/index.mjs"
+    }
+  },
+  "files": ["targets", "CHANGELOG.md"]
+}

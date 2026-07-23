@@ -145,6 +145,7 @@ type NodeConfig<C extends Catalog, R extends Registry, Schema extends BaseSchema
   readonly visible?: VisibleBind<Schema>
 }
 
+/** Provides typed JSON-spec authoring over a catalog, action registry, and state schema. */
 interface Author<C extends Catalog, R extends Registry, Schema extends BaseSchema> {
   spec(root: JsonNode): JsonSpec
   node<

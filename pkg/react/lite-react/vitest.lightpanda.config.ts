@@ -4,5 +4,6 @@ export default defineConfig({
   test: {
     include: ['./tests/use-flow.lightpanda.test.ts'],
     environment: 'node',
+    testTimeout: 60_000,
   },
 })

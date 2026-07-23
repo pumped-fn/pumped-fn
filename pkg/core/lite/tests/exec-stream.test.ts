@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest"
-import { controller, createScope, flow, FlowFault, isStreamingExec, preset, resource, typed } from "../src/index"
+import { controller, createScope, flow, FlowFault, isStreamingExec, preset, resource, tag, tags, typed } from "../src/index"
 import type { Lite } from "../src/index"
 
 async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
@@ -30,6 +30,66 @@ describe("ctx.execStream()", () => {
     await expect(execResult).resolves.toEqual({ id: "abc" })
 
     await ctx.close()
+    await scope.dispose()
+  })
+
+  it("runs a stream in an owned scope boundary", async () => {
+    const events: string[] = []
+    const tenant = tag<string>({ label: "tenant" })
+    const lease = resource({
+      deps: { tenant: tags.required(tenant) },
+      factory: (ctx, { tenant }) => {
+        ctx.cleanup((target) => { target.push("close") }, events)
+        return tenant
+      },
+    })
+    const read = flow({
+      deps: { lease },
+      factory: async function* (_ctx, { lease }) {
+        yield lease
+        return "done"
+      },
+    })
+    const scope = createScope()
+    const stream = scope.runStream({ flow: read, tags: [tenant("lease")] })
+
+    expectTypeOf(stream).toEqualTypeOf<Lite.FlowStream<string, string>>()
+    expect(await collect(stream)).toEqual(["lease"])
+    await expect(stream.result).resolves.toBe("done")
+    expect(events).toEqual(["close"])
+    await scope.dispose()
+  })
+
+  it("aborts and closes an owned scope stream on consumer break", async () => {
+    const events: string[] = []
+    const closes: Lite.CloseResult[] = []
+    const lease = resource({
+      factory: (ctx) => {
+        ctx.onClose((result, target) => { target.push(result) }, closes)
+        ctx.cleanup((target) => { target.push("close") }, events)
+        return "lease"
+      },
+    })
+    const read = flow({
+      deps: { lease },
+      factory: async function* (_ctx, { lease }) {
+        yield lease
+        yield "second"
+        return "done"
+      },
+    })
+    const scope = createScope()
+    const stream = scope.runStream({ flow: read })
+
+    expect(() => stream.result).toThrow("use exec() to drain")
+    for await (const value of stream) {
+      expect(value).toBe("lease")
+      break
+    }
+
+    await expect(stream.result).rejects.toThrow("Flow stream aborted")
+    expect(closes[0]).toMatchObject({ ok: false, aborted: true })
+    expect(events).toEqual(["close"])
     await scope.dispose()
   })
 

@@ -3,10 +3,14 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: {
-    alias: {
-      "@pumped-fn/sdk": fileURLToPath(new URL("../core/src/index.ts", import.meta.url)),
-      "@pumped-fn/lite-extension-suspense": fileURLToPath(new URL("../../ext/suspense/src/index.ts", import.meta.url)),
-      "@pumped-fn/lite": fileURLToPath(new URL("../../core/lite/src/index.ts", import.meta.url)),
-    },
+    alias: [
+      { find: "@pumped-fn/sdk/agent", replacement: fileURLToPath(new URL("../core/src/agent.ts", import.meta.url)) },
+      { find: "@pumped-fn/sdk/session", replacement: fileURLToPath(new URL("../core/src/session.ts", import.meta.url)) },
+      { find: "@pumped-fn/sdk/sandbox", replacement: fileURLToPath(new URL("../core/src/sandbox.ts", import.meta.url)) },
+      { find: "@pumped-fn/sdk/validation", replacement: fileURLToPath(new URL("../core/src/validation.ts", import.meta.url)) },
+      { find: /^@pumped-fn\/sdk$/, replacement: fileURLToPath(new URL("../core/src/index.ts", import.meta.url)) },
+      { find: "@pumped-fn/lite-extension-suspense", replacement: fileURLToPath(new URL("../../ext/suspense/src/index.ts", import.meta.url)) },
+      { find: "@pumped-fn/lite", replacement: fileURLToPath(new URL("../../core/lite/src/index.ts", import.meta.url)) },
+    ],
   },
 });

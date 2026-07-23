@@ -673,11 +673,11 @@ describe("ExecutionContext", () => {
       })
 
       await expect(contextOnlyCtx.resolve(taggedAtom)).rejects.toThrow('Tag "ctx-resolve-request" not found')
-      expect(() => scope.createContext([requestTag("legacy")] as never)).toThrow("createContext() expects { tags, parent }")
+      expect(() => scope.createContext([requestTag("legacy")] as never)).toThrow("createContext() expects { tags, parent, signal }")
       expect(() => scope.createContext({ tag: [requestTag("typo")] } as never))
-        .toThrow('createContext() expects { tags, parent }; received "tag"')
+        .toThrow('createContext() expects { tags, parent, signal }; received "tag"')
       expect(() => scope.createContext({ tags: requestTag("bad") } as never))
-        .toThrow("createContext() expects { tags, parent }")
+        .toThrow("createContext() expects { tags, parent, signal }")
 
       await ctx.close()
       await contextOnlyCtx.close()
@@ -1115,6 +1115,35 @@ describe("ExecutionContext", () => {
 
       await parentCtx.close()
       expect(cleanups).toEqual(["root"])
+      await scope.dispose()
+    })
+
+    it("isolates boundary-owned resources across explicit contexts regardless of resolution order", async () => {
+      let creates = 0
+      const sharedResource = resource({
+        name: "explicit-boundary-resource",
+        factory: () => ({ id: ++creates }),
+      })
+      const readResource = flow({
+        name: "read-explicit-boundary-resource",
+        deps: { sharedResource },
+        factory: (_ctx, { sharedResource }) => sharedResource,
+      })
+
+      const scope = createScope()
+      const parent = scope.createContext()
+      const child = scope.createContext({ parent })
+
+      const parentValue = await parent.resolve(sharedResource)
+      const childValue = await child.resolve(sharedResource)
+
+      expect(childValue).not.toBe(parentValue)
+      expect(await child.exec({ flow: readResource })).toBe(childValue)
+      expect(await parent.exec({ flow: readResource })).toBe(parentValue)
+      expect(creates).toBe(2)
+
+      await child.close()
+      await parent.close()
       await scope.dispose()
     })
 
@@ -1597,13 +1626,14 @@ describe("ExecutionContext", () => {
     })
   })
 
-  describe("ctx.exec() with fn", () => {
-    it("executes plain function with auto-injected ctx", async () => {
+  describe("ctx.exec() inline operations", () => {
+    it("executes an inline operation with explicit params and no dependency map", async () => {
       const scope = createScope()
       const ctx = scope.createContext()
 
       const result = await ctx.exec({
-        fn: (_ctx: Lite.ExecutionContext, a: number, b: number) => a + b,
+        name: "add",
+        fn: (a: number, b: number) => a + b,
         params: [1, 2],
       })
 
@@ -1611,13 +1641,15 @@ describe("ExecutionContext", () => {
       await ctx.close()
     })
 
-    it("applies exec tags to function child context", async () => {
+    it("resolves exec tags through declared deps", async () => {
       const marker = tag<string>({ label: "fn-exec-marker" })
       const scope = createScope()
       const ctx = scope.createContext()
 
       const result = await ctx.exec({
-        fn: (childCtx: Lite.ExecutionContext) => childCtx.data.seekTag(marker),
+        name: "read-marker",
+        deps: { marker: tags.required(marker) },
+        fn: ({ marker }) => marker,
         params: [],
         tags: [marker("fn")],
       })
@@ -1662,6 +1694,21 @@ describe("ExecutionContext", () => {
       await ctx.close()
 
       expect(closed).toEqual(["second"])
+      await scope.dispose()
+    })
+
+    it("passes inferred close dependencies", async () => {
+      const scope = createScope()
+      const ctx = scope.createContext()
+      const events: string[] = []
+
+      ctx.onClose((result, target, value) => {
+        expect(result).toEqual({ ok: true })
+        target.push(value)
+      }, events, "closed")
+
+      await ctx.close()
+      expect(events).toEqual(["closed"])
       await scope.dispose()
     })
   })
@@ -2023,9 +2070,23 @@ describe("ExecutionContext", () => {
       expect(ctrl.get()).toBe(2)
       expect(notifications).toEqual(["resolved", "resolved"])
     })
+
   })
 
   describe("controller.on()", () => {
+    it("infers declared listener parameters", async () => {
+      const scope = createScope()
+      const value = atom({ factory: () => 1 })
+      const ctrl = scope.controller(value)
+      const events: string[] = []
+
+      ctrl.on("resolved", (target, event) => target.push(event), events, "resolved")
+      await ctrl.resolve()
+
+      expect(events).toEqual(["resolved"])
+      await scope.dispose()
+    })
+
     it("notifies on state change, invalidation, and exactly twice per invalidation cycle", async () => {
       const scope = createScope()
 
@@ -2108,6 +2169,18 @@ describe("ExecutionContext", () => {
   })
 
   describe("scope.on()", () => {
+    it("infers declared listener parameters", async () => {
+      const scope = createScope()
+      const value = atom({ factory: () => 1 })
+      const events: string[] = []
+
+      scope.on("resolved", value, (target, event) => target.push(event), events, "resolved")
+      await scope.resolve(value)
+
+      expect(events).toEqual(["resolved"])
+      await scope.dispose()
+    })
+
     it("fires state transitions, failed events, and supports unsubscribe", async () => {
       const scope = createScope()
       const events: string[] = []
@@ -2688,7 +2761,7 @@ describe("Coverage: edge cases and error paths", () => {
 
     const ctx = scope.createContext()
     await expect(
-      ctx.exec({ fn: () => { throw new Error("fn-error") }, params: [] })
+      ctx.exec({ name: "fail", fn: () => { throw new Error("fn-error") }, params: [] })
     ).rejects.toThrow("fn-error")
 
     let callCount = 0
@@ -3344,6 +3417,20 @@ describe("scope.select()", () => {
         scope.select(todosAtom, (todos) => todos[0])
       }).toThrow("Cannot select from unresolved atom")
     })
+
+    it("infers declared subscriber parameters", async () => {
+      const scope = createScope()
+      const value = atom({ factory: () => 1 })
+      await scope.resolve(value)
+      const handle = scope.select(value, (current) => current)
+      const events: string[] = []
+
+      handle.subscribe((target, event) => target.push(event), events, "changed")
+      scope.controller(value).set(2)
+
+      expect(events).toEqual(["changed"])
+      await scope.dispose()
+    })
   })
 
   describe("equality", () => {
@@ -3897,7 +3984,7 @@ describe("public helper coverage", () => {
       },
       wrapExec: async (
         next: () => Promise<unknown>,
-        _target: Lite.Flow<unknown, unknown> | ((ctx: Lite.ExecutionContext, ...args: unknown[]) => unknown),
+        _target: Lite.ExecTarget,
         ctx: Lite.ExecutionContext
       ) => {
         extensionEvents.push(`exec:${ctx.name ?? "anonymous"}`)
@@ -3931,10 +4018,10 @@ describe("public helper coverage", () => {
     })
     expect(await ctx.exec({ flow: namedFlow })).toBe("named-flow:1")
     expect(await ctx.exec({
-      fn: (childCtx: Lite.ExecutionContext, value: number) => `${childCtx.name}:${value}`,
       name: "inline-exec",
+      fn: (value: number) => value,
       params: [7],
-    })).toBe("inline-exec:7")
+    })).toBe(7)
 
     const replacementFlow = flow({
       name: "replacement-flow",
@@ -4069,7 +4156,7 @@ describe("public helper coverage", () => {
       },
       wrapExec: async (
         next: () => Promise<unknown>,
-        _target: Lite.Flow<unknown, unknown> | ((ctx: Lite.ExecutionContext, ...args: unknown[]) => unknown),
+        _target: Lite.ExecTarget,
         ctx: Lite.ExecutionContext
       ) => {
         resourceEvents.push(`exec:${ctx.name ?? "anonymous"}`)
@@ -4181,12 +4268,9 @@ describe("public helper coverage", () => {
     expect(await ctx.exec({ flow: lazyCtrlFlow })).toBe(5)
     expect(await ctx.exec({ flow: resourceFlow })).toBe(5)
 
-    const anonymousFn = ((_ctx: Lite.ExecutionContext) => "anon") as (
-      ctx: Lite.ExecutionContext,
-      ...args: unknown[]
-    ) => string
+    const anonymousFn = (() => "anon") as (...args: unknown[]) => string
     Object.defineProperty(anonymousFn, "name", { value: "" })
-    expect(await ctx.exec({ fn: anonymousFn, params: [] })).toBe("anon")
+    expect(await ctx.exec({ name: "anonymous", fn: anonymousFn, params: [] })).toBe("anon")
 
     const presetAtom = atom({ factory: () => 1 })
     const presetScope = createScope({
@@ -4314,6 +4398,179 @@ describe("public helper coverage", () => {
 })
 
 describe("release() cleanup", () => {
+  it("waits for a pending generation and drains cleanup registered after release starts", async () => {
+    let factoryStarted!: () => void
+    let finishFactory!: () => void
+    const started = new Promise<void>(resolve => { factoryStarted = resolve })
+    const finish = new Promise<void>(resolve => { finishFactory = resolve })
+    const cleaned: number[] = []
+    let factoryCalls = 0
+    const scope = createScope()
+    const subject = atom({
+      factory: async (ctx) => {
+        const generation = ++factoryCalls
+        if (generation === 1) {
+          factoryStarted()
+          await finish
+        }
+        ctx.cleanup(() => { cleaned.push(generation) })
+        return generation
+      },
+    })
+
+    const first = scope.resolve(subject)
+    await started
+    let released = false
+    const release = scope.release(subject).then(() => { released = true })
+    let replacementSettled = false
+    const replacement = scope.resolve(subject).then(value => {
+      replacementSettled = true
+      return value
+    })
+
+    await Promise.resolve()
+    expect(released).toBe(false)
+    expect(replacementSettled).toBe(false)
+    finishFactory()
+
+    expect(await first).toBe(1)
+    await release
+    expect(await replacement).toBe(2)
+    expect(factoryCalls).toBe(2)
+    expect(cleaned).toEqual([1])
+
+    await scope.release(subject)
+    expect(cleaned).toEqual([1, 2])
+    await scope.dispose()
+  })
+
+  it("detaches invalidation cleanups before a cleanup awaits its release capability", async () => {
+    const cleaned: number[] = []
+    const releases: Array<() => Promise<void>> = []
+    let factoryCalls = 0
+    const scope = createScope()
+    const subject = atom({
+      factory: (ctx) => {
+        const generation = ++factoryCalls
+        releases.push(ctx.release)
+        ctx.cleanup(async () => {
+          cleaned.push(generation)
+          await ctx.release()
+        })
+        return generation
+      },
+    })
+
+    expect(await scope.resolve(subject)).toBe(1)
+    const ctrl = scope.controller(subject)
+    ctrl.invalidate()
+    await scope.flush()
+
+    expect(ctrl.state).toBe("resolved")
+    expect(ctrl.get()).toBe(2)
+    expect(cleaned).toEqual([1])
+
+    await releases[0]!()
+    expect(ctrl.state).toBe("resolved")
+    expect(ctrl.get()).toBe(2)
+    await releases[1]!()
+    expect(cleaned).toEqual([1, 2])
+    await scope.dispose()
+  })
+
+  it("keeps outside callers waiting while cleanup awaits its release capability", async () => {
+    let cleanupStarted!: () => void
+    let enterReentrantRelease!: () => void
+    let reentrantReleaseFinished!: () => void
+    let finishCleanup!: () => void
+    const started = new Promise<void>(resolve => { cleanupStarted = resolve })
+    const enterReentrant = new Promise<void>(resolve => { enterReentrantRelease = resolve })
+    const reentrantFinished = new Promise<void>(resolve => { reentrantReleaseFinished = resolve })
+    const finish = new Promise<void>(resolve => { finishCleanup = resolve })
+    let cleanupCalls = 0
+    const scope = createScope()
+    const subject = atom({
+      factory: (ctx) => {
+        ctx.cleanup(async () => {
+          cleanupCalls++
+          cleanupStarted()
+          await enterReentrant
+          await ctx.release()
+          reentrantReleaseFinished()
+          await finish
+        })
+        return "value"
+      },
+    })
+    await scope.resolve(subject)
+    const ctrl = scope.controller(subject)
+
+    const first = scope.release(subject)
+    await started
+    let outsideReleased = false
+    const second = scope.release(subject).then(() => { outsideReleased = true })
+    let resolutionSettled = false
+    let resolutionError: unknown
+    const resolving = scope.resolve(subject).then(
+      () => { resolutionSettled = true },
+      (error: unknown) => {
+        resolutionSettled = true
+        resolutionError = error
+      },
+    )
+    let disposed = false
+    const disposing = scope.dispose().then(() => { disposed = true })
+
+    expect(cleanupCalls).toBe(1)
+    expect(outsideReleased).toBe(false)
+    expect(resolutionSettled).toBe(false)
+    expect(disposed).toBe(false)
+    enterReentrantRelease()
+    await reentrantFinished
+    expect(cleanupCalls).toBe(1)
+    expect(outsideReleased).toBe(false)
+    expect(resolutionSettled).toBe(false)
+    expect(disposed).toBe(false)
+    finishCleanup()
+    await Promise.all([first, second, resolving, disposing])
+    expect(cleanupCalls).toBe(1)
+    expect(outsideReleased).toBe(true)
+    expect(resolutionSettled).toBe(true)
+    expect(resolutionError).toEqual(new Error("Scope is disposed"))
+    expect(disposed).toBe(true)
+    expect(ctrl.state).toBe("idle")
+  })
+
+  it("does not let a stale release capability release a replacement generation", async () => {
+    const releases: Array<() => Promise<void>> = []
+    let cleanupCalls = 0
+    const scope = createScope()
+    const subject = atom({
+      factory: (ctx) => {
+        const generation = releases.length
+        releases.push(ctx.release)
+        ctx.cleanup(() => { cleanupCalls++ })
+        return generation
+      },
+    })
+
+    expect(await scope.resolve(subject)).toBe(0)
+    await scope.release(subject)
+    expect(cleanupCalls).toBe(1)
+
+    expect(await scope.resolve(subject)).toBe(1)
+    const ctrl = scope.controller(subject)
+    await releases[0]!()
+    expect(ctrl.state).toBe("resolved")
+    expect(ctrl.get()).toBe(1)
+    expect(cleanupCalls).toBe(1)
+
+    await releases[1]!()
+    expect(ctrl.state).toBe("idle")
+    expect(cleanupCalls).toBe(2)
+    await scope.dispose()
+  })
+
   it("removes dependents on release and controller ops throw after release", async () => {
     let factoryCalls = 0
     const depAtom = atom({ factory: () => { factoryCalls++; return "dep" } })
@@ -4368,6 +4625,26 @@ describe("pendingSet on failure path", () => {
 })
 
 describe("listener notification", () => {
+  it("finishes invalidation after a listener throws and surfaces the failure from flush", async () => {
+    let factoryCalls = 0
+    let siblingCalls = 0
+    const scope = createScope()
+    const subject = atom({ factory: () => ++factoryCalls })
+    await scope.resolve(subject)
+    const ctrl = scope.controller(subject)
+
+    ctrl.on("resolving", () => { throw new Error("listener failed") })
+    ctrl.on("resolving", () => { siblingCalls++ })
+    ctrl.invalidate()
+
+    await expect(scope.flush()).rejects.toThrow("listener failed")
+    expect(siblingCalls).toBe(1)
+    expect(factoryCalls).toBe(2)
+    expect(ctrl.state).toBe("resolved")
+    expect(ctrl.get()).toBe(2)
+    await scope.dispose()
+  })
+
   it("adding a listener during notification does not fire it in the same cycle", async () => {
     const myAtom = atom({ factory: () => 42 })
     const scope = createScope()

@@ -22,7 +22,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "access": "public"
@@ -34,8 +35,8 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/sdk": "^2.0.0",
-    "@pumped-fn/lite": "^3.1.0"
+    "@pumped-fn/sdk": "^3.0.0",
+    "@pumped-fn/lite": "^6.0.0"
   },
   "dependencies": {
     "just-bash": "catalog:"

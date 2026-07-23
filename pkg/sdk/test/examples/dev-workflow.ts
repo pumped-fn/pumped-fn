@@ -1,12 +1,9 @@
-import { createScope, flow, tags, typed } from "@pumped-fn/lite"
+import { controller, createScope, flow, tags, typed } from "@pumped-fn/lite"
 import {
   SuspendSignal,
-  runtime,
   workflowRun,
   step,
   workflow as workflowRuntime,
-  workerRegistry,
-  workers,
   type WorkflowStepEntry,
 } from "@pumped-fn/sdk"
 import {
@@ -48,6 +45,19 @@ export interface DevRun {
     test: number
   }
   entries: WorkflowStepEntry[]
+}
+
+export class DevWorkflowError extends Error {
+  readonly kind = "dev-workflow"
+
+  constructor(
+    readonly op: "review" | "resume",
+    readonly entity: string,
+    message: string,
+  ) {
+    super(message)
+    this.name = "DevWorkflowError"
+  }
 }
 
 export async function runDevWorkflow(
@@ -96,25 +106,22 @@ export async function runDevWorkflow(
     name: "await-product-review",
     tags: [step({ durable: true, kind: "review" })],
     factory: () => {
-      throw new Error("await-product-review should suspend before factory runs")
+      throw new DevWorkflowError("review", "product", "await-product-review should suspend before factory runs")
     },
   })
 
   const developFeature = flow({
     name: "develop-feature",
     parse: typed<DevRequest>(),
-    tags: [
-      step({ workflow: true }),
-      workers(workerRegistry([implementFeature])),
-    ],
+    tags: [step({ workflow: true })],
     deps: {
+      implementFeature: controller(implementFeature),
       workflow: tags.required(workflowRuntime),
-      runtime: tags.required(runtime),
-      runFeatureTests,
-      waitForProductReview,
+      runFeatureTests: controller(runFeatureTests),
+      waitForProductReview: controller(waitForProductReview),
     },
-    factory: async (ctx, { workflow, runtime, runFeatureTests, waitForProductReview }): Promise<DevResult> => {
-      const patch = await runtime.delegate<Patch, DevRequest>("implement-feature", ctx.input)
+    factory: async (ctx, { implementFeature, workflow, runFeatureTests, waitForProductReview }): Promise<DevResult> => {
+      const patch = await implementFeature.exec({ input: ctx.input })
       const tests = await runFeatureTests.exec({ input: { patch } })
       const approval = await waitForProductReview.exec()
       return {
@@ -148,7 +155,7 @@ export async function runDevWorkflow(
   const pending = log.entries().find((entry) =>
     entry.status === "pending" && entry.targetName === "await-product-review"
   )
-  if (!pending) throw new Error("development workflow did not wait for product review")
+  if (!pending) throw new DevWorkflowError("resume", request.ticket, "development workflow did not wait for product review")
   await log.resolve(pending.key, options.approval ?? "product-approved")
 
   const secondCtx = scope.createContext({ tags: [workflowRun({ taskId, runId })] })

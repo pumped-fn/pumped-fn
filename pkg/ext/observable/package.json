@@ -21,7 +21,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "access": "public"
@@ -33,7 +34,7 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@pumped-fn/lite": "^3.1.0"
+    "@pumped-fn/lite": "^6.0.0"
   },
   "devDependencies": {
     "@pumped-fn/lite": "workspace:*",

@@ -22,6 +22,7 @@ type ScopedValueCloseHelpers<State> = {
   get(): State
 }
 
+/** Exposes scoped state reads, writes, subscriptions, actions, and disposal state. */
 interface ScopedValueAccess<State, Actions extends ScopedValueActions = {}> {
   readonly disposed: boolean
   readonly actions: Actions
@@ -38,6 +39,7 @@ type ScopedValueView<State, Actions extends ScopedValueActions = {}> =
     readonly snapshot: State
   }
 
+/** Configures scoped state creation, graph dependencies, actions, tags, and cleanup. */
 interface ScopedValueConfig<
   State,
   Deps extends ScopedValueDeps = {},
@@ -114,11 +116,11 @@ function scopedValue<
       }
     }
 
-    const offClose = ctx.onClose(closeAccess)
-    ctx.cleanup(() => {
-      offClose()
-      return closeAccess({ ok: true })
-    })
+    const offClose = ctx.onClose((result, close) => close(result), closeAccess)
+    ctx.cleanup(async (unregister, close) => {
+      unregister()
+      await close({ ok: true })
+    }, offClose, closeAccess)
 
     return access
   }

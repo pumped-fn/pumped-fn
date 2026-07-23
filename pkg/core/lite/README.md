@@ -20,6 +20,7 @@ Lite owns the application boundary below framework adapters:
 
 - A `Scope` owns long-lived graph values and their cleanup.
 - An `ExecutionContext` owns one request, job, command, action, or UI boundary.
+- Every execution context exposes one effective `signal`; closing a context aborts and joins its descendants before resource cleanup.
 - `atom()` defines scope-owned transports, capabilities, state, derived data, and caches.
 - `flow()` defines execution work with optional typed or parsed input.
 - `resource()` defines execution-context-owned values such as transactions, request loggers, spans, action buffers, and drafts.
@@ -103,12 +104,10 @@ const loadUser = flow({
 })
 
 const scope = createScope({ tags: [tenant("acme")] })
-const ctx = scope.createContext()
-const user = await ctx.exec({ flow: loadUser, input: { id: "u1" } })
+const user = await scope.run({ flow: loadUser, input: { id: "u1" } })
 
 if (user.name !== "acme:u1") throw new Error("unexpected user")
 
-await ctx.close()
 await scope.dispose()
 ```
 
@@ -120,6 +119,59 @@ What this demonstrates:
 - `loadUser` is a flow. It receives input through an execution context and uses declared dependencies.
 - The composition root chooses the tenant and owns cleanup.
 
+### One execution or a managed lifetime
+
+`scope.run` and `scope.runStream` create and close one execution boundary. Use an explicit context when
+resources, tags, or cancellation must span several executions.
+
+| One owned execution | Managed execution lifetime |
+| --- | --- |
+| `scope.run({ flow, input, tags })` | `scope.createContext({ tags })`, then `ctx.exec({ flow, input })` |
+| `scope.run({ name, fn, params, tags })` for a named one-off operation; add `deps` when needed | Define a flow when the operation is reused inside a managed lifetime |
+| `scope.runStream({ flow, input, tags })` | `scope.createContext({ tags })`, then `ctx.execStream({ flow, input })` |
+| Scope closes the temporary context after success, failure, or stream cancellation | The caller closes `ctx` after the last related execution |
+
+```ts
+const users = atom({
+  factory: () => ({ byId: (id: string) => ({ id }) }),
+})
+
+const loadUser = flow({
+  parse: typed<{ id: string }>(),
+  factory: (ctx) => ctx.input,
+})
+
+const result = await scope.run({ flow: loadUser, input: { id: "u1" } })
+
+const inline = await scope.run({
+  name: "load-user-once",
+  deps: { users },
+  params: ["u2"],
+  fn: ({ users }, id) => users.byId(id),
+})
+
+const ctx = scope.createContext()
+try {
+  const first = await ctx.exec({ flow: loadUser, input: { id: "u1" } })
+  const second = await ctx.exec({ flow: loadUser, input: { id: "u2" } })
+  console.log(result, inline, first, second)
+} finally {
+  await ctx.close()
+}
+```
+
+Both paths use the same parsing, presets, extensions, tag precedence, dependency activation, and cleanup
+rules. `scope.run*` seeds its tags on the temporary owner boundary. For a managed lifetime, put shared tags
+on `createContext`; `ctx.exec({ tags })` remains an invocation-local override. `scope.run*` is lifecycle
+ownership, not a second execution model.
+
+The inline form is for a named composition-root operation that is used once. Add `deps` only for graph
+dependencies. Execution inputs must be listed in `params`; without `deps`, the callback receives those
+parameters directly. With `deps`, resolved dependency values come first. The callback receives neither
+`ctx` nor `scope`.
+Define a flow instead when the operation needs reuse, parsing, typed faults, flow tags, presets, a handle in
+another dependency graph, or streaming yields.
+
 Flows compose through dependencies. The dependency value is a context-bound handle, so nested execution
 keeps the `ctx.exec` options shape, parsing, presets, extensions, tags, and resource cleanup while making
 the flow edge visible.
@@ -130,11 +182,11 @@ like a bare flow dependency; `tags.optional(model)` yields the handle or `undefi
 yields an array of handles. Bindings are provided where the graph is composed — `createScope({ tags })`
 for the default implementation, `scope.createContext({ tags })` to rebind for a call, a test, or a tenant.
 
-**Foreign integration** is an adapter atom plus `ctx.exec({ fn })`. Wrap the foreign client in an atom
+**Foreign integration** is an adapter atom plus named inline execution. Wrap the foreign client in an atom
 (the substitution seam — presets swap it in tests), then instrument each call at its use site with
-`ctx.exec({ fn: () => client.send(message), name: "client.send", tags })` — one named, tag-able edge per
-call, receiver preserved by ordinary method-call syntax, and it works on class-instance SDKs. `fn`-exec is
-the one primitive; a flow is the other, for capabilities that are graph nodes.
+`ctx.exec({ name: "client.send", deps: { client }, params: [message], fn: ({ client }, content) => client.send(content), tags })`.
+That creates one named, tag-able edge per call while keeping graph values in `deps` and execution values in
+`params`. Inline execution is one primitive; a flow is the other, for capabilities that are graph nodes.
 
 ```ts
 const auditUserLoad = flow({
@@ -170,10 +222,16 @@ const plannedAudit = flow({
 })
 ```
 
+Direct and tag-selected child flows activate their declared dependency trees before the parent factory runs. A `controller(flow)` edge is an execution boundary. `prepare().ready` activates that child tree inside an isolated lifetime with the prepared tags; `exec()` or `execStream()` then uses the same ready resources. No child factory or `wrapExec` effect runs during readiness.
+
 ## Execution-Scoped Resources
 
 Use `resource()` for values below the scope. Resources are not stored in `ctx.data` and are not owned by
 controllers. The resolved value lives on the owning execution context.
+
+Default resources stay inside the nearest explicit execution boundary. Nested `ctx.exec()` work shares
+that boundary's value; a nested `createContext({ parent })` starts a separate boundary even when the parent
+already resolved the same resource.
 
 Choose ownership by user expectation:
 
@@ -202,8 +260,8 @@ const tx = resource({
         events.push("release")
       },
     }
-    ctx.onClose((result) => result.ok ? tx.commit() : tx.rollback())
-    ctx.cleanup(() => tx.release())
+    ctx.onClose((result, target) => result.ok ? target.commit() : target.rollback(), tx)
+    ctx.cleanup((target) => target.release(), tx)
     return tx
   },
 })
@@ -302,6 +360,22 @@ await scope.dispose()
 
 > **Note:** Use `controller(dep, { resolve: true, watch: true, eq })` in atom dependencies for derived atoms that should invalidate when a dependency changes. That replaces manual subscription wiring and automatically cleans up on re-resolve, release, and dispose.
 
+### Atom Release Ownership
+
+An atom factory's resolve context exposes `ctx.release()`, bound to the exact atom generation that created
+that context. Use it when a cleanup path can re-enter release after an async boundary. Releasing that
+generation remains exactly once: the owning cleanup does not wait on itself, while outside
+`scope.release(atom)`, `scope.resolve(atom)`, and `scope.dispose()` callers wait for cleanup to finish.
+After the atom resolves again, an older context's release capability is stale and cannot release the new
+generation. `ctx.scope` remains the original scope.
+
+The generation also owns its pending factory and cleanup list. `scope.release(atom)` waits for a pending
+factory to settle, drains cleanup registered before settlement, and only then lets a replacement resolve.
+Invalidation detaches the old generation before running its cleanup, so cleanup can await its own stale
+`ctx.release()` without running twice or releasing the replacement. Listener failures still reject the
+owning `resolve()`, `release()`, or `flush()` call, but only after sibling listeners run and the state
+transition finishes.
+
 ### Async Iteration
 
 Every subscription surface is also consumable as an async iterator. `scope.changes(atom)` yields values
@@ -348,7 +422,7 @@ async function handle(_order: Order): Promise<void> {}
 const orders = atom({
   factory: async function* (ctx) {
     const sub = await connect("orders")
-    ctx.cleanup(() => sub.close())
+    ctx.cleanup((target) => target.close(), sub)
     yield* sub
   },
 })
@@ -467,7 +541,11 @@ composition roots. See [Observability](../../../docs/observability.md).
 | `scope.changes(target, options?)` / `ctx.changes(...)` | Async-iterate atom values, select slices, or state transitions, conflated to latest |
 | `scope.resolveStream(atom)` / `ctx.resolveStream(atom)` | Consume an async-iterable atom through a scope-driven fan-out view |
 | `scope.drain(atom, options?)` | Collect an async-iterable atom into an array, optionally `take`-bounded |
+| `scope.run(options)` | Execute one flow, traced function, or named inline dependency operation in a temporary context and close it with the outcome |
+| `scope.runStream(options)` | Stream one generator flow from a temporary context; completion or cancellation closes it |
 | `ctx.execStream(options)` | Consume a generator flow's yields; `result` carries the final output, break cancels |
+| `ctx.exec(options)` | Execute a child flow or function; optional `signal` joins caller cancellation with context lifetime |
+| `flowHandle.prepare(options)` | Activate a controller child with its tags; `ready` resolves after dependencies and resources, then `exec()` or `execStream()` runs once |
 
 Complete type reference: [`dist/index.d.mts`](./dist/index.d.mts)
 

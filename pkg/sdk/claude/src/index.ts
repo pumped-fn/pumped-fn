@@ -1,9 +1,9 @@
-import { isAbsolute } from "node:path"
+import { existsSync, realpathSync } from "node:fs"
+import { basename, dirname, isAbsolute, resolve } from "node:path"
 import { createInterface } from "node:readline"
 import { spawn } from "node:child_process"
 import { atom, controller, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
 import {
-  abortSignal,
   formatModelPrompt,
   model,
   parseModelResponse,
@@ -12,11 +12,14 @@ import {
   type ModelRequest,
   type PromptInput,
 } from "@pumped-fn/sdk"
+import * as agent from "@pumped-fn/sdk/agent"
+import * as session from "@pumped-fn/sdk/session"
 
 export type ClaudeAuth =
   | { kind: "token"; env?: string }
   | { kind: "global" }
 
+/** Configures Claude authentication, roots, isolation, permission, and process timeouts. */
 export interface ClaudeConfig {
   auth: ClaudeAuth
   command?: string
@@ -80,14 +83,23 @@ export const claudeSession = resource({
   name: "claude.session",
   ownership: "boundary",
   deps: {
+    authority: tags.optional(session.current.authority),
+    attempt: tags.optional(session.current.attempt),
+    branch: tags.optional(session.current.branch),
     config: tags.required(claudeConfig),
     clock,
     engine,
     environment,
+    epoch: tags.optional(session.current.epoch),
     lineReader,
+    runtime: tags.optional(session.current.session),
+    work: tags.optional(session.current.work),
   },
-  factory: (ctx, { clock, config, engine, environment, lineReader }) => {
-    const resolved = resolveConfig(config, environment)
+  factory: (ctx, { attempt, authority, branch, clock, config, engine, environment, epoch, lineReader, runtime, work }) => {
+    assertClaudeProvenance(runtime, work, attempt, branch, authority, epoch)
+    const boundAuthority = bindClaudeAuthority(authority, work)
+    const effectiveConfig = boundAuthority ? authorizeClaudeConfig(config, boundAuthority) : config
+    const resolved = resolveConfig(effectiveConfig, environment)
     const child = engine(resolved.command, [...resolved.args], {
       cwd: resolved.cwd,
       env: resolved.env,
@@ -107,7 +119,6 @@ export const claudeSession = resource({
     } | undefined
     let closed = false
     let closing = false
-    let shutdown: Promise<void> | undefined
     let shutdownPhase: "open" | "graceful" | "force" = "open"
     let stderr = ""
     let tail = Promise.resolve()
@@ -218,30 +229,146 @@ export const claudeSession = resource({
       return transaction
     }
 
-    ctx.cleanup(() => shutdown ??= close())
+    const lifetime = { close, shutdown: undefined as Promise<void> | undefined }
+    ctx.cleanup((target) => target.shutdown ??= target.close(), lifetime)
 
     return { prompt }
   },
 })
 
+/** Manages reusable and transient Claude sessions keyed by session identity. */
+export interface ClaudeLeaseManager {
+  identity?(sessionId: string, authority?: session.Authority, work?: session.WorkRecord): string
+  prompt(
+    sessionId: string,
+    prompt: string,
+    signal?: AbortSignal,
+  ): { readonly events: AsyncIterable<agent.ModelEvent>; readonly result: Promise<string> }
+  release(sessionId: string): Promise<void>
+  transient(): string
+}
+
+export const claudeLeases = resource({
+  name: "claude.leases",
+  ownership: "boundary",
+  deps: {
+    authority: tags.optional(session.current.authority),
+    attempt: tags.optional(session.current.attempt),
+    branch: tags.optional(session.current.branch),
+    config: tags.required(claudeConfig),
+    clock,
+    engine,
+    environment,
+    epoch: tags.optional(session.current.epoch),
+    lineReader,
+    runtime: tags.optional(session.current.session),
+    work: tags.optional(session.current.work),
+  },
+  factory: (ctx, { attempt, authority, branch, clock, config, engine, environment, epoch, lineReader, runtime, work }): ClaudeLeaseManager => {
+    assertClaudeProvenance(runtime, work, attempt, branch, authority, epoch)
+    const boundAuthority = bindClaudeAuthority(authority, work)
+    const effectiveConfig = boundAuthority ? authorizeClaudeConfig(config, boundAuthority) : config
+    const leases = new Map<string, ReturnType<typeof createManagedLease>>()
+    let next = 0
+    const lease = (sessionId: string) => {
+      const existing = leases.get(sessionId)
+      if (existing) return existing
+      const created = createManagedLease(effectiveConfig, { clock, engine, environment, lineReader })
+      leases.set(sessionId, created)
+      return created
+    }
+    const release = async (sessionId: string) => {
+      const current = leases.get(sessionId)
+      if (!current) return
+      try {
+        await current.close()
+      } finally {
+        if (leases.get(sessionId) === current) leases.delete(sessionId)
+      }
+    }
+    ctx.cleanup(async (active) => {
+      const current = [...active.entries()]
+      active.clear()
+      await Promise.all(current.map(([, value]) => value.close()))
+    }, leases)
+    return {
+      identity: (sessionId, identityAuthority, identityWork) => identityAuthority && identityWork
+        ? `${sessionId}:${identityWork.id}:${identityAuthority.fingerprint}`
+        : sessionId,
+      prompt: (sessionId, prompt, signal) => lease(sessionId).prompt(prompt, signal),
+      release,
+      transient: () => `transient-${next++}`,
+    }
+  },
+})
+
+export const claudeAttempt: agent.Attempt = flow({
+  name: "claude.attempt",
+  parse: typed<ModelRequest>(),
+  deps: {
+    attempt: tags.optional(session.current.attempt),
+    authority: tags.optional(session.current.authority),
+    branch: tags.optional(session.current.branch),
+    config: tags.optional(claudeConfig),
+    epoch: tags.optional(session.current.epoch),
+    leases: claudeLeases,
+    record: tags.optional(session.record),
+    runtime: tags.optional(session.current.session),
+    work: tags.optional(session.current.work),
+  },
+  tags: [step({ workflow: true, kind: "llm" })],
+  factory: async function* (ctx, { attempt, authority, branch, config, epoch, leases, record, runtime, work }) {
+    assertClaudeProvenance(runtime, work, attempt, branch, authority, epoch)
+    const boundAuthority = bindClaudeAuthority(authority, work)
+    if (boundAuthority) {
+      if (config) authorizeClaudeConfig(config, boundAuthority)
+    }
+    const sessionId = record
+      ? branch
+        ? `${record.id}:${branch.id}`
+        : record.id
+      : leases.transient()
+    const leaseId = leases.identity?.(sessionId, boundAuthority, work) ?? sessionId
+    const invocation = leases.prompt(leaseId, formatModelPrompt(ctx.input), ctx.signal)
+    let completed = false
+    try {
+      for await (const event of invocation.events) yield event
+      const result = parseModelResponse(await invocation.result)
+      completed = true
+      return result
+    } finally {
+      if (!completed || !record) await leases.release(leaseId)
+    }
+  },
+})
+
+export const claudeAttemptBinding = agent.impl.attempt(claudeAttempt)
+
 export const claudeRun = flow({
   name: "claude.run",
   parse: typed<PromptInput>(),
   deps: {
+    attempt: tags.optional(session.current.attempt),
+    authority: tags.optional(session.current.authority),
+    branch: tags.optional(session.current.branch),
+    epoch: tags.optional(session.current.epoch),
+    runtime: tags.optional(session.current.session),
     session: claudeSession,
-    signal: tags.optional(abortSignal),
+    work: tags.optional(session.current.work),
   },
   tags: [step({ workflow: true, kind: "llm" })],
-  factory: (ctx, { session, signal }) => session.prompt(ctx.input.prompt, signal),
+  factory: (ctx, { attempt, authority, branch, epoch, runtime, session, work }) => {
+    assertClaudeProvenance(runtime, work, attempt, branch, authority, epoch)
+    bindClaudeAuthority(authority, work)
+    return session.prompt(ctx.input.prompt, ctx.signal)
+  },
 })
 
 export const claudeTurn = flow({
   name: "claude.complete",
   parse: typed<ModelRequest>(),
-  deps: { run: controller(claudeRun) },
-  factory: async (ctx, { run }) => parseModelResponse(await run.exec({
-    input: { prompt: formatModelPrompt(ctx.input) },
-  })),
+  deps: { attempt: controller(claudeAttempt) },
+  factory: (ctx, { attempt }) => attempt.exec({ input: ctx.input }),
 })
 
 export const claude = model(claudeTurn)
@@ -288,6 +415,117 @@ function resolveConfig(config: ClaudeConfig, environment: NodeJS.ProcessEnv) {
   }
 }
 
+function bindClaudeAuthority(
+  authority: session.Authority | undefined,
+  work: session.WorkRecord | undefined,
+): session.Authority | undefined {
+  if (authority && session.authorityFingerprint(authority) !== authority.fingerprint) {
+    throw new ClaudeConfigError("Claude authority fingerprint is invalid")
+  }
+  if (work && session.authorityFingerprint(work.authority) !== work.authority.fingerprint) {
+    throw new ClaudeConfigError("Claude work authority fingerprint is invalid")
+  }
+  if (!work) return authority
+  if (!authority || authority.fingerprint !== work.authority.fingerprint) {
+    throw new ClaudeConfigError("Claude authority does not match current work")
+  }
+  return work.authority
+}
+
+function assertClaudeProvenance(
+  runtime: session.SessionRuntime | undefined,
+  work: session.WorkRecord | undefined,
+  attempt: session.AttemptRecord | undefined,
+  branch: session.BranchRecord | undefined,
+  authority: session.Authority | undefined,
+  epoch: number | undefined,
+): void {
+  const present = runtime !== undefined
+    || work !== undefined
+    || attempt !== undefined
+    || branch !== undefined
+    || authority !== undefined
+    || epoch !== undefined
+  if (!present) return
+  if (!runtime || !work || !attempt || !branch || !authority || epoch === undefined) {
+    throw new ClaudeConfigError("Claude session tags must be provided as one bound tuple")
+  }
+  if (
+    session.authorityFingerprint(authority) !== authority.fingerprint
+    || session.authorityFingerprint(runtime.authority) !== runtime.authority.fingerprint
+    || session.authorityFingerprint(work.authority) !== work.authority.fingerprint
+    || session.authorityFingerprint(runtime.record.authorityConstraints) !== runtime.record.authorityFingerprint
+    || runtime.record.authorityFingerprint !== runtime.authority.fingerprint
+  ) {
+    throw new ClaudeConfigError("Claude session authority fingerprint is invalid")
+  }
+  const recordedWork = runtime.record.work.find((value) => value.id === work.id)
+  const recordedBranch = runtime.record.branches.find((value) => value.id === branch.id)
+  const recordedAttempt = runtime.record.attempts.find((value) => value.workId === attempt.workId
+    && value.attempt === attempt.attempt
+    && value.snapshotEpoch === attempt.snapshotEpoch)
+  if (!recordedWork || !recordedBranch || !recordedAttempt) {
+    throw new ClaudeConfigError("Claude session provenance does not match the active attempt")
+  }
+  if (
+    authority.fingerprint !== work.authority.fingerprint
+    || !authorityWithin(runtime.authority, authority)
+    || attempt.workId !== work.id
+    || work.attempt !== attempt.attempt
+    || attempt.status !== "working"
+    || branch.id !== work.branchId
+    || recordedWork.branchId !== branch.id
+    || recordedWork.authority.fingerprint !== work.authority.fingerprint
+    || recordedBranch.authorityFingerprint !== branch.authorityFingerprint
+    || recordedAttempt.snapshotEpoch !== attempt.snapshotEpoch
+    || recordedAttempt.status !== "working"
+    || epoch !== attempt.snapshotEpoch
+  ) {
+    throw new ClaudeConfigError("Claude session provenance does not match the active attempt")
+  }
+}
+
+function authorityWithin(parent: session.Authority, child: session.Authority): boolean {
+  try {
+    return session.narrowAuthority(parent, {
+      roots: child.roots,
+      permissions: child.permissions,
+      tools: child.tools,
+      sandbox: child.sandbox,
+    }).fingerprint === child.fingerprint
+  } catch {
+    return false
+  }
+}
+
+function authorizeClaudeConfig(config: ClaudeConfig, authority: session.Authority): ClaudeConfig {
+  if (!authority.sandbox.network) throw new ClaudeConfigError("Claude network exceeds current work authority")
+  const roots = [config.cwd, ...config.roots]
+  if (roots.some((root) => !isAbsolute(root))) throw new ClaudeConfigError("Claude authority roots must be absolute")
+  const canonicalRoots = roots.map(canonicalPath)
+  const allowedRoots = authority.sandbox.roots.map(canonicalPath)
+  if (canonicalRoots.some((root) => !allowedRoots.some((allowed) => within(root, allowed)))) {
+    throw new ClaudeConfigError("Claude roots exceed current work authority")
+  }
+  return { ...config, cwd: canonicalRoots[0]!, roots: canonicalRoots.slice(1) }
+}
+
+function within(path: string, root: string): boolean {
+  return root === "/" || path === root || path.startsWith(`${root}/`)
+}
+
+function canonicalPath(path: string): string {
+  let current = resolve(path)
+  const remainder: string[] = []
+  while (!existsSync(current)) {
+    const parent = dirname(current)
+    if (parent === current) throw new ClaudeConfigError(`Claude root ${path} cannot be resolved`)
+    remainder.unshift(basename(current))
+    current = parent
+  }
+  return resolve(realpathSync(current), ...remainder)
+}
+
 function parseEvent(line: string): { type: string; result: string; is_error: boolean } {
   const event = JSON.parse(line) as Record<string, unknown>
   if (event["type"] !== "result") return { type: String(event["type"]), result: "", is_error: false }
@@ -301,4 +539,215 @@ function requiredEnvironment(environment: NodeJS.ProcessEnv, name: string): stri
   const value = environment[name]
   if (!value) throw new ClaudeConfigError(`Claude token environment variable "${name}" is not set`)
   return value
+}
+
+function createManagedLease(
+  config: ClaudeConfig,
+  deps: {
+    readonly clock: {
+      set(fn: () => void, ms: number): number
+      clear(token: number): void
+    }
+    readonly engine: typeof spawn
+    readonly environment: NodeJS.ProcessEnv
+    readonly lineReader: typeof createInterface
+  },
+) {
+  const resolved = resolveConfig(config, deps.environment)
+  const child = deps.engine(resolved.command, [...resolved.args], {
+    cwd: resolved.cwd,
+    env: resolved.env,
+    stdio: ["pipe", "pipe", "pipe"],
+  })
+  const lines = deps.lineReader({ input: child.stdout })
+  const exited = new Promise<Error | undefined>((resolve) => {
+    child.once("error", resolve)
+    child.once("close", () => resolve(undefined))
+  })
+  let current: {
+    readonly events: EventQueue<agent.ModelEvent>
+    readonly resolve: (value: string) => void
+    readonly reject: (error: Error) => void
+    readonly signal?: AbortSignal
+    readonly abort?: () => void
+    timeout?: number
+  } | undefined
+  let closed = false
+  let closing = false
+  let shutdown: Promise<void> | undefined
+  let tail = Promise.resolve()
+
+  const settle = (result: { value: string } | { error: Error }) => {
+    const transaction = current
+    if (!transaction) return
+    current = undefined
+    if (transaction.abort) transaction.signal?.removeEventListener("abort", transaction.abort)
+    if (transaction.timeout !== undefined) deps.clock.clear(transaction.timeout)
+    if ("value" in result) {
+      transaction.events.push({ type: "provider_status", status: "completed" })
+      transaction.events.end()
+      transaction.resolve(result.value)
+    } else {
+      transaction.events.fail(result.error)
+      transaction.reject(result.error)
+    }
+  }
+
+  const awaitExit = () => new Promise<boolean>((resolve) => {
+    const timeout = deps.clock.set(() => resolve(false), config.shutdownTimeoutMs)
+    exited.then(() => {
+      deps.clock.clear(timeout)
+      resolve(true)
+    })
+  })
+
+  const close = async () => {
+    if (shutdown) return shutdown
+    shutdown = (async () => {
+      closing = true
+      if (!closed) {
+        if (current) child.kill("SIGINT")
+        else child.stdin.end()
+      }
+      if (!await awaitExit()) {
+        child.kill("SIGKILL")
+        if (!await awaitExit()) throw new ClaudeShutdownError(`Claude process did not exit within two ${config.shutdownTimeoutMs}ms shutdown bounds`)
+      }
+      lines.close()
+      settle({ error: new ClaudeProcessError("Claude session closed during prompt") })
+    })()
+    return shutdown
+  }
+
+  child.stderr.resume()
+  exited.then((error) => {
+    closed = true
+    if (error) {
+      closing = true
+      lines.close()
+      settle({ error })
+    } else if (!closing && current) {
+      settle({ error: new ClaudeProcessError("Claude process closed before result") })
+    }
+  })
+  lines.on("line", (line) => {
+    try {
+      const event = parseManagedEvent(line)
+      if (event.model) current?.events.push(event.model)
+      if (event.result) {
+        if (event.result.is_error) settle({ error: new ClaudeProcessError(event.result.value) })
+        else settle({ value: event.result.value })
+      }
+    } catch (error) {
+      settle({ error: error instanceof Error ? error : new ClaudeProcessError(String(error)) })
+    }
+  })
+
+  const prompt = (value: string, signal?: AbortSignal) => {
+    const events = new EventQueue<agent.ModelEvent>()
+    const result = tail.then(() => new Promise<string>((resolve, reject) => {
+      if (closed || closing) {
+        reject(new ClaudeProcessError("Claude session is closed"))
+        return
+      }
+      if (signal?.aborted) {
+        reject(new DOMException("Claude prompt aborted", "AbortError"))
+        return
+      }
+      const abort = () => {
+        closing = true
+        child.kill("SIGINT")
+        settle({ error: new DOMException("Claude prompt aborted", "AbortError") })
+      }
+      current = { events, resolve, reject, signal, abort }
+      events.push({ type: "provider_status", status: "started" })
+      signal?.addEventListener("abort", abort, { once: true })
+      if (config.timeoutMs !== undefined) {
+        current.timeout = deps.clock.set(() => {
+          closing = true
+          child.kill("SIGINT")
+          settle({ error: new ClaudeProcessError(`Claude prompt timed out after ${config.timeoutMs}ms`) })
+        }, config.timeoutMs)
+      }
+      child.stdin.write(`${JSON.stringify({ type: "user", message: { role: "user", content: value } })}\n`)
+    }))
+    tail = result.then(() => undefined, () => undefined)
+    result.catch((error) => events.fail(error))
+    return { events, result }
+  }
+
+  return { prompt, close }
+}
+
+function parseManagedEvent(line: string): {
+  readonly model?: agent.ModelEvent
+  readonly result?: { readonly value: string; readonly is_error: boolean }
+} {
+  const value = JSON.parse(line) as Record<string, unknown>
+  if (value["type"] === "result") {
+    if (typeof value["result"] !== "string" || typeof value["is_error"] !== "boolean") {
+      throw new ClaudeProcessError("Claude result event is invalid")
+    }
+    return { result: { value: value["result"], is_error: value["is_error"] } }
+  }
+  if (value["type"] === "stream_event" && isRecord(value["event"])) {
+    const event = value["event"]
+    if (event["type"] === "content_block_delta" && isRecord(event["delta"])) {
+      const delta = event["delta"]
+      if (delta["type"] === "text_delta" && typeof delta["text"] === "string") {
+        return { model: { type: "content_delta", content: delta["text"] } }
+      }
+      if (delta["type"] === "thinking_delta" && typeof delta["thinking"] === "string") {
+        return { model: { type: "reasoning_delta", content: delta["thinking"] } }
+      }
+    }
+  }
+  return {}
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+class EventQueue<T> implements AsyncIterable<T> {
+  private values: T[] = []
+  private waiters: Array<(result: IteratorResult<T>) => void> = []
+  private failure: unknown
+  private closed = false
+
+  push(value: T): void {
+    if (this.closed) return
+    const waiter = this.waiters.shift()
+    if (waiter) waiter({ done: false, value })
+    else this.values.push(value)
+  }
+
+  end(): void {
+    if (this.closed) return
+    this.closed = true
+    for (const waiter of this.waiters.splice(0)) waiter({ done: true, value: undefined })
+  }
+
+  fail(error: unknown): void {
+    this.failure = error
+    this.end()
+  }
+
+  async *[Symbol.asyncIterator](): AsyncGenerator<T, void, unknown> {
+    while (true) {
+      const result = await this.next()
+      if (result.done) {
+        if (this.failure) throw this.failure
+        return
+      }
+      yield result.value
+    }
+  }
+
+  private next(): Promise<IteratorResult<T>> {
+    const value = this.values.shift()
+    if (value !== undefined) return Promise.resolve({ done: false, value })
+    if (this.closed) return Promise.resolve({ done: true, value: undefined })
+    return new Promise((resolve) => this.waiters.push(resolve))
+  }
 }
