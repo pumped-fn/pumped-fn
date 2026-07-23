@@ -51,8 +51,8 @@ export const provision = flow({
       createdAt: clock.now(),
     }
     const result = await ctx.exec({
-      fn: () => database.insertUser(user),
-      params: [],
+      fn: (_ctx, input) => database.insertUser(input),
+      params: [user],
       name: "database.insertUser",
     })
     if (result === "duplicate") ctx.fail({ kind: "duplicate-email", email: ctx.input.email })

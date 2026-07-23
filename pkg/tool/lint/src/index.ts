@@ -11,6 +11,7 @@ export type RuleId =
   | "pumped/no-explicit-atom-type-argument"
   | "pumped/no-handle-spread"
   | "pumped/no-handle-factory"
+  | "pumped/no-hidden-exec-params"
   | "pumped/no-implicit-tag-read"
   | "pumped/no-internal-example-label"
   | "pumped/no-immediate-return-binding"
@@ -186,6 +187,7 @@ const ctxArgumentMessage = "ctx is a receiver, never an argument; reify the cont
 const exportedScopeGlueMessage = "exported scope/ctx-taking functions are shared glue; roots stay inline, reuse lives in the graph."
 const scopeReachMessage = "graph nodes never reach the scope or create execution contexts; boundaries live at composition roots."
 const unattributedAwaitMessage = "awaited foreign call outside a declared span; move it into a step-tagged flow or reach it through a port flow."
+const hiddenExecParamsMessage = "ctx.exec function uses execution input that is missing from params; pass the real arguments through params and omit or redact sensitive telemetry with runtime tags."
 const graphMachineryMethods = new Set(["exec", "execStream", "prepare"])
 
 function normalizePath(filePath: string): string {
@@ -441,14 +443,6 @@ function calledName(expression: ts.Expression): string | null {
   return null
 }
 
-function creatorKind(expression: ts.Expression, imports: Imports): CreatorKind | null {
-  if (ts.isIdentifier(expression)) return imports.creatorKinds.get(expression.text) ?? null
-  if (!ts.isPropertyAccessExpression(expression) || !creatorNames.has(expression.name.text)) return null
-  if (!ts.isIdentifier(expression.expression)) return null
-  if (!imports.liteNamespaces.has(expression.expression.text) && !imports.liteReactNamespaces.has(expression.expression.text)) return null
-  return expression.name.text as CreatorKind
-}
-
 function isNamespaceCall(expression: ts.Expression, namespaces: Set<string>, name: string): boolean {
   return ts.isPropertyAccessExpression(expression)
     && expression.name.text === name
@@ -457,7 +451,7 @@ function isNamespaceCall(expression: ts.Expression, namespaces: Set<string>, nam
 }
 
 function isCreatorCall(expression: ts.Expression, imports: Imports): boolean {
-  return creatorKind(expression, imports) !== null
+  return unshadowedCreatorKind(expression, expression.getSourceFile(), imports) !== null
 }
 
 function unshadowedCreatorKind(expression: ts.Expression, sourceFile: ts.SourceFile, imports: Imports): CreatorKind | null {
@@ -506,8 +500,7 @@ function immediateReturnBindings(block: ts.Block): ts.VariableDeclaration[] {
 }
 
 function isFlowCall(expression: ts.Expression, imports: Imports): boolean {
-  if (ts.isIdentifier(expression)) return imports.flow.has(expression.text)
-  return isNamespaceCall(expression, imports.liteNamespaces, "flow")
+  return unshadowedCreatorKind(expression, expression.getSourceFile(), imports) === "flow"
 }
 
 function isCreateScopeCall(expression: ts.Expression, imports: Imports): boolean {
@@ -589,15 +582,21 @@ function enclosingParameterClosures(
   imports: Imports,
 ): Array<{ name: ts.Identifier; owner: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression }> {
   const config = unitCallObject(node, imports)
-  const factory = config && objectProperty(config, "factory")
-  if (!factory || (!ts.isArrowFunction(factory.initializer) && !ts.isFunctionExpression(factory.initializer))) return []
+  const factory = config && objectFunction(config, "factory")
+  if (!factory || !factory.body) return []
+  const roots: ts.Node[] = [factory.body]
+  for (const parameter of factory.parameters) {
+    bindingRuntimeExpressions(parameter.name, roots)
+    if (parameter.initializer) roots.push(parameter.initializer)
+  }
   let current: ts.Node | undefined = node.parent
   while (current) {
     if (ts.isFunctionDeclaration(current) || ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
-      const references = collectIdentifierReferences(factory.initializer.body)
       const owner = current
       return current.parameters.flatMap((parameter) =>
-        ts.isIdentifier(parameter.name) && references.has(parameter.name.text)
+        ts.isIdentifier(parameter.name)
+          && !parameterNames(factory).has(parameter.name.text)
+          && containsUnshadowedReference(roots, factory, parameter.name.text)
           ? [{ name: parameter.name, owner }]
           : []
       )
@@ -649,13 +648,23 @@ function declarationName(node: ts.Node): string | null {
   return null
 }
 
+function initializingVariableDeclaration(node: ts.Node): ts.VariableDeclaration | null {
+  let current: ts.Node | undefined = node.parent
+  while (current) {
+    if (ts.isVariableDeclaration(current) && current.initializer) return current
+    if (isRuntimeFunction(current)) return null
+    current = current.parent
+  }
+  return null
+}
+
 function nearestCreatorConfig(node: ts.Node, imports: Imports) {
   const sourceFile = node.getSourceFile()
   let current: ts.Node | undefined = node
   while (current) {
     if (ts.isObjectLiteralExpression(current)) {
-      const call: ts.Node = current.parent
-      if (ts.isCallExpression(call) && call.arguments[0] === current) {
+      const call = inlineObjectCall(current)
+      if (call) {
         const kind = unshadowedCreatorKind(call.expression, sourceFile, imports)
         if (kind !== null) return { config: current, kind }
       }
@@ -669,14 +678,16 @@ function insideOwnedBoundary(node: ts.Node, imports: Imports): boolean {
   const nearest = nearestCreatorConfig(node, imports)
   if (nearest === null) return false
   const ownership = objectProperty(nearest.config, "ownership")
-  const factory = objectProperty(nearest.config, "factory")
+  const factory = objectFunction(nearest.config, "factory")
+  const ownershipValue = ownership && unwrapExpression(ownership.initializer)
   let ancestor: ts.Node | undefined = node
-  while (ancestor && ancestor !== nearest.config && ancestor !== factory?.initializer) ancestor = ancestor.parent
+  while (ancestor && ancestor !== nearest.config && ancestor !== factory) ancestor = ancestor.parent
   return nearest.kind === "resource"
     && ownership !== null
-    && ts.isStringLiteral(ownership.initializer)
-    && ownership.initializer.text === "boundary"
-    && ancestor === factory?.initializer
+    && ownershipValue !== null
+    && ts.isStringLiteral(ownershipValue)
+    && ownershipValue.text === "boundary"
+    && ancestor === factory
 }
 
 function ambientAllowedAt(node: ts.Node, filePath: string, imports: Imports, extraCompositionPaths: RegExp[] = []): boolean {
@@ -705,45 +716,184 @@ function isAmbientCall(expression: ts.Expression): boolean {
 
 function propertyNameText(name: ts.PropertyName): string | null {
   if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text
+  if (ts.isComputedPropertyName(name)) return staticExpressionName(name.expression)
   return null
 }
 
+function effectiveObjectElement(
+  object: ts.ObjectLiteralExpression,
+  name: string,
+): ts.ObjectLiteralElementLike | null | undefined {
+  for (const property of [...object.properties].reverse()) {
+    if (ts.isSpreadAssignment(property)) {
+      const spread = unwrapExpression(property.expression)
+      if (!ts.isObjectLiteralExpression(spread)) return null
+      const nested = effectiveObjectElement(spread, name)
+      if (nested !== undefined) return nested
+      continue
+    }
+    const propertyName = propertyNameText(property.name)
+    if (propertyName === null) return null
+    if (propertyName === name) return property
+  }
+  return undefined
+}
+
+function effectiveObjectElements(object: ts.ObjectLiteralExpression): ts.ObjectLiteralElementLike[] {
+  const elements: ts.ObjectLiteralElementLike[] = []
+  function walk(
+    properties: readonly ts.ObjectLiteralElementLike[],
+    state: { blocked: Set<string>; opaque: boolean },
+  ): void {
+    for (const property of [...properties].reverse()) {
+      if (ts.isSpreadAssignment(property)) {
+        const spread = unwrapExpression(property.expression)
+        if (ts.isObjectLiteralExpression(spread)) walk(spread.properties, state)
+        else state.opaque = true
+        continue
+      }
+      const name = propertyNameText(property.name)
+      if (name === null) {
+        if (!state.opaque && state.blocked.size === 0) elements.push(property)
+        state.opaque = true
+        continue
+      }
+      if (!state.opaque && !state.blocked.has(name)) elements.push(property)
+      state.blocked.add(name)
+    }
+  }
+  walk(object.properties, { blocked: new Set(), opaque: false })
+  return elements.sort((left, right) => left.getStart() - right.getStart())
+}
+
 function objectProperty(object: ts.ObjectLiteralExpression, name: string): ts.PropertyAssignment | null {
-  for (const property of object.properties) {
-    if (!ts.isPropertyAssignment(property)) continue
-    if (propertyNameText(property.name) === name) return property
+  const property = effectiveObjectElement(object, name)
+  return property && ts.isPropertyAssignment(property) ? property : null
+}
+
+type InlineExecFunction = ts.ArrowFunction | ts.FunctionExpression | ts.MethodDeclaration
+
+function unwrapExpression(expression: ts.Expression): ts.Expression {
+  let current = expression
+  while (
+    ts.isParenthesizedExpression(current)
+    || ts.isAsExpression(current)
+    || ts.isTypeAssertionExpression(current)
+    || ts.isSatisfiesExpression(current)
+    || ts.isNonNullExpression(current)
+    || ts.isPartiallyEmittedExpression(current)
+    || ts.isExpressionWithTypeArguments(current)
+  ) current = current.expression
+  return current
+}
+
+function objectFunction(object: ts.ObjectLiteralExpression, name: string): InlineExecFunction | null {
+  const property = effectiveObjectElement(object, name)
+  if (property && ts.isMethodDeclaration(property)) return property
+  if (!property || !ts.isPropertyAssignment(property)) return null
+  const initializer = unwrapExpression(property.initializer)
+  if (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) return initializer
+  return null
+}
+
+function inlineObjectCall(object: ts.ObjectLiteralExpression): ts.CallExpression | null {
+  let current: ts.Expression = object
+  while (true) {
+    const parent = current.parent
+    if (
+      (ts.isParenthesizedExpression(parent)
+        || ts.isAsExpression(parent)
+        || ts.isTypeAssertionExpression(parent)
+        || ts.isSatisfiesExpression(parent)
+        || ts.isNonNullExpression(parent)
+        || ts.isPartiallyEmittedExpression(parent)
+        || ts.isExpressionWithTypeArguments(parent))
+      && parent.expression === current
+    ) {
+      current = parent
+      continue
+    }
+    return ts.isCallExpression(parent) && parent.arguments[0] === current ? parent : null
+  }
+}
+
+function inlineFunctionCall(fn: InlineExecFunction, name: string): ts.CallExpression | null {
+  let current: ts.Node = fn
+  while (current.parent) {
+    const parent = current.parent
+    if (ts.isObjectLiteralExpression(parent)) {
+      let object = parent
+      while (objectFunction(object, name) === fn) {
+        const call = inlineObjectCall(object)
+        if (call) return call
+        let expression: ts.Expression = object
+        while (
+          (ts.isParenthesizedExpression(expression.parent)
+            || ts.isAsExpression(expression.parent)
+            || ts.isTypeAssertionExpression(expression.parent)
+            || ts.isSatisfiesExpression(expression.parent)
+            || ts.isNonNullExpression(expression.parent)
+            || ts.isPartiallyEmittedExpression(expression.parent)
+            || ts.isExpressionWithTypeArguments(expression.parent))
+          && expression.parent.expression === expression
+        ) expression = expression.parent
+        const spread = expression.parent
+        if (!ts.isSpreadAssignment(spread) || spread.expression !== expression || !ts.isObjectLiteralExpression(spread.parent)) {
+          return null
+        }
+        object = spread.parent
+      }
+      return null
+    }
+    if (
+      ((ts.isParenthesizedExpression(parent)
+        || ts.isAsExpression(parent)
+        || ts.isTypeAssertionExpression(parent)
+        || ts.isSatisfiesExpression(parent)
+        || ts.isNonNullExpression(parent)
+        || ts.isPartiallyEmittedExpression(parent)
+        || ts.isExpressionWithTypeArguments(parent))
+        && parent.expression === current)
+      || (ts.isPropertyAssignment(parent) && unwrapExpression(parent.initializer) === fn)
+    ) {
+      current = parent
+      continue
+    }
+    return null
   }
   return null
 }
 
+function inlineExecCall(fn: InlineExecFunction): ts.CallExpression | null {
+  return inlineFunctionCall(fn, "fn")
+}
+
 function containsFlowProperty(object: ts.ObjectLiteralExpression): boolean {
-  return object.properties.some((property) =>
-    ts.isPropertyAssignment(property) && propertyNameText(property.name) === "flow"
-  )
+  const property = effectiveObjectElement(object, "flow")
+  return property !== null && property !== undefined
 }
 
 function flowCallObject(node: ts.CallExpression, imports: Imports): ts.ObjectLiteralExpression | null {
   if (!isFlowCall(node.expression, imports)) return null
-  const config = node.arguments[0]
+  const argument = node.arguments[0]
+  const config = argument && unwrapExpression(argument)
   return config && ts.isObjectLiteralExpression(config) ? config : null
 }
 
-function enclosingFlowFactory(node: ts.Node, imports: Imports): ts.PropertyAssignment | null {
+function enclosingFlowFactory(node: ts.Node, imports: Imports): InlineExecFunction | null {
   let current: ts.Node | undefined = node
   while (current) {
     if (
-      ts.isPropertyAssignment(current)
+      (ts.isPropertyAssignment(current) || ts.isMethodDeclaration(current))
       && propertyNameText(current.name) === "factory"
-      && (ts.isArrowFunction(current.initializer) || ts.isFunctionExpression(current.initializer))
     ) {
-      const config = current.parent
-      const call = config.parent
-      if (
-        ts.isObjectLiteralExpression(config)
-        && ts.isCallExpression(call)
-        && flowCallObject(call, imports) === config
-      ) {
-        return current
+      const factory = ts.isMethodDeclaration(current)
+        ? current
+        : unwrapExpression(current.initializer)
+      if (ts.isArrowFunction(factory) || ts.isFunctionExpression(factory) || ts.isMethodDeclaration(factory)) {
+        const call = inlineFunctionCall(factory, "factory")
+        const config = call && flowCallObject(call, imports)
+        if (config && objectFunction(config, "factory") === factory) return factory
       }
     }
     current = current.parent
@@ -771,29 +921,33 @@ function containsThrow(root: ts.Node): boolean {
 
 function unitCallObject(node: ts.CallExpression, imports: Imports): ts.ObjectLiteralExpression | null {
   if (!isCreatorCall(node.expression, imports)) return null
-  const config = node.arguments[0]
+  const argument = node.arguments[0]
+  const config = argument && unwrapExpression(argument)
   return config && ts.isObjectLiteralExpression(config) ? config : null
 }
 
 function graphNodeCallObject(node: ts.CallExpression, imports: Imports): ts.ObjectLiteralExpression | null {
-  const kind = creatorKind(node.expression, imports)
+  const kind = unshadowedCreatorKind(node.expression, node.getSourceFile(), imports)
   if (kind === null || !graphNodeCreatorKinds.has(kind)) return null
-  const config = node.arguments[0]
+  const argument = node.arguments[0]
+  const config = argument && unwrapExpression(argument)
   return config && ts.isObjectLiteralExpression(config) ? config : null
 }
 
-function enclosingUnitFactory(node: ts.Node, imports: Imports): ts.ArrowFunction | ts.FunctionExpression | null {
+function enclosingUnitFactory(node: ts.Node, imports: Imports): InlineExecFunction | null {
   let current: ts.Node | undefined = node
   while (current) {
     if (
-      ts.isPropertyAssignment(current)
+      (ts.isPropertyAssignment(current) || ts.isMethodDeclaration(current))
       && propertyNameText(current.name) === "factory"
-      && (ts.isArrowFunction(current.initializer) || ts.isFunctionExpression(current.initializer))
     ) {
-      const config = current.parent
-      const call = config.parent
-      if (ts.isObjectLiteralExpression(config) && ts.isCallExpression(call) && unitCallObject(call, imports) === config) {
-        return current.initializer
+      const factory = ts.isMethodDeclaration(current)
+        ? current
+        : unwrapExpression(current.initializer)
+      if (ts.isArrowFunction(factory) || ts.isFunctionExpression(factory) || ts.isMethodDeclaration(factory)) {
+        const call = inlineFunctionCall(factory, "factory")
+        const config = call && unitCallObject(call, imports)
+        if (config && objectFunction(config, "factory") === factory) return factory
       }
     }
     current = current.parent
@@ -801,18 +955,20 @@ function enclosingUnitFactory(node: ts.Node, imports: Imports): ts.ArrowFunction
   return null
 }
 
-function enclosingGraphNodeFactory(node: ts.Node, imports: Imports): ts.ArrowFunction | ts.FunctionExpression | null {
+function enclosingGraphNodeFactory(node: ts.Node, imports: Imports): InlineExecFunction | null {
   let current: ts.Node | undefined = node
   while (current) {
     if (
-      ts.isPropertyAssignment(current)
+      (ts.isPropertyAssignment(current) || ts.isMethodDeclaration(current))
       && propertyNameText(current.name) === "factory"
-      && (ts.isArrowFunction(current.initializer) || ts.isFunctionExpression(current.initializer))
     ) {
-      const config = current.parent
-      const call = config.parent
-      if (ts.isObjectLiteralExpression(config) && ts.isCallExpression(call) && graphNodeCallObject(call, imports) === config) {
-        return current.initializer
+      const factory = ts.isMethodDeclaration(current)
+        ? current
+        : unwrapExpression(current.initializer)
+      if (ts.isArrowFunction(factory) || ts.isFunctionExpression(factory) || ts.isMethodDeclaration(factory)) {
+        const call = inlineFunctionCall(factory, "factory")
+        const config = call && graphNodeCallObject(call, imports)
+        if (config && objectFunction(config, "factory") === factory) return factory
       }
     }
     current = current.parent
@@ -822,7 +978,9 @@ function enclosingGraphNodeFactory(node: ts.Node, imports: Imports): ts.ArrowFun
 
 function enclosingUnitConfig(node: ts.Node, imports: Imports): ts.ObjectLiteralExpression | null {
   const factory = enclosingUnitFactory(node, imports)
-  return factory ? (factory.parent as ts.PropertyAssignment).parent as ts.ObjectLiteralExpression : null
+  if (!factory) return null
+  const call = inlineFunctionCall(factory, "factory")
+  return call ? unitCallObject(call, imports) : null
 }
 
 function tagExecutorModeOf(expression: ts.Expression, imports: Imports): string | null {
@@ -910,15 +1068,13 @@ function collectCreatorHandleNames(sourceFile: ts.SourceFile, imports: Imports):
   return names
 }
 
-function collectUnitFactoryNodes(sourceFile: ts.SourceFile, imports: Imports): Array<ts.ArrowFunction | ts.FunctionExpression> {
-  const nodes: Array<ts.ArrowFunction | ts.FunctionExpression> = []
+function collectUnitFactoryNodes(sourceFile: ts.SourceFile, imports: Imports): InlineExecFunction[] {
+  const nodes: InlineExecFunction[] = []
   function walk(node: ts.Node): void {
     if (ts.isCallExpression(node)) {
       const config = unitCallObject(node, imports)
-      const factory = config && objectProperty(config, "factory")
-      if (factory && (ts.isArrowFunction(factory.initializer) || ts.isFunctionExpression(factory.initializer))) {
-        nodes.push(factory.initializer)
-      }
+      const factory = config && objectFunction(config, "factory")
+      if (factory) nodes.push(factory)
     }
     ts.forEachChild(node, walk)
   }
@@ -952,7 +1108,579 @@ function collectIdentifierReferences(root: ts.Node): Set<string> {
   return names
 }
 
-function isClosedOverByFactory(name: string, factoryNodes: Array<ts.ArrowFunction | ts.FunctionExpression>): boolean {
+function collectBindingNames(name: ts.BindingName, names: Set<string>): void {
+  if (ts.isIdentifier(name)) {
+    names.add(name.text)
+    return
+  }
+  for (const element of name.elements) {
+    if (ts.isBindingElement(element)) collectBindingNames(element.name, names)
+  }
+}
+
+type PathSegment =
+  | { kind: "root" | "static"; value: string }
+  | { kind: "computed"; value: string; identity: number }
+type BindingDeclaration =
+  | ts.VariableDeclaration
+  | ts.ParameterDeclaration
+  | ts.FunctionDeclaration
+  | ts.ClassDeclaration
+  | ts.EnumDeclaration
+type LocalBinding = { declaration: BindingDeclaration; aliasSegments: PathSegment[] | null; capture: boolean }
+
+function staticExpressionName(expression: ts.Expression): string | null {
+  const value = unwrapExpression(expression)
+  if (ts.isStringLiteral(value) || ts.isNumericLiteral(value)) return value.text
+  if (value.kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral) return (value as ts.NoSubstitutionTemplateLiteral).text
+  if (
+    ts.isPrefixUnaryExpression(value)
+    && (value.operator === ts.SyntaxKind.PlusToken || value.operator === ts.SyntaxKind.MinusToken)
+    && ts.isNumericLiteral(value.operand)
+  ) {
+    const number = Number(value.operand.text)
+    return String(value.operator === ts.SyntaxKind.MinusToken ? -number : number)
+  }
+  return null
+}
+
+function collectBindings(
+  name: ts.BindingName,
+  declaration: BindingDeclaration,
+  bindings: Map<string, LocalBinding>,
+  aliasSegments: PathSegment[] | null,
+  capture: boolean,
+): void {
+  if (ts.isIdentifier(name)) {
+    bindings.set(name.text, { declaration, aliasSegments, capture })
+    return
+  }
+  if (ts.isObjectBindingPattern(name)) {
+    for (const element of name.elements) {
+      const property = element.propertyName
+        ? ts.isComputedPropertyName(element.propertyName)
+          ? staticExpressionName(element.propertyName.expression)
+          : propertyNameText(element.propertyName)
+        : ts.isIdentifier(element.name) ? element.name.text : null
+      const next = aliasSegments && !element.dotDotDotToken && !element.initializer && property !== null
+        ? [...aliasSegments, { kind: "static" as const, value: property }]
+        : null
+      collectBindings(element.name, declaration, bindings, next, capture)
+    }
+    return
+  }
+  for (const [index, element] of name.elements.entries()) {
+    if (!ts.isBindingElement(element)) continue
+    const next = aliasSegments && !element.dotDotDotToken && !element.initializer
+      ? [...aliasSegments, { kind: "static" as const, value: String(index) }]
+      : null
+    collectBindings(element.name, declaration, bindings, next, capture)
+  }
+}
+
+type IndexedBinding = {
+  binding: LocalBinding
+  scope: ts.Node
+  executionScope: ts.Node
+  requiresPriorPosition: boolean
+}
+
+function isRuntimeFunction(node: ts.Node): node is ts.FunctionLikeDeclaration {
+  return ts.isFunctionDeclaration(node)
+    || ts.isFunctionExpression(node)
+    || ts.isArrowFunction(node)
+    || ts.isMethodDeclaration(node)
+    || ts.isConstructorDeclaration(node)
+    || ts.isGetAccessorDeclaration(node)
+    || ts.isSetAccessorDeclaration(node)
+}
+
+function nearestFunctionScope(node: ts.Node, boundary: ts.Node): ts.Node {
+  let current: ts.Node | undefined = node.parent
+  while (current && current !== boundary) {
+    if (isRuntimeFunction(current)) return current
+    current = current.parent
+  }
+  return boundary
+}
+
+function nearestExecutionScope(node: ts.Node, factory: InlineExecFunction): ts.Node {
+  let child: ts.Node = node
+  let current: ts.Node | undefined = node.parent
+  while (current && current !== factory) {
+    if (isRuntimeFunction(current)) return current
+    if (
+      ts.isPropertyDeclaration(current)
+      && current.initializer === child
+      && !(ts.getModifiers(current) ?? []).some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword)
+    ) return current
+    child = current
+    current = current.parent
+  }
+  return factory
+}
+
+function variableBindingScope(declaration: ts.VariableDeclaration, boundary: ts.Node): ts.Node {
+  if (ts.isCatchClause(declaration.parent)) return declaration.parent.block
+  const declarationList = declaration.parent
+  if (!ts.isVariableDeclarationList(declarationList) || !(declarationList.flags & ts.NodeFlags.BlockScoped)) {
+    return nearestFunctionScope(declaration, boundary)
+  }
+  const owner = declarationList.parent
+  if (ts.isForStatement(owner) || ts.isForOfStatement(owner) || ts.isForInStatement(owner)) return owner
+  let scope: ts.Node | undefined = owner.parent
+  while (
+    scope
+    && scope !== boundary
+    && !ts.isBlock(scope)
+    && !ts.isCaseBlock(scope)
+    && !ts.isSourceFile(scope)
+  ) scope = scope.parent
+  return scope ?? boundary
+}
+
+function declarationBindingScope(
+  declaration: ts.FunctionDeclaration | ts.ClassDeclaration | ts.EnumDeclaration,
+  factory: InlineExecFunction,
+): ts.Node {
+  let scope: ts.Node | undefined = declaration.parent
+  while (
+    scope
+    && scope !== factory
+    && !ts.isBlock(scope)
+    && !ts.isCaseBlock(scope)
+    && !ts.isSourceFile(scope)
+  ) scope = scope.parent
+  return scope ?? factory
+}
+
+const localBindingIndexes = new WeakMap<InlineExecFunction, Map<string, IndexedBinding[]>>()
+
+function localBindingIndex(factory: InlineExecFunction): Map<string, IndexedBinding[]> {
+  const cached = localBindingIndexes.get(factory)
+  if (cached) return cached
+  const index = new Map<string, IndexedBinding[]>()
+  function record(
+    name: ts.BindingName,
+    declaration: BindingDeclaration,
+    scope: ts.Node,
+    executionScope: ts.Node,
+    requiresPriorPosition: boolean,
+    aliasSegments: PathSegment[] | null,
+    capture: boolean,
+  ): void {
+    const bindings = new Map<string, LocalBinding>()
+    collectBindings(name, declaration, bindings, aliasSegments, capture)
+    for (const [bindingName, binding] of bindings) {
+      const entries = index.get(bindingName) ?? []
+      entries.push({ binding, scope, executionScope, requiresPriorPosition })
+      index.set(bindingName, entries)
+    }
+  }
+  function walk(node: ts.Node): void {
+    if (node !== factory && isRuntimeFunction(node)) {
+      for (const parameter of node.parameters) record(parameter.name, parameter, node, node, false, null, true)
+    }
+    if (ts.isVariableDeclaration(node)) {
+      record(node.name, node, variableBindingScope(node, factory), nearestExecutionScope(node, factory), true, [], true)
+    }
+    if ((ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isEnumDeclaration(node)) && node.name) {
+      record(
+        node.name,
+        node,
+        declarationBindingScope(node, factory),
+        nearestExecutionScope(node, factory),
+        false,
+        null,
+        false,
+      )
+    }
+    ts.forEachChild(node, walk)
+  }
+  if (factory.body) walk(factory.body)
+  localBindingIndexes.set(factory, index)
+  return index
+}
+
+function containsNode(scope: ts.Node, target: ts.Node, boundary: ts.Node): boolean {
+  let current: ts.Node | undefined = target
+  while (current && current !== boundary) {
+    if (current === scope) return true
+    current = current.parent
+  }
+  return scope === boundary
+}
+
+function localBindingsBefore(
+  factory: InlineExecFunction,
+  target: ts.Node,
+  names: Set<string>,
+): Map<string, LocalBinding> {
+  const bindings = new Map<string, LocalBinding>()
+  const position = target.getStart()
+  const targetExecutionScope = nearestExecutionScope(target, factory)
+  const index = localBindingIndex(factory)
+  const pending = [...names]
+  const visited = new Set<string>()
+  while (pending.length > 0) {
+    const name = pending.pop()
+    if (!name || visited.has(name)) continue
+    visited.add(name)
+    let selected: { entry: IndexedBinding; distance: number } | null = null
+    for (const entry of index.get(name) ?? []) {
+      if (!containsNode(entry.scope, target, factory)) continue
+      if (
+        entry.requiresPriorPosition
+        && entry.executionScope === targetExecutionScope
+        && entry.binding.declaration.getStart() >= position
+      ) continue
+      let distance = 0
+      let current: ts.Node | undefined = target
+      while (current && current !== entry.scope) {
+        distance++
+        current = current.parent
+      }
+      const selectedStart = selected?.entry.binding.declaration.getStart() ?? -1
+      if (
+        !selected
+        || distance < selected.distance
+        || (distance === selected.distance && entry.binding.declaration.getStart() > selectedStart)
+      ) selected = { entry, distance }
+    }
+    if (selected) bindings.set(name, selected.entry.binding)
+    const binding = bindings.get(name)
+    const declaration = binding?.declaration
+    if (declaration && ts.isVariableDeclaration(declaration) && declaration.initializer) {
+      const root = directReferencePath(declaration.initializer)?.segments[0]?.value
+      if (root && !visited.has(root)) pending.push(root)
+    }
+  }
+  return bindings
+}
+
+function parameterNames(fn: InlineExecFunction): Set<string> {
+  const names = new Set<string>()
+  for (const parameter of fn.parameters) collectBindingNames(parameter.name, names)
+  if (ts.isFunctionExpression(fn) && fn.name) names.add(fn.name.text)
+  if (ts.isFunctionExpression(fn) || ts.isMethodDeclaration(fn)) names.add("arguments")
+  return names
+}
+
+type ReferencePath = { key: string; segments: PathSegment[]; display: string }
+
+function pathValue(segments: PathSegment[]): ReferencePath {
+  return {
+    key: JSON.stringify(segments),
+    segments,
+    display: segments.reduce((display, segment, index) => {
+      if (index === 0) return segment.value
+      if (segment.kind === "computed") return `${display}[${segment.value}]`
+      return /^[A-Za-z_$][\w$]*$/.test(segment.value)
+        ? `${display}.${segment.value}`
+        : `${display}[${JSON.stringify(segment.value)}]`
+    }, ""),
+  }
+}
+
+function staticElementName(expression: ts.Expression): string | null {
+  return staticExpressionName(expression)
+}
+
+function memberRequiresReceiver(member: ts.PropertyAccessExpression | ts.ElementAccessExpression): boolean {
+  let current: ts.Node = member
+  while (true) {
+    const parent = current.parent
+    if (
+      (ts.isParenthesizedExpression(parent)
+        || ts.isAsExpression(parent)
+        || ts.isTypeAssertionExpression(parent)
+        || ts.isSatisfiesExpression(parent)
+        || ts.isNonNullExpression(parent)
+        || ts.isPartiallyEmittedExpression(parent)
+        || ts.isExpressionWithTypeArguments(parent))
+      && parent.expression === current
+    ) {
+      current = parent
+      continue
+    }
+    if (
+      (ts.isCallExpression(parent) && parent.expression === current)
+      || (ts.isTaggedTemplateExpression(parent) && parent.tag === current)
+      || (ts.isDeleteExpression(parent) && parent.expression === current)
+    ) return true
+    if (
+      (ts.isPrefixUnaryExpression(parent) || ts.isPostfixUnaryExpression(parent))
+      && parent.operand === current
+      && (parent.operator === ts.SyntaxKind.PlusPlusToken || parent.operator === ts.SyntaxKind.MinusMinusToken)
+    ) return true
+    if (
+      ts.isBinaryExpression(parent)
+      && parent.left === current
+      && parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+      && parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+    ) return true
+    if (
+      (ts.isArrayLiteralExpression(parent) && parent.elements.includes(current as ts.Expression))
+      || (ts.isObjectLiteralExpression(parent) && parent.properties.includes(current as ts.ObjectLiteralElementLike))
+      || (ts.isPropertyAssignment(parent) && parent.initializer === current)
+      || ((ts.isSpreadElement(parent) || ts.isSpreadAssignment(parent)) && parent.expression === current)
+    ) {
+      current = parent
+      continue
+    }
+    return (ts.isForInStatement(parent) || ts.isForOfStatement(parent)) && parent.initializer === current
+  }
+}
+
+function isBindingDeclarationName(node: ts.Identifier): boolean {
+  const parent = node.parent
+  return (ts.isVariableDeclaration(parent) || ts.isParameter(parent) || ts.isBindingElement(parent)) && parent.name === node
+}
+
+function referencePath(node: ts.Identifier): ReferencePath | null {
+  const parent = node.parent
+  if (ts.isMetaProperty(parent) && parent.name === node) return null
+  if (ts.isPropertyAccessExpression(parent) && parent.name === node) return null
+  if (isBindingDeclarationName(node)) return null
+  if (ts.isBindingElement(parent) && parent.propertyName === node) return null
+  if (ts.isJsxNamespacedName(parent)) return null
+  if (ts.isJsxAttribute(parent) && parent.name === node) return null
+  if (
+    (ts.isJsxOpeningElement(parent) || ts.isJsxSelfClosingElement(parent) || ts.isJsxClosingElement(parent))
+    && parent.tagName === node
+    && /^[a-z]/.test(node.text)
+  ) return null
+  if (
+    (ts.isPropertyAssignment(parent)
+      || ts.isMethodDeclaration(parent)
+      || ts.isGetAccessorDeclaration(parent)
+      || ts.isSetAccessorDeclaration(parent)
+      || ts.isPropertyDeclaration(parent)
+      || ts.isPropertySignature(parent)
+      || ts.isMethodSignature(parent)
+      || ts.isEnumMember(parent))
+    && parent.name === node
+  ) return null
+  if (
+    (ts.isLabeledStatement(parent)
+      || ts.isBreakStatement(parent)
+      || ts.isContinueStatement(parent))
+    && parent.label === node
+  ) return null
+  let expression: ts.Expression = node
+  const segments: PathSegment[] = [{ kind: "root", value: node.text }]
+  while (true) {
+    const next = expression.parent
+    if (
+      (ts.isParenthesizedExpression(next)
+        || ts.isAsExpression(next)
+        || ts.isTypeAssertionExpression(next)
+        || ts.isSatisfiesExpression(next)
+        || ts.isNonNullExpression(next)
+        || ts.isPartiallyEmittedExpression(next)
+        || ts.isExpressionWithTypeArguments(next))
+      && next.expression === expression
+    ) {
+      expression = next
+      continue
+    }
+    if (ts.isPropertyAccessExpression(next) && next.expression === expression) {
+      if (!memberRequiresReceiver(next)) {
+        segments.push({ kind: "static", value: next.name.text })
+      }
+      expression = next
+      continue
+    }
+    if (ts.isElementAccessExpression(next) && next.expression === expression) {
+      const staticName = staticElementName(next.argumentExpression)
+      if (!memberRequiresReceiver(next)) {
+        segments.push(staticName === null
+          ? {
+              kind: "computed",
+              value: unwrapExpression(next.argumentExpression).getText(),
+              identity: next.argumentExpression.getStart(),
+            }
+          : { kind: "static", value: staticName })
+      }
+      expression = next
+      continue
+    }
+    return pathValue(segments)
+  }
+}
+
+function directReferencePath(expression: ts.Expression): ReferencePath | null {
+  let current = unwrapExpression(expression)
+  while (ts.isPropertyAccessExpression(current) || ts.isElementAccessExpression(current)) {
+    current = unwrapExpression(current.expression)
+  }
+  return ts.isIdentifier(current) ? referencePath(current) : null
+}
+
+function immutableAliasPath(
+  path: ReferencePath,
+  bindings: Map<string, LocalBinding>,
+  ctxName: string,
+  seen = new Set<string>(),
+): ReferencePath {
+  const root = path.segments[0]?.value
+  const binding = root ? bindings.get(root) : undefined
+  const declaration = binding?.declaration
+  if (
+    !root
+    || root === ctxName
+    || seen.has(root)
+    || !binding
+    || binding.aliasSegments === null
+    || !declaration
+    || !ts.isVariableDeclaration(declaration)
+    || !declaration.initializer
+    || !ts.isVariableDeclarationList(declaration.parent)
+    || !(declaration.parent.flags & ts.NodeFlags.Const)
+  ) return path
+  const initializer = directReferencePath(declaration.initializer)
+  if (!initializer) return path
+  const resolved = immutableAliasPath(initializer, bindings, ctxName, new Set([...seen, root]))
+  return pathValue([...resolved.segments, ...binding.aliasSegments, ...path.segments.slice(1)])
+}
+
+function referencedPaths(
+  roots: readonly ts.Node[],
+  boundary: ts.Node,
+  candidates: Set<string>,
+  bindings: Map<string, LocalBinding>,
+  ctxName: string,
+  excluded = new Set<string>(),
+): Map<string, ReferencePath> {
+  const paths = new Map<string, ReferencePath>()
+  function walk(node: ts.Node): void {
+    if (ts.isExpressionWithTypeArguments(node)) {
+      if (
+        !ts.isHeritageClause(node.parent)
+        || (node.parent.token === ts.SyntaxKind.ExtendsKeyword
+          && (ts.isClassDeclaration(node.parent.parent) || ts.isClassExpression(node.parent.parent)))
+      ) walk(node.expression)
+      return
+    }
+    if (ts.isTypeNode(node)) return
+    if (
+      ts.isIdentifier(node)
+      && candidates.has(node.text)
+      && !excluded.has(node.text)
+      && !shadowsName(node, boundary, node.text)
+    ) {
+      const path = referencePath(node)
+      if (path) {
+        const resolved = immutableAliasPath(path, bindings, ctxName)
+        paths.set(resolved.key, resolved)
+      }
+    }
+    ts.forEachChild(node, walk)
+  }
+  for (const root of roots) walk(root)
+  return paths
+}
+
+function bindingRuntimeExpressions(name: ts.BindingName, expressions: ts.Node[]): void {
+  if (ts.isIdentifier(name)) return
+  for (const element of name.elements) {
+    if (!ts.isBindingElement(element)) continue
+    if (element.propertyName && ts.isComputedPropertyName(element.propertyName)) expressions.push(element.propertyName.expression)
+    if (element.initializer) expressions.push(element.initializer)
+    bindingRuntimeExpressions(element.name, expressions)
+  }
+}
+
+function capturedPaths(
+  fn: InlineExecFunction,
+  candidates: Set<string>,
+  bindings: Map<string, LocalBinding>,
+  ctxName: string,
+): Map<string, ReferencePath> {
+  const roots: ts.Node[] = []
+  for (const parameter of fn.parameters) {
+    bindingRuntimeExpressions(parameter.name, roots)
+    if (parameter.initializer) roots.push(parameter.initializer)
+  }
+  if (fn.body) roots.push(fn.body)
+  return referencedPaths(roots, fn, candidates, bindings, ctxName, parameterNames(fn))
+}
+
+function suppliedPaths(
+  elements: readonly ts.Expression[],
+  boundary: ts.Node,
+  candidates: Set<string>,
+  bindings: Map<string, LocalBinding>,
+  ctxName: string,
+): Map<string, ReferencePath> {
+  const paths = new Map<string, ReferencePath>()
+  function addObjectProperties(
+    properties: readonly ts.ObjectLiteralElementLike[],
+    state: { blocked: Set<string>; opaque: boolean },
+  ): void {
+    for (const property of [...properties].reverse()) {
+      if (ts.isSpreadAssignment(property)) {
+        const spread = unwrapExpression(property.expression)
+        if (ts.isObjectLiteralExpression(spread)) addObjectProperties(spread.properties, state)
+        else state.opaque = true
+        continue
+      }
+      const name = propertyNameText(property.name)
+      if (name === null) {
+        if (!state.opaque && state.blocked.size === 0 && ts.isPropertyAssignment(property)) add(property.initializer)
+        state.opaque = true
+        continue
+      }
+      if (!state.opaque && !state.blocked.has(name)) {
+        if (ts.isPropertyAssignment(property)) add(property.initializer)
+        if (ts.isShorthandPropertyAssignment(property)) add(property.name)
+      }
+      state.blocked.add(name)
+    }
+  }
+  function add(expression: ts.Expression): void {
+    if (ts.isSpreadElement(expression)) {
+      const spread = unwrapExpression(expression.expression)
+      if (ts.isArrayLiteralExpression(spread)) add(spread)
+      return
+    }
+    const value = unwrapExpression(expression)
+    const path = directReferencePath(value)
+    const root = path?.segments[0]?.value
+    if (path && root && candidates.has(root) && !shadowsName(value, boundary, root)) {
+      const resolved = immutableAliasPath(path, bindings, ctxName)
+      paths.set(resolved.key, resolved)
+      return
+    }
+    if (ts.isArrayLiteralExpression(value)) {
+      for (const element of value.elements) {
+        if (!ts.isOmittedExpression(element)) add(element)
+      }
+      return
+    }
+    if (ts.isObjectLiteralExpression(value)) {
+      addObjectProperties(value.properties, { blocked: new Set(), opaque: false })
+    }
+  }
+  for (const element of elements) add(element)
+  return paths
+}
+
+function suppliedPath(capture: ReferencePath, supplied: Map<string, ReferencePath>): boolean {
+  for (const path of supplied.values()) {
+    if (
+      path.segments.length <= capture.segments.length
+      && path.segments.every((segment, index) => {
+        const captured = capture.segments[index]
+        if (captured?.kind !== segment.kind || captured.value !== segment.value) return false
+        return captured.kind !== "computed" || segment.kind !== "computed" || captured.identity === segment.identity
+      })
+    ) return true
+  }
+  return false
+}
+
+function isClosedOverByFactory(name: string, factoryNodes: InlineExecFunction[]): boolean {
   return factoryNodes.some((factory) => collectIdentifierReferences(factory).has(name))
 }
 
@@ -977,11 +1705,35 @@ function nakedGlobalName(node: ts.CallExpression | ts.NewExpression): string | n
   return null
 }
 
-function containsMemberRead(body: ts.Node, paramName: string): boolean {
+function containsUnshadowedReference(roots: readonly ts.Node[], boundary: ts.Node, name: string): boolean {
   let found = false
   function walk(node: ts.Node): void {
-    if (found) return
-    if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === paramName) {
+    if (found || ts.isTypeNode(node)) return
+    if (
+      ts.isIdentifier(node)
+      && node.text === name
+      && referencePath(node)
+      && !shadowsName(node, boundary, name)
+    ) {
+      found = true
+      return
+    }
+    ts.forEachChild(node, walk)
+  }
+  for (const root of roots) walk(root)
+  return found
+}
+
+function containsMemberRead(body: ts.Node, paramName: string, boundary: ts.Node): boolean {
+  let found = false
+  function walk(node: ts.Node): void {
+    if (found || ts.isTypeNode(node)) return
+    if (
+      (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === paramName
+      && !shadowsName(node.expression, boundary, paramName)
+    ) {
       found = true
       return
     }
@@ -991,7 +1743,7 @@ function containsMemberRead(body: ts.Node, paramName: string): boolean {
   return found
 }
 
-function factoryCtxName(factory: ts.ArrowFunction | ts.FunctionExpression | null): string | null {
+function factoryCtxName(factory: InlineExecFunction | null): string | null {
   const parameter = factory?.parameters[0]
   return parameter && ts.isIdentifier(parameter.name) ? parameter.name.text : null
 }
@@ -1002,7 +1754,7 @@ function rootIdentifier(expression: ts.Expression): ts.Identifier | null {
   return null
 }
 
-function depsBindingNames(factory: ts.ArrowFunction | ts.FunctionExpression): Map<string, string | null> {
+function depsBindingNames(factory: InlineExecFunction): Map<string, string | null> {
   const names = new Map<string, string | null>()
   const parameter = factory.parameters[1]
   if (!parameter) return names
@@ -1067,17 +1819,48 @@ function statementDeclaresName(statement: ts.Statement, name: string): boolean {
   return false
 }
 
+const hoistedVarNames = new WeakMap<ts.FunctionLikeDeclaration, Set<string>>()
+
+function functionVarNames(fn: ts.FunctionLikeDeclaration): Set<string> {
+  const cached = hoistedVarNames.get(fn)
+  if (cached) return cached
+  const names = new Set<string>()
+  function walk(node: ts.Node): void {
+    if (
+      node !== fn.body
+      && (isRuntimeFunction(node) || ts.isClassDeclaration(node) || ts.isClassExpression(node))
+    ) return
+    if (ts.isVariableDeclarationList(node) && !(node.flags & ts.NodeFlags.BlockScoped)) {
+      for (const declaration of node.declarations) collectBindingNames(declaration.name, names)
+    }
+    ts.forEachChild(node, walk)
+  }
+  if (fn.body) walk(fn.body)
+  hoistedVarNames.set(fn, names)
+  return names
+}
+
 function scopeStatements(node: ts.Node): readonly ts.Statement[] {
   if (ts.isSourceFile(node) || ts.isBlock(node) || ts.isModuleBlock(node)) return Array.from(node.statements)
   if (ts.isCaseClause(node) || ts.isDefaultClause(node)) return Array.from(node.statements)
+  if (ts.isCaseBlock(node)) return node.clauses.flatMap((clause) => Array.from(clause.statements))
   return []
 }
 
-function scopeDeclaresNameBefore(scope: ts.Node, position: number, name: string, afterPosition: number, sourceFile: ts.SourceFile): boolean {
+function scopeDeclaresName(scope: ts.Node, name: string, afterPosition: number, sourceFile: ts.SourceFile): boolean {
+  if (
+    ts.isBlock(scope)
+    && isRuntimeFunction(scope.parent)
+    && functionVarNames(scope.parent).has(name)
+  ) return true
   return scopeStatements(scope).some((statement) => {
     const start = statement.getStart(sourceFile)
-    return start > afterPosition && start < position && statementDeclaresName(statement, name)
+    return start > afterPosition && statementDeclaresName(statement, name)
   })
+}
+
+function scopeHoistsFunctionName(scope: ts.Node, name: string): boolean {
+  return scopeStatements(scope).some((statement) => ts.isFunctionDeclaration(statement) && statement.name?.text === name)
 }
 
 function importedCallee(callee: ts.Identifier, imports: Map<string, number>): boolean {
@@ -1113,7 +1896,6 @@ function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports)
 
 function shadowsName(node: ts.Node, boundary: ts.Node, name: string, afterPosition = -1): boolean {
   const sourceFile = node.getSourceFile()
-  const position = node.getStart(sourceFile)
   let current: ts.Node | undefined = node.parent
   while (current && current !== boundary) {
     if (
@@ -1121,7 +1903,9 @@ function shadowsName(node: ts.Node, boundary: ts.Node, name: string, afterPositi
         || ts.isFunctionExpression(current)
         || ts.isArrowFunction(current)
         || ts.isMethodDeclaration(current)
-        || ts.isConstructorDeclaration(current))
+        || ts.isConstructorDeclaration(current)
+        || ts.isGetAccessorDeclaration(current)
+        || ts.isSetAccessorDeclaration(current))
       && current.parameters.some((parameter) => bindingNameHas(parameter.name, name))
     ) {
       return true
@@ -1142,16 +1926,20 @@ function shadowsName(node: ts.Node, boundary: ts.Node, name: string, afterPositi
       return true
     }
     if (
-      (ts.isFunctionDeclaration(current) || ts.isFunctionExpression(current) || ts.isClassDeclaration(current))
+      (ts.isFunctionDeclaration(current)
+        || ts.isFunctionExpression(current)
+        || ts.isClassDeclaration(current)
+        || ts.isClassExpression(current))
       && current.name?.text === name
     ) {
       return true
     }
-    if (scopeDeclaresNameBefore(current, position, name, afterPosition, sourceFile)) return true
+    if (scopeHoistsFunctionName(current, name)) return true
+    if (scopeDeclaresName(current, name, afterPosition, sourceFile)) return true
     current = current.parent
   }
   if (current === boundary && ts.isSourceFile(boundary)) {
-    return scopeDeclaresNameBefore(boundary, position, name, afterPosition, sourceFile)
+    return scopeDeclaresName(boundary, name, afterPosition, sourceFile)
   }
   return false
 }
@@ -1177,7 +1965,19 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const allowScopeFactory = isCompositionPath(filePath, extraCompositionPaths)
   const allowScopeReach = isTestPath(filePath)
   const allowUnattributedAwait = isTestPath(filePath) || isCompositionPath(filePath, extraCompositionPaths)
-  const localFlows = new Set<string>()
+  const localFlows = new Map<string, Array<{ declaration: ts.VariableDeclaration; scope: ts.Node }>>()
+  function collectLocalFlows(node: ts.Node): void {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      const initializer = unwrapExpression(node.initializer)
+      if (ts.isCallExpression(initializer) && isFlowCall(initializer.expression, imports)) {
+        const declarations = localFlows.get(node.name.text) ?? []
+        declarations.push({ declaration: node, scope: variableBindingScope(node, sourceFile) })
+        localFlows.set(node.name.text, declarations)
+      }
+    }
+    ts.forEachChild(node, collectLocalFlows)
+  }
+  collectLocalFlows(sourceFile)
   const allowImplicit = new Set(options?.rules?.["pumped/no-implicit-tag-read"]?.allowImplicit ?? [])
   const allowGlobals = new Set([...nakedGlobalDefaultAllow, ...(options?.rules?.["pumped/no-naked-globals"]?.allowGlobals ?? [])])
   const allowBuiltins = new Set(options?.rules?.["pumped/no-untyped-throw"]?.allowBuiltins ?? [])
@@ -1189,13 +1989,50 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
   const hasGraphNodes = unitFactoryNodes.length > 0
   const creatorHandleNames = collectCreatorHandleNames(sourceFile, imports)
 
-  function factoryCtxAt(node: ts.Node): { factory: ts.ArrowFunction | ts.FunctionExpression; name: string } | null {
+  function factoryCtxAt(node: ts.Node): { factory: InlineExecFunction; name: string } | null {
     const factory = enclosingUnitFactory(node, imports)
     const name = factoryCtxName(factory)
     return factory && name ? { factory, name } : null
   }
 
-  function graphFactoryCtxAt(node: ts.Node): { factory: ts.ArrowFunction | ts.FunctionExpression; name: string } | null {
+  function execReceiver(call: ts.CallExpression): ts.Expression | null {
+    const callee = unwrapExpression(call.expression)
+    if (ts.isPropertyAccessExpression(callee) && callee.name.text === "exec") return callee.expression
+    if (
+      ts.isElementAccessExpression(callee)
+      && staticElementName(callee.argumentExpression) === "exec"
+    ) return callee.expression
+    return null
+  }
+
+  function executionContextAt(
+    call: ts.CallExpression,
+  ): { factory: InlineExecFunction; name: string; roots: Set<string> } | null {
+    const factory = enclosingUnitFactory(call, imports)
+    const receiverExpression = execReceiver(call)
+    const receiver = receiverExpression && unwrapExpression(receiverExpression)
+    if (!factory || !receiver || !ts.isIdentifier(receiver)) return null
+    let current: ts.Node | undefined = call.parent
+    while (current && current !== factory) {
+      if (ts.isArrowFunction(current) || ts.isFunctionExpression(current) || ts.isMethodDeclaration(current)) {
+        const outerCall = inlineExecCall(current)
+        const outerContext = outerCall && executionContextAt(outerCall)
+        if (outerContext) {
+          const name = factoryCtxName(current)
+          if (name === receiver.text && !shadowsName(receiver, current, name)) {
+            return { factory, name, roots: new Set([...outerContext.roots, name]) }
+          }
+        }
+      }
+      current = current.parent
+    }
+    const name = factoryCtxName(factory)
+    return name === receiver.text && !shadowsName(receiver, factory, name)
+      ? { factory, name, roots: new Set([name]) }
+      : null
+  }
+
+  function graphFactoryCtxAt(node: ts.Node): { factory: InlineExecFunction; name: string } | null {
     const factory = enclosingGraphNodeFactory(node, imports)
     const name = factoryCtxName(factory)
     return factory && name ? { factory, name } : null
@@ -1227,7 +2064,7 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     return ts.isIdentifier(expression) && expression.text === ctxName
   }
 
-  function factoryDepsAt(node: ts.Node): { factory: ts.ArrowFunction | ts.FunctionExpression; names: Map<string, string | null> } | null {
+  function factoryDepsAt(node: ts.Node): { factory: InlineExecFunction; names: Map<string, string | null> } | null {
     const factory = enclosingUnitFactory(node, imports)
     if (!factory) return null
     const names = depsBindingNames(factory)
@@ -1256,7 +2093,68 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     pushNodeDiagnostic(diagnostics, sourceFile, filePath, "pumped/no-unattributed-await", reportNode, unattributedAwaitMessage)
   }
 
+  function checkHiddenExecParams(call: ts.CallExpression): void {
+    const context = executionContextAt(call)
+    if (!context) return
+    const { factory, name: ctxName, roots: contextRoots } = context
+    const optionsArgument = call.arguments[0]
+    const options = optionsArgument && unwrapExpression(optionsArgument)
+    if (!options || !ts.isObjectLiteralExpression(options)) return
+    const fn = objectFunction(options, "fn")
+    const params = objectProperty(options, "params")
+    const paramsArray = params && unwrapExpression(params.initializer)
+    if (
+      !fn
+      || !params
+      || !paramsArray
+      || !ts.isArrayLiteralExpression(paramsArray)
+    ) return
+    const relevantNames = collectIdentifierReferences(fn)
+    for (const name of collectIdentifierReferences(paramsArray)) relevantNames.add(name)
+    for (const name of contextRoots) relevantNames.add(name)
+    const bindings = localBindingsBefore(factory, call, relevantNames)
+    const candidates = new Set(
+      [...bindings]
+        .filter(([, binding]) => binding.capture)
+        .map(([name]) => name),
+    )
+    for (const name of contextRoots) candidates.add(name)
+    const dependencyNames = new Set(depsBindingNames(factory).keys())
+    for (const name of dependencyNames) {
+      if (!bindings.has(name)) candidates.delete(name)
+    }
+    const initializing = initializingVariableDeclaration(call)
+    if (initializing) {
+      const names = new Set<string>()
+      collectBindingNames(initializing.name, names)
+      for (const name of names) {
+        if (bindings.get(name)?.declaration === initializing) candidates.delete(name)
+      }
+    }
+    const supplied = suppliedPaths(paramsArray.elements, paramsArray, candidates, bindings, ctxName)
+    const hidden = [...capturedPaths(fn, candidates, bindings, ctxName).values()]
+      .filter((path) => {
+        const root = path.segments[0]?.value
+        const binding = root ? bindings.get(root) : undefined
+        if (binding && !binding.capture) return false
+        return !root || !dependencyNames.has(root) || binding !== undefined
+      })
+      .filter((path) => !suppliedPath(path, supplied))
+      .map((path) => path.display)
+      .sort()
+    if (hidden.length === 0) return
+    pushNodeDiagnostic(
+      diagnostics,
+      sourceFile,
+      filePath,
+      "pumped/no-hidden-exec-params",
+      fn,
+      `${hiddenExecParamsMessage} Hidden: ${hidden.join(", ")}.`,
+    )
+  }
+
   function visit(node: ts.Node): void {
+    if (ts.isCallExpression(node)) checkHiddenExecParams(node)
     if (ts.isBlock(node)) {
       for (const declaration of immediateReturnBindings(node)) {
         pushNodeDiagnostic(
@@ -1549,30 +2447,32 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
 
       if (
         enclosingFlowFactory(node, imports)
-        && ts.isPropertyAccessExpression(node.expression)
-        && node.expression.name.text === "exec"
-        && node.arguments[0]
-        && ts.isObjectLiteralExpression(node.arguments[0])
-        && containsFlowProperty(node.arguments[0])
+        && execReceiver(node)
       ) {
-        pushNodeDiagnostic(
-          diagnostics,
-          sourceFile,
-          filePath,
-          "pumped/no-direct-flow-composition",
-          node.expression,
-          "Flows should compose child flows through deps: { child: controller(childFlow) } and child.exec(...).",
-        )
+        const argument = node.arguments[0]
+        const options = argument && unwrapExpression(argument)
+        if (options && ts.isObjectLiteralExpression(options) && containsFlowProperty(options)) {
+          pushNodeDiagnostic(
+            diagnostics,
+            sourceFile,
+            filePath,
+            "pumped/no-direct-flow-composition",
+            node.expression,
+            "Flows should compose child flows through deps: { child: controller(childFlow) } and child.exec(...).",
+          )
+        }
       }
 
       const unitFactory = unitCallObject(node, imports)
-      const factoryProperty = unitFactory && objectProperty(unitFactory, "factory")
-      if (
-        factoryProperty
-        && (ts.isArrowFunction(factoryProperty.initializer) || ts.isFunctionExpression(factoryProperty.initializer))
-      ) {
-        const depsParam = factoryProperty.initializer.parameters[1]
-        if (depsParam && ts.isIdentifier(depsParam.name) && factoryProperty.initializer.body && containsMemberRead(factoryProperty.initializer.body, depsParam.name.text)) {
+      const factory = unitFactory && objectFunction(unitFactory, "factory")
+      if (factory) {
+        const depsParam = factory.parameters[1]
+        if (
+          depsParam
+          && ts.isIdentifier(depsParam.name)
+          && factory.body
+          && containsMemberRead(factory.body, depsParam.name.text, factory)
+        ) {
           pushNodeDiagnostic(
             diagnostics,
             sourceFile,
@@ -1707,14 +2607,6 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
     }
 
     if (ts.isVariableDeclaration(node) && node.initializer) {
-      if (
-        ts.isIdentifier(node.name)
-        && ts.isCallExpression(node.initializer)
-        && isFlowCall(node.initializer.expression, imports)
-      ) {
-        localFlows.add(node.name.text)
-      }
-
       if (ts.isIdentifier(node.name)) {
         if (ts.isIdentifier(node.initializer) && imports.viObjects.has(node.initializer.text)) {
           imports.viObjects.add(node.name.text)
@@ -1782,15 +2674,22 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
       const config = flowCallObject(node, imports)
       if (config) {
         const deps = objectProperty(config, "deps")
-        if (deps && ts.isObjectLiteralExpression(deps.initializer)) {
-          for (const property of deps.initializer.properties) {
+        const depsValue = deps && unwrapExpression(deps.initializer)
+        if (depsValue && ts.isObjectLiteralExpression(depsValue)) {
+          for (const property of effectiveObjectElements(depsValue)) {
             const initializer = ts.isShorthandPropertyAssignment(property)
               ? property.name
               : ts.isPropertyAssignment(property)
-                ? property.initializer
+                ? unwrapExpression(property.initializer)
                 : null
             if (!initializer) continue
-            if (ts.isIdentifier(initializer) && localFlows.has(initializer.text)) {
+            if (
+              ts.isIdentifier(initializer)
+              && (localFlows.get(initializer.text) ?? []).some(({ declaration, scope }) =>
+                containsNode(scope, initializer, sourceFile)
+                && !shadowsName(initializer, sourceFile, initializer.text, declaration.getEnd())
+              )
+            ) {
               pushNodeDiagnostic(
                 diagnostics,
                 sourceFile,

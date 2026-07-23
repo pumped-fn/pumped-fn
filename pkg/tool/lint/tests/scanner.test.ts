@@ -215,6 +215,53 @@ describe("lite lint scanner", () => {
     ])
   })
 
+  it("finds direct flow composition through effective inline shapes", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const child = flow({ factory: (ctx) => ctx.input })
+      const spreadFactory = flow({
+        ...{
+          factory: (ctx) => ctx.exec({ flow: child, input: ctx.input }),
+        },
+      })
+      const spreadOptions = flow({
+        factory(ctx) {
+          return ctx.exec({ ...{ flow: child }, input: ctx.input })
+        },
+      })
+      const wrapped = flow({
+        factory: ((ctx) => ctx.exec(({
+          flow: child,
+          input: ctx.input,
+        }) satisfies object)) satisfies Function,
+      })
+    `)).toEqual([
+      "pumped/no-direct-flow-composition",
+      "pumped/no-direct-flow-composition",
+      "pumped/no-direct-flow-composition",
+    ])
+  })
+
+  it("finds raw flow dependencies through effective deps shapes", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const child = flow({ factory: (ctx) => ctx.input })
+      const wrapped = flow({
+        deps: ({ child }) satisfies object,
+        factory: () => "wrapped",
+      })
+      const spread = flow({
+        deps: { ...{ child } },
+        factory: () => "spread",
+      })
+    `)).toEqual([
+      "pumped/no-direct-flow-composition",
+      "pumped/no-direct-flow-composition",
+    ])
+  })
+
   it("finds factory ctx used as an argument or embedded value", () => {
     expect(ids(`
       import { atom, flow, resource } from "@pumped-fn/lite"
@@ -650,6 +697,33 @@ describe("lite lint scanner", () => {
         factory: () => Math.random(),
       })
     `)).toEqual([])
+
+    expect(ids(`
+      import { resource } from "@pumped-fn/lite"
+
+      const session = resource(({
+        name: "session",
+        ownership: "boundary",
+        factory() {
+          return fetch("/session")
+        },
+      }) satisfies object)
+    `)).toEqual([])
+
+    expect(ids(`
+      import { resource } from "@pumped-fn/lite"
+
+      const first = resource({
+        ownership: ("boundary" as const),
+        factory() {
+          return fetch("/first")
+        },
+      })
+      const second = resource({
+        ownership: ("boundary" satisfies "boundary"),
+        factory: () => fetch("/second"),
+      })
+    `)).toEqual([])
   })
 
   it("keeps ambient effects invalid without explicit boundary ownership", () => {
@@ -813,6 +887,22 @@ describe("lite lint scanner", () => {
         factory: (ctx, deps) => deps.tx.save(ctx.input.key),
       })
     `)).toEqual(["pumped/prefer-destructured-deps"])
+
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const first = flow({
+        factory(ctx, deps) {
+          return deps.port(ctx.input)
+        },
+      })
+      const second = flow({
+        factory: (((ctx, deps) => deps.port(ctx.input)) satisfies Function),
+      })
+    `)).toEqual([
+      "pumped/prefer-destructured-deps",
+      "pumped/prefer-destructured-deps",
+    ])
   })
 
   it("allows destructured deps params, no second param, and identifiers only passed through whole", () => {
@@ -1525,6 +1615,1373 @@ describe("lite lint scanner", () => {
         factory: (ctx, { client }) => ctx.exec({ fn: () => client.send(msg), name: "client.send", params: [] }),
       })
     `)).toEqual([])
+  })
+
+  it("finds ctx.exec functions that hide flow input from params", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const bearer = ctx.input.bearer
+          return ctx.exec({
+            name: "client.send",
+            fn: () => client.send(bearer),
+            params: [],
+          })
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("finds direct ctx input closed over by ctx.exec functions", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.exec({
+          name: "client.send",
+          fn: () => client.send(ctx.input),
+          params: [],
+        }),
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("allows captured values when params records the real input", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const bearer = ctx.input.bearer
+          return ctx.exec({
+            name: "client.send",
+            fn: () => client.send(bearer),
+            params: [bearer],
+          })
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("allows real ctx.exec inputs in params and true zero-argument calls", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const bearer = ctx.input.bearer
+          return Promise.all([
+            ctx.exec({
+              name: "client.send",
+              fn: (_ctx, value) => client.send(value),
+              params: [bearer],
+            }),
+            ctx.exec({
+              name: "client.ping",
+              fn: () => client.ping(),
+              params: [],
+            }),
+          ])
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("does not treat the variable receiving ctx.exec output as an input capture", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: async (ctx, { client }) => {
+          const keys = await ctx.exec({
+            name: "client.keys",
+            fn: () => client.keys(),
+            params: [],
+          })
+          return keys
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("does not treat an earlier block-local binding as visible exec input", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          if (ctx.input.cached) {
+            const handle = ctx.input.handle
+            client.remember(handle)
+          }
+          return ctx.exec({
+            name: "client.send",
+            fn: () => client.send(ctx.input.handle),
+            params: [ctx.input.handle],
+          })
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("keeps unrelated ctx input paths distinct", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.exec({
+          name: "client.send",
+          fn: () => client.send(ctx.input.bearer, ctx.input.accountId),
+          params: [ctx.input.bearer],
+        }),
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("does not treat property names as captures", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const request = ctx.input.request
+          client.remember(request)
+          return ctx.exec({
+            name: "client.request",
+            fn: () => client.request(),
+            params: [],
+          })
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("ignores exec calls on a shadowed ctx receiver", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const request = ctx.input.request
+          return [client].map((ctx) => ctx.exec({
+            name: "client.request",
+            fn: () => client.request(request),
+            params: [],
+          }))
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("does not retain ended loop or catch bindings as visible inputs", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const item = "module"
+      const problem = "module"
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          for (const item of ctx.input.items) client.remember(item)
+          try {
+            client.prepare()
+          } catch (problem) {
+            client.remember(problem)
+          }
+          return ctx.exec({
+            name: "client.request",
+            fn: () => client.request(item, problem),
+            params: [],
+          })
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("scans method shorthand exec functions", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.exec({
+          name: "client.send",
+          fn(_ctx) {
+            return client.send(ctx.input)
+          },
+          params: [],
+        }),
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("scans exec function parameter initializers", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.exec({
+          name: "client.send",
+          fn: (_ctx, value = ctx.input.secret) => client.send(value),
+          params: [],
+        }),
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("does not treat discarded or function-wrapped params values as supplied", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const bearer = ctx.input.bearer
+          return Promise.all([
+            ctx.exec({
+              name: "client.discarded",
+              fn: () => client.send(bearer),
+              params: [void bearer],
+            }),
+            ctx.exec({
+              name: "client.wrapped",
+              fn: () => client.send(bearer),
+              params: [() => bearer],
+            }),
+          ])
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params", "pumped/no-hidden-exec-params"])
+  })
+
+  it("finds captures local to a callback containing ctx.exec", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.input.items.map((item) => {
+          const prepared = item.value
+          return ctx.exec({
+            name: "client.send",
+            fn: () => client.send(prepared),
+            params: [],
+          })
+        }),
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("keeps wrapped ctx input paths distinct", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      interface Input {
+        bearer: string
+        accountId: string
+      }
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.exec({
+          name: "client.send",
+          fn: () => client.send((ctx.input as Input).accountId),
+          params: [(ctx.input as Input).bearer],
+        }),
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("scans parenthesized and asserted inline functions", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => Promise.all([
+          ctx.exec({
+            name: "client.parenthesized",
+            fn: (() => client.send(ctx.input.secret)),
+            params: [],
+          }),
+          ctx.exec({
+            name: "client.asserted",
+            fn: (() => client.send(ctx.input.secret)) as (() => unknown),
+            params: [],
+          }),
+        ]),
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params", "pumped/no-hidden-exec-params"])
+  })
+
+  it("keeps a local capture that shadows a dependency", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          if (!ctx.input.override) return client.send()
+          const client = ctx.input.override
+          return ctx.exec({
+            name: "client.override",
+            fn: () => client.send(),
+            params: [],
+          })
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("matches immutable ctx aliases to their source path", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const bearer = ctx.input.bearer
+          return ctx.exec({
+            name: "client.send",
+            fn: () => client.send(bearer),
+            params: [ctx.input.bearer],
+          })
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("ignores type-only references to execution input", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const bearer = ctx.input.bearer
+          return ctx.exec({
+            name: "client.send",
+            fn: () => {
+              const value = null as unknown as typeof bearer
+              return client.send(value)
+            },
+            params: [],
+          })
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("normalizes equivalent dot and bracket paths", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.exec({
+          name: "client.send",
+          fn: () => client.send(ctx.input.bearer),
+          params: [ctx.input["bearer"]],
+        }),
+      })
+    `)).toEqual([])
+  })
+
+  it("scans computed destructuring keys in exec parameters", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const key = ctx.input.key
+          return ctx.exec({
+            name: "client.send",
+            fn: (_ctx, { [key]: value }) => client.send(value),
+            params: [{}],
+          })
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("ignores static renamed destructuring keys", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const bearer = ctx.input.bearer
+          client.remember(bearer)
+          return ctx.exec({
+            name: "client.send",
+            fn: (_ctx, input) => {
+              const { bearer: value } = input
+              return client.send(value)
+            },
+            params: [{ bearer: "fixed" }],
+          })
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("distinguishes computed member paths from static bracket-like keys", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const key = "bearer"
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.exec({
+          name: "client.send",
+          fn: () => client.send(ctx.input[key]),
+          params: [ctx.input["[key]"]],
+        }),
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("scans method and transparently wrapped unit factories", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const first = flow({
+        deps: { client },
+        factory(ctx, { client }) {
+          return ctx.exec({ fn: () => client.send(ctx.input.secret), params: [] })
+        },
+      })
+      const second = flow({
+        deps: { client },
+        factory: ((ctx, { client }) => ctx.exec({
+          fn: () => client.send(ctx.input.secret),
+          params: [],
+        })) satisfies Function,
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params", "pumped/no-hidden-exec-params"])
+  })
+
+  it("scans transparent wrappers around ctx exec options and params", () => {
+    expect(ids(`
+      import { flow, type ExecutionContext } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => Promise.all([
+          (ctx as ExecutionContext).exec({ fn: () => client.send(ctx.input.secret), params: [] }),
+          ctx.exec(({ fn: () => client.send(ctx.input.secret), params: [] }) satisfies object),
+          ctx.exec({ fn: () => client.send(ctx.input.secret), params: ([] as unknown[]) }),
+        ]),
+      })
+    `)).toEqual([
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+    ])
+  })
+
+  it("ignores named function self bindings and hoisted local functions", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx) => {
+          const recur = ctx.input.recur
+          const helper = ctx.input.helper
+          return Promise.all([
+            ctx.exec({ fn: function recur(): unknown { return recur() }, params: [] }),
+            ctx.exec({
+              fn: () => {
+                return helper()
+                function helper() { return "local" }
+              },
+              params: [],
+            }),
+          ])
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("ignores immutable aliases of declared dependencies", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const api = client
+          return ctx.exec({ fn: () => api.send(), params: [] })
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("matches static destructured ctx aliases to source paths", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const { auth: { bearer }, accounts: [account] } = ctx.input
+          return Promise.all([
+            ctx.exec({ fn: () => client.send(bearer), params: [ctx.input.auth.bearer] }),
+            ctx.exec({ fn: () => client.send(account), params: [ctx.input.accounts[0]] }),
+          ])
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("scans runtime class heritage expressions", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const make = flow({
+        factory: (ctx) => {
+          const Base = ctx.input.Base
+          return ctx.exec({ fn: () => class extends Base {}, params: [] })
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("ignores JSX intrinsic and attribute names but scans component values", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const render = flow({
+        factory: (ctx) => {
+          const div = ctx.input.div
+          const title = ctx.input.title
+          const Widget = ctx.input.Widget
+          return Promise.all([
+            ctx.exec({ fn: () => <div title="fixed" />, params: [] }),
+            ctx.exec({ fn: () => <Widget title="fixed" />, params: [] }),
+          ])
+        },
+      })
+    `, "src/example.tsx")).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("requires member call receivers instead of unbound method values", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx) => {
+          const receiver = ctx.input.receiver
+          return ctx.exec({
+            fn: () => receiver.run(),
+            params: [receiver.run],
+          })
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("finds captures from containing method parameters", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ({
+          run(item: string) {
+            return ctx.exec({ fn: () => client.send(item), params: [] })
+          },
+        }).run(ctx.input.secret),
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("follows value-preserving literal spreads in params", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const bearer = ctx.input.bearer
+          return Promise.all([
+            ctx.exec({ fn: () => client.send(bearer), params: [...[bearer]] }),
+            ctx.exec({ fn: () => client.send(bearer), params: [{ ...{ bearer } }] }),
+          ])
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("does not equate separately evaluated computed member paths", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client, nextKey } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.exec({
+          fn: () => client.send(ctx.input[nextKey()]),
+          params: [ctx.input[nextKey()]],
+        }),
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("requires receivers for bracketed wrapped and tagged member invocations", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx) => {
+          const receiver = ctx.input.receiver
+          return Promise.all([
+            ctx.exec({ fn: () => receiver["run"](), params: [receiver["run"]] }),
+            ctx.exec({ fn: () => (receiver.run)(), params: [receiver.run] }),
+            ctx.exec({ fn: () => receiver.tag\`fixed\`, params: [receiver.tag] }),
+          ])
+        },
+      })
+    `)).toEqual([
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+    ])
+  })
+
+  it("matches literal-computed destructuring and negative numeric keys", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const { ["bearer"]: bearer } = ctx.input
+          return Promise.all([
+            ctx.exec({ fn: () => client.send(bearer), params: [ctx.input.bearer] }),
+            ctx.exec({ fn: () => client.send(ctx.input[-1]), params: [ctx.input["-1"]] }),
+          ])
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("ignores JSX namespace accessor and enum member names", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const render = flow({
+        factory: (ctx) => {
+          const svg = ctx.input.svg
+          const xml = ctx.input.xml
+          const secret = ctx.input.secret
+          return ctx.exec({
+            fn: () => [
+              <svg:path xml:lang="en" />,
+              { get secret() { return "fixed" } },
+              class { static value = (() => { enum E { secret }; return E })() },
+            ],
+            params: [],
+          })
+        },
+      })
+    `, "src/example.tsx")).toEqual([])
+  })
+
+  it("scans transparently wrapped creator configs", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow(({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.exec({
+          fn: () => client.send(ctx.input.secret),
+          params: [],
+        }),
+      }) satisfies object)
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("finds later outer bindings captured by deferred nested functions", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const invoke = () => ctx.exec({ fn: () => client.send(secret), params: [] })
+          const secret = ctx.input.secret
+          return invoke()
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("ignores containing function and class declarations that shadow inputs", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx) => {
+          const helper = ctx.input.helper
+          const Model = ctx.input.Model
+          function invoke() {
+            function helper() { return "local" }
+            class Model {}
+            return Promise.all([
+              ctx.exec({ fn: () => helper(), params: [] }),
+              ctx.exec({ fn: () => Model, params: [] }),
+            ])
+          }
+          return invoke()
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("ignores named class expression self bindings", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx) => {
+          const Model = ctx.input.Model
+          return ctx.exec({
+            fn: () => class Model { static copy = Model },
+            params: [],
+          })
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("selects the nearest visible binding independent of traversal order", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const invoke = () => {
+            const value = ctx.input.inner
+            return Promise.all([
+              ctx.exec({ fn: () => client.send(value), params: [ctx.input.inner] }),
+              ctx.exec({ fn: () => client.send(value), params: [] }),
+            ])
+          }
+          const value = ctx.input.outer
+          return invoke()
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("scans executions through inline exec function contexts", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => Promise.all([
+          ctx.exec({
+            fn: (innerCtx, value) => innerCtx.exec({
+              fn: () => client.send(value),
+              params: [],
+            }),
+            params: [ctx.input.value],
+          }),
+          ctx.exec({
+            fn(innerCtx, value) {
+              return innerCtx.exec({
+                fn: () => client.send(value),
+                params: [],
+              })
+            },
+            params: [ctx.input.value],
+          }),
+        ]),
+      })
+    `)).toEqual([
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+    ])
+  })
+
+  it("keeps ancestor execution contexts in nested edge provenance", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const missing = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.exec({
+          fn: (innerCtx) => innerCtx.exec({
+            fn: () => client.send(ctx.input.secret),
+            params: [],
+          }),
+          params: [ctx.input.secret],
+        }),
+      })
+      const supplied = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const secret = ctx.input.secret
+          return ctx.exec({
+            fn: (innerCtx) => innerCtx.exec({
+              fn: () => client.send(secret),
+              params: [ctx.input.secret],
+            }),
+            params: [secret],
+          })
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("scans static-computed factory and exec option names", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        ["factory"]: (ctx, { client }) => ctx["exec"]({
+          ["fn"]: () => client.send(ctx.input.secret),
+          ["params"]: [],
+        }),
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("preserves member receivers through generic instantiation wrappers", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx) => {
+          const receiver = ctx.input.receiver
+          return ctx.exec({
+            fn: () => (receiver.run<string>)(),
+            params: [receiver.run],
+          })
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("scans effective options through inline literal spreads", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const first = flow({
+        deps: { client },
+        ...{
+          factory: (ctx, { client }) => ctx.exec({
+            ...{ fn: () => client.send(ctx.input.secret) },
+            params: [],
+          }),
+        },
+      })
+      const second = flow({
+        deps: { client },
+        factory: (ctx, { client }) => ctx.exec({
+          fn: () => client.send(ctx.input.secret),
+          ...{ params: [] },
+        }),
+      })
+      const safe = flow({
+        ...{ factory: (ctx) => ctx.exec({ fn: () => ctx.input.secret, params: [] }) },
+        factory: () => "fixed",
+      })
+    `)).toEqual([
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+    ])
+  })
+
+  it("tracks object property overwrites in params", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client, override } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const value = ctx.input.value
+          return Promise.all([
+            ctx.exec({ fn: () => client.send(value), params: [{ value, ...override() }] }),
+            ctx.exec({ fn: () => client.send(value), params: [{ value, ...{ value: "fixed" } }] }),
+            ctx.exec({ fn: () => client.send(value), params: [{ ...override(), value }] }),
+            ctx.exec({ fn: () => client.send(value), params: [{ ...{ value: "fixed" }, value }] }),
+          ])
+        },
+      })
+    `)).toEqual([
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+    ])
+  })
+
+  it("tracks dynamic property overwrites in params", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const value = ctx.input.value
+          return Promise.all([
+            ctx.exec({
+              fn: () => client.send(value),
+              params: [{ [ctx.input.key]: value, value: "fixed" }],
+            }),
+            ctx.exec({
+              fn: () => client.send(value),
+              params: [{ value: "fixed", [ctx.input.key]: value }],
+            }),
+            ctx.exec({
+              fn: () => client.send(value),
+              params: [{ [ctx.input.key]: value }],
+            }),
+          ])
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("ignores runtime enum bindings that shadow input aliases", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx) => {
+          const State = ctx.input.State
+          {
+            enum State { Fixed }
+            return ctx.exec({ fn: () => State.Fixed, params: [] })
+          }
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("uses one lexical scope for unbraced switch clauses", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          const helper = ctx.input.helper
+          switch (ctx.input.kind) {
+            case "a":
+              function helper() { return "fixed" }
+            case "b":
+              return ctx.exec({ fn: () => client.send(helper()), params: [] })
+          }
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("finds later bindings captured by deferred instance fields", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+      import { client } from "./ports"
+
+      const send = flow({
+        deps: { client },
+        factory: (ctx, { client }) => {
+          class Runner {
+            result = ctx.exec({ fn: () => client.send(value), params: [] })
+          }
+          const value = ctx.input.value
+          return new Runner()
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
+  })
+
+  it("ignores meta-property names when collecting captures", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const inspect = flow({
+        factory: (ctx) => {
+          const target = ctx.input.target
+          const meta = ctx.input.meta
+          return ctx.exec({
+            fn: function () {
+              return [new.target, import.meta.url]
+            },
+            params: [],
+          })
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("honors later lexical declarations inside deferred closures", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const inspect = flow({
+        factory: (ctx) => {
+          const secret = ctx.input.secret
+          return Promise.all([
+            ctx.exec({
+              fn: () => {
+                const read = () => secret
+                let secret = "local"
+                return read()
+              },
+              params: [],
+            }),
+            ctx.exec({
+              fn: () => {
+                const read = () => secret
+                if (ctx.input.enabled) {
+                  var secret = "local"
+                }
+                return read()
+              },
+              params: [ctx.input.enabled],
+            }),
+            ctx.exec({
+              fn: () => {
+                const read = () => secret
+                class secret {}
+                return read()
+              },
+              params: [],
+            }),
+          ])
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("finds enclosing parameter captures in effective factory shapes", () => {
+    const ruleIds = ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      export function make(secret: string) {
+        const first = flow({
+          factory() {
+            return secret
+          },
+        })
+        const second = flow({
+          factory: ((ctx) => secret) satisfies Function,
+        })
+        return [first, second]
+      }
+    `)
+    expect(ruleIds.filter((ruleId) => ruleId === "pumped/config-via-tags")).toEqual([
+      "pumped/config-via-tags",
+      "pumped/config-via-tags",
+    ])
+  })
+
+  it("does not suppress captures that share enclosing declaration names", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const send = flow({
+        factory: (ctx) => {
+          const send = ctx.input.send
+          return ctx.exec({ fn: () => send(), params: [] })
+        },
+      })
+      const method = flow({
+        factory(ctx) {
+          const factory = ctx.input.factory
+          return ctx.exec({ fn: () => factory(), params: [] })
+        },
+      })
+    `)).toEqual([
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+    ])
+  })
+
+  it("resolves raw flow dependencies by lexical declaration", () => {
+    const ruleIds = ids(`
+      import { atom, flow } from "@pumped-fn/lite"
+
+      const child = flow({ factory: () => "child" })
+      function make(child: unknown) {
+        return flow({ deps: { child }, factory: () => "parameter" })
+      }
+      {
+        const child = atom({ factory: () => "atom" })
+        const local = flow({ deps: { child }, factory: () => "local" })
+      }
+      const wrapped = (flow({ factory: () => "wrapped" }) satisfies object)
+      const parent = flow({ deps: { wrapped }, factory: () => "parent" })
+      function build() {
+        return flow({ deps: { later }, factory: () => "deferred" })
+      }
+      const later = flow({ factory: () => "later" })
+      const deferred = build()
+    `)
+    expect(ruleIds.filter((ruleId) => ruleId === "pumped/no-direct-flow-composition")).toEqual([
+      "pumped/no-direct-flow-composition",
+      "pumped/no-direct-flow-composition",
+    ])
+  })
+
+  it("respects shadowing in factory capture and deps-member checks", () => {
+    const ruleIds = ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      export function make(options: string) {
+        const first = flow({ factory(options) { return options } })
+        const second = flow({
+          factory: () => {
+            const use = (options: string) => options
+            return use("fixed")
+          },
+        })
+        return [first, second]
+      }
+      const mapped = flow({
+        factory(ctx, deps) {
+          return [ctx.input].map((deps) => deps.value)
+        },
+      })
+    `)
+    expect(ruleIds.filter((ruleId) =>
+      ruleId === "pumped/config-via-tags" || ruleId === "pumped/prefer-destructured-deps"
+    )).toEqual([])
+  })
+
+  it("ignores calls through bindings that shadow creator imports", () => {
+    const ruleIds = ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      export function build(flow: (value: object) => unknown) {
+        const child = flow({ factory: () => "child" })
+        return flow({ deps: { child }, factory: () => "parent" })
+      }
+    `)
+    expect(ruleIds.filter((ruleId) =>
+      ruleId === "pumped/no-direct-flow-composition"
+      || ruleId === "pumped/no-handle-factory"
+      || ruleId === "pumped/config-via-tags"
+    )).toEqual([])
+  })
+
+  it("finds enclosing captures in factory parameter evaluation", () => {
+    const ruleIds = ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      export function make(options: object) {
+        const first = flow({
+          factory: (_ctx, deps = options) => deps,
+        })
+        const second = flow({
+          factory: (_ctx, { [options.toString()]: value } = {}) => value,
+        })
+        return [first, second]
+      }
+    `)
+    expect(ruleIds.filter((ruleId) => ruleId === "pumped/config-via-tags")).toEqual([
+      "pumped/config-via-tags",
+      "pumped/config-via-tags",
+    ])
+  })
+
+  it("finds bracketed member reads on identifier deps", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const first = flow({
+        factory(ctx, deps) {
+          return deps["port"](ctx.input)
+        },
+      })
+      const second = flow({
+        factory(ctx, deps) {
+          return deps[ctx.input.key]
+        },
+      })
+    `)).toEqual([
+      "pumped/prefer-destructured-deps",
+      "pumped/prefer-destructured-deps",
+    ])
+  })
+
+  it("respects setter parameter shadowing", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      declare function sink(value: unknown): unknown
+
+      const inspect = flow({
+        factory: (ctx) => {
+          const value = ctx.input.value
+          return ctx.exec({
+            fn: () => ({
+              set value(value) {
+                sink(value)
+              },
+              set context(ctx) {
+                ctx.exec({ fn: () => value, params: [] })
+              },
+            }),
+            params: [value],
+          })
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("excludes destructured bindings initialized by the exec call", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const inspect = flow({
+        factory: (ctx) => {
+          const [task] = [ctx.exec({
+            fn: async () => {
+              await 0
+              return task
+            },
+            params: [],
+          })]
+          const { result } = { result: ctx.exec({
+            fn: async () => {
+              await 0
+              return result
+            },
+            params: [],
+          }) }
+          return [task, result]
+        },
+      })
+    `)).toEqual([])
+  })
+
+  it("scans defaults nested in exec parameter bindings", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const inspect = flow({
+        factory: (ctx) => Promise.all([
+          ctx.exec({
+            fn: (_inner, { value = ctx.input.secret } = {}) => value,
+            params: [{}],
+          }),
+          ctx.exec({
+            fn: (_inner, [value = ctx.input.secret] = []) => value,
+            params: [[]],
+          }),
+        ]),
+      })
+    `)).toEqual([
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+    ])
+  })
+
+  it("requires member receivers for writes updates and deletes", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const mutate = flow({
+        factory: (ctx) => {
+          const state = ctx.input.state
+          return Promise.all([
+            ctx.exec({ fn: () => state.secret = "fixed", params: [state.secret] }),
+            ctx.exec({ fn: () => state.count++, params: [state.count] }),
+            ctx.exec({ fn: () => delete state["secret"], params: [state.secret] }),
+            ctx.exec({ fn: () => state.nested.secret = "fixed", params: [state.nested.secret] }),
+            ctx.exec({ fn: () => [state.secret] = ["fixed"], params: [state.secret] }),
+            ctx.exec({ fn: () => ({ value: state.secret } = { value: "fixed" }), params: [state.secret] }),
+            ctx.exec({ fn: () => { for (state.secret of ["fixed"]) {} }, params: [state.secret] }),
+            ctx.exec({ fn: () => { for (state.secret in { fixed: true }) {} }, params: [state.secret] }),
+          ])
+        },
+      })
+    `)).toEqual([
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+      "pumped/no-hidden-exec-params",
+    ])
+  })
+
+  it("respects implicit arguments bindings in non-arrow exec functions", () => {
+    expect(ids(`
+      import { flow } from "@pumped-fn/lite"
+
+      const inspect = flow({
+        factory: (ctx) => {
+          const arguments = ctx.input.arguments
+          return Promise.all([
+            ctx.exec({ fn: function () { return arguments.length }, params: [] }),
+            ctx.exec({ fn() { return arguments.length }, params: [] }),
+            ctx.exec({ fn: () => arguments.length, params: [] }),
+          ])
+        },
+      })
+    `)).toEqual(["pumped/no-hidden-exec-params"])
   })
 
 })
