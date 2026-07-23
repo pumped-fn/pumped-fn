@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/sdk-claude",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": false,
   "description": "Claude CLI model provider for @pumped-fn/sdk",
   "type": "module",

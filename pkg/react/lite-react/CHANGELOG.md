@@ -1,5 +1,11 @@
 # @pumped-fn/lite-react
 
+## 3.0.0
+
+### Major Changes
+
+- 2e95323: Move Lite React to the Lite 6 lifecycle contract. Managed execution contexts and scoped values use structured cleanup, public hook options carry complete documentation, and the package now requires Lite 6.
+
 ## 2.3.1
 
 ### Patch Changes

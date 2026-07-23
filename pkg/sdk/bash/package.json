@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/sdk-just-bash",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": false,
   "description": "just-bash sandbox provider for @pumped-fn/sdk",
   "type": "module",

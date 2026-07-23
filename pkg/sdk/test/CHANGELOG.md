@@ -1,5 +1,16 @@
 # @pumped-fn/sdk-test
 
+## 3.0.0
+
+### Major Changes
+
+- 2e95323: Keep the existing workflow test exports and add module-level scalar-model, streaming-attempt, and session-store stubs for the resource-backed session kernel. Tests now own their `createScope` composition and current-owned session context explicitly; helpers do not create or cache a scope.
+
+### Patch Changes
+
+- Updated dependencies [2e95323]
+  - @pumped-fn/lite-extension-suspense@1.1.2
+
 ## 2.0.0
 
 ### Minor Changes

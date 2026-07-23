@@ -1,5 +1,11 @@
 # @pumped-fn/lite-hono
 
+## 0.2.2
+
+### Patch Changes
+
+- 2e95323: Document exported interfaces and align callback registrations with Lite's explicit trailing-parameter contract. Compatible packages widen their peer ranges to include Lite 6 and the Lite React 3.0 release line.
+
 ## 0.2.1
 
 ### Patch Changes

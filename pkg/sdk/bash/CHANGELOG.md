@@ -1,5 +1,13 @@
 # @pumped-fn/sdk-just-bash
 
+## 3.0.0
+
+### Major Changes
+
+- 2e95323: Replace the sandbox method bag with session-mediated read, write, and exec port flows. Add explicit authority, readiness, workspace, and engine resources with cancellation, timeout, output-cap, path, command, and session-isolation checks.
+
+  The exec port is stream-compatible, while the just-bash backend emits at most one buffered stdout event and one buffered stderr event after command completion.
+
 ## 2.0.0
 
 ### Patch Changes
