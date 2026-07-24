@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/sdk-mcp",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "private": false,
   "description": "Expose pumped-fn flows as an MCP server",
   "type": "module",

@@ -1,5 +1,11 @@
 # @pumped-fn/lite-extension-logging
 
+## 1.0.0
+
+### Major Changes
+
+- 2e95323: Adopt Lite 6 structured cleanup and listener registration with explicit callback parameters. These packages now require Lite 6 and graduate their pre-1.0 release lines to 1.0.
+
 ## 0.3.0
 
 ### Minor Changes

@@ -1,5 +1,12 @@
 # @pumped-fn/lite-hmr
 
+## 1.0.2
+
+### Patch Changes
+
+- b10849f: Publish Lite HMR so `@pumped-fn/pumped` resolves its runtime dependency from npm.
+- 2e95323: Document exported interfaces and align callback registrations with Lite's explicit trailing-parameter contract. Compatible packages widen their peer ranges to include Lite 6 and the Lite React 3.0 release line.
+
 ## 1.0.1
 
 ### Patch Changes

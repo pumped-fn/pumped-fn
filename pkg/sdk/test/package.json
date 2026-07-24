@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/sdk-test",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": false,
   "description": "In-memory test helpers for @pumped-fn/sdk",
   "type": "module",

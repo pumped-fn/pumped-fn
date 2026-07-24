@@ -1,5 +1,16 @@
 # @pumped-fn/pumped
 
+## 0.2.1
+
+### Patch Changes
+
+- 2e95323: Document exported interfaces and align callback registrations with Lite's explicit trailing-parameter contract. Compatible packages widen their peer ranges to include Lite 6 and the Lite React 3.0 release line.
+- Updated dependencies [b10849f]
+- Updated dependencies [2e95323]
+- Updated dependencies [2e95323]
+  - @pumped-fn/lite-hmr@1.0.2
+  - @pumped-fn/lite-extension-scheduler@1.0.0
+
 ## 0.2.0
 
 ### Minor Changes
