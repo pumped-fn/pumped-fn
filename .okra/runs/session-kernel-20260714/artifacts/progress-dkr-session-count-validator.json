@@ -1,0 +1,15 @@
+{
+  "type": "worker_progress",
+  "worker_id": "DKR-SESSION-COUNT-VALIDATOR",
+  "unit_id": "DKR-SESSION-1",
+  "status": "finished",
+  "observed_at": "2026-07-14T08:12:26Z",
+  "assignment": "Replay the corrected exact case set.",
+  "evidence_refs_or_hashes": [
+    "sha256:f6e664168b0dd6f3c56a80a4ec139267a0a9a35a341172e41594b495acfc3fb8",
+    "ledger.jsonl#seq=24"
+  ],
+  "result": "29 exact keys, all true, no missing or extra keys.",
+  "accepted_claims": 1,
+  "rejected_claims": 0
+}

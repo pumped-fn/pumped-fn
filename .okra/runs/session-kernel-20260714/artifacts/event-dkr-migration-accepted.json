@@ -1,0 +1,15 @@
+{
+  "type": "checkpoint_accepted",
+  "unit_id": "DKR-MIGRATION-1",
+  "checkpoint_id": "checkpoint.DKR-MIGRATION-1.accepted",
+  "observed_at": "2026-07-14T09:41:00Z",
+  "decision": "accepted_sdk_3_session_kernel_migration_promote_implementation_pkrs",
+  "evidence_refs_or_hashes": [
+    "sha256:0a978a1c1711ad098dbfa710db06b5564b02e05a3fbc6eac96c59e412506eaa2",
+    "sha256:0773bd6dd49b1e0d041a441c64e506ea056a8a556f728085969fa62a1ba4f07f",
+    "sha256:1dfbb62e58c1da8ed29d27616c02502e8eb10e9c891bcbda23c09044c644b1b5",
+    "sha256:11b6a57204f85ac55c850939c8e36ae72723bb5db51156a55c0e1c9be5465a19",
+    "sha256:be227f27eb2044e6464c85284a431cb1413a7ce96a655e80fa0ec99e80ba19c7"
+  ],
+  "self_acceptance": false
+}

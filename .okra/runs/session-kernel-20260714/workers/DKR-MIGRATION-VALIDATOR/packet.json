@@ -1,0 +1,53 @@
+{
+  "role_header": "# Role: OKRA validator (verification worker)",
+  "model_phrasing": {
+    "detected_id": "GPT-5.x",
+    "source": "system prompt",
+    "phrasing_profile_id": "RTM-PH6OCQ6MX4"
+  },
+  "frame": {
+    "objective": "Open one reviewed successor PR for the resource-native session kernel.",
+    "active_anti_goals": [
+      "AG-LIFECYCLE-USE",
+      "AG-LIFECYCLE-EFFECT",
+      "AG-LIFECYCLE-JOIN",
+      "AG-ACTIVE-TURN",
+      "AG-TOOLS-READY",
+      "AG-TOOL-SNAPSHOT",
+      "AG-AUTHORITY",
+      "AG-IMPLICIT",
+      "AG-HIDDEN-EDGE",
+      "AG-SCOPE-SEAM",
+      "AG-MCP",
+      "AG-BREAKING",
+      "AG-INDEPENDENCE",
+      "AG-LEVEL",
+      "AG-STORAGE"
+    ],
+    "forbidden": [
+      "Product edits",
+      "MCP or automatic tool collection",
+      "Self-acceptance",
+      "Changing the candidate contract"
+    ]
+  },
+  "current_state": {
+    "run_id": "session-kernel-20260714",
+    "candidate_contract": "artifacts/dkr-migration-contract.md",
+    "candidate_contract_sha256": "f7dcadcb6b444a86ab097fe03fad34713fbdcb4184c9ff9be502175f9f4e23a7",
+    "candidate_checkpoint": "artifacts/dkr-migration-checkpoint-candidate.json",
+    "candidate_checkpoint_sha256": "4c056db923c505dd48a78644f5ddab68932584a84b1c36c26bbdb6408c9847f4",
+    "provider_matrix": "artifacts/dkr-provider-capability-matrix.md",
+    "provider_matrix_sha256": "8b045a8c24f2a1eac5e9e534efc700f22f0339edc71a305bf47742e307965386",
+    "provider_replay": "replay/dkr-provider-capabilities.sh",
+    "provider_replay_sha256": "3cd21e9f7f4b5370e9c10f01f8887a516d399baaba1babb112ffdfc08d767c5d"
+  },
+  "assignment": "Independently validate DKR-MIGRATION-1. Replay the provider capability script twice and compare the semantic results. Run the executable checkpoint checker, plain-wording checker, hashes, and store verify. Audit the proposed TypeScript declarations against public Lite types and the current SDK/provider source. Challenge the package subpaths, no-duplicate-loop migration, Standard Schema generic coherence, session admission/finish ordering, inert flow definitions, authority rebinding, root pre-resolution, scalar Model compatibility, streaming bridge, Claude abort isolation, Codex correlation, pi stream path, database-analysis example, changeset, and every active wall. Reject any API that cannot compile as declared, any provider claim not backed by current source, or any hidden effect. Do not edit or repair.",
+  "budget_and_stop_rule": {
+    "turns": 1,
+    "time_min": 30,
+    "stop": "Stop after the source audit and deterministic replays; return exact blockers if any."
+  },
+  "hand_back_rule": "Use exact audit-trace blocks. Distinguish candidate design gaps from implementation work. No self-acceptance.",
+  "output_schema": "Exact claims, commands, exit codes, hashes, observed_at, accepted/rejected decisions, and final totals."
+}

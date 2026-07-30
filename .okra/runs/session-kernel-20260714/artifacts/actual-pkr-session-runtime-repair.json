@@ -1,0 +1,11 @@
+{
+  "type": "estimation_record",
+  "phase": "actual",
+  "unit_id": "PKR-SESSION-RUNTIME-REPAIR",
+  "actual": {
+    "time_min": 51,
+    "turns": 2,
+    "tokens": null
+  },
+  "observed_at": "2026-07-14T10:51:00Z"
+}

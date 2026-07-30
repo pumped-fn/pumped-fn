@@ -1,0 +1,11 @@
+{
+  "event_type": "rework_event",
+  "unit_id": "DKR-SESSION-1",
+  "observed_at": "2026-07-14T08:12:00Z",
+  "evidence_refs_or_hashes": [
+    "artifacts/dkr-session-validation-2.md",
+    "workers/DKR-SESSION-PROBE-2/progress.jsonl#seq=1",
+    "workers/DKR-SESSION-VALIDATOR-2/progress.jsonl#seq=1"
+  ],
+  "cause": "The revision packet and writer report counted 30 cases; the complete emitted key set contains 29."
+}

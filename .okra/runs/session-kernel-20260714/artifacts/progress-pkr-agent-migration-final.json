@@ -1,0 +1,31 @@
+{
+  "type": "worker_progress",
+  "worker_id": "PKR-AGENT-MIGRATION",
+  "unit_id": "PKR-AGENT-MIGRATION",
+  "status": "finished",
+  "observed_at": "2026-07-14T10:51:00Z",
+  "assignment": "Replace the Agent facade with explicit role, tool, turn, work, and attempt graph definitions; migrate pumped and the canonical database-analysis proof.",
+  "evidence_refs_or_hashes": [
+    "sha256:0a978a1c1711ad098dbfa710db06b5564b02e05a3fbc6eac96c59e412506eaa2",
+    "pkg/sdk/core/src/agent.ts",
+    "pkg/sdk/core/tests/database-analysis.test.ts",
+    "pkg/framework/pumped/tests/agent.test.ts",
+    "examples/invoice-triage/vitest.config.ts"
+  ],
+  "checks": [
+    "agent_role_tool_turn_database_analysis=pass",
+    "tool_schema_validation_and_authority_recheck=pass",
+    "scalar_and_streaming_attempt_dispatch=pass",
+    "skill_tool_and_subagent_invocation_lifecycle=pass",
+    "pumped_tests=45/45_pass",
+    "invoice_triage_tests=23/23_pass",
+    "package_export_types=pass",
+    "esm_and_cjs_subpath_imports=pass",
+    "root_lint=pass",
+    "direct_sdk_lint_exact_diagnostic_gate=pass"
+  ],
+  "unknowns": [
+    "The monorepo test sweep has an unchanged lite-perf browser benchmark failure from duplicate React hook state; changed SDK packages and all dependent migration proofs pass independently."
+  ],
+  "self_acceptance": false
+}

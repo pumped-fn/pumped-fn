@@ -1,0 +1,70 @@
+{
+  "type": "steering_checkin",
+  "checkin_id": "checkin.DKR-SESSION-1.revise.20260714T075704Z",
+  "round": 2,
+  "observed_at": "2026-07-14T07:57:04Z",
+  "frame_hash": "4fabdff43b4868fbbbeabcbb300dcf8814073ca4490328ebc9bd245baa6f5ecc",
+  "tree_hash": "746bab24796bed07b27c6fc9a6ee4d855034d3fc8c882fc59c70eeeb8e367294",
+  "inbound_signal": "The deterministic validator accepted the narrow 12-case probe but the isolated Claude Opus 4.8 review returned REVISE with three load-bearing unproven claims.",
+  "decision_delta": "Keep DKR-SESSION-1 active, leave every CKR and PKR unpromoted, and fund DKR-SESSION-PROBE-2 for authority resume and fork, in-flight finish joining, real interrupt abort and join, and the remaining conformance reads.",
+  "expected_effect": "Prevent implementation from descending while active-turn joining, steering settlement, or resumed authority could still force a Lite or kernel redesign.",
+  "affected_units": [
+    "DKR-SESSION-1",
+    "DKR-SESSION-PROBE-2",
+    "CKR-SESSION",
+    "CKR-DATABASE"
+  ],
+  "worker_progress_refs": [
+    "workers/DKR-SESSION-CONTRACT/progress.jsonl#seq=1",
+    "workers/DKR-SESSION-PROBE/progress.jsonl#seq=1",
+    "workers/DKR-SESSION-VALIDATOR/progress.jsonl#seq=1"
+  ],
+  "hallucination_sweep": [
+    {
+      "claim": "The first probe proved the full session contract.",
+      "evidence_ref": "artifacts/claude-session-review-isolated.md",
+      "verdict": "rejected-overclaim"
+    }
+  ],
+  "missing_context_sweep": [
+    {
+      "claim": "The independent Claude review was isolated from user-level Claude memory.",
+      "evidence_ref": "artifacts/claude-session-review-isolated.raw.json",
+      "verdict": "credential-only temporary home used; no user settings, history, plans, plugins, or CLAUDE.md copied"
+    }
+  ],
+  "unexpected_results": [
+    {
+      "claim": "The architecture review would allow implementation descent after the narrow probe.",
+      "evidence_ref": "artifacts/claude-session-review-isolated.md",
+      "verdict": "unexpected REVISE; active-turn join and authority resume remain unproven"
+    }
+  ],
+  "anti_goal_violation_review": [
+    {
+      "claim": "Accepting the current checkpoint would violate no-single-LLM-truth and active-turn walls.",
+      "evidence_ref": "artifacts/dkr-session-validation.md",
+      "verdict": "checkpoint remains blocked; no violation accepted"
+    }
+  ],
+  "uncertainty_5why": {
+    "terminal_metric_or_uncertainty_id": "dkr.session_active_join_uncertainty",
+    "reducing_dkr": "DKR-SESSION-PROBE-2",
+    "status": "open"
+  },
+  "problem_restatement": "Prove that a rich SDK session can own semantic work and cooperative settlement without owning physical contexts or requiring hidden Lite behavior.",
+  "evidence_delta": "The core placement passed; three stop-rule claims and six secondary conformance reads did not yet have executable coverage.",
+  "alternatives_considered": [
+    "Promote with P0 gaps deferred to implementation",
+    "Change Lite immediately",
+    "Extend the public-Lite DKR probe before descent"
+  ],
+  "assumptions_at_risk": [
+    "SDK-owned cooperative signals can join every declared invocation",
+    "Fresh authority can be rebound before protected state and capability resolution",
+    "Provider-neutral streaming can share one settlement contract"
+  ],
+  "dkr_decision": "Continue DKR-SESSION-1 with the bounded revision probe; do not change Lite or promote implementation.",
+  "open_flags": [],
+  "next_check_at": "2026-07-14T08:07:04Z"
+}

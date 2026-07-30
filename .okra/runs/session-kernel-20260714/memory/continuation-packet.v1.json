@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "run_id": "session-kernel-20260714",
+  "terminal_state": "stopped_by_human",
+  "continuation_owner": "https://github.com/pumped-fn/pumped-fn/issues/348",
+  "candidate_head": "6a43616936f26c4de946ae116e50c8d8eecaf269",
+  "baseline_head": "d974efe050b953e270c9972700f5dd5f355ba465",
+  "performance_result": "15 confirmed Lite regressions and 31 evidence gaps",
+  "performance_evidence": "artifacts/terminal-performance-comparison-6a436169.json",
+  "sunset_evidence": "sha256:fc57bf02308816197d4573c0bcfa97c3e27da7f6bc8115b6cf5edf76e5c72a02",
+  "standing_anti_goal_count": 19,
+  "next_action": "Use issue #348 to isolate the regression clusters, restore the performance wall, and rerun the same five-pair comparison."
+}

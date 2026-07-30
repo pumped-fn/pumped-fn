@@ -1,0 +1,11 @@
+{
+  "checker_hash": "sha256:7189021c6c626016fb8edb78c1b9ddd472df91d87aa0b387bd9740d98755c048",
+  "evidence_refs_or_hashes": [
+    "sha256:fc57bf02308816197d4573c0bcfa97c3e27da7f6bc8115b6cf5edf76e5c72a02"
+  ],
+  "observed_content_hashes": [
+    "sha256:fc57bf02308816197d4573c0bcfa97c3e27da7f6bc8115b6cf5edf76e5c72a02"
+  ],
+  "passed": true,
+  "schema_version": "okra.replay-evidence.v1"
+}

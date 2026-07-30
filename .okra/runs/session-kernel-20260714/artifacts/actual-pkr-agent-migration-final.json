@@ -1,0 +1,11 @@
+{
+  "type": "estimation_record",
+  "phase": "actual",
+  "unit_id": "PKR-AGENT-MIGRATION",
+  "actual": {
+    "time_min": 70,
+    "turns": 4,
+    "tokens": null
+  },
+  "observed_at": "2026-07-14T10:51:00Z"
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": "session-kernel-terminal-gate.v1",
+  "observed_at": "2026-07-20T10:35:43Z",
+  "run_id": "session-kernel-20260714",
+  "objective": {
+    "metric_id": "session_kernel_pr_ready_count",
+    "value": 1,
+    "target": 1,
+    "status": "held"
+  },
+  "pull_request": {
+    "number": 347,
+    "url": "https://github.com/pumped-fn/pumped-fn/pull/347",
+    "state": "OPEN",
+    "mergeable": "MERGEABLE",
+    "head": "6a43616936f26c4de946ae116e50c8d8eecaf269",
+    "successful_check_count": 7,
+    "failed_check_count": 0
+  },
+  "independent_review": {
+    "reviewer": "sol_xhigh_reviewer",
+    "verdict": "EXCLUDE_TERMINALIZATION",
+    "current_head_reviewed": "6a43616936f26c4de946ae116e50c8d8eecaf269",
+    "confirmed_blocker": "lite_lifecycle_performance_regression_count is not zero"
+  },
+  "terminal_decision": "keep_active"
+}

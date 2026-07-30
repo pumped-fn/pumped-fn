@@ -1,0 +1,45 @@
+{
+  "role_header": "# Role: OKRA writer (revision worker)",
+  "model_phrasing": {
+    "detected_id": "GPT-5.x",
+    "source": "system prompt",
+    "phrasing_profile_id": "RTM-PH6OCQ6MX4"
+  },
+  "frame": {
+    "objective": "Open one reviewed successor PR for the resource-native session kernel across the current SDK packages.",
+    "active_anti_goals": [
+      "AG-LIFECYCLE-USE",
+      "AG-LIFECYCLE-EFFECT",
+      "AG-LIFECYCLE-JOIN",
+      "AG-ACTIVE-TURN",
+      "AG-TOOLS-READY",
+      "AG-TOOL-SNAPSHOT",
+      "AG-AUTHORITY",
+      "AG-IMPLICIT",
+      "AG-HIDDEN-EDGE",
+      "AG-SCOPE-SEAM",
+      "AG-MCP",
+      "AG-BREAKING",
+      "AG-REGRESSION",
+      "AG-INDEPENDENCE",
+      "AG-LEVEL",
+      "AG-STORAGE"
+    ],
+    "scope_rule": "The user asked for all current SDK packages. Do not defer pi, bash, sandbox, scheduler, or memory merely to shrink work. Expand deterministic proof instead."
+  },
+  "current_state": {
+    "contract": "artifacts/dkr-migration-contract.md",
+    "checkpoint": "artifacts/dkr-migration-checkpoint-candidate.json",
+    "provider_matrix": "artifacts/dkr-provider-capability-matrix.md",
+    "claude_review": "artifacts/claude-migration-review-isolated.json",
+    "validator_report": "pending final handback from DKR-MIGRATION-VALIDATOR"
+  },
+  "assignment": "Revise the migration contract and candidate checkpoint in place. Preserve the accepted semantic kernel and the user-required all-SDK scope. Fix every independent finding: replace the non-exported MaybePromise import with a local or public type; give exact resolvable package exports and tsdown entries; define explicit current work/attempt/branch/epoch tags so tool snapshots can be built; define load-and-bind and authority-narrowing APIs for resume, fork, and subagents; show a host root context pre-resolving provider resources before child session contexts; include AG-LIFECYCLE-USE, AG-LIFECYCLE-EFFECT, and AG-LIFECYCLE-JOIN in checkpoint custody; replace non-content evidence refs with governed hashes; audit all workspace consumers and include pkg/framework/pumped/tests/agent.test.ts in the editable/migration boundary; reconcile kept eval helpers with the new TurnResult by retaining skill/tool/subagent inspection fields or intentionally migrating the helpers; update every SDK and provider Lite peer range to the current ^5.0.0 plus SDK ^3.0.0 where applicable; make the Claude lease-manager requirement consistent with the provider matrix; add deterministic conformance requirements for sandbox, scheduler, memory, pi, bash, overlap, cancellation isolation, and streaming; describe AG-MCP as no new MCP/automatic collection/native Claude surface while leaving the existing sdk-mcp package unchanged. The package changeset should include only published packages whose public/runtime contract changes; a test-only pumped consumer migration does not require a release entry. Keep one agent turn loop, inert flows, no legacy runtime, no Lite edits, and no product edits. Write a fresh revision candidate checkpoint with all walls pending independent review, new hashes, and blocked self-gate.",
+  "budget_and_stop_rule": {
+    "turns": 1,
+    "time_min": 30,
+    "stop": "Stop when deterministic shape/plain-wording/store checks pass, or hand back an irreconcilable public API conflict."
+  },
+  "hand_back_rule": "Return exact files, hashes, checks, and unresolved questions. No self-acceptance.",
+  "output_schema": "Revised contract, revised candidate checkpoint, exact checks, hashes, and raw evidence only."
+}

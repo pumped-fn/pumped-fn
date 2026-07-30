@@ -1,0 +1,18 @@
+{
+  "type": "worker_progress",
+  "worker_id": "DKR-SESSION-VALIDATOR-2",
+  "unit_id": "DKR-SESSION-1",
+  "status": "finished",
+  "observed_at": "2026-07-14T08:07:49Z",
+  "assignment": "Replay and source-audit every revised session probe invariant.",
+  "evidence_refs_or_hashes": [
+    "artifacts/dkr-session-validation-2.md",
+    "sha256:f6e664168b0dd6f3c56a80a4ec139267a0a9a35a341172e41594b495acfc3fb8"
+  ],
+  "accepted_claims": 15,
+  "rejected_claims": 1,
+  "rejected_ids": [
+    "REVISED-PROBE-CASE-COUNT"
+  ],
+  "rejection_reason": "Expected 30 keys; emitted and asserted set has 29."
+}

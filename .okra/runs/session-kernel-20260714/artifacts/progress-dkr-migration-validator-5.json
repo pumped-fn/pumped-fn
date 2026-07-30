@@ -1,0 +1,19 @@
+{
+  "type": "worker_progress",
+  "worker_id": "DKR-MIGRATION-VALIDATOR-5",
+  "unit_id": "DKR-MIGRATION-1",
+  "status": "finished",
+  "observed_at": "2026-07-14T09:37:29Z",
+  "assignment": "Independently validate the corrected authority boolean tuple, digest vectors, full normalized authority body, prior claim stability, checkpoint custody, and deterministic artifact checks.",
+  "evidence_refs_or_hashes": [
+    "sha256:0a978a1c1711ad098dbfa710db06b5564b02e05a3fbc6eac96c59e412506eaa2",
+    "sha256:7241a29a497871eca9dcf65093f32cc3ba4d19292b1997c9d8b95fa72e273533",
+    "sha256:8b045a8c24f2a1eac5e9e534efc700f22f0339edc71a305bf47742e307965386",
+    "sha256:3cd21e9f7f4b5370e9c10f01f8887a516d399baaba1babb112ffdfc08d767c5d"
+  ],
+  "accepted_claims": 8,
+  "rejected_claims": 0,
+  "rejected_ids": [],
+  "prior_accepted_claims_regressed": 0,
+  "self_acceptance": false
+}

@@ -1,0 +1,18 @@
+{
+  "type": "worker_progress",
+  "worker_id": "DKR-MIGRATION-PROVIDERS",
+  "unit_id": "DKR-MIGRATION-1",
+  "status": "finished",
+  "observed_at": "2026-07-14T08:29:05Z",
+  "assignment": "Classify Claude, Codex, and pi provider capabilities and prove root-pre-resolved lifetime.",
+  "evidence_refs_or_hashes": [
+    "sha256:8b045a8c24f2a1eac5e9e534efc700f22f0339edc71a305bf47742e307965386",
+    "sha256:3cd21e9f7f4b5370e9c10f01f8887a516d399baaba1babb112ffdfc08d767c5d"
+  ],
+  "unknowns": [
+    "Exact rich attempt public names",
+    "Real ACP overlap and cancel isolation",
+    "Exact Claude and pi stream event normalization"
+  ],
+  "self_acceptance": false
+}

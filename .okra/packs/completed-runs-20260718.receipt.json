@@ -1,0 +1,27 @@
+{
+  "schema_version": "okra.completed-runs-pack-receipt.v1",
+  "pack_path": ".okra/packs/completed-runs-20260718.okra-pack",
+  "pack_sha256": "b558f3584c65c93f0333f6bf818fc665e84a574c6b9514f900bef8345f4765a8",
+  "manifest_sha256": "c3c675d8e75a2ed8f4497ee255362ecf00e3a11a982e41aa586b3e35c7963741",
+  "source_file_count": 1827,
+  "source_byte_count": 31911608,
+  "archive_entry_count": 1828,
+  "run_count": 13,
+  "anti_goal_snapshots": [
+    {
+      "path": ".okra/memory/reverse-tornado-okr/prior-anti-goals.v1.jsonl",
+      "sha256": "7028a676e81ba89c47d63c3d933e115b7ea71ed64f4d4567dbe328f048a72e57",
+      "entry_count": 58
+    },
+    {
+      "path": ".okra/memory/pumped-fn-lite/candidate-anti-goals.v1.json",
+      "sha256": "d2b559e36540433a05228a606cdef7824dd1a828efadd289cc62cdcdca575ad3",
+      "entry_count": 24
+    }
+  ],
+  "verification": {
+    "entry_hash_mismatch_count": 0,
+    "inventory_mismatch_count": 0,
+    "verdict": "verified"
+  }
+}

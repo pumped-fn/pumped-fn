@@ -1,0 +1,113 @@
+{
+  "ckrs": [
+    {
+      "id": "CKR-LIFECYCLE",
+      "metric_id": "lifecycle_conformance_pass_rate",
+      "source_dkr": "DKR-LIFECYCLE-1",
+      "status": "candidate",
+      "target": 1
+    },
+    {
+      "id": "CKR-SESSION",
+      "metric_id": "session_kernel_conformance_pass_rate",
+      "source_dkr": "DKR-SESSION-1",
+      "status": "candidate",
+      "target": 1
+    },
+    {
+      "id": "CKR-DATABASE",
+      "metric_id": "database_analysis_end_to_end_pass_rate",
+      "source_dkr": "DKR-SESSION-1",
+      "status": "candidate",
+      "target": 1
+    },
+    {
+      "id": "CKR-PROVIDERS",
+      "metric_id": "managed_provider_session_parity_count",
+      "source_dkr": "DKR-MIGRATION-1",
+      "status": "candidate",
+      "target": 2
+    },
+    {
+      "id": "CKR-DELIVERY",
+      "metric_id": "session_kernel_pr_ready_count",
+      "source_dkr": "DKR-MIGRATION-1",
+      "status": "candidate",
+      "target": 1
+    }
+  ],
+  "dkrs": [
+    {
+      "artifact": "artifacts/dkr-lifecycle-contract.md",
+      "budget": {
+        "time_min": 60,
+        "turns": 2
+      },
+      "decision_target": "Choose the smallest reusable dependency-live finalization and cleanup-order contract across context close, explicit release, shared dependencies, active child turns, and repeated close.",
+      "id": "DKR-LIFECYCLE-1",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-LIFECYCLE-ORDER",
+        "AG-LIFECYCLE-JOIN",
+        "AG-ACTIVE-TURN",
+        "AG-PERFORMANCE",
+        "AG-INDEPENDENCE",
+        "AG-LEVEL"
+      ],
+      "status": "active",
+      "stop_rule": "Stop when one option has source-backed semantics, executable conformance cases, and independent Claude plus challenger review, or return an unresolved checkpoint."
+    },
+    {
+      "artifact": "artifacts/dkr-session-contract.md",
+      "budget": {
+        "time_min": 45,
+        "turns": 1
+      },
+      "decision_target": "Define the semantic session state, ownership, resume, fork, authority fingerprint, turn streaming, and provider continuation contract using the accepted lifecycle primitive.",
+      "id": "DKR-SESSION-1",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-ACTIVE-TURN",
+        "AG-AUTHORITY",
+        "AG-HIDDEN-EDGE",
+        "AG-SCOPE-SEAM",
+        "AG-LEVEL"
+      ],
+      "status": "candidate",
+      "stop_rule": "Stop when the database-analysis case distinguishes session-owned durable state from turn-owned runtime resources."
+    },
+    {
+      "artifact": "artifacts/dkr-migration-contract.md",
+      "budget": {
+        "time_min": 35,
+        "turns": 1
+      },
+      "decision_target": "Choose the migration from legacy agent/session and temporary currentAgent/currentTool surfaces to one resource-native API without carrying duplicate runtime paths.",
+      "id": "DKR-MIGRATION-1",
+      "risk_or_anti_goal_uncertainty": [
+        "AG-BREAKING",
+        "AG-MCP",
+        "AG-HIDDEN-EDGE",
+        "AG-REGRESSION",
+        "AG-LEVEL"
+      ],
+      "status": "candidate",
+      "stop_rule": "Stop with an API map, compatibility decision, provider impact list, and PR boundary."
+    }
+  ],
+  "frame_version": 1,
+  "graph": {
+    "edges": [],
+    "nodes": []
+  },
+  "orchestrator": {
+    "owner": "Codex /root",
+    "responsibilities": [
+      "objective checks",
+      "check-ins",
+      "OKR board",
+      "subagent steering"
+    ],
+    "terminal_condition": "Continue until the objective metric reaches target, the human stops or changes the frame, or a blocking flag requires human resolution."
+  },
+  "pkrs": [],
+  "tree_version": 1
+}

@@ -1,0 +1,19 @@
+{
+  "type": "worker_progress",
+  "worker_id": "DKR-SESSION-VALIDATOR",
+  "unit_id": "DKR-SESSION-1",
+  "status": "finished",
+  "observed_at": "2026-07-14T07:46:52Z",
+  "assignment": "Replay the session checkpoint, probe, hashes, wording, store, and changed paths without edits.",
+  "evidence_refs_or_hashes": [
+    "artifacts/dkr-session-validation.md",
+    "sha256:18d95950f4d3e8e0de79f0b4cc8c29c7a5d435d23bc3aac8395d9b5a33e238ac"
+  ],
+  "accepted_claims": 13,
+  "rejected_claims": 3,
+  "rejected_ids": [
+    "CHECKPOINT-FRESHNESS-VALUE",
+    "STORE-INTEGRITY",
+    "CHANGED-PATH-ATTRIBUTION"
+  ]
+}

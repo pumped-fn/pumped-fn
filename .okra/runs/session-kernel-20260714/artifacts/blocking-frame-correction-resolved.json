@@ -1,0 +1,25 @@
+{
+  "type": "flag",
+  "flag_id": "blocking.AG-LIFECYCLE-ORDER.metric-correction",
+  "status": "resolved",
+  "opened_at": "2026-07-14T04:08:29Z",
+  "resolved_at": "2026-07-14T07:30:34Z",
+  "owner": "human",
+  "severity": "blocking-promotion",
+  "affected": [
+    "AG-LIFECYCLE-ORDER",
+    "DKR-LIFECYCLE-1",
+    "CKR-LIFECYCLE",
+    "DKR-SESSION-1",
+    "DKR-MIGRATION-1"
+  ],
+  "evidence": [
+    "frame/frame.v2.json",
+    "tree/tree.v2.json",
+    "artifacts/dkr-lifecycle-validation.md",
+    "artifacts/graph-edge-lifecycle-session-v2.json"
+  ],
+  "resolution": "Frame v2 retires dependent_cleanup_after_dependency_count and adds dependency_use_after_dependency_close_count plus business_effect_in_lifecycle_hook_count. The empirical lifecycle probe remains accepted; the thin-session architecture and broad lifecycle-finalization conclusion are superseded.",
+  "approver": "User",
+  "approver_evidence": "User: lets resume the /goal, accumulate the learning to steer the details"
+}

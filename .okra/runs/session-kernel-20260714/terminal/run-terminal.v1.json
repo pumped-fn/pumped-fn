@@ -1,0 +1,284 @@
+{
+  "accepted_dkr_checkpoints": [
+    {
+      "path": "workers/DKR-SUNSET-HANDOFF/progress.jsonl",
+      "record_hash": "aec793576d42d041af844cddcea006e350538876df37f784faa685c50603c011",
+      "seq": 4
+    }
+  ],
+  "anti_goal_metric_refs": [
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "unjoined_close_or_release_count",
+      "record_hash": "4cd7153aa3a8541e206095dd6f5e36413b533fe9d44d1fe44c1b24c144d6c588",
+      "seq": 102,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "active_turn_after_session_close_count",
+      "record_hash": "38cb3ca233c1433b0d11874ef179d4792e1810c892200fa9f56c1129878dca4b",
+      "seq": 103,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "advertised_but_unresolved_tool_count",
+      "record_hash": "67daf8f0453970a7996dbb50178037bff1773c286c29e1ea76da26c37db87989",
+      "seq": 104,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "tool_snapshot_drift_within_turn_count",
+      "record_hash": "06e6ffa5088b39cde4ad828ebf07926cd292fe86e0032aab08b984253b51a160",
+      "seq": 105,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "undeclared_root_or_permission_grant_count",
+      "record_hash": "5749a8e47b8d184370f7d53531975be9b56529c5159e63329a1491187dcb8f16",
+      "seq": 106,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "unrequested_builtin_binding_count",
+      "record_hash": "b296c1f2f27413866f6ab1934f4e2e8b9761ea315bd85bd7916f76989b6a16a6",
+      "seq": 107,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "hidden_execution_edge_count",
+      "record_hash": "34b946eb662c19ebbb1b5f2c253e116064f64ee5088eb24cd930e8aa72b33caa",
+      "seq": 108,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "scope_seam_escape_count",
+      "record_hash": "09ba7477f716c6ab3384160d84e5e94f47901f9545b30bb2256800a78e23fdfa",
+      "seq": 109,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "premature_mcp_or_automatic_collection_surface_count",
+      "record_hash": "7a6adbdb1d8f3054fd2dc2c4a27e38b438178036441b779296f469016a5e1de7",
+      "seq": 110,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "unexpected_breaking_change_count",
+      "record_hash": "43c289f2d8820ca8311b835a0052c7cd58de147719d0ed5de88facb49a1c2091",
+      "seq": 111,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "lite_lifecycle_performance_regression_count",
+      "record_hash": "27ab63a44106bbea11a9de231112d83757bd1d730e74821499783fbb8f7631bb",
+      "seq": 112,
+      "value": 15
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "touched_surface_regression_count",
+      "record_hash": "318930af3b0b22023d3a5a2b92b893f939faa236919526ebcf242d4726115588",
+      "seq": 113,
+      "value": 1
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "user_change_overwrite_count",
+      "record_hash": "954a496ffa5a3ca03ab25710c8741c7238534679bfeb8095b19837509398be33",
+      "seq": 114,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "anti_goal_bypass_or_dishonesty_count",
+      "record_hash": "1e56381f15afaa3f34899e1fa544d20384d4b19ea0da096a8c2bddb3442966af",
+      "seq": 115,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "single_llm_truth_acceptance_count",
+      "record_hash": "ab57194031cbf4ebb93cde6af207764d1c203e894b7149011c5c2afa63e2ae2d",
+      "seq": 116,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "abstraction_level_jump_count",
+      "record_hash": "17bee778173bc3d907bbb74ec0e71f061e7f0fb50393599ba9eec0cc407094a6",
+      "seq": 117,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "ungoverned_write_or_read_count",
+      "record_hash": "e087d8ff4580c2d8f502292cc9d2b4c4ef3a2d24d056f99d71a74697b5eab01c",
+      "seq": 118,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "dependency_use_after_dependency_close_count",
+      "record_hash": "b29501c30b71ce6ca3648196697be23fcc21f586e9693d472b3cb78c2bc8d71d",
+      "seq": 119,
+      "value": 0
+    },
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "business_effect_in_lifecycle_hook_count",
+      "record_hash": "5e3104f25668c96b1d43ad560a3c4603b540f4d3d074dcf00ded62fb4806a4fa",
+      "seq": 120,
+      "value": 0
+    }
+  ],
+  "append_log_heads": {
+    "checkins.jsonl": {
+      "record_hash": "270216e9b17e14b14734719ccd3a393077700cb2bc8e2d62419f837508fce906",
+      "seq": 21
+    },
+    "flags.jsonl": {
+      "record_hash": "2688a19b563e13e8b97863f011359a3b8056df4896785d3affc7f943d56d4653",
+      "seq": 4
+    },
+    "ledger.jsonl": {
+      "record_hash": "a12b0791ff92622f1ee736f03ff9f56f8177de8f0425a5cb2775a711849483e2",
+      "seq": 121
+    },
+    "workers/DKR-LIFECYCLE-1/progress.jsonl": {
+      "record_hash": "0e5da1f4eaae7cf54d3dd072ba5398e4d2b25834bb2f92fac976a80e3fc4f9a7",
+      "seq": 2
+    },
+    "workers/DKR-LIFECYCLE-VALIDATOR/progress.jsonl": {
+      "record_hash": "a399367f8fe7c795a3c4a91530c151a9f8a27dc7de2b70af3d5a4d44bc72e22f",
+      "seq": 1
+    },
+    "workers/DKR-MIGRATION-API/progress.jsonl": {
+      "record_hash": "ec241071c99e38439e9408b32ad5e58605fc2dbf1056f0a3f062ec3e16b861a5",
+      "seq": 1
+    },
+    "workers/DKR-MIGRATION-PROVIDERS/progress.jsonl": {
+      "record_hash": "3ea7ebe8c66e9ff537537fe1c748c6d8b6868f9919d140a637d15d6c511ca615",
+      "seq": 1
+    },
+    "workers/DKR-MIGRATION-REVISION-2/progress.jsonl": {
+      "record_hash": "df57c933c9124666ab5d3bccf6c4a5adf834e4549dc5ee2bf900620e1607733b",
+      "seq": 1
+    },
+    "workers/DKR-MIGRATION-REVISION-3/progress.jsonl": {
+      "record_hash": "5b8ff624959ce85ef4b4c6fe52909a301336fcbe34c941be7c4f96b4964cc99e",
+      "seq": 1
+    },
+    "workers/DKR-MIGRATION-REVISION-4/progress.jsonl": {
+      "record_hash": "6162543d2ec4f463337cf1f0ccc62527de3e70da4c8b5f6d158bb095d132391e",
+      "seq": 1
+    },
+    "workers/DKR-MIGRATION-REVISION/progress.jsonl": {
+      "record_hash": "5dce6cf4a4e049b5c9404ea1cfe20046d607f1e17c16c2a40c287df9df8862d8",
+      "seq": 1
+    },
+    "workers/DKR-MIGRATION-VALIDATOR-2/progress.jsonl": {
+      "record_hash": "5518bb7744d6ffeaf9236c2edd24e7dc168d78c595e35631d2480166e2585ebc",
+      "seq": 1
+    },
+    "workers/DKR-MIGRATION-VALIDATOR-3/progress.jsonl": {
+      "record_hash": "80f0be6acb8dd6bd9e0f6c330adc99d395e181492ce225c003ea8c685a5432ea",
+      "seq": 1
+    },
+    "workers/DKR-MIGRATION-VALIDATOR-4/progress.jsonl": {
+      "record_hash": "fed1306c4d38b3c2f2db4964f7177e42e7cd55ecc0e921529fb449a26c9e3ed3",
+      "seq": 1
+    },
+    "workers/DKR-MIGRATION-VALIDATOR-5/progress.jsonl": {
+      "record_hash": "9d186877d276be38df695198a7643b72bb49bf948f76f09d5ca8efb383f03554",
+      "seq": 1
+    },
+    "workers/DKR-MIGRATION-VALIDATOR/progress.jsonl": {
+      "record_hash": "664ff911f1504adcae415adbd5133e8f06b3a2010dc91193e45c65aa905fb3cf",
+      "seq": 1
+    },
+    "workers/DKR-SESSION-CONTRACT/progress.jsonl": {
+      "record_hash": "9a29fd08aae7c783a99b2bf393ed4a710ec3ac10024e7e556ea86fd95144e55e",
+      "seq": 1
+    },
+    "workers/DKR-SESSION-COUNT-VALIDATOR/progress.jsonl": {
+      "record_hash": "a1fa94d50fdfdcd468ad938270716f5929c70efd2dcdf803923830b828f82b88",
+      "seq": 1
+    },
+    "workers/DKR-SESSION-PROBE-2/progress.jsonl": {
+      "record_hash": "560959b0716058d01758f3ea9ef6d2f36a669210795b7f05640d50fe5b3c5e1c",
+      "seq": 1
+    },
+    "workers/DKR-SESSION-PROBE/progress.jsonl": {
+      "record_hash": "d7ccea7b10215a234acde22a781fa531b5d07aa2c970e6f6d804d5dfdb476e9f",
+      "seq": 1
+    },
+    "workers/DKR-SESSION-VALIDATOR-2/progress.jsonl": {
+      "record_hash": "25cb0209f155512d0e8bcf2b34977481c15be785432abb5e9136f6f4e3669694",
+      "seq": 1
+    },
+    "workers/DKR-SESSION-VALIDATOR/progress.jsonl": {
+      "record_hash": "ab515fb8c4f75d575866e268b46090addaed0e8f2eaf0531074a2baa9dd40ebf",
+      "seq": 1
+    },
+    "workers/DKR-SUNSET-HANDOFF/progress.jsonl": {
+      "record_hash": "aec793576d42d041af844cddcea006e350538876df37f784faa685c50603c011",
+      "seq": 4
+    },
+    "workers/PKR-AGENT-MIGRATION/progress.jsonl": {
+      "record_hash": "bd6769302e98cbba5639dd143a33ead03d5ec9f6563d440049bee246bb1a9c87",
+      "seq": 1
+    },
+    "workers/PKR-INTEGRATION-REVIEW-CLAUDE/progress.jsonl": {
+      "record_hash": "cabbe4e469ca8ec856a4a1a34908a7379e20dbc2d9aa66801c382b9e7e70ac81",
+      "seq": 1
+    },
+    "workers/PKR-INTEGRATION-REVIEW-FINAL/progress.jsonl": {
+      "record_hash": "20007773982f0f678e0dc4d03277424fe64a9eb52c7c1fc840bb405329f79f77",
+      "seq": 1
+    },
+    "workers/PKR-PR-OPEN/progress.jsonl": {
+      "record_hash": "879bfd2691e20adeac87c12022a82b6a8f85cb46e6c6801515a78b0cb9f382c9",
+      "seq": 1
+    },
+    "workers/PKR-PROVIDERS/progress.jsonl": {
+      "record_hash": "cc567dd594b1d6e443217d7f668d79dbac424ccffdd38977faf0b6d20e94e304",
+      "seq": 1
+    },
+    "workers/PKR-SANDBOX/progress.jsonl": {
+      "record_hash": "db64534cc3fd0583445679257865b6e850118f9c10d99ca21fb08ae65cc3f7f6",
+      "seq": 1
+    },
+    "workers/PKR-SESSION-RUNTIME/progress.jsonl": {
+      "record_hash": "b6f6d7576c24bf5e8fb7cee930f4b35806a1972f1f4b922762941f9465189d0e",
+      "seq": 2
+    }
+  },
+  "consolidation_output": "memory/completed-run-consolidation.v1.json",
+  "continuation_packet": "memory/continuation-packet.v1.json",
+  "memory_promotion_status": "accepted as a run-local handoff; performance conclusions remain open.",
+  "objective_metric_refs": [
+    {
+      "log": "ledger.jsonl",
+      "metric_id": "session_kernel_pr_ready_count",
+      "record_hash": "a12b0791ff92622f1ee736f03ff9f56f8177de8f0425a5cb2775a711849483e2",
+      "seq": 121,
+      "value": 1
+    }
+  ],
+  "retained_trace_manifest": "memory/trace-manifest.v1.jsonl",
+  "review_set_status": "Sol-xhigh excluded target_reached; issue #348 owns the performance follow-up.",
+  "run_id": "session-kernel-20260714",
+  "terminal_state": "stopped_by_human",
+  "terminalized_at": "2026-07-20T11:16:02.677296Z",
+  "unresolved_flags": []
+}

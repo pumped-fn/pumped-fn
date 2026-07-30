@@ -1,0 +1,11 @@
+{
+  "type": "edge_event",
+  "edge_id": "edge.DKR-SESSION-1.refines.DKR-MIGRATION-1",
+  "from_node": "DKR-SESSION-1",
+  "to_node": "DKR-MIGRATION-1",
+  "relation": "refines",
+  "status": "accepted",
+  "confidence": 0.86,
+  "observed_at": "2026-07-14T08:15:38Z",
+  "source_ref": "artifacts/claude-session-review-followup.md"
+}

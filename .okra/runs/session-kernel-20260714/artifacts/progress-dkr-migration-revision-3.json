@@ -1,0 +1,27 @@
+{
+  "type": "worker_progress",
+  "worker_id": "DKR-MIGRATION-REVISION-3",
+  "unit_id": "DKR-MIGRATION-REVISION-3",
+  "parent_unit_id": "DKR-MIGRATION-1",
+  "status": "finished",
+  "observed_at": "2026-07-14T09:22:05Z",
+  "assignment": "Apply the focused round-three through round-five contract corrections for strict declarations, admission-safe subagents, executable database lifecycle ordering, durable wait and wake, inert event collection, and exact authority fingerprint construction and comparison.",
+  "evidence_refs_or_hashes": [
+    "sha256:07ef022dfcc1cce0973e5565e60e1068ff374e4d9d945d76e494771d047a503d",
+    "sha256:609b39e9720a93945cd6b175c2adc72375a6071970b3bd0e4e311fadd1750696"
+  ],
+  "checks": [
+    "executable_dkr_checkpoint=10/10",
+    "plain_wording_violation_count=0",
+    "authority_fingerprint_contract_probe=pass",
+    "active_anti_goals=16",
+    "pending_null_wall_verifications=16",
+    "downstream_advance=blocked",
+    "okra_store_verify=pass"
+  ],
+  "unknowns": [
+    "Fresh independent review of the round-five authority fingerprint contract",
+    "Product implementation and conformance evidence remain outside this writer unit"
+  ],
+  "self_acceptance": false
+}

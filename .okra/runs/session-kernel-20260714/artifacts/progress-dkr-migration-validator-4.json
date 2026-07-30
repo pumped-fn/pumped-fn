@@ -1,0 +1,18 @@
+{
+  "type": "worker_progress",
+  "worker_id": "DKR-MIGRATION-VALIDATOR-4",
+  "unit_id": "DKR-MIGRATION-1",
+  "status": "finished",
+  "observed_at": "2026-07-14T09:27:13Z",
+  "assignment": "Independently validate the final migration contract, every previously rejected claim, package and provider migration coverage, checkpoint custody, and deterministic checks.",
+  "evidence_refs_or_hashes": [
+    "sha256:07ef022dfcc1cce0973e5565e60e1068ff374e4d9d945d76e494771d047a503d",
+    "sha256:609b39e9720a93945cd6b175c2adc72375a6071970b3bd0e4e311fadd1750696",
+    "sha256:8b045a8c24f2a1eac5e9e534efc700f22f0339edc71a305bf47742e307965386",
+    "sha256:3cd21e9f7f4b5370e9c10f01f8887a516d399baaba1babb112ffdfc08d767c5d"
+  ],
+  "accepted_claims": 19,
+  "rejected_claims": 0,
+  "rejected_ids": [],
+  "self_acceptance": false
+}

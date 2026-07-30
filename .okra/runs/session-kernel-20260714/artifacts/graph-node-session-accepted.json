@@ -1,0 +1,12 @@
+{
+  "type": "node_event",
+  "node_id": "DKR-SESSION-1",
+  "node_kind": "dkr",
+  "status": "accepted",
+  "quadrant": {
+    "level": "approach",
+    "certainty": 0.91
+  },
+  "observed_at": "2026-07-14T08:15:38Z",
+  "source_ref": "artifacts/dkr-session-checkpoint-accepted.json"
+}

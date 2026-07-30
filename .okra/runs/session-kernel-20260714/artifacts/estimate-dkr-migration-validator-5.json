@@ -1,0 +1,11 @@
+{
+  "type": "estimation_record",
+  "phase": "estimate",
+  "unit_id": "DKR-MIGRATION-VALIDATOR-5",
+  "estimate": {
+    "time_min": 5,
+    "turns": 1,
+    "tokens": null
+  },
+  "observed_at": "2026-07-14T09:40:00Z"
+}

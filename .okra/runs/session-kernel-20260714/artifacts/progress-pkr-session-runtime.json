@@ -1,0 +1,31 @@
+{
+  "type": "worker_progress",
+  "worker_id": "PKR-SESSION-RUNTIME",
+  "unit_id": "PKR-SESSION-RUNTIME",
+  "status": "finished",
+  "observed_at": "2026-07-14T10:00:45Z",
+  "assignment": "Implement the accepted session runtime, authority, lifecycle, registry, persistence, and configurable Standard Schema validation base without Lite, provider, MCP, agent, sandbox, index, or documentation edits.",
+  "evidence_refs_or_hashes": [
+    "sha256:0a978a1c1711ad098dbfa710db06b5564b02e05a3fbc6eac96c59e412506eaa2",
+    "sha256:0c6d7490dc222fbf52528c26e40f83ec21fb24911029f0a2e13b49233ffbd7f3",
+    "sha256:d826d4b23cadc64394654f8b93ab1e74f0a889f44042442397b9e57738998336",
+    "sha256:7a5d3282125615f6960f3d71b437de301d77c27095990cb077d4836156a1a0de",
+    "sha256:ad6d24d299fb4bd85fe0ce6e5a8703379afc07123dcf8962ea529d61a616e947"
+  ],
+  "checks": [
+    "core_tests=14/14_pass",
+    "session_and_validation_tests=11/11_pass",
+    "core_typecheck=pass",
+    "core_cjs_esm_build=pass",
+    "diff_and_whitespace_checks=pass",
+    "authority_boolean_vectors=4/4_pass",
+    "zod_and_valibot_standard_schema_proof=pass",
+    "context_close_business_commit_count=0",
+    "concurrent_finish_commit_count=1"
+  ],
+  "unknowns": [
+    "The accepted export function run contract conflicts with pumped/no-handle-factory and pumped/config-via-tags; the lint integration needs a documented combinator allowance or a coordinated contract change.",
+    "Cross-package provider and test harness convergence is owned by the integration units."
+  ],
+  "self_acceptance": false
+}

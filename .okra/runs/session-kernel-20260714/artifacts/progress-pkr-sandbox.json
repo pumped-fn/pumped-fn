@@ -1,0 +1,35 @@
+{
+  "type": "worker_progress",
+  "worker_id": "PKR-SANDBOX",
+  "unit_id": "PKR-SANDBOX",
+  "status": "finished",
+  "observed_at": "2026-07-14T10:02:11Z",
+  "assignment": "Implement the session-mediated sandbox contract, the Just Bash resource adapter, and SDK 3 test harness support without Lite, provider, MCP, lockfile, or unrelated core edits.",
+  "evidence_refs_or_hashes": [
+    "sha256:0a978a1c1711ad098dbfa710db06b5564b02e05a3fbc6eac96c59e412506eaa2",
+    "sha256:bf0b5836f1392e92822eb875bd3131e43d32602a65556c298a9c01b28ab7404f",
+    "sha256:d67c431f5af77ca84dc861b1281b5e715420b6485736b8d05fb281449198a76b",
+    "sha256:15726e348ac9512dee7fa613e0c73a20b7958d6f9354d348238353690dd48fa7",
+    "sha256:dd74e2c393d7de02827df733db1f6ec38ba05bff29d3cf76af252c874a800631",
+    "sha256:d821b5260ff863a7e4f6163c75ddf10f5e6e527f023adf4516208e1012bd133f",
+    "sha256:59b707b9c226d8695f1577facaadcd961555b97a76efc109eb55fbc362ad1f08"
+  ],
+  "checks": [
+    "sdk_just_bash_tests=4/4_pass",
+    "sdk_just_bash_typecheck=pass",
+    "sdk_just_bash_cjs_esm_build=pass",
+    "sdk_test_tests=40/40_pass",
+    "sdk_test_sdk3_runtime_tests=12/12_pass",
+    "sdk_test_typecheck=pass",
+    "sdk_test_cjs_esm_build=pass",
+    "sandbox_read_write_exec_policy_denial_output_cap_abort_and_isolation=pass",
+    "session_harness_owner_pre_resolution=pass",
+    "diff_and_whitespace_checks=pass",
+    "lockfile_changes=none"
+  ],
+  "unknowns": [
+    "Just Bash 3 exposes scalar exec output, so the adapter exposes streaming flow events after command settlement while timeout, context-close, and attempt cancellation remain live during execution.",
+    "The offline dependency refresh was blocked by the repository minimum-release-age policy after linking an already declared dependency; no lockfile changed."
+  ],
+  "self_acceptance": false
+}

@@ -1,0 +1,17 @@
+{
+  "type": "worker_progress",
+  "worker_id": "DKR-MIGRATION-REVISION-2",
+  "unit_id": "DKR-MIGRATION-1",
+  "status": "finished",
+  "observed_at": "2026-07-14T09:11:00Z",
+  "assignment": "Close the five round-two blockers and correct join and wait-wake ordering.",
+  "evidence_refs_or_hashes": [
+    "sha256:2e0a604ee8e3f60018ad049801f3e969a8d88c339851910f7f8664fd3b6e3f8d",
+    "sha256:29d12ff6f1cacf6831afed4768030c77537276ae5979610d4bbe6957a3ffef3f"
+  ],
+  "unknowns": [
+    "Independent round-three validation",
+    "Isolated Claude follow-up review"
+  ],
+  "self_acceptance": false
+}

@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "run_id": "session-kernel-20260714",
+  "source_run_id": "session-kernel-20260714",
+  "status": "consolidated",
+  "terminal_state": "stopped_by_human",
+  "terminal_record_hash": "aa2cec5538b456b7c9b87fdef534b301a76af40f2079a5fc4212483484f50ba6",
+  "accepted_learnings": [
+    "PR #347 is the single reviewed session-kernel PR and its current checks pass.",
+    "The exact PR head has 15 confirmed Lite performance regressions in the retained five-pair comparison.",
+    "Issue #348 is the durable continuation for regression isolation and repair."
+  ],
+  "extracted_traps": [
+    "Treating PR readiness as proof that every anti-goal held.",
+    "Closing a performance flag without retaining the breached metric and a continuation owner.",
+    "Calling a stopped run target_reached."
+  ],
+  "extracted_avoidances": [
+    "Bind benchmarks to exact baseline and candidate revisions.",
+    "Keep environment fingerprints equal across paired runs.",
+    "Move unresolved repair work to one issue before removing active traces."
+  ],
+  "extracted_misconceptions": [
+    "A green PR check set does not discharge a separately measured performance wall.",
+    "A source clue is not a confirmed root cause."
+  ],
+  "extracted_optimizations": [
+    "Retain the comparison summary and content hashes instead of every temporary benchmark trace.",
+    "Use issue #348 as the single continuation surface."
+  ],
+  "candidate_anti_goals": [
+    "lite_lifecycle_performance_regression_count == 0",
+    "touched_surface_regression_count == 0"
+  ],
+  "standing_wall_metric_ids": [
+    "unjoined_close_or_release_count",
+    "active_turn_after_session_close_count",
+    "advertised_but_unresolved_tool_count",
+    "tool_snapshot_drift_within_turn_count",
+    "undeclared_root_or_permission_grant_count",
+    "unrequested_builtin_binding_count",
+    "hidden_execution_edge_count",
+    "scope_seam_escape_count",
+    "premature_mcp_or_automatic_collection_surface_count",
+    "unexpected_breaking_change_count",
+    "lite_lifecycle_performance_regression_count",
+    "touched_surface_regression_count",
+    "user_change_overwrite_count",
+    "anti_goal_bypass_or_dishonesty_count",
+    "single_llm_truth_acceptance_count",
+    "abstraction_level_jump_count",
+    "ungoverned_write_or_read_count",
+    "dependency_use_after_dependency_close_count",
+    "business_effect_in_lifecycle_hook_count"
+  ],
+  "trace_manifest_refs": [
+    "memory/trace-manifest.v1.jsonl"
+  ],
+  "no_regression_evidence": [
+    "Not held: 15 Lite rows regressed and 31 evidence gaps remain.",
+    "No performance repair is claimed by this sunset."
+  ],
+  "review_set_status": "Sol-xhigh excluded target_reached and accepted a stopped_by_human handoff.",
+  "memory_promotion_status": "Accepted as run-local evidence. Root-cause claims remain candidates until issue #348 is resolved."
+}

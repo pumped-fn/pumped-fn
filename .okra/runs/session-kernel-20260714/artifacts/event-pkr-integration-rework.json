@@ -1,0 +1,13 @@
+{
+  "type": "rework_event",
+  "unit_id": "PKR-AGENT-MIGRATION",
+  "observed_at": "2026-07-14T11:06:00Z",
+  "cause": "Final adversarial convergence review and isolated Claude implementation review found authority, lifecycle, effect-order, provider fencing, packaging-proof, documentation, and invocation-settlement defects.",
+  "reason": "The implementation gate returned REVISE before commit or PR creation.",
+  "evidence_refs_or_hashes": [
+    "sha256:1e01839180a9fed27b36a5512573331336227b18b63d6607e21eadac22c0a299"
+  ],
+  "claude_review_ref": "sha256:1e01839180a9fed27b36a5512573331336227b18b63d6607e21eadac22c0a299",
+  "downstream_advance": "blocked",
+  "next_unit": "PKR-SESSION-RUNTIME-REPAIR"
+}

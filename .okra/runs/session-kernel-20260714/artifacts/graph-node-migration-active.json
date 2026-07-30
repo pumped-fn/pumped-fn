@@ -1,0 +1,12 @@
+{
+  "type": "node_event",
+  "node_id": "DKR-MIGRATION-1",
+  "node_kind": "dkr",
+  "status": "active",
+  "quadrant": {
+    "level": "approach",
+    "certainty": 0.86
+  },
+  "observed_at": "2026-07-14T08:15:38Z",
+  "source_ref": "artifacts/claude-session-review-followup.md"
+}

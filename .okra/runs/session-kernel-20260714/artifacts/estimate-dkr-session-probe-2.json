@@ -1,0 +1,12 @@
+{
+  "type": "estimation_record",
+  "phase": "estimate",
+  "unit_id": "DKR-SESSION-PROBE-2",
+  "estimate": {
+    "time_min": 50,
+    "turns": 1,
+    "tokens": null
+  },
+  "observed_at": "2026-07-14T07:54:00Z",
+  "dispatch_ref": "workers/DKR-SESSION-PROBE-2/packet.json"
+}
