@@ -4,6 +4,7 @@ import { useExecutionContext } from '@pumped-fn/lite-react'
 import type { Lite, ScopedValueAccess } from '@pumped-fn/lite-react'
 import { useRef } from 'react'
 
+type TagInput = Lite.Tagged<any> | readonly TagInput[]
 type ScopedValueStateSource<State extends object> = Pick<ScopedValueAccess<State>, 'getSnapshot' | 'set' | 'subscribe'>
 type JsonRenderActionParams = Record<string, unknown>
 type FlowActionHandlerResult<Target> =
@@ -33,7 +34,7 @@ interface ScopedValueStateStoreSliceOptions<State extends object> {
 interface FlowActionBaseOptions<Flow extends Lite.Flow<any, any>> {
   flow: Flow
   name?: string
-  tags?: Lite.Tagged<any>[]
+  tags?: TagInput
 }
 
 /** Maps JSON Render action parameters to a typed flow input. */

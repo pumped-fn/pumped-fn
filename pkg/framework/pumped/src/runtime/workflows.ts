@@ -28,9 +28,9 @@ export function runWorkflows(manifest: Manifest, io?: WorkflowsIo, scope?: Lite.
   const runs = entries.map((entry) => runEntry(entry))
 
   async function runEntry(entry: ManifestEntry): Promise<void> {
-    const tags: Lite.Tagged<any>[] = [
+    const tags = [
       workflowRun({ taskId: entry.name, runId: randomUUID() }),
-      ...appConfig.context(),
+      appConfig.context(),
     ]
     const context = appScope.createContext({ tags })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { createScope, flow, typed } from "@pumped-fn/lite"
+import { createScope, flow, tag, tags, typed } from "@pumped-fn/lite"
 import {
   SuspendSignal,
   extension,
@@ -47,6 +47,24 @@ describe("suspense extension", () => {
   it("uses distinct tag labels", () => {
     expect(replay.label).toBe("suspense.replay")
     expect(suspend.label).toBe("suspense.suspend")
+  })
+
+  it("composes single and nested run tags", async () => {
+    const marker = tag<string>({ label: "suspense-run-tag-input" })
+    const read = flow({
+      deps: { values: tags.all(marker) },
+      factory: (_ctx, { values }) => values,
+    })
+    const scope = createScope()
+    const ctx = scope.createContext(run({
+      taskId: "tag-input",
+      runId: "tag-input",
+      tags: [marker("one"), [marker("two")]],
+    }))
+
+    expect(await ctx.exec({ flow: read })).toEqual(["one", "two"])
+    await ctx.close({ ok: true })
+    await scope.dispose()
   })
 
   it("replays completed marked steps", async () => {

@@ -1,19 +1,21 @@
 import type { Lite } from "@pumped-fn/lite"
 import type { EntryKind } from "../discover"
 
+type TagInput = Lite.Tagged<any> | readonly TagInput[]
+
 export interface AppConfig {
   presets?: Lite.Preset<any, any>[]
-  tags?: Lite.Tagged<any>[]
+  tags?: TagInput
   extensions?: Lite.Extension[]
-  context?: (request?: Request) => Lite.Tagged<any>[]
+  context?: (request?: Request) => TagInput
   mapError?: (error: unknown) => { status: number; body: unknown } | undefined
 }
 
 export interface NormalizedAppConfig {
   presets: Lite.Preset<any, any>[]
-  tags: Lite.Tagged<any>[]
+  tags: TagInput
   extensions: Lite.Extension[]
-  context: (request?: Request) => Lite.Tagged<any>[]
+  context: (request?: Request) => TagInput
   mapError?: (error: unknown) => { status: number; body: unknown } | undefined
 }
 

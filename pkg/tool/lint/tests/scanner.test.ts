@@ -1426,6 +1426,27 @@ describe("lite lint scanner", () => {
     `)).toBe(0)
   })
 
+  it("allows awaited deps calls with single and nested step tag inputs", () => {
+    expect(unattributedAwaitCount(`
+      import { flow } from "@pumped-fn/lite"
+      import { step } from "@pumped-fn/sdk"
+
+      const single = flow({
+        tags: step({ workflow: true, kind: "email" }),
+        factory: async (_ctx, { mailer }) => {
+          await mailer.send()
+        },
+      })
+
+      const nested = flow({
+        tags: [[], [step({ workflow: true, kind: "email" })]],
+        factory: async (_ctx, { mailer }) => {
+          await mailer.send()
+        },
+      })
+    `)).toBe(0)
+  })
+
   it("allows graph machinery ops (exec/execStream/resolve) on deps handles untagged", () => {
     expect(unattributedAwaitCount(`
       import { controller, flow } from "@pumped-fn/lite"

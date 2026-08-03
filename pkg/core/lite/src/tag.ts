@@ -10,6 +10,38 @@ export interface TagOptions<T, HasDefault extends boolean> {
 const registry = new WeakMap<Lite.Tag<unknown, boolean>, WeakRef<Lite.Atom<unknown>>[]>()
 const tagRegistry: WeakRef<Lite.Tag<unknown, boolean>>[] = []
 
+function isTagInputArray(value: unknown): value is readonly Lite.TagInput[] {
+  return Array.isArray(value)
+}
+
+export function normalizeTags(input: Lite.TagInput): Lite.Tagged<any>[]
+export function normalizeTags(input: undefined): undefined
+export function normalizeTags(input: Lite.TagInput | undefined): Lite.Tagged<any>[] | undefined
+export function normalizeTags(input: Lite.TagInput | undefined): Lite.Tagged<any>[] | undefined {
+  if (input === undefined) return undefined
+  const normalized: Lite.Tagged<any>[] = []
+  const active = new Set<readonly unknown[]>()
+  const append = (value: unknown): void => {
+    if (isTagged(value)) {
+      normalized.push(value)
+      return
+    }
+    if (!isTagInputArray(value)) {
+      throw new TypeError("tags must contain only tagged values and arrays")
+    }
+    if (active.has(value)) throw new TypeError("tags must not contain cyclic arrays")
+    active.add(value)
+    for (let i = 0; i < value.length; i++) append(value[i])
+    active.delete(value)
+  }
+  append(input)
+  return normalized
+}
+
+function sourceTags(source: Lite.TagSource): Lite.Tagged<any>[] {
+  return normalizeTags(isTagged(source) || isTagInputArray(source) ? source : source.tags) ?? []
+}
+
 /**
  * Returns all tags that have been created.
  *
@@ -143,7 +175,7 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
   }
 
   function get(source: Lite.TagSource): T {
-    const tags = Array.isArray(source) ? source : source.tags ?? []
+    const tags = sourceTags(source)
     for (let i = 0; i < tags.length; i++) {
       if (tags[i]!.key === key) return tags[i]!.value as unknown as T
     }
@@ -152,7 +184,7 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
   }
 
   function find(source: Lite.TagSource): T | undefined {
-    const tags = Array.isArray(source) ? source : source.tags ?? []
+    const tags = sourceTags(source)
     for (let i = 0; i < tags.length; i++) {
       if (tags[i]!.key === key) return tags[i]!.value as unknown as T
     }
@@ -161,7 +193,7 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
   }
 
   function collect(source: Lite.TagSource): T[] {
-    const tags = Array.isArray(source) ? source : source.tags ?? []
+    const tags = sourceTags(source)
     const result: T[] = []
     for (let i = 0; i < tags.length; i++) {
       if (tags[i]!.key === key) result.push(tags[i]!.value as unknown as T)

@@ -1,6 +1,8 @@
 import { atom, tag, tags, type Lite } from "@pumped-fn/lite"
 import { Cron } from "croner"
 
+type TagInput = Lite.Tagged<any> | readonly TagInput[]
+
 export namespace Scheduler {
   export type Cadence = { cron: string } | { every: string }
   export type Overlap = "skip" | "queue"
@@ -28,7 +30,7 @@ export namespace Scheduler {
     flow: Lite.Flow<any, Input, any>
     input: () => Input
     onError?: OnError
-    tags?: () => Lite.Tagged<any>[]
+    tags?: () => TagInput
   }
 }
 
@@ -51,7 +53,7 @@ export function schedule<Input>(opts: Scheduler.Options<Input>): Lite.Atom<Sched
         { name, cadence: opts.cadence, overlap, catchUp, onError: opts.onError },
         async (tick) => {
           const context = ctx.scope.createContext({
-            tags: [run({ name, scheduledAt: tick.scheduledAt }), ...(opts.tags?.() ?? [])],
+            tags: [run({ name, scheduledAt: tick.scheduledAt }), opts.tags?.() ?? []],
           })
           try {
             await context.exec({ flow: opts.flow, input: opts.input() } as Lite.ExecFlowOptions<unknown, Input>)

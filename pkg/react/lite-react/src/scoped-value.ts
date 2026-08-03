@@ -6,6 +6,7 @@ import { createStore, type PatchValue } from './store'
 
 type ScopedValueActions = object
 type ScopedValueDeps = Record<string, Lite.ResourceDependency>
+type TagInput = Lite.Tagged<any> | readonly TagInput[]
 
 type ScopedValueHelpers<State> = {
   readonly ctx: Lite.ExecutionContext
@@ -46,7 +47,7 @@ interface ScopedValueConfig<
   Actions extends ScopedValueActions = {},
 > {
   name?: string
-  tags?: Lite.Tagged<any>[]
+  tags?: TagInput
   deps?: Deps
   initial(ctx: Lite.ExecutionContext, deps: Lite.InferDeps<Deps>): State
   actions?(

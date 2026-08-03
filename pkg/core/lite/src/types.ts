@@ -91,14 +91,14 @@ export namespace Lite {
   }
 
   export interface CreateContextOptions {
-    tags?: Tagged<any>[]
+    tags?: TagInput
     parent?: ExecutionContext
     signal?: AbortSignal
   }
 
   export interface ScopeOptions {
     extensions?: Extension[]
-    tags?: Tagged<any>[]
+    tags?: TagInput
     presets?: Preset<any, any, any>[]
     gc?: GCOptions
   }
@@ -132,7 +132,7 @@ export namespace Lite {
 
   export interface FlowRunOptions {
     name?: string
-    tags?: Tagged<any>[]
+    tags?: TagInput
     signal?: AbortSignal
   }
 
@@ -161,7 +161,7 @@ export namespace Lite {
 
   export interface FlowInvocation<Output, Input, Yield = never> {
     readonly flow: Flow<Output, Input, any, Yield>
-    readonly options: FlowPrepareOptions<Input>
+    readonly options: FlowPrepareOptions<Input> & { tags?: Tagged<any>[] }
     readonly key: string | undefined
     readonly ready: Promise<void>
     exec(): Promise<Output>
@@ -302,7 +302,7 @@ export namespace Lite {
   export type ExecFlowOptions<Output, Input, Yield = never> = {
     flow: Flow<Output, Input, any, Yield>
     name?: string
-    tags?: Tagged<any>[]
+    tags?: TagInput
     signal?: AbortSignal
   } & (
     | ([NoInfer<Input>] extends [void | undefined | null]
@@ -320,7 +320,7 @@ export namespace Lite {
     deps: D
     fn: (deps: InferDeps<D>, ...args: Args) => Result
     params: Args
-    tags?: Tagged<any>[]
+    tags?: TagInput
     signal?: AbortSignal
     flow?: never
   } & (Extract<
@@ -336,7 +336,7 @@ export namespace Lite {
     deps?: never
     fn: (...args: Args) => Result
     params: Args
-    tags?: Tagged<any>[]
+    tags?: TagInput
     signal?: AbortSignal
     flow?: never
   } & (Extract<
@@ -456,7 +456,9 @@ export namespace Lite {
     readonly tag: Tag<T, boolean>
   }
 
-  export type TagSource = Tagged<any>[] | { tags?: Tagged<any>[] }
+  export type TagInput = Tagged<any> | readonly TagInput[]
+
+  export type TagSource = TagInput | { tags?: TagInput }
 
   export interface TagExecutor<Output, Value = Output> {
     readonly [tagExecutorSymbol]: true
