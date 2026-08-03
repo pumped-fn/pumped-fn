@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
@@ -20,7 +20,23 @@ try {
   run("pnpm", ["--filter", "@pumped-fn/lite-react", "build"])
   mkdirSync(output, { recursive: true })
 
-  for (let pair = 1; pair <= 5; pair++) {
+  capture(1, 5)
+  if (compare(5).decision === "evidence_inconclusive") {
+    capture(6, 9)
+    compare(9)
+  }
+} finally {
+  spawnSync("git", ["worktree", "remove", "--force", baseline], { cwd: repo })
+}
+
+function run(command, args, env = process.env) {
+  const result = spawnSync(command, args, { cwd: repo, stdio: "inherit", env })
+  if (result.error) throw result.error
+  if (result.status !== 0) process.exit(result.status ?? 1)
+}
+
+function capture(first, last) {
+  for (let pair = first; pair <= last; pair++) {
     const variants = pair % 2 === 1 ? ["baseline", "candidate"] : ["candidate", "baseline"]
     for (const lane of ["lite", "lite-react"]) {
       for (let position = 1; position <= 2; position++) {
@@ -43,25 +59,21 @@ try {
       }
     }
   }
+}
 
+function compare(pairs) {
+  const path = resolve(output, `comparison-${pairs}.json`)
   const result = spawnSync(process.execPath, [
     resolve(repo, "benchmarks/lite-perf/scripts/compare.mjs"),
     "--mode", "full",
     "--input-dir", output,
-    "--pairs", "5",
+    "--pairs", String(pairs),
     "--floor", "0.95",
-    "--output", resolve(output, "comparison.json"),
+    "--output", path,
   ], { cwd: repo, encoding: "utf8" })
   process.stdout.write(result.stdout)
   process.stderr.write(result.stderr)
   if (result.error) throw result.error
   if (result.status !== 0 && result.status !== 2) process.exit(result.status ?? 1)
-} finally {
-  spawnSync("git", ["worktree", "remove", "--force", baseline], { cwd: repo })
-}
-
-function run(command, args, env = process.env) {
-  const result = spawnSync(command, args, { cwd: repo, stdio: "inherit", env })
-  if (result.error) throw result.error
-  if (result.status !== 0) process.exit(result.status ?? 1)
+  return JSON.parse(readFileSync(path, "utf8"))
 }
