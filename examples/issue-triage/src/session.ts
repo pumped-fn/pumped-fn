@@ -144,7 +144,7 @@ export const load: session.Load = flow({
   name: "issue-triage.session.load",
   parse: typed<{ id: string }>(),
   deps: { pool: control },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { pool }): Promise<session.SessionRecord> => {
     const result = await ctx.exec({
       fn: (target, sql, values) => target.query<{ record: unknown }>(sql, [...values]),
@@ -161,7 +161,7 @@ export const commit: session.Commit = flow({
   name: "issue-triage.session.commit",
   parse: typed<{ record: session.SessionRecord; expectedVersion: number }>(),
   deps: { pool: control },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { pool }): Promise<{ version: number }> => {
     const version = ctx.input.expectedVersion + 1
     const record = { ...ctx.input.record, version }

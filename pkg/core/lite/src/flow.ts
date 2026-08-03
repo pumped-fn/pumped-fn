@@ -1,5 +1,6 @@
 import { flowSymbol, typedSymbol, FlowFault, type Lite, type MaybePromise } from "./types"
 import { warmDepsGraph } from "./deps-graph"
+import { normalizeTags } from "./tag"
 
 /**
  * Type marker for flow input without runtime parsing.
@@ -31,7 +32,7 @@ export interface FlowConfig<
   deps?: D
   faults?: Lite.Typed<Fault>
   factory: Lite.FlowFactory<Output, Input, Fault, D, Yield>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }
 
 /**
@@ -57,7 +58,7 @@ export function flow<Fault = never>(config: {
   deps?: undefined
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault>) => never
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<never, void, Fault>
 
 export function flow<
@@ -69,7 +70,7 @@ export function flow<
   deps: D
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault>, deps: Lite.InferDeps<D>) => never
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<never, void, Fault>
 
 export function flow<Output, Yield, Fault = never>(config: {
@@ -78,7 +79,7 @@ export function flow<Output, Yield, Fault = never>(config: {
   deps?: undefined
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault>) => AsyncGenerator<Yield, Output, unknown>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<Output, void, Fault, Yield>
 
 export function flow<Output, Yield, Input, Fault = never>(config: {
@@ -87,7 +88,7 @@ export function flow<Output, Yield, Input, Fault = never>(config: {
   deps?: undefined
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }) => AsyncGenerator<Yield, Output, unknown>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<Output, Input, Fault, Yield>
 
 export function flow<Output, Yield, Input, Fault = never>(config: {
@@ -96,7 +97,7 @@ export function flow<Output, Yield, Input, Fault = never>(config: {
   deps?: undefined
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }) => AsyncGenerator<Yield, Output, unknown>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<Output, Input, Fault, Yield>
 
 export function flow<
@@ -110,7 +111,7 @@ export function flow<
   deps: D
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault>, deps: Lite.InferDeps<D>) => AsyncGenerator<Yield, Output, unknown>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<Output, void, Fault, Yield>
 
 export function flow<
@@ -125,7 +126,7 @@ export function flow<
   deps: D
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }, deps: Lite.InferDeps<D>) => AsyncGenerator<Yield, Output, unknown>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<Output, Input, Fault, Yield>
 
 export function flow<
@@ -140,7 +141,7 @@ export function flow<
   deps: D
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }, deps: Lite.InferDeps<D>) => AsyncGenerator<Yield, Output, unknown>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<Output, Input, Fault, Yield>
 
 export function flow<Output, Fault = never>(config: {
@@ -149,7 +150,7 @@ export function flow<Output, Fault = never>(config: {
   deps?: undefined
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault>) => MaybePromise<Output>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<Output, void, Fault>
 
 export function flow<Output, Input, Fault = never>(config: {
@@ -158,7 +159,7 @@ export function flow<Output, Input, Fault = never>(config: {
   deps?: undefined
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }) => MaybePromise<Output>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<Output, Input, Fault>
 
 export function flow<Output, Input, Fault = never>(config: {
@@ -167,7 +168,7 @@ export function flow<Output, Input, Fault = never>(config: {
   deps?: undefined
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }) => MaybePromise<Output>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<Output, Input, Fault>
 
 export function flow<
@@ -180,7 +181,7 @@ export function flow<
   deps: D
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault>, deps: Lite.InferDeps<D>) => MaybePromise<Output>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<Output, void, Fault>
 
 export function flow<
@@ -194,7 +195,7 @@ export function flow<
   deps: D
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }, deps: Lite.InferDeps<D>) => MaybePromise<Output>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<Output, Input, Fault>
 
 export function flow<
@@ -208,7 +209,7 @@ export function flow<
   deps: D
   faults?: Lite.Typed<Fault>
   factory: (ctx: Lite.ExecutionContext<Fault> & { readonly input: NoInfer<Input> }, deps: Lite.InferDeps<D>) => MaybePromise<Output>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
 }): Lite.Flow<Output, Input, Fault>
 
 export function flow(config: any): Lite.Flow<any, any, any, any> {
@@ -232,7 +233,7 @@ export function flow(config: any): Lite.Flow<any, any, any, any> {
       unknown
     >,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
-    tags: config.tags,
+    tags: normalizeTags(config.tags),
   }
 }
 

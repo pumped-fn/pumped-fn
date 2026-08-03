@@ -604,7 +604,7 @@ describe('ExecutionContextProvider + useResource', () => {
 
     const view = render(
       <ScopeProvider scope={scope}>
-        <ExecutionContextProvider tags={[tenant('acme')]}>
+        <ExecutionContextProvider tags={[[tenant('acme')]]}>
           <TestComponent />
         </ExecutionContextProvider>
       </ScopeProvider>
@@ -677,10 +677,12 @@ describe('ExecutionContextProvider + useResource', () => {
       eq: (a, b) => a.id === b.id && a.version === b.version,
     })
     const scope = createScope()
+    const meta = tag<string>({ label: 'managed-object-meta' })
     const closes: number[] = []
     let creates = 0
     const draft = scopedValue({
       name: 'managed-object-draft',
+      tags: meta('draft'),
       deps: { boundary: tags.required(boundary) },
       initial: (_ctx, { boundary }) => ({
         id: boundary.id,
@@ -691,6 +693,8 @@ describe('ExecutionContextProvider + useResource', () => {
         closes.push(helpers.get().created)
       },
     })
+
+    expect(meta.find(draft)).toBe('draft')
 
     function Editor() {
       const load = useScopedValue(draft, { suspense: false })

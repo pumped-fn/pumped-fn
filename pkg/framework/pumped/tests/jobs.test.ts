@@ -80,7 +80,7 @@ describe("runJobs", () => {
 
   it("does not notify io.onDefaultBackend when the app config sets its own scheduler.backend tag", async () => {
     const manifest: Manifest = {
-      app: { tags: [scheduler.backend(scheduler.inProcess())] },
+      app: { tags: scheduler.backend(scheduler.inProcess()) },
       entries: [],
     }
     let notified = false

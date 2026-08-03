@@ -1,11 +1,11 @@
 import { atomSymbol, controllerDepSymbol, flowSymbol, resourceSymbol, type Lite, type MaybePromise } from "./types"
-import { registerAtomToTags } from "./tag"
+import { normalizeTags, registerAtomToTags } from "./tag"
 import { warmDepsGraph } from "./deps-graph"
 
 export interface AtomConfig<T, D extends Record<string, Lite.Dependency>> {
   deps?: D
   factory: Lite.AtomFactory<T, D>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
   keepAlive?: boolean
 }
 
@@ -29,7 +29,7 @@ export interface AtomConfig<T, D extends Record<string, Lite.Dependency>> {
 export function atom<T>(config: {
   deps?: undefined
   factory: (ctx: Lite.ResolveContext) => MaybePromise<T>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
   keepAlive?: boolean
 }): Lite.Atom<T>
 
@@ -39,21 +39,22 @@ export function atom<
 >(config: {
   deps: D
   factory: (ctx: Lite.ResolveContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
   keepAlive?: boolean
 }): Lite.Atom<T>
 
 export function atom(config: any): Lite.Atom<any> {
+  const normalizedTags = normalizeTags(config.tags)
   const atomInstance: Lite.Atom<any> = {
     [atomSymbol]: true,
     factory: config.factory,
     deps: config.deps,
-    tags: config.tags,
+    tags: normalizedTags,
     keepAlive: config.keepAlive,
   }
 
-  if (config.tags?.length) {
-    registerAtomToTags(atomInstance, config.tags)
+  if (normalizedTags?.length) {
+    registerAtomToTags(atomInstance, normalizedTags)
   }
 
   if (config.deps) warmDepsGraph(config.deps as Record<string, Lite.Dependency>)
@@ -188,7 +189,7 @@ export function controller<T>(
       [controllerDepSymbol]: true,
       flow: target as Lite.Flow<any, any, any, any>,
       name: flowOptions?.name,
-      tags: flowOptions?.tags,
+      tags: normalizeTags(flowOptions?.tags),
       key: flowOptions?.key,
     }
   }

@@ -14,14 +14,19 @@ const contextTag = tag<string>({ label: "context" })
 const scope = createScope()
 
 scope.createContext({ tags: [contextTag("ok")] })
+scope.createContext({ tags: contextTag("single") })
+scope.createContext({ tags: [contextTag("nested"), [contextTag("list")]] })
 const parentCtx = scope.createContext()
 scope.createContext({ parent: parentCtx, tags: [contextTag("child")] })
 
 // @ts-expect-error createContext takes an options object, not bare tags
 scope.createContext([contextTag("legacy")])
 
-// @ts-expect-error createContext options only accept tags and parent
+// @ts-expect-error createContext options use the tags key
 scope.createContext({ tag: [contextTag("typo")] })
+
+// @ts-expect-error tags require bound values, not tag definitions
+scope.createContext({ tags: contextTag })
 
 atom({
   deps: { source: controller(sourceAtom, { resolve: true, watch: true }) },
@@ -353,4 +358,3 @@ flow({
     return { profile, optionalHandle, allHandles }
   },
 })
-

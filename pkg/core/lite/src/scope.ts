@@ -3,6 +3,7 @@ import { isAtom, isControllerDep } from "./atom"
 import { classifyDeps, type DepsGraph } from "./deps-graph"
 import { isFlow } from "./flow"
 import { isResource } from "./resource"
+import { isTagged, normalizeTags } from "./tag"
 import { latest, type Latest } from "./latest"
 import { assertNoReturnedStream, consumeScalarResult, isAsyncGenerator, isAsyncGeneratorFunction, isPromiseLike, markStreamingExec, registerStreamingExec, requireAsyncGenerator, streamResultBeforeStartError } from "./streaming"
 export { isStreamingExec } from "./streaming"
@@ -261,7 +262,7 @@ type ExecFlowRuntimeOptions = {
   input?: unknown
   rawInput?: unknown
   name?: string
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
   signal?: AbortSignal
   blockedTags?: Lite.Tagged<any>[]
 }
@@ -271,7 +272,7 @@ type ExecDepsRuntimeOptions = {
   deps: Record<string, Lite.ExecutionDependency>
   fn: (deps: Record<string, unknown>, ...params: any[]) => unknown
   params: unknown[]
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
   signal?: AbortSignal
 }
 
@@ -280,7 +281,7 @@ type ExecRuntimeOptions = {
   deps?: undefined
   fn: (...params: any[]) => unknown
   params: unknown[]
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
   signal?: AbortSignal
 }
 
@@ -588,7 +589,7 @@ class ScopeImpl implements Lite.Scope {
 
   constructor(options?: Lite.ScopeOptions) {
     this.extensions = options?.extensions ?? []
-    this.tags = options?.tags ?? []
+    this.tags = normalizeTags(options?.tags) ?? []
     this.resolveExts = this.extensions.filter(e => e.wrapResolve)
     this.execExts = this.extensions.filter(e => e.wrapExec)
 
@@ -1422,7 +1423,7 @@ class ScopeImpl implements Lite.Scope {
       },
       prepare: (...args: Lite.FlowPrepareArgs<Input>) => {
         const options = this.mergeFlowOptions(defaults, args[0] ?? {})
-        const preparedOptions = options as Lite.FlowPrepareOptions<Input>
+        const preparedOptions = options as Lite.FlowPrepareOptions<Input> & { tags?: Lite.Tagged<any>[] }
         const preparedCtx = new ExecutionContextImpl(this, {
           parent: ctx,
           boundary: false,
@@ -1545,16 +1546,15 @@ class ScopeImpl implements Lite.Scope {
     defaults: Lite.FlowControllerOptions<Input> | undefined,
     options: Lite.FlowPrepareOptions<Input> | Lite.FlowExecOptions<Input> | {}
   ): Lite.FlowPrepareOptions<Input> | Lite.FlowExecOptions<Input> | {} {
-    if (!defaults) return options
     const callOptions = options as Lite.FlowPrepareOptions<Input>
-    const defaultTags = defaults.tags ?? []
-    const callTags = callOptions.tags ?? []
+    const defaultTags = normalizeTags(defaults?.tags) ?? []
+    const callTags = normalizeTags(callOptions.tags) ?? []
     return {
-      ...defaults,
+      ...(defaults ?? {}),
       ...callOptions,
       tags: defaultTags.length > 0 || callTags.length > 0
         ? [...defaultTags, ...callTags]
-        : undefined,
+        : defaults?.tags !== undefined || callOptions.tags !== undefined ? [] : undefined,
     }
   }
 
@@ -2275,13 +2275,14 @@ class ScopeImpl implements Lite.Scope {
     Result,
   >(options: Lite.ExecDepsOptions<D, Args, Result>): Promise<Awaited<Result>>
   async run(options: ExecFlowRuntimeOptions | ExecRuntimeOptions | ExecDepsRuntimeOptions): Promise<unknown> {
-    const ctx = this.createContext(options.tags || options.signal
-      ? { tags: options.tags, signal: options.signal }
+    const execTags = normalizeTags(options.tags)
+    const ctx = this.createContext(execTags || options.signal
+      ? { tags: execTags, signal: options.signal }
       : undefined) as ExecutionContextImpl
     try {
       let execution: ExecFlowRuntimeOptions | ExecRuntimeOptions | ExecDepsRuntimeOptions
       if ("flow" in options && options.flow !== undefined) {
-        execution = { ...options, tags: undefined, signal: undefined, blockedTags: options.tags }
+        execution = { ...options, tags: undefined, signal: undefined, blockedTags: execTags }
       } else {
         execution = { ...options, tags: undefined, signal: undefined }
       }
@@ -2321,14 +2322,15 @@ class ScopeImpl implements Lite.Scope {
           let ctx: ExecutionContextImpl | undefined
           let closed = false
           try {
-            ctx = owner.createContext(options.tags || options.signal
-              ? { tags: options.tags, signal: options.signal }
+            const execTags = normalizeTags(options.tags)
+            ctx = owner.createContext(execTags || options.signal
+              ? { tags: execTags, signal: options.signal }
               : undefined) as ExecutionContextImpl
             const stream = ctx.execStream({
               ...options,
               tags: undefined,
               signal: undefined,
-              blockedTags: options.tags,
+              blockedTags: execTags,
             })
             for await (const value of stream) yield value
             const output = await stream.result
@@ -2370,9 +2372,9 @@ class ScopeImpl implements Lite.Scope {
         throw new Error("createContext() parent must belong to the same scope")
       }
     }
-    const ctx = new ExecutionContextImpl(this, options)
+    const ctxTags = normalizeTags(options?.tags)
+    const ctx = new ExecutionContextImpl(this, options && { ...options, tags: ctxTags })
 
-    const ctxTags = options?.tags
     if (ctxTags && ctxTags.length > 0) {
       for (let i = 0; i < ctxTags.length; i++) {
         ctx.appendTagValue(ctxTags[i]!.key, ctxTags[i]!.value)
@@ -2401,7 +2403,7 @@ function assertCreateContextOptions(options: unknown): asserts options is Lite.C
   if (invalidKey) {
     throw new Error(`createContext() expects { tags, parent, signal }; received "${invalidKey}"`)
   }
-  if (record["tags"] !== undefined && !Array.isArray(record["tags"])) {
+  if (record["tags"] !== undefined && !isTagged(record["tags"]) && !Array.isArray(record["tags"])) {
     throw new Error("createContext() expects { tags, parent, signal }")
   }
 }
@@ -2692,10 +2694,10 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   exec(options: ExecFlowRuntimeOptions | ExecRuntimeOptions | ExecDepsRuntimeOptions): Promise<unknown> {
     try {
       this.assertOpen()
+      return this.runExec({ ...options, tags: normalizeTags(options.tags) })
     } catch (error) {
       return Promise.reject(error)
     }
-    return this.runExec(options)
   }
 
   private async runExec(options: ExecFlowRuntimeOptions | ExecRuntimeOptions | ExecDepsRuntimeOptions): Promise<unknown> {
@@ -2794,7 +2796,13 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       [Symbol.asyncIterator]() {
         if (consumed) throw new Error("execStream() results can be consumed only once.")
         consumed = true
-        const iterator = owner.iterateExecStream(options, result, settleResult!, failResult!, start)
+        const iterator = owner.iterateExecStream(
+          { ...options, tags: normalizeTags(options.tags) },
+          result,
+          settleResult!,
+          failResult!,
+          start,
+        )
         owner.activeIterators ??= new Set()
         owner.activeIterators.add(iterator)
         return {
@@ -2824,10 +2832,11 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   private seedTags(
     childCtx: ExecutionContextImpl,
-    execTags?: Lite.Tagged<any>[],
+    inputTags?: Lite.TagInput,
     flowTags?: Lite.Tagged<any>[],
     blockedTags?: Lite.Tagged<any>[]
   ): void {
+    const execTags = normalizeTags(inputTags)
     if (execTags) for (let i = 0; i < execTags.length; i++) {
       childCtx.appendTagValue(execTags[i]!.key, execTags[i]!.value)
     }

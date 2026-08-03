@@ -27,7 +27,7 @@ describe("TanStack Start helpers", () => {
       headers: { "x-request-id": "request-a" },
     })
     const withRequest = lite.request({
-      tags: (request) => [requestId(request.headers.get("x-request-id") ?? "missing")],
+      tags: (request) => requestId(request.headers.get("x-request-id") ?? "missing"),
     })
 
     const result = await withRequest.options.server!({
@@ -67,7 +67,7 @@ describe("TanStack Start helpers", () => {
     let parentRequestId: unknown
     const controller = new AbortController()
     const withCall = lite.call({
-      tags: () => [requestId("child")],
+      tags: () => [[], requestId("child")],
     })
 
     await withCall.options.server!({

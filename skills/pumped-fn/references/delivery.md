@@ -78,7 +78,7 @@ export const waterBed = flow({
 import { createScope } from "@pumped-fn/lite"
 import { plot, waterBed } from "../src/garden.js"
 
-const scope = createScope({ tags: [plot("herbs")] })
+const scope = createScope({ tags: plot("herbs") })
 const ctx = scope.createContext()
 try {
   console.log(await ctx.exec({ flow: waterBed, input: { ml: 300 } }))
@@ -105,7 +105,7 @@ describe("waterBed", () => {
       presets: [preset(pump, {
         deliver: async (ml: number) => { delivered.push(ml) },
       })],
-      tags: [plot("herbs")],
+      tags: plot("herbs"),
     })
     const ctx = scope.createContext()
     const run = ctx.exec({ flow: waterBed, input: { ml: 300 } })

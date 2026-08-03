@@ -56,11 +56,11 @@ A tool is an ordinary flow carrying `agent.config.tool` metadata. Its dependenci
 ```ts
 const inspectIssue = flow({
   name: "inspect_issue",
-  tags: [agent.config.tool({
+  tags: agent.config.tool({
     version: "1",
     description: "Read issue and repository evidence.",
     input: issueSchema,
-  })],
+  }),
   deps: {
     repository: tags.required(repository.impl.inspect),
     ready: tags.required(repository.ready),

@@ -25,12 +25,12 @@ const wire = sync.memory()
 
 const left = createScope({
   extensions: [sync.extension()],
-  tags: [sync.runtime({ peer: "left", transport: wire })],
+  tags: sync.runtime({ peer: "left", transport: wire }),
 })
 
 const right = createScope({
   extensions: [sync.extension()],
-  tags: [sync.runtime({ peer: "right", transport: wire })],
+  tags: sync.runtime({ peer: "right", transport: wire }),
 })
 ```
 

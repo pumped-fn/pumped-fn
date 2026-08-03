@@ -32,7 +32,7 @@ describe("middleware", () => {
     app.use(
       "*",
       lite.middleware<BaseEnv>({
-        tags: (request) => [requestId(request.headers.get("x-request-id") ?? "missing")],
+        tags: (request) => requestId(request.headers.get("x-request-id") ?? "missing"),
       })
     )
     app.use("*", async (context, next) => {

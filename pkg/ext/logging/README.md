@@ -21,14 +21,12 @@ import { logging } from "@pumped-fn/lite-extension-logging"
 const records = logging.memory()
 const scope = createScope({
   extensions: [logging.extension()],
-  tags: [
-    logging.runtime({
-      sinks: [records],
-      level: "info",
-      flow: "errors",
-      fields: { service: "worker" },
-    }),
-  ],
+  tags: logging.runtime({
+    sinks: [records],
+    level: "info",
+    flow: "errors",
+    fields: { service: "worker" },
+  }),
 })
 
 const run = flow({

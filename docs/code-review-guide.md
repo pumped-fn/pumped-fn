@@ -43,7 +43,7 @@ const send = flow({
 })
 
 const scope = createScope({
-  tags: [clock({ now: () => new Date("2026-07-05T12:00:00.000Z") })],
+  tags: clock({ now: () => new Date("2026-07-05T12:00:00.000Z") }),
 })
 
 const ctx = scope.createContext()

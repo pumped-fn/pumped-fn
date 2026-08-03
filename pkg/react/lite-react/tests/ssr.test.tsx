@@ -3,6 +3,7 @@ import { renderToString } from 'react-dom/server'
 import { renderToReadableStream } from 'react-dom/server.browser'
 import { hydrateRoot } from 'react-dom/client'
 import { act, Suspense } from 'react'
+import { tag } from '@pumped-fn/lite'
 import { atom, createScope, resource, ExecutionContextProvider, ScopeProvider, useAtom, useExecutionContext, useResource, useSelect, type Lite } from '../src'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -57,20 +58,22 @@ describe('SSR', () => {
 
   it('managed ExecutionContextProvider renders children on the server', () => {
     const scope = createScope()
+    const marker = tag<string>({ label: 'ssr-context-tag-input' })
 
     function Probe() {
-      useExecutionContext()
-      return <div>inside-ctx</div>
+      const ctx = useExecutionContext()
+      return <div>inside-ctx:{ctx.data.seekTag(marker)}</div>
     }
 
     const html = renderToString(
       <ScopeProvider scope={scope}>
-        <ExecutionContextProvider>
+        <ExecutionContextProvider tags={[[marker('nested')]]}>
           <Probe />
         </ExecutionContextProvider>
       </ScopeProvider>
     )
     expect(html).toContain('inside-ctx')
+    expect(html).toContain('nested')
   })
 
   it('streaming SSR resolves resources under a managed provider', async () => {

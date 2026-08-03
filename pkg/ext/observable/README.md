@@ -21,14 +21,12 @@ import { observable } from "@pumped-fn/lite-extension-observable"
 const events = observable.memory()
 const scope = createScope({
   extensions: [observable.extension()],
-  tags: [
-    observable.runtime({
-      sinks: [events],
-      only: ["flow", "resource"],
-      input: false,
-      output: false,
-    }),
-  ],
+  tags: observable.runtime({
+    sinks: [events],
+    only: ["flow", "resource"],
+    input: false,
+    output: false,
+  }),
 })
 
 const run = flow({

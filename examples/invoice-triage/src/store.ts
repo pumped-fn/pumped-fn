@@ -45,7 +45,7 @@ export const enqueue = flow({
     outstanding: controller(outstanding, { resolve: true }),
     queueSignal: controller(queueSignal, { resolve: true }),
   },
-  tags: [step({ workflow: true, kind: "store" })],
+  tags: step({ workflow: true, kind: "store" }),
   factory: async (ctx, { db, clock, outstanding, queueSignal }): Promise<EnqueueSummary> => {
     const accepted = await db.transaction(async (tx) => {
       const rows = ctx.input.invoices.map((invoice) => ({
@@ -80,7 +80,7 @@ export const settleInvoice = flow({
     db: database,
     clock: tags.required(clock),
   },
-  tags: [step({ workflow: true, kind: "store" })],
+  tags: step({ workflow: true, kind: "store" }),
   factory: (ctx, { db, clock }): Promise<StoredInvoice> => db.transaction(async (tx) => {
     const importedAt = clock.now()
     const claimed = await tx.delete(pendingInvoices).where(eq(pendingInvoices.id, ctx.input.invoice.id)).returning({ id: pendingInvoices.id })
@@ -132,7 +132,7 @@ export const saveInvoice = flow({
 export const listStored = flow({
   name: "invoice.listStored",
   deps: { db: database },
-  tags: [step({ workflow: true, kind: "store" })],
+  tags: step({ workflow: true, kind: "store" }),
   factory: async (_ctx, { db }): Promise<readonly StoredInvoice[]> => {
     const rows = await db.select().from(storedInvoices).orderBy(asc(storedInvoices.importedAt), asc(storedInvoices.id))
     return rows.map(storedFromRow)
@@ -142,7 +142,7 @@ export const listStored = flow({
 export const listPending = flow({
   name: "invoice.listPending",
   deps: { db: database },
-  tags: [step({ workflow: true, kind: "store" })],
+  tags: step({ workflow: true, kind: "store" }),
   factory: async (_ctx, { db }): Promise<readonly Invoice[]> => {
     const rows = await db.select().from(pendingInvoices).orderBy(asc(pendingInvoices.enqueuedAt), asc(pendingInvoices.id))
     return rows.map((row) => row.invoice)
@@ -152,7 +152,7 @@ export const listPending = flow({
 export const reviewCount = flow({
   name: "invoice.reviewCount",
   deps: { db: database },
-  tags: [step({ workflow: true, kind: "store" })],
+  tags: step({ workflow: true, kind: "store" }),
   factory: async (_ctx, { db }): Promise<number> => {
     const [row] = await db.select({ value: count() }).from(storedInvoices)
       .where(sql`${storedInvoices.classification}->>'risk' = 'review'`)
@@ -163,7 +163,7 @@ export const reviewCount = flow({
 export const listAudit = flow({
   name: "invoice.listAudit",
   deps: { db: database },
-  tags: [step({ workflow: true, kind: "store" })],
+  tags: step({ workflow: true, kind: "store" }),
   factory: async (_ctx, { db }): Promise<readonly AuditEvent[]> => {
     const rows = await db.select().from(auditEvents).orderBy(asc(auditEvents.sequence))
     return rows.map(auditFromRow)
@@ -177,7 +177,7 @@ export const markReminderSent = flow({
     db: database,
     clock: tags.required(clock),
   },
-  tags: [step({ workflow: true, kind: "store" })],
+  tags: step({ workflow: true, kind: "store" }),
   factory: (ctx, { db, clock }): Promise<StoredInvoice | undefined> => db.transaction(async (tx) => {
     const remindedAt = clock.now()
     const [row] = await tx.update(storedInvoices)

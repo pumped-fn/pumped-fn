@@ -103,7 +103,7 @@ const loadUser = flow({
   factory: (ctx, deps) => deps.users.byId(ctx.input.id),
 })
 
-const scope = createScope({ tags: [tenant("acme")] })
+const scope = createScope({ tags: tenant("acme") })
 const user = await scope.run({ flow: loadUser, input: { id: "u1" } })
 
 if (user.name !== "acme:u1") throw new Error("unexpected user")
@@ -293,6 +293,24 @@ only to preconfigure child-flow `exec()`/`prepare()` defaults.
 Tags carry typed ambient values through scopes and execution contexts. Use them for config and runtime
 metadata that should not be parameter-drilled.
 
+Every `tags` input accepts one bound tag, a list, or nested lists. Nested lists are flattened from left
+to right without removing duplicates, and handles keep exposing a flat `Tagged[]` metadata array.
+
+```ts
+import { createScope, tag } from "@pumped-fn/lite"
+
+const region = tag<string>({ label: "region" })
+const stage = tag<string>({ label: "stage" })
+const tenant = tag<string>({ label: "tenant" })
+const deploymentTags = [region("us-east-1"), stage("production")]
+
+const single = createScope({ tags: tenant("acme") })
+const nested = createScope({ tags: [tenant("acme"), deploymentTags] })
+
+await single.dispose()
+await nested.dispose()
+```
+
 Tags can define `eq` for value equality inside that tag family. `tag.eq(a, b)` compares raw values.
 `tag.same(left, right)` first checks both tagged records belong to that family, then uses `eq`.
 
@@ -320,7 +338,7 @@ const same = account.same(
 
 if (!same) throw new Error("expected equal account tags")
 
-const scope = createScope({ tags: [account({ id: "acct_1", version: 1 })] })
+const scope = createScope({ tags: account({ id: "acct_1", version: 1 }) })
 const ctx = scope.createContext()
 const id = await ctx.exec({ flow: readAccount })
 

@@ -2086,10 +2086,17 @@ function depIsController(config: ts.ObjectLiteralExpression | null, key: string 
 
 function hasStepTag(config: ts.ObjectLiteralExpression | null, imports: Imports): boolean {
   const tagsProperty = config && objectProperty(config, "tags")
-  if (!tagsProperty || !ts.isArrayLiteralExpression(tagsProperty.initializer)) return false
-  return tagsProperty.initializer.elements.some((element) =>
-    ts.isCallExpression(element) && ts.isIdentifier(element.expression) && imports.stepLocals.has(element.expression.text)
-  )
+  if (!tagsProperty) return false
+  const containsStep = (expression: ts.Expression): boolean => {
+    const value = unwrapExpression(expression)
+    if (ts.isCallExpression(value) && ts.isIdentifier(value.expression)) {
+      return imports.stepLocals.has(value.expression.text)
+    }
+    return ts.isArrayLiteralExpression(value) && value.elements.some((element) =>
+      containsStep(ts.isSpreadElement(element) ? element.expression : element)
+    )
+  }
+  return containsStep(tagsProperty.initializer)
 }
 
 function shadowsName(

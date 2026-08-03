@@ -171,7 +171,7 @@ describe("GitHub production adapters", () => {
     const saved: unknown[] = []
     const requests: string[] = []
     const scope = createScope({
-      tags: [config.github({
+      tags: config.github({
         token: "token",
         repository: "acme/payments",
         label: "agent:triage",
@@ -180,7 +180,7 @@ describe("GitHub production adapters", () => {
         leaseMs: 300_000,
         publicationTimeoutMs: 30_000,
         maxAttempts: 5,
-      })],
+      }),
       presets: [
         preset(readPublication, () => undefined),
         preset(reservePublication, () => ({}) as PoolClient),
@@ -233,7 +233,7 @@ describe("GitHub production adapters", () => {
     const requests: string[] = []
     let released: boolean | undefined
     const scope = createScope({
-      tags: [config.github({
+      tags: config.github({
         token: "secret-token",
         repository: "acme/payments",
         label: "agent:triage",
@@ -242,7 +242,7 @@ describe("GitHub production adapters", () => {
         leaseMs: 300_000,
         publicationTimeoutMs: 30_000,
         maxAttempts: 5,
-      })],
+      }),
       presets: [
         preset(readPublication, () => undefined),
         preset(reservePublication, () => ({}) as PoolClient),
@@ -545,7 +545,7 @@ describe("GitHub production adapters", () => {
     } | undefined
     let posts = 0
     const scope = createScope({
-      tags: [config.github({
+      tags: config.github({
         token: "token",
         repository: "acme/payments",
         label: "agent:triage",
@@ -554,7 +554,7 @@ describe("GitHub production adapters", () => {
         leaseMs: 300_000,
         publicationTimeoutMs: 30_000,
         maxAttempts: 5,
-      })],
+      }),
       presets: [
         preset(reservePublication, async () => {
           const previous = available
@@ -652,7 +652,7 @@ describe("GitHub production adapters", () => {
     await ctx.exec({
       flow: releasePublication,
       input: { commit: true },
-      tags: [publication.reservation(reservation)],
+      tags: publication.reservation(reservation),
     })
     expect(statements.at(-1)).toBe("COMMIT")
     expect(released).toBe(true)
@@ -728,7 +728,7 @@ describe("GitHub production adapters", () => {
       },
     }
     const scope = createScope({
-      tags: [config.github({
+      tags: config.github({
         token: "token",
         repository: "acme/payments",
         label: "agent:triage",
@@ -737,7 +737,7 @@ describe("GitHub production adapters", () => {
         leaseMs: 300_000,
         publicationTimeoutMs: 1_000,
         maxAttempts: 5,
-      })],
+      }),
       presets: [
         preset(timers, fakeTimers),
         preset(reservePublication, () => ({}) as PoolClient),

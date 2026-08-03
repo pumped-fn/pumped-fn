@@ -127,11 +127,11 @@ const database = {
 
 const inspectSchema = flow({
   name: "inspect_schema",
-  tags: [agent.config.tool({
+  tags: agent.config.tool({
     version: "1",
     description: "Read the current database schema.",
     input: z.object({ schema: z.string() }),
-  })],
+  }),
   parse: typed<InspectInput>(),
   deps: {
     ready: tags.required(database.ready),
@@ -142,11 +142,11 @@ const inspectSchema = flow({
 
 const explainQuery = flow({
   name: "explain_query",
-  tags: [agent.config.tool({
+  tags: agent.config.tool({
     version: "1",
     description: "Explain a query without executing it.",
     input: z.object({ sql: z.string() }),
-  })],
+  }),
   parse: typed<ExplainInput>(),
   deps: {
     ready: tags.required(database.ready),

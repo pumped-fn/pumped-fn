@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest"
-import { atom, controller, createScope, resource, type Lite } from "@pumped-fn/lite"
+import { atom, controller, createScope, resource, tag, type Lite } from "@pumped-fn/lite"
 import { sync, type Sync } from "../src"
 
 describe("sync extension", () => {
+  it("normalizes sync metadata tags", () => {
+    const marker = tag<string>({ label: "sync-tag-input" })
+    const draft = sync({
+      id: "tagged-draft",
+      tags: [marker("one"), [marker("two")]],
+      factory: () => ({ title: "" }),
+    })
+
+    expect(marker.collect(draft)).toEqual(["one", "two"])
+  })
+
   it("replicates plain state through scope tags and public controllers", async () => {
     const draft = sync({
       id: "draft",
