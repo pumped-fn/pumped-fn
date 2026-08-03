@@ -19,6 +19,13 @@ describe("buildConfig", () => {
     expect(config.build.ssr).toBe(true)
     expect(config.build.rollupOptions.input).toBe("virtual:pumped/entry-cli")
   })
+
+  it("isolates named app artifacts from the default app", () => {
+    expect(buildConfig("server").build.outDir).toBe("dist")
+    expect(buildConfig("server", "default").build.outDir).toBe("dist")
+    expect(buildConfig("server", "east").build.outDir).toBe("dist/apps/east")
+    expect(buildConfig("cli", "east/preview").build.outDir).toBe("dist/apps/east%2Fpreview")
+  })
 })
 
 describe("selectTargetEntries", () => {

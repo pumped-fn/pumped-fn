@@ -36,7 +36,7 @@ async function dev(selectedApp?: string): Promise<void> {
 async function buildTarget(target: "server" | "cli", selectedApp?: string): Promise<void> {
   const userConfig = (await hasUserConfig()) ? {} : { plugins: [pumped({ app: selectedApp })] }
 
-  await viteBuild({ ...userConfig, ...buildConfig(target) })
+  await viteBuild({ ...userConfig, ...buildConfig(target, selectedApp) })
 }
 
 async function build(target: Target, selectedApp?: string): Promise<void> {

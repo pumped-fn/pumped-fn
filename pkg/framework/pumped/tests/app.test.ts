@@ -1,4 +1,5 @@
 import * as lite from "@pumped-fn/lite"
+import type { Lite } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
 import {
   app,
@@ -23,6 +24,15 @@ describe("app", () => {
     expect(app()).toEqual({})
     expect(pumped.app).toBe(app)
     expect(p.app).toBe(app)
+  })
+
+  it("rejects cyclic tags while composing apps", () => {
+    const cyclic: unknown[] = []
+    cyclic.push(cyclic)
+
+    expect(() => app({}, { tags: cyclic as Lite.TagInput })).toThrow(
+      "tags must not contain cyclic arrays"
+    )
   })
 
   it("composes tags, presets, extensions, context, and error mapping", async () => {

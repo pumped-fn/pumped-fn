@@ -54,10 +54,17 @@ export function discover(sourceDir: string): DiscoveryResult {
   const appFile = ["app.ts", "app.tsx", "app.js", "app.mjs"]
     .map((name) => join(root, name))
     .find((file) => existsSync(file))
-  const apps = listEntryFiles(join(root, "apps")).map((fileName) => ({
-    name: toKebabCase(fileName.replace(extname(fileName), "")),
-    file: join(root, "apps", fileName),
-  }))
+  const apps: AppDescriptor[] = []
+  const appNames = new Map<string, string>()
+  for (const fileName of listEntryFiles(join(root, "apps"))) {
+    const name = toKebabCase(fileName.replace(extname(fileName), ""))
+    const file = join(root, "apps", fileName)
+    const existing = appNames.get(name)
+    if (name === "default") throw new Error(`named app "default" is reserved for ${appFile ?? "src/app.ts"}`)
+    if (existing) throw new Error(`named app "${name}" is ambiguous: ${existing}, ${file}`)
+    appNames.set(name, file)
+    apps.push({ name, file })
+  }
 
   return { entries, appFile, apps }
 }

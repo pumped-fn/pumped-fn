@@ -37,7 +37,7 @@ Build the derived east app instead:
 
 ```bash
 pnpm -F @pumped-fn/pumped-tour build:east
-pnpm -F @pumped-fn/pumped-tour cli greet --json '{"name":"Ada"}'
+pnpm -F @pumped-fn/pumped-tour cli:east greet --json '{"name":"Ada"}'
 ```
 
 Its output ends with `from east`.
@@ -66,7 +66,8 @@ node, the flow declares its directory and region edges, and opaque factory work 
 `unknowns`.
 
 The production compiler emits `dist/server.mjs` with server roots and `dist/cli.mjs` with CLI roots.
-It does not put the other target's exclusive roots in either artifact.
+Named apps use their own directory, such as `dist/apps/east/`, so builds cannot mix app selections.
+No artifact contains the other target's exclusive roots.
 
 ## Package boundary verdict
 
@@ -78,8 +79,8 @@ The current verdict is to keep the package experimental. It removes two hand-wri
 roots and their build wiring in this small app, so the compiler earns a boundary. `app()` alone would
 not earn one.
 
-The dogfood build also exposes the next gate. Artifacts currently contain absolute source paths, and
-building east writes over the default files in `dist/`. The artifact still needs its selected app
-name and manifest hash. Graph analysis also still needs a command that loads the generated manifest
-without starting the app. If those gaps cannot be removed without making this example more complex,
-sunset Pumped and keep explicit Lite composition roots instead.
+The dogfood build also exposes the next gate. Artifacts currently contain absolute source paths.
+The artifact still needs its selected app name and manifest hash. Graph analysis also still needs a
+command that loads the generated manifest without starting the app. If those gaps cannot be removed
+without making this example more complex, sunset Pumped and keep explicit Lite composition roots
+instead.

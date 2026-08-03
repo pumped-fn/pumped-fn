@@ -1,15 +1,18 @@
 import { tag } from "@pumped-fn/lite"
 
+/** HTTP method and path metadata for a discovered server flow. */
 export interface RouteMeta {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
   path?: string
 }
 
+/** Name and help text metadata for a discovered CLI flow. */
 export interface CommandMeta {
   name?: string
   description?: string
 }
 
+/** Task and run identity attached to a workflow execution context. */
 export interface WorkflowRunMeta {
   taskId: string
   runId: string

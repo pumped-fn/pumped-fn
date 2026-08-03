@@ -6,12 +6,16 @@ type TagInput = Lite.TagInput
 export function normalizeTagInput(input: TagInput | undefined): Lite.Tagged<any>[] {
   if (input === undefined) return []
   const normalized: Lite.Tagged<any>[] = []
+  const active = new Set<readonly TagInput[]>()
   const append = (value: TagInput): void => {
     if (isTagged(value)) {
       normalized.push(value)
       return
     }
+    if (active.has(value)) throw new TypeError("tags must not contain cyclic arrays")
+    active.add(value)
     for (const nested of value) append(nested)
+    active.delete(value)
   }
   append(input)
   return normalized

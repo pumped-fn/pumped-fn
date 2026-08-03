@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto"
-import { readFileSync, writeFileSync } from "node:fs"
 import { dirname, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { build, version as viteVersion } from "vite"
@@ -9,7 +7,6 @@ import { flow as metaFlow } from "@pumped-fn/pumped/app"
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, "../../../../..")
 process.chdir(root)
-const evidenceFile = resolve(here, "authoring-import-v3.json")
 const liteFixture = resolve(here, "fixture/lite.mjs")
 const metaFixture = resolve(here, "fixture/meta.mjs")
 const maxExtraBytes = 256
@@ -34,10 +31,6 @@ function normalize(value) {
     : clean
 }
 
-function hash(value) {
-  return createHash("sha256").update(value).digest("hex")
-}
-
 async function capture(name) {
   try {
     const result = await build({
@@ -60,8 +53,14 @@ async function capture(name) {
     const chunks = outputs.filter((item) => item.type === "chunk")
     const assets = outputs.filter((item) => item.type === "asset")
     const modules = [...new Set(chunks.flatMap((chunk) => Object.keys(chunk.modules).map(normalize)))].sort()
+    const imports = [...new Set(chunks.flatMap((chunk) => [
+      ...chunk.imports,
+      ...chunk.dynamicImports,
+    ]).map(normalize))].sort()
     const references = [...new Set(
-      modules.flatMap((module) => forbidden.filter((value) => module.includes(value)))
+      [...modules, ...imports].flatMap((reference) => (
+        forbidden.filter((value) => reference.includes(value))
+      ))
     )].sort()
 
     return {
@@ -92,7 +91,7 @@ async function createEvidence() {
     && meta.forbiddenReferences.length === 0
     && identityPreserved
     && meta.emittedBytes <= lite.emittedBytes + maxExtraBytes
-  const evidence = {
+  return {
     schemaVersion: 1,
     nullHypothesis: "The one-package authoring import is worse than importing Lite directly.",
     frozenGate: {
@@ -105,13 +104,20 @@ async function createEvidence() {
       node: process.version,
       vite: viteVersion,
     },
-    inputs: {
-      liteFixture: hash(readFileSync(liteFixture)),
-      metaFixture: hash(readFileSync(metaFixture)),
-      litePackage: hash(readFileSync(resolve(root, "pkg/core/lite/dist/index.mjs"))),
-      metaPackage: hash(readFileSync(resolve(root, "pkg/framework/pumped/dist/app.mjs"))),
+    cases: {
+      lite: {
+        status: lite.status,
+        emittedBytes: lite.emittedBytes,
+        moduleCount: lite.moduleCount,
+        forbiddenReferences: lite.forbiddenReferences,
+      },
+      pumped: {
+        status: meta.status,
+        emittedBytes: meta.emittedBytes,
+        moduleCount: meta.moduleCount,
+        forbiddenReferences: meta.forbiddenReferences,
+      },
     },
-    cases: { lite, meta },
     comparison: {
       identityPreserved,
       extraBytes: meta.emittedBytes - lite.emittedBytes,
@@ -119,31 +125,8 @@ async function createEvidence() {
       nullRejected: metaGatePass,
     },
   }
-  const serialized = JSON.stringify(evidence)
-  return {
-    ...evidence,
-    selfHash: hash(serialized),
-  }
 }
 
 const evidence = await createEvidence()
-const output = `${JSON.stringify(evidence, null, 2)}\n`
-
-if (process.argv.includes("--write")) {
-  writeFileSync(evidenceFile, output)
-  process.stdout.write(output)
-} else {
-  const existing = readFileSync(evidenceFile, "utf8")
-  if (existing !== output) {
-    const expectedLines = existing.split("\n")
-    const actualLines = output.split("\n")
-    const index = expectedLines.findIndex((line, lineIndex) => line !== actualLines[lineIndex])
-    process.stderr.write(`authoring import evidence changed at line ${index + 1}\n`)
-    process.stderr.write(`stored: ${expectedLines[index]}\n`)
-    process.stderr.write(`actual: ${actualLines[index]}\n`)
-    process.stderr.write("run capture.mjs --write and review the result\n")
-    process.exitCode = 1
-  } else {
-    process.stdout.write(`authoring import evidence matches ${evidence.selfHash}\n`)
-  }
-}
+process.stdout.write(`${JSON.stringify(evidence, null, 2)}\n`)
+if (!evidence.comparison.nullRejected) process.exitCode = 1

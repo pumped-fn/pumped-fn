@@ -308,6 +308,9 @@ pumped dev --app east
 pumped build --app east --target all
 ```
 
+Default artifacts are written to `dist/`. Named app artifacts are isolated under
+`dist/apps/<app>/`.
+
 An unknown name fails with the available app names. `PUMPED_APP=east` provides the same selection
 when Vite is driven directly; an explicit `pumped.plugin({ app: "east" })` option takes precedence.
 

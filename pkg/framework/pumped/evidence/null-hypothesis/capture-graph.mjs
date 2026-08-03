@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto"
-import { readFileSync, writeFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { createScope } from "@pumped-fn/pumped/app"
@@ -8,14 +6,8 @@ import { directory, greet, manifest } from "./fixture/graph.mjs"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, "../../../../..")
-const evidenceFile = resolve(here, "graph-v2.json")
-const fixtureFile = resolve(here, "fixture/graph.mjs")
 
 process.chdir(root)
-
-function hash(value) {
-  return createHash("sha256").update(value).digest("hex")
-}
 
 function sorted(items, key) {
   return [...items].sort((left, right) => key(left).localeCompare(key(right)))
@@ -95,17 +87,19 @@ async function createEvidence() {
     schemaVersion: 1,
     nullHypothesis: "Pumped cannot report a useful, truthful graph from public handles without missing edges or hiding opaque work.",
     frozenGate: {
-      expected,
+      expectedNodes: expected.nodes.length,
+      expectedEdges: expected.edges.length,
+      expectedUnknowns: expected.unknowns.length,
       runtimeEvents: ["flow:greet", "atom:directory"],
       requiresMissingRequiredTagFailure: true,
       requiresFactoryBodiesMarkedUnknown: true,
     },
-    inputs: {
-      fixture: hash(readFileSync(fixtureFile)),
-      pumpedPackage: hash(readFileSync(resolve(root, "pkg/framework/pumped/dist/index.mjs"))),
-    },
     analyzeAvailable: analyze !== undefined,
-    report,
+    report: report && {
+      nodes: report.nodes.length,
+      edges: report.edges.length,
+      unknowns: report.unknowns.length,
+    },
     runtime,
     decision: {
       staticGraphExact,
@@ -113,21 +107,10 @@ async function createEvidence() {
       nullRejected: staticGraphExact && runtimeExact,
     },
   }
-  return { ...evidence, selfHash: hash(JSON.stringify(evidence)) }
+  if (!staticGraphExact) evidence.graphMismatch = { expected, actual: report }
+  return evidence
 }
 
 const evidence = await createEvidence()
-const output = `${JSON.stringify(evidence, null, 2)}\n`
-
-if (process.argv.includes("--write")) {
-  writeFileSync(evidenceFile, output)
-  process.stdout.write(output)
-} else {
-  const existing = readFileSync(evidenceFile, "utf8")
-  if (existing !== output) {
-    process.stderr.write("graph evidence changed; run capture-graph.mjs --write and review the result\n")
-    process.exitCode = 1
-  } else {
-    process.stdout.write(`graph evidence matches ${evidence.selfHash}\n`)
-  }
-}
+process.stdout.write(`${JSON.stringify(evidence, null, 2)}\n`)
+if (!evidence.decision.nullRejected) process.exitCode = 1

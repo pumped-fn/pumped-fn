@@ -27,6 +27,7 @@ export type GraphEdgeKind =
   | "controls"
   | "reads-tag"
   | "provides-tag"
+  | "implemented-by"
   | "annotates"
   | "uses-extension"
   | "presets"
@@ -109,6 +110,13 @@ export function analyze(manifest: Manifest): GraphReport {
     }
   }
 
+  function addTagBinding(from: GraphNode, tagged: Lite.Tagged<any>, kind: "annotates" | "provides-tag"): void {
+    const tagNode = addTag(tagged.tag)
+    edges.push({ from: from.id, to: tagNode.id, kind })
+    const implementor = visitUnit(tagged.value, `${tagged.tag.label}-implementor`)
+    if (implementor) edges.push({ from: tagNode.id, to: implementor.id, kind: "implemented-by" })
+  }
+
   function visitUnit(target: unknown, hint: string): GraphNode | undefined {
     let node: GraphNode
     let deps: Record<string, Lite.Dependency> | undefined
@@ -136,18 +144,21 @@ export function analyze(manifest: Manifest): GraphReport {
 
     for (const tagged of tags ?? []) {
       if (!isTagged(tagged)) continue
-      edges.push({ from: node.id, to: addTag(tagged.tag).id, kind: "annotates" })
+      addTagBinding(node, tagged, "annotates")
     }
 
     for (const [key, dependency] of Object.entries(deps ?? {})) {
       if (isTagExecutor(dependency)) {
+        const tagNode = addTag(dependency.tag)
         edges.push({
           from: node.id,
-          to: addTag(dependency.tag).id,
+          to: tagNode.id,
           kind: "reads-tag",
           key,
           mode: dependency.mode,
         })
+        const implementor = visitUnit(dependency.tag.defaultValue, `${dependency.tag.label}-default`)
+        if (implementor) edges.push({ from: tagNode.id, to: implementor.id, kind: "implemented-by" })
         continue
       }
 
@@ -174,7 +185,7 @@ export function analyze(manifest: Manifest): GraphReport {
   usedIds.add(app.id)
 
   for (const tagged of normalizeTagInput(manifest.app?.tags)) {
-    edges.push({ from: app.id, to: addTag(tagged.tag).id, kind: "provides-tag" })
+    addTagBinding(app, tagged, "provides-tag")
   }
 
   for (const extension of manifest.app?.extensions ?? []) {
@@ -192,6 +203,7 @@ export function analyze(manifest: Manifest): GraphReport {
     edges.push({ from: app.id, to: targetNode.id, kind: "presets" })
     const substituteNode = visitUnit(preset.value, `${targetNode.label}-substitute`)
     if (substituteNode) edges.push({ from: targetNode.id, to: substituteNode.id, kind: "substitutes" })
+    else if (typeof preset.value === "function") addUnknown(targetNode.id, "preset-factory")
   }
 
   for (const entry of manifest.entries) {

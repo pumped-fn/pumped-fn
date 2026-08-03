@@ -1,4 +1,6 @@
-import { resolve } from "node:path"
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join, resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 import { discover, selectAppFile } from "../src/discover"
 
@@ -45,5 +47,20 @@ describe("discover", () => {
     expect(() => selectAppFile({ entries: [], appFile: undefined, apps: [] }, "west")).toThrow(
       'app "west" was not found; no apps are available'
     )
+  })
+
+  it("rejects ambiguous and reserved named apps", () => {
+    const ambiguous = mkdtempSync(join(tmpdir(), "pumped-apps-"))
+    mkdirSync(join(ambiguous, "apps"))
+    writeFileSync(join(ambiguous, "apps/east_us.ts"), "export default {}\n")
+    writeFileSync(join(ambiguous, "apps/east-us.ts"), "export default {}\n")
+
+    expect(() => discover(ambiguous)).toThrow('named app "east-us" is ambiguous')
+
+    const reserved = mkdtempSync(join(tmpdir(), "pumped-apps-"))
+    mkdirSync(join(reserved, "apps"))
+    writeFileSync(join(reserved, "apps/default.ts"), "export default {}\n")
+
+    expect(() => discover(reserved)).toThrow('named app "default" is reserved')
   })
 })

@@ -531,28 +531,28 @@ risk blocks more later work.
 The frozen browser gate allowed no forbidden framework module, required exact handle identity, and
 allowed at most 256 bytes over the Lite entry.
 
-| Evidence | Import | Modules | Bytes | Extra bytes | Result |
+| Attempt | Import | Modules | Bytes | Extra bytes | Result |
 | --- | --- | ---: | ---: | ---: | --- |
-| `authoring-import-v1.json` | package root | 166 | 1,923,432 | 1,921,862 | Rejected |
-| `authoring-import-v2.json` | `/app` with metadata tags | 4 | 3,417 | 1,847 | Rejected |
-| `authoring-import-v3.json` | `/app` without metadata tags | 2 | 4,236 | 0 | Admitted |
+| Package root | package root | 166 | 1,923,432 | 1,921,862 | Rejected |
+| Coupled app entry | `/app` with metadata tags | 4 | 3,417 | 1,847 | Rejected |
+| Split app entry | `/app` without metadata tags | 2 | Live gate | 0 | Admitted |
 
 All three retain exact Lite handle identity. V1 pulled the Node framework into the browser build. V2
 removed the Node framework but retained metadata tag creation. V3 moves route and command metadata
 to the separate lightweight `/meta` entry and rejects the null hypothesis with zero emitted-byte
 penalty. The package root remains the framework operations entry.
 
-Evidence and reproduction commands live in [the null-hypothesis evidence directory](evidence/null-hypothesis/README.md).
+Reproduction commands live in [the null-hypothesis gate directory](evidence/null-hypothesis/README.md).
 
 ### Risk 2 slice: build-target root isolation
 
 The frozen production-build gate selected default, east, and west for both targets. It required the
 exact selected app closure and exact target root set in each emitted artifact.
 
-| Evidence | Manifest | Passed cases | Result |
+| Attempt | Manifest | Passed cases | Result |
 | --- | --- | ---: | --- |
-| `app-target-roots-v1.json` | shared by both targets | 0/6 | Rejected |
-| `app-target-roots-v2.json` | target-specific | 6/6 | Admitted |
+| Shared manifest | shared by both targets | 0/6 | Rejected |
+| Target manifest | target-specific | 6/6 | Admitted |
 
 V1 imported all five root kinds into every artifact. V2 gives the server only server, agent, job,
 and workflow roots, and gives the CLI only CLI and agent roots. Unrelated app markers stay out.
@@ -567,15 +567,16 @@ The frozen graph contains one server root, one flow, one atom, one required tag,
 provider. Public extension hooks confirm the flow and atom that execute. Removing the tag must fail.
 Because factories are opaque functions, their bodies must remain explicit unknowns.
 
-| Evidence | Analyzer | Static graph | Runtime | Result |
+| Attempt | Analyzer | Static graph | Runtime | Result |
 | --- | --- | --- | --- | --- |
-| `graph-v1.json` | absent | missing | exact | Rejected |
-| `graph-v2.json` | public handles | exact | exact | Admitted |
+| No analyzer | absent | missing | exact | Rejected |
+| Declared slice | public handles | exact | exact | Admitted |
 
-V2 reports five nodes, four proven edges, and two `factory-body` unknowns without executing a
-factory during analysis. This rejects the smallest missing-edge counterexample. The full Risk 3
-matrix still needs resources, controllers, schedules, role-tag implementors, presets, extensions,
-and inline named execution before Pumped can claim broad graph coverage.
+The admitted slice reports five nodes, four proven edges, and two `factory-body` unknowns without
+executing a factory during analysis. This rejects the smallest missing-edge counterexample. Tag
+implementors and opaque preset factories are now represented, but the full Risk 3 matrix still
+needs resources, controllers, schedules, extension runtime parity, and inline named execution
+before Pumped can claim broad graph coverage.
 
 ## Risk-first execution plan
 
@@ -587,12 +588,12 @@ Work:
 
 - Check in the six baseline scenarios.
 - Capture the public commands for direct scope tests, dev, server build, CLI build, and browser build.
-- Record loaded modules, emitted bytes, roots, static edges, runtime edges, and required user code.
-- Give every measurement a machine-readable artifact and hash.
+- Measure loaded modules, emitted bytes, roots, static edges, runtime edges, and required user code.
+- Give every measurement an executable pass/fail gate with compact live output.
 
 Exit gate:
 
-- A clean checkout can reproduce every baseline artifact.
+- A clean checkout can reproduce every baseline gate.
 - No proposed meta feature is required to run the baseline.
 
 Stop rule:

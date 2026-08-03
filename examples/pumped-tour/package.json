@@ -3,12 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pumped build --target all",
-    "build:east": "pumped build --app east --target all",
-    "dev": "pumped dev",
-    "dev:east": "pumped dev --app east",
+    "build": "node ../../pkg/framework/pumped/dist/cli.mjs build --target all",
+    "build:east": "node ../../pkg/framework/pumped/dist/cli.mjs build --app east --target all",
+    "dev": "node ../../pkg/framework/pumped/dist/cli.mjs dev",
+    "dev:east": "node ../../pkg/framework/pumped/dist/cli.mjs dev --app east",
     "server": "node dist/server.mjs",
+    "server:east": "node dist/apps/east/server.mjs",
     "cli": "node dist/cli.mjs",
+    "cli:east": "node dist/apps/east/cli.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

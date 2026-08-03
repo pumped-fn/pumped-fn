@@ -1,4 +1,4 @@
-import { atom, flow, tag, tags, typed } from "@pumped-fn/lite"
+import { atom, flow, preset, tag, tags, typed } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
 import { analyze } from "../src/analyze"
 import { app } from "../src/app"
@@ -62,5 +62,40 @@ describe("analyze", () => {
       { from: "root:server:shared", to: "flow:shared", kind: "executes" },
       { from: "root:cli:shared", to: "flow:shared", kind: "executes" },
     ])
+  })
+
+  it("follows flow implementors supplied through tags", () => {
+    const implementation = flow({
+      name: "implementation",
+      parse: typed<string>(),
+      factory: (context) => context.input,
+    })
+    const model = tag<typeof implementation>({ label: "example.graph.model" })
+    const run = flow({
+      name: "run",
+      deps: { model: tags.required(model) },
+      factory: (_context, { model }) => model.exec({ input: "ok" }),
+    })
+    const report = analyze({
+      app: app({ tags: model(implementation) }),
+      entries: [{ kind: "server", name: "run", file: "src/server/run.ts", flow: run }],
+    })
+
+    expect(report.edges).toContainEqual({
+      from: "tag:example.graph.model",
+      to: "flow:implementation",
+      kind: "implemented-by",
+    })
+    expect(report.idOf(implementation)).toBe("flow:implementation")
+  })
+
+  it("marks function preset replacements as opaque", () => {
+    const target = flow({ name: "target", factory: () => "target" })
+    const report = analyze({
+      app: app({ presets: [preset(target, () => "replacement")] }),
+      entries: [],
+    })
+
+    expect(report.unknowns).toContainEqual({ from: "flow:target", reason: "preset-factory" })
   })
 })
