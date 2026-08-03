@@ -168,7 +168,7 @@ describe('flowHandlers', () => {
           flow: record,
           input: (params) => ({ quantity: Number(params.quantity) }),
           name: 'json-render.record',
-          tags: [actionSource('json-render')],
+          tags: actionSource('json-render'),
         }),
       },
     })

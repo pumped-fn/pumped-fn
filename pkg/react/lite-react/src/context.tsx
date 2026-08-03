@@ -2,7 +2,7 @@
 'use no memo'
 
 import { createContext, useContext, useEffect, useId, useMemo, type ReactNode } from 'react'
-import { type Lite } from '@pumped-fn/lite'
+import { isTagged, type Lite } from '@pumped-fn/lite'
 import { pendingCtxWork } from './pending-work'
 
 /**
@@ -11,6 +11,8 @@ import { pendingCtxWork } from './pending-work'
 const ScopeContext = createContext<Lite.Scope | null>(null)
 const ExecutionContextContext = createContext<Lite.ExecutionContext | null>(null)
 const ManagedRootContext = createContext<object | null>(null)
+
+type TagInput = Lite.Tagged<any> | readonly TagInput[]
 
 type ManagedEntry = {
   ctx: Lite.ExecutionContext
@@ -66,6 +68,27 @@ function sameTags(a: Lite.Tagged<any>[] | undefined, b: Lite.Tagged<any>[] | und
   return true
 }
 
+function normalizeTags(input: TagInput | undefined): Lite.Tagged<any>[] | undefined {
+  if (input === undefined) return undefined
+  const normalized: Lite.Tagged<any>[] = []
+  const active = new Set<readonly unknown[]>()
+  const append = (value: unknown): void => {
+    if (isTagged(value)) {
+      normalized.push(value)
+      return
+    }
+    if (!Array.isArray(value)) {
+      throw new TypeError("tags must contain only tagged values and arrays")
+    }
+    if (active.has(value)) throw new TypeError("tags must not contain cyclic arrays")
+    active.add(value)
+    for (let i = 0; i < value.length; i++) append(value[i])
+    active.delete(value)
+  }
+  append(input)
+  return normalized
+}
+
 function closeEntry(map: Map<string, ManagedEntry>, id: string, entry: ManagedEntry): void {
   if (entry.closed) return
   entry.closed = true
@@ -111,7 +134,7 @@ type ExecutionContextProviderProps =
     }
   | {
       ctx?: undefined
-      tags?: Lite.Tagged<any>[]
+      tags?: TagInput
       children: ReactNode
     }
 
@@ -142,7 +165,7 @@ function ExecutionContextProvider({ children, ...props }: ExecutionContextProvid
   const inheritedCtx = useContext(ExecutionContextContext)
   const id = useId()
   const explicitCtx = 'ctx' in props && props.ctx ? props.ctx : undefined
-  const tags = explicitCtx ? undefined : props.tags
+  const tags = explicitCtx ? undefined : normalizeTags(props.tags)
   const parent = !explicitCtx && inheritedCtx?.scope === scope ? inheritedCtx : undefined
   const entryId = !explicitCtx && root ? `${managedRootKey(root)}:${id}:${managedParentKey(parent)}` : id
 

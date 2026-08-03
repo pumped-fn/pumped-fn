@@ -107,9 +107,10 @@ error it saw, if any.
 **Job ticks do not run `app.context()`.** `context(request)` only fires for HTTP requests handled by
 `createServer`; a background tick has no request, so anything a job needs from tag-space must come
 from one of two places: the scope's own ambient `tags` (set once, e.g. in `app.ts`'s `tags` array,
-and visible to every tick and every request alike) or `schedule({ tags })` — an optional
-`() => Lite.Tagged<any>[]` applied to that job's own tick contexts on top of the scope's ambient
-tags. Reaching into `app.context()`'s request-only branch for a job's identity/config is a bug. Derive
+and visible to every tick and every request alike) or `schedule({ tags })` — an optional callback
+returning one bound tag, a list, or nested lists, applied to that job's own tick contexts on top of
+the scope's ambient tags. Reaching into `app.context()`'s request-only branch for a job's
+identity/config is a bug. Derive
 job-visible tags once at the scope level so ticks and requests see the same identity/config.
 
 ```ts
@@ -263,7 +264,7 @@ import { actor, configureAccount, createMemoryStore, store } from "./domain"
 
 const scope = createScope({
   presets: [preset(store, createMemoryStore())],
-  tags: [actor({ id: "ops-1", role: "operator" })],
+  tags: actor({ id: "ops-1", role: "operator" }),
 })
 
 const account = await scope.createContext().exec({

@@ -140,7 +140,7 @@ const key = flow({
 })
 
 const scope = createScope()
-const ctx = scope.createContext({ tags: [tenant("acme")] })
+const ctx = scope.createContext({ tags: tenant("acme") })
 const value = await ctx.exec({ flow: key, input: { id: "42" } })
 
 if (value !== "acme:invoice:42") throw new Error("unexpected key")

@@ -58,7 +58,7 @@ const load = flow({
   },
 })
 
-const scope = createScope({ tags: [tenant("acme")] })
+const scope = createScope({ tags: tenant("acme") })
 const ctx = scope.createContext()
 
 await ctx.exec({ flow: load, input: { id: "42" } })

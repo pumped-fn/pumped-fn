@@ -1,4 +1,5 @@
 import { resourceSymbol, type Lite, type MaybePromise } from "./types"
+import { normalizeTags } from "./tag"
 
 /**
  * Creates an execution-context-owned dependency.
@@ -24,7 +25,7 @@ import { resourceSymbol, type Lite, type MaybePromise } from "./types"
  */
 export function resource<T>(config: {
   name?: string
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
   ownership?: Lite.ResourceOwnership
   deps?: undefined
   factory: (ctx: Lite.ResourceContext) => MaybePromise<T>
@@ -35,7 +36,7 @@ export function resource<
   const D extends Record<string, Lite.ResourceDependency>,
 >(config: {
   name?: string
-  tags?: Lite.Tagged<any>[]
+  tags?: Lite.TagInput
   ownership?: Lite.ResourceOwnership
   deps: D
   factory: (ctx: Lite.ResourceContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
@@ -45,7 +46,7 @@ export function resource(config: any): Lite.Resource<any> {
   return Object.freeze({
     [resourceSymbol]: true,
     name: config.name,
-    tags: config.tags,
+    tags: normalizeTags(config.tags),
     ownership: config.ownership,
     deps: config.deps as unknown as Record<string, Lite.Dependency> | undefined,
     factory: config.factory as unknown as Lite.ResourceFactory<any, Record<string, Lite.Dependency>>,

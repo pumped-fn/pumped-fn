@@ -1,6 +1,7 @@
 import { isStreamingExec, tag, type Lite } from "@pumped-fn/lite"
 
 type MaybePromise<T> = T | Promise<T>
+type TagInput = Lite.Tagged<any> | readonly TagInput[]
 
 /** Tracks the next durable step number within a suspense run. */
 export interface SuspenseStepCounter {
@@ -90,7 +91,7 @@ export function formatSuspenseStepKey(key: SuspenseStepKey): string {
 export interface SuspenseRunOptions {
   taskId: string
   runId: string
-  tags?: Lite.Tagged<any>[]
+  tags?: TagInput
 }
 
 export function run(options: SuspenseRunOptions): Lite.CreateContextOptions {
@@ -99,7 +100,7 @@ export function run(options: SuspenseRunOptions): Lite.CreateContextOptions {
       taskId(options.taskId),
       runId(options.runId),
       stepCounter({ next: 0 }),
-      ...(options.tags ?? []),
+      options.tags ?? [],
     ],
   }
 }

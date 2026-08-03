@@ -1,4 +1,4 @@
-import { createScope, flow, preset, typed } from "@pumped-fn/lite"
+import { createScope, flow, preset, tag, tags, typed } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
 import { scheduler, type Scheduler } from "../src"
 
@@ -89,6 +89,31 @@ describe("schedule()", () => {
 
     expect(counter.value).toBe(4)
 
+    await scope.dispose()
+  })
+
+  it("accepts single and nested execution tags", async () => {
+    const marker = tag<string>({ label: "scheduler-tag-input" })
+    const seen: string[][] = []
+    const sweep = flow({
+      deps: { values: tags.all(marker) },
+      factory: (_ctx, { values }) => {
+        seen.push(values)
+      },
+    })
+    const entry = scheduler.schedule({
+      name: "tagged-sweep",
+      cadence: { cron: "* * * * *" },
+      flow: sweep,
+      input: () => undefined,
+      tags: () => [marker("one"), [marker("two")]],
+    })
+    const scope = createScope({ tags: scheduler.backend(scheduler.inProcess()) })
+    const registration = await scope.resolve(entry)
+
+    await registration.trigger()
+
+    expect(seen).toEqual([["one", "two"]])
     await scope.dispose()
   })
 

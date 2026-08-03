@@ -140,7 +140,7 @@ The model seam is the SDK `model` tag:
 
 ```ts
 createScope({
-  tags: [model(heuristic)],
+  tags: model(heuristic),
 })
 ```
 

@@ -44,7 +44,7 @@ The same flow can run in a test with the same API.
 
 ```ts
 const scope = createScope()
-const ctx = scope.createContext({ tags: [requestId("test-request")] })
+const ctx = scope.createContext({ tags: requestId("test-request") })
 const id = await ctx.exec({ flow: readRequest })
 await ctx.close()
 await scope.dispose()

@@ -102,7 +102,7 @@ function OrderBridge(
   const actions = useMemo(() => ({
     submitOrder: flowAction({
       flow: submitOrder,
-      tags: [currentOrderDraft(draft)],
+      tags: currentOrderDraft(draft),
     }),
   }), [draft])
   const handlers = useFlowHandlers(actions)

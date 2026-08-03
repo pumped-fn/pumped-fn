@@ -8,7 +8,7 @@ export function createAppScope(manifest: Manifest, extraExtensions: Lite.Extensi
   const appConfig = normalizeApp(manifest.app)
   const tags =
     schedulerBackend.find(appConfig.tags) === undefined
-      ? [...appConfig.tags, schedulerBackend(defaultSchedulerBackend)]
+      ? [appConfig.tags, schedulerBackend(defaultSchedulerBackend)]
       : appConfig.tags
 
   return createScope({

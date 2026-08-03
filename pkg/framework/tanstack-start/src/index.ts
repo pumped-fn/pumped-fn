@@ -3,6 +3,7 @@ import type { Lite } from "@pumped-fn/lite"
 
 const contextKey = "lite"
 
+type TagInput = Lite.Tagged<any> | readonly TagInput[]
 type StartMiddleware =
   | import("@tanstack/react-start").AnyRequestMiddleware
   | import("@tanstack/react-start").AnyFunctionMiddleware
@@ -14,13 +15,13 @@ interface StartKeyOptions<Key extends string = string> {
 }
 
 interface StartRequestOptions {
-  tags?: (request: Request) => Lite.Tagged<any>[]
+  tags?: (request: Request) => TagInput
   close?: boolean
 }
 
 interface StartCallOptions<TMiddlewares extends readonly StartMiddleware[] = readonly []> {
   middleware?: TMiddlewares
-  tags?: () => Lite.Tagged<any>[]
+  tags?: () => TagInput
   close?: boolean
 }
 

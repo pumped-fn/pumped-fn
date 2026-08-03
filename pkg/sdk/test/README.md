@@ -61,7 +61,7 @@ const provider = attemptStubConfig({
 const store = sessionStoreStub([record])
 const scope = createScope({
   tags: [
-    ...provider,
+    provider,
     store.config,
     store.binding.load,
     store.binding.commit,

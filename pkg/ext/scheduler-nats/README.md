@@ -29,7 +29,7 @@ const nightlySweep = scheduler.schedule({
 })
 
 const scope = createScope({
-  tags: [scheduler.backend(nats({ connection, bucket: "scheduler", history: { ttlMs: 7 * 24 * 60 * 60 * 1000 } }))],
+  tags: scheduler.backend(nats({ connection, bucket: "scheduler", history: { ttlMs: 7 * 24 * 60 * 60 * 1000 } })),
 })
 await scope.resolve(nightlySweep)
 ```

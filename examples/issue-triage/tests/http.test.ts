@@ -17,10 +17,10 @@ describe("HTTP adapter", () => {
       return Promise.resolve(new Response("ok"))
     }))
     const scope = createScope({
-      tags: [policy({
+      tags: policy({
         origins: ["https://api.github.test"],
         maxResponseBytes: 1_024,
-      })],
+      }),
     })
     scopes.push(scope)
     const ctx = scope.createContext()

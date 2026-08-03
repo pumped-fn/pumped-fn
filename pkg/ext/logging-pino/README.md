@@ -17,7 +17,7 @@ const records = pino.sink(logger)
 
 const scope = createScope({
   extensions: [logging.extension()],
-  tags: [logging.runtime({ sinks: [records], flow: "errors" })],
+  tags: logging.runtime({ sinks: [records], flow: "errors" }),
 })
 ```
 

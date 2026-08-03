@@ -2,6 +2,7 @@ import type { Lite } from "@pumped-fn/lite"
 import type { Env as HonoEnv, MiddlewareHandler } from "hono"
 import { createMiddleware } from "hono/factory"
 
+type TagInput = Lite.Tagged<any> | readonly TagInput[]
 type EnvVariables<E extends HonoEnv> = E extends { Variables: infer Variables extends object } ? Variables : {}
 
 const contextKey = "lite"
@@ -20,7 +21,7 @@ type HonoEnvShape<
 interface HonoOptions<
   E extends HonoEnv = HonoEnv,
 > {
-  tags?: (request: Request) => Lite.Tagged<any>[]
+  tags?: (request: Request) => TagInput
   close?: boolean
 }
 

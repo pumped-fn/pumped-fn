@@ -57,7 +57,7 @@ export const control = resource({
         fn: (target, sql) => target.query(sql),
         params: [pool, statement],
         name: "postgres.control.migrate",
-        tags: [step({ workflow: true, kind: "database" })],
+        tags: step({ workflow: true, kind: "database" }),
       })
     }
     return pool
@@ -103,7 +103,7 @@ export const syncIssues = flow({
   name: "issue-triage.database.sync-issues",
   parse: typed<SyncIssuesInput>(),
   deps: { pool: control },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { pool }): Promise<void> => {
     const client = await ctx.exec({
       fn: (target) => target.connect(),
@@ -191,7 +191,7 @@ export const readCursor = flow({
   name: "issue-triage.database.read-cursor",
   parse: typed<{ repository: string }>(),
   deps: { pool: control },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { pool }): Promise<{ sinceAt: string; etag?: string }> => {
     const result = await ctx.exec({
       fn: (target, sql, values) => target.query<{ since_at: Date; etag: string | null }>(sql, [...values]),
@@ -215,7 +215,7 @@ export const claimIssue = flow({
   name: "issue-triage.database.claim-issue",
   parse: typed<{ repository: string; leaseId: string; leaseMs: number; maxAttempts: number }>(),
   deps: { pool: control },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { pool }): Promise<ClaimedIssue | undefined> => {
     const result = await ctx.exec({
       fn: (target, sql, values) => target.query<{
@@ -274,7 +274,7 @@ export const acknowledgeIssue = flow({
   name: "issue-triage.database.acknowledge-issue",
   parse: typed<{ leaseId: string; receipt: unknown }>(),
   deps: { pool: control },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { pool }): Promise<void> => {
     const result = await ctx.exec({
       fn: (target, sql, values) => target.query(sql, [...values]),
@@ -296,7 +296,7 @@ export const rejectIssue = flow({
   name: "issue-triage.database.reject-issue",
   parse: typed<{ leaseId: string; error: string; maxAttempts: number; retryAt: string }>(),
   deps: { pool: control },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { pool }): Promise<void> => {
     await ctx.exec({
       fn: (target, sql, values) => target.query(sql, [...values]),
@@ -322,7 +322,7 @@ export const issueLeaseValid = flow({
   name: "issue-triage.database.issue-lease-valid",
   parse: typed<{ leaseId: string }>(),
   deps: { pool: control },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { pool }): Promise<boolean> => {
     const result = await ctx.exec({
       fn: (target, sql, values) => target.query<{ valid: boolean }>(sql, [...values]),
@@ -341,7 +341,7 @@ export const readPublication = flow({
   name: "issue-triage.database.read-publication",
   parse: typed<{ authorityFingerprint: string; idempotencyKey: string }>(),
   deps: { reservation: tags.required(publication.reservation) },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { reservation }) => {
     const result = await ctx.exec({
       fn: (target, sql, values) => target.query<{
@@ -380,7 +380,7 @@ export const savePublication = flow({
     publishedAt: string
   }>(),
   deps: { reservation: tags.required(publication.reservation) },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { reservation }) => {
     const result = await ctx.exec({
       fn: (target, sql, values) => target.query<{ publication_id: string }>(sql, [...values]),
@@ -418,7 +418,7 @@ export const reservePublication = flow({
     issue: number
   }>(),
   deps: { pool: control },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { pool }): Promise<PoolClient> => {
     const client = await ctx.exec({
       fn: (target) => target.connect(),
@@ -483,7 +483,7 @@ export const releasePublication = flow({
   name: "issue-triage.database.release-publication",
   parse: typed<{ commit: boolean }>(),
   deps: { reservation: tags.required(publication.reservation) },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { reservation }): Promise<void> => {
     try {
       await ctx.exec({

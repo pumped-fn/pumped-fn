@@ -1,6 +1,7 @@
 import { atom, tag, type Lite } from "@pumped-fn/lite"
 
 type MaybePromise<T> = T | Promise<T>
+type TagInput = Lite.Tagged<any> | readonly TagInput[]
 
 export namespace Sync {
   export type Value = Lite.JsonValue
@@ -64,7 +65,7 @@ export namespace Sync {
     readonly factory: D extends Record<string, Lite.AtomDependency>
       ? (ctx: Lite.ResolveContext, deps: Lite.InferDeps<D>) => MaybePromise<T>
       : (ctx: Lite.ResolveContext) => MaybePromise<T>
-    readonly tags?: Lite.Tagged<any>[]
+    readonly tags?: TagInput
     readonly keepAlive?: boolean
     readonly conflict?: Policy<NoInfer<T>>
   }
@@ -137,7 +138,7 @@ function create(config: Sync.Base<unknown, Record<string, Lite.AtomDependency> |
         if (isPromise(value)) return value.then((resolved) => validate(resolved, spec))
         return validate(value, spec)
       },
-      tags: [meta(spec), ...(config.tags ?? [])],
+      tags: [meta(spec), config.tags ?? []],
       keepAlive: config.keepAlive ?? true,
     })
   }
@@ -148,7 +149,7 @@ function create(config: Sync.Base<unknown, Record<string, Lite.AtomDependency> |
       if (isPromise(value)) return value.then((resolved) => validate(resolved, spec))
       return validate(value, spec)
     },
-    tags: [meta(spec), ...(config.tags ?? [])],
+    tags: [meta(spec), config.tags ?? []],
     keepAlive: config.keepAlive ?? true,
   })
 }

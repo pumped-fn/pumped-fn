@@ -34,7 +34,7 @@ export const request: Request = flow({
     policy: tags.required(policy),
     request: tags.required(implementation),
   },
-  tags: [step({ workflow: true, kind: "http" })],
+  tags: step({ workflow: true, kind: "http" }),
   factory: (ctx, { runtime, policy, request }) => {
     const url = new URL(ctx.input.url)
     if (!runtime.authority.sandbox.network) throw new TriageError("authorize", ctx.input.url, "Session authority denies network access")
@@ -50,7 +50,7 @@ export const fetchRequest: Request = flow({
   name: "issue-triage.http.fetch",
   parse: typed<RequestInput>(),
   deps: { policy: tags.required(policy) },
-  tags: [step({ workflow: true, kind: "http" })],
+  tags: step({ workflow: true, kind: "http" }),
   factory: async (ctx, { policy }): Promise<ResponseOutput> => {
     const response = await fetch(ctx.input.url, {
       method: ctx.input.method,

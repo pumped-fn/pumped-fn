@@ -317,6 +317,8 @@ sequenceDiagram
 
 Propagate values without wiring parameters. Tags serve three roles: scope-level config (consumed by atoms via `tags.required()`), per-context ambient data (requestId, locale), and role selection — a tag carrying a flow arrives in deps position as a context-bound `FlowHandle`, so composition roots pick which implementation fills a port (`tags.optional` yields handle-or-undefined, `tags.all` an array of handles). Use `tags.required()` in deps to declare that an atom or flow needs an ambient value (e.g., a transacted connection) — extensions or context setup provide the value, the consumer just depends on it.
 
+Every `tags` input accepts a bound tag, a list, or nested lists such as `tags: [requestId(rid), sharedTags]`. Flattening is stable and keeps duplicates. Unit metadata remains a flat tagged array.
+
 Use `tag({ eq })` only to define value equality inside that tag family. `tag.same(a, b)` compares two already-created tagged records; it does not change lookup, source precedence, defaults, parsing, `tags.all()` multiplicity, tag discovery, or cache identity. Equal values should be fully substitutable for every consumer of that tag.
 
 ```mermaid
@@ -328,15 +330,15 @@ sequenceDiagram
     participant ChildCtx
     participant Data as ctx.data
 
-    App->>Scope: createScope({ tags: [config(cfg)] })
+    App->>Scope: createScope({ tags: config(cfg) })
     App->>Scope: resolve(db)
     Note right of Atom: deps: { config: tags.required(config) }
     Scope->>Atom: factory(ctx, { config: cfg })
 
-    App->>Scope: scope.createContext({ tags: [requestId(rid)] })
+    App->>Scope: scope.createContext({ tags: [requestId(rid), sharedTags] })
     Scope-->>App: ctx
 
-    App->>Ctx: ctx.exec({ flow, tags: [locale('en')] })
+    App->>Ctx: ctx.exec({ flow, tags: locale('en') })
     Ctx->>ChildCtx: create with merged tags
 
     ChildCtx->>Data: ctx.data.seekTag(requestId)

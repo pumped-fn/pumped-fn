@@ -14,7 +14,7 @@ import {
 
 const waitForCommit = flow({
   name: "wait-for-commit",
-  tags: [suspend(true)],
+  tags: suspend(true),
   factory: () => {
     throw new Error("resolved externally")
   },

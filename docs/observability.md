@@ -33,7 +33,7 @@ const checkout = flow({
 
 const scope = createScope({
   extensions: [observable.extension()],
-  tags: [observable.runtime({ sinks: [otel.sink({ tracer: recorder() })] })],
+  tags: observable.runtime({ sinks: [otel.sink({ tracer: recorder() })] }),
 })
 
 const ctx = scope.createContext()
@@ -54,7 +54,7 @@ await ctx.exec({
   deps: { notifier },
   params: [message],
   fn: ({ notifier }, content) => notifier.send(content),
-  tags: [step({ workflow: true, kind: "email" })],
+  tags: step({ workflow: true, kind: "email" }),
 })
 ```
 

@@ -76,7 +76,7 @@ const listIssues = flow({
     github: tags.required(config.github),
     request: controller(fetchRequest),
   },
-  tags: [step({ workflow: true, kind: "http" })],
+  tags: step({ workflow: true, kind: "http" }),
   factory: async (ctx, { github, request }) => {
     let url: URL | undefined = githubUrl(github.apiUrl, `repos/${github.repository}/issues`)
     url.searchParams.set("state", "open")
@@ -267,7 +267,7 @@ const listComments = flow({
     github: tags.required(config.github),
     request: controller(fetchRequest),
   },
-  tags: [step({ workflow: true, kind: "http" })],
+  tags: step({ workflow: true, kind: "http" }),
   factory: async (ctx, { github, request }) => {
     let url: URL | undefined = githubUrl(github.apiUrl, `repos/${github.repository}/issues/${ctx.input.issue}/comments?per_page=100`)
     const comments: z.infer<typeof commentShape>[] = []
@@ -304,7 +304,7 @@ const createComment = flow({
     github: tags.required(config.github),
     request: controller(fetchRequest),
   },
-  tags: [step({ workflow: true, kind: "http" })],
+  tags: step({ workflow: true, kind: "http" }),
   factory: async (ctx, { github, request }) => {
     const response = await request.exec({
       input: {
@@ -394,7 +394,7 @@ export const publisher = flow({
           authorityFingerprint: ctx.input.authorityFingerprint,
           idempotencyKey: ctx.input.idempotencyKey,
         },
-        tags: [publication.reservation(reservation)],
+        tags: publication.reservation(reservation),
       })
       if (stored) {
         if (stored.payloadDigest !== payloadDigest) throw new TriageError("publish", ctx.input.idempotencyKey, "Publication key conflicts with another payload")
@@ -436,7 +436,7 @@ export const publisher = flow({
           issueId: receipt.issueId,
           publishedAt: receipt.publishedAt,
         },
-        tags: [publication.reservation(reservation)],
+        tags: publication.reservation(reservation),
       })
       commit = true
       return receipt
@@ -445,7 +445,7 @@ export const publisher = flow({
       ctx.signal.removeEventListener("abort", abort)
       await release.exec({
         input: { commit },
-        tags: [publication.reservation(reservation)],
+        tags: publication.reservation(reservation),
       })
     }
   },
