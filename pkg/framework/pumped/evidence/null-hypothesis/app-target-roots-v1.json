@@ -1,0 +1,288 @@
+{
+  "schemaVersion": 1,
+  "nullHypothesis": "Selecting an app and build target does not isolate the intended production roots.",
+  "frozenGate": {
+    "selectedAppOnly": true,
+    "exactAppsBySelection": {
+      "default": [
+        "default"
+      ],
+      "east": [
+        "default",
+        "east"
+      ],
+      "west": [
+        "default",
+        "west"
+      ]
+    },
+    "exactRootsByTarget": {
+      "server": [
+        "server",
+        "agents",
+        "jobs",
+        "workflows"
+      ],
+      "cli": [
+        "cli",
+        "agents"
+      ]
+    },
+    "cases": 6
+  },
+  "environment": {
+    "node": "v22.23.2",
+    "vite": "8.0.16"
+  },
+  "inputs": {
+    "fixtures": {
+      "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/agents/assistant.ts": "9c11d3e79cbfb0108b379e1fe97d9a4868df2ee913e78139ce4fe7f8bc91051b",
+      "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/app.ts": "22a49249a053628361abfab04385155adabb19ff09a56aab084efa8c03920bcf",
+      "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/apps/east.ts": "8c642d2135c2096ac2627f26816cf4616ae23dfc8e0946c9972ae3eb3189f9ad",
+      "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/apps/west.ts": "f7b71d752ff9a0f45aa383ce89b27f3af096d6f7d48d768015ed3d340272d417",
+      "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/cli/tool.ts": "c19ae6f854b85bd2a6136e7ddca905263842718517a83f601e685262e6c659cb",
+      "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/jobs/sweep.ts": "bbc09c71d32a10815a7862e4c346b5e07aaed574d22565bd1853158f89ac6226",
+      "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/profile.ts": "6054f4845b64b93df8a92de316d73c77c81a3aa5b8382bc14f70d3812bba84ce",
+      "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/server/http.ts": "2774dcd9927661ac960deb40e69dabc56ce6879cead964d19ba761581037f60c",
+      "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/workflows/report.ts": "5307716115ff9a980b1645d51b766cd9e78f2fccc71c183cbb2d038ec5b85a8e"
+    },
+    "pumpedPackage": "976ff21fe4d1d6e06827a584aa3c8bf31c2379d932501a6bea2a8d5c84f93e7d",
+    "pumpedPackageBytes": 4363
+  },
+  "cases": [
+    {
+      "app": "default",
+      "target": "server",
+      "expectedRoots": [
+        "server",
+        "agents",
+        "jobs",
+        "workflows"
+      ],
+      "expectedApps": [
+        "default"
+      ],
+      "includedRoots": [
+        "agents",
+        "cli",
+        "jobs",
+        "server",
+        "workflows"
+      ],
+      "includedApps": [
+        "default"
+      ],
+      "emittedBytes": 4637,
+      "modules": [
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/agents/assistant.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/app.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/cli/tool.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/jobs/sweep.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/profile.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/server/http.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/workflows/report.ts",
+        "<virtual>:pumped:entry-server",
+        "<virtual>:pumped:manifest",
+        "<virtual>:rolldown/runtime.js"
+      ],
+      "pass": false
+    },
+    {
+      "app": "default",
+      "target": "cli",
+      "expectedRoots": [
+        "cli",
+        "agents"
+      ],
+      "expectedApps": [
+        "default"
+      ],
+      "includedRoots": [
+        "agents",
+        "cli",
+        "jobs",
+        "server",
+        "workflows"
+      ],
+      "includedApps": [
+        "default"
+      ],
+      "emittedBytes": 4201,
+      "modules": [
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/agents/assistant.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/app.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/cli/tool.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/jobs/sweep.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/profile.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/server/http.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/workflows/report.ts",
+        "<virtual>:pumped:entry-cli",
+        "<virtual>:pumped:manifest",
+        "<virtual>:rolldown/runtime.js"
+      ],
+      "pass": false
+    },
+    {
+      "app": "east",
+      "target": "server",
+      "expectedRoots": [
+        "server",
+        "agents",
+        "jobs",
+        "workflows"
+      ],
+      "expectedApps": [
+        "default",
+        "east"
+      ],
+      "includedRoots": [
+        "agents",
+        "cli",
+        "jobs",
+        "server",
+        "workflows"
+      ],
+      "includedApps": [
+        "default",
+        "east"
+      ],
+      "emittedBytes": 4811,
+      "modules": [
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/agents/assistant.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/app.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/apps/east.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/cli/tool.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/jobs/sweep.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/profile.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/server/http.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/workflows/report.ts",
+        "<virtual>:pumped:entry-server",
+        "<virtual>:pumped:manifest",
+        "<virtual>:rolldown/runtime.js"
+      ],
+      "pass": false
+    },
+    {
+      "app": "east",
+      "target": "cli",
+      "expectedRoots": [
+        "cli",
+        "agents"
+      ],
+      "expectedApps": [
+        "default",
+        "east"
+      ],
+      "includedRoots": [
+        "agents",
+        "cli",
+        "jobs",
+        "server",
+        "workflows"
+      ],
+      "includedApps": [
+        "default",
+        "east"
+      ],
+      "emittedBytes": 4375,
+      "modules": [
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/agents/assistant.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/app.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/apps/east.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/cli/tool.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/jobs/sweep.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/profile.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/server/http.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/workflows/report.ts",
+        "<virtual>:pumped:entry-cli",
+        "<virtual>:pumped:manifest",
+        "<virtual>:rolldown/runtime.js"
+      ],
+      "pass": false
+    },
+    {
+      "app": "west",
+      "target": "server",
+      "expectedRoots": [
+        "server",
+        "agents",
+        "jobs",
+        "workflows"
+      ],
+      "expectedApps": [
+        "default",
+        "west"
+      ],
+      "includedRoots": [
+        "agents",
+        "cli",
+        "jobs",
+        "server",
+        "workflows"
+      ],
+      "includedApps": [
+        "default",
+        "west"
+      ],
+      "emittedBytes": 4811,
+      "modules": [
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/agents/assistant.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/app.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/apps/west.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/cli/tool.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/jobs/sweep.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/profile.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/server/http.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/workflows/report.ts",
+        "<virtual>:pumped:entry-server",
+        "<virtual>:pumped:manifest",
+        "<virtual>:rolldown/runtime.js"
+      ],
+      "pass": false
+    },
+    {
+      "app": "west",
+      "target": "cli",
+      "expectedRoots": [
+        "cli",
+        "agents"
+      ],
+      "expectedApps": [
+        "default",
+        "west"
+      ],
+      "includedRoots": [
+        "agents",
+        "cli",
+        "jobs",
+        "server",
+        "workflows"
+      ],
+      "includedApps": [
+        "default",
+        "west"
+      ],
+      "emittedBytes": 4375,
+      "modules": [
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/agents/assistant.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/app.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/apps/west.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/cli/tool.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/jobs/sweep.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/profile.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/server/http.ts",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/workflows/report.ts",
+        "<virtual>:pumped:entry-cli",
+        "<virtual>:pumped:manifest",
+        "<virtual>:rolldown/runtime.js"
+      ],
+      "pass": false
+    }
+  ],
+  "decision": {
+    "passedCases": 0,
+    "totalCases": 6,
+    "nullRejected": false
+  },
+  "selfHash": "81cc8ad286e682a683e907a6e5377ee62c72bf366aad2f3b6610d135ce395f17"
+}

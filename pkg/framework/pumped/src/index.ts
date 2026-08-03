@@ -1,4 +1,5 @@
 import { route, command, workflowRun, jobRun } from "./tags"
+import { app } from "./app"
 import { pumped as pumpedPlugin } from "./plugin"
 import { createServer } from "./runtime/serve"
 import { runCli } from "./runtime/cli"
@@ -8,6 +9,7 @@ import { createAppScope } from "./runtime/app-scope"
 import { normalizeAgentEntry } from "./runtime/agent"
 
 export const pumped = {
+  app,
   route,
   command,
   workflowRun,
@@ -55,8 +57,9 @@ export namespace p {
 }
 
 export { route, command, workflowRun, jobRun }
+export { app }
 export { createServer, createAppScope, runCli, runJobs, runWorkflows }
-export type { EntryDescriptor, EntryKind } from "./discover"
+export type { AppDescriptor, EntryDescriptor, EntryKind } from "./discover"
 export { discover } from "./discover"
 export { generateManifest } from "./codegen"
 export { normalizeAgentEntry } from "./runtime/agent"

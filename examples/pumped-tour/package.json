@@ -1,0 +1,29 @@
+{
+  "name": "@pumped-fn/pumped-tour",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pumped build --target all",
+    "build:east": "pumped build --app east --target all",
+    "dev": "pumped dev",
+    "dev:east": "pumped dev --app east",
+    "server": "node dist/server.mjs",
+    "cli": "node dist/cli.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "@pumped-fn/lite": "workspace:*",
+    "@pumped-fn/lite-hono": "workspace:*",
+    "@pumped-fn/pumped": "workspace:*",
+    "hono": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

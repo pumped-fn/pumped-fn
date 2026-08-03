@@ -1,12 +1,12 @@
 import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
-import { discover } from "../src/discover"
+import { discover, selectAppFile } from "../src/discover"
 
 const fixtureDir = resolve(__dirname, "fixtures/basic/src")
 
 describe("discover", () => {
   it("scans server, cli, and jobs entries flat, ignoring nested support modules", () => {
-    const { entries, appFile } = discover(fixtureDir)
+    const { entries, appFile, apps } = discover(fixtureDir)
 
     expect(entries).toEqual(
       expect.arrayContaining([
@@ -18,10 +18,32 @@ describe("discover", () => {
     )
     expect(entries).toHaveLength(4)
     expect(appFile).toBe(resolve(fixtureDir, "app.ts"))
+    expect(apps).toEqual([
+      { name: "east", file: resolve(fixtureDir, "apps/east.ts") },
+    ])
   })
 
   it("returns undefined appFile and no entries when nothing exists", () => {
     const result = discover(resolve(__dirname, "fixtures/empty"))
-    expect(result).toEqual({ entries: [], appFile: undefined })
+    expect(result).toEqual({ entries: [], appFile: undefined, apps: [] })
+  })
+
+  it("selects the default or a named app", () => {
+    const discovery = discover(fixtureDir)
+
+    expect(selectAppFile(discovery)).toBe(resolve(fixtureDir, "app.ts"))
+    expect(selectAppFile(discovery, "default")).toBe(resolve(fixtureDir, "app.ts"))
+    expect(selectAppFile(discovery, "east")).toBe(resolve(fixtureDir, "apps/east.ts"))
+  })
+
+  it("reports the available apps when selection fails", () => {
+    const discovery = discover(fixtureDir)
+
+    expect(() => selectAppFile(discovery, "west")).toThrow(
+      'app "west" was not found; available apps: default, east'
+    )
+    expect(() => selectAppFile({ entries: [], appFile: undefined, apps: [] }, "west")).toThrow(
+      'app "west" was not found; no apps are available'
+    )
   })
 })

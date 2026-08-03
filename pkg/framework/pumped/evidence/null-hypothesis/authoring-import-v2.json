@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "nullHypothesis": "The one-package authoring import is worse than importing Lite directly.",
+  "frozenGate": {
+    "maxExtraBytes": 256,
+    "maxForbiddenReferences": 0,
+    "requiresExactHandleIdentity": true,
+    "requiresBrowserBuild": true
+  },
+  "environment": {
+    "node": "v22.23.2",
+    "vite": "8.0.16"
+  },
+  "inputs": {
+    "liteFixture": "163b903f0a70b4a7f58b5423af2ba52c5327839e75cc1b5bf6ac367bfe7d2333",
+    "metaFixture": "0e2dd36146370bc1db04a9e2853d083a56ba9daf3ba8f2effe07c48bbb368e86",
+    "litePackage": "2af02b0ca40df2b959ecce1e9750c7b22db0ef8d290194ef18ce8c3fa04492b2",
+    "metaPackage": "9fa6f3bbdd210a713e2b8a76619cc73094985bf8dd64d2ff7b05ec3082ec72e9"
+  },
+  "cases": {
+    "lite": {
+      "status": "built",
+      "emittedBytes": 1570,
+      "moduleCount": 2,
+      "modules": [
+        "<repo>/pkg/core/lite/dist/index.mjs",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/lite.mjs"
+      ],
+      "forbiddenReferences": []
+    },
+    "meta": {
+      "status": "built",
+      "emittedBytes": 3417,
+      "moduleCount": 4,
+      "modules": [
+        "<repo>/pkg/core/lite/dist/index.mjs",
+        "<repo>/pkg/framework/pumped/dist/app.mjs",
+        "<repo>/pkg/framework/pumped/dist/tags-DjvNnEez.mjs",
+        "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/meta.mjs"
+      ],
+      "forbiddenReferences": []
+    }
+  },
+  "comparison": {
+    "identityPreserved": true,
+    "extraBytes": 1847,
+    "metaGatePass": false,
+    "nullRejected": false
+  },
+  "selfHash": "2370edfe8cd58632c88603280daf22f530372d7435b32ee3433e9be6f7a33acf"
+}

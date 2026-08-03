@@ -6,6 +6,7 @@ Use this when you add or change an example. `examples/` is a proof surface for d
 
 | Directory | Package | Role |
 | --- | --- | --- |
+| `pumped-tour/` | `@pumped-fn/pumped-tour` | Small convention compiler tour with HTTP, CLI, named app composition, builds, and tests. |
 | `invoice-triage/` | `@pumped-fn/invoice-triage` | Postgres-backed invoice import, LLM triage, database capabilities, daemon/server/CLI entrypoints, and scheduler cron. |
 
 ## Naming

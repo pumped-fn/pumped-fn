@@ -11,34 +11,56 @@ async function hasUserConfig(): Promise<boolean> {
   return config !== null
 }
 
-async function dev(): Promise<void> {
-  const server = await createViteServer(
-    (await hasUserConfig()) ? {} : { plugins: [pumped()] }
-  )
-  await server.listen()
-  server.printUrls()
+async function withSelectedApp<T>(name: string | undefined, fn: () => Promise<T>): Promise<T> {
+  if (name === undefined) return fn()
+  const previous = process.env["PUMPED_APP"]
+  process.env["PUMPED_APP"] = name
+  try {
+    return await fn()
+  } finally {
+    if (previous === undefined) delete process.env["PUMPED_APP"]
+    else process.env["PUMPED_APP"] = previous
+  }
 }
 
-async function buildTarget(target: "server" | "cli"): Promise<void> {
-  const userConfig = (await hasUserConfig()) ? {} : { plugins: [pumped()] }
+async function dev(selectedApp?: string): Promise<void> {
+  await withSelectedApp(selectedApp, async () => {
+    const server = await createViteServer(
+      (await hasUserConfig()) ? {} : { plugins: [pumped({ app: selectedApp })] }
+    )
+    await server.listen()
+    server.printUrls()
+  })
+}
+
+async function buildTarget(target: "server" | "cli", selectedApp?: string): Promise<void> {
+  const userConfig = (await hasUserConfig()) ? {} : { plugins: [pumped({ app: selectedApp })] }
 
   await viteBuild({ ...userConfig, ...buildConfig(target) })
 }
 
-async function build(target: Target): Promise<void> {
-  if (target === "server" || target === "all") await buildTarget("server")
-  if (target === "cli" || target === "all") await buildTarget("cli")
+async function build(target: Target, selectedApp?: string): Promise<void> {
+  await withSelectedApp(selectedApp, async () => {
+    if (target === "server" || target === "all") await buildTarget("server", selectedApp)
+    if (target === "cli" || target === "all") await buildTarget("cli", selectedApp)
+  })
 }
 
 const program = cac("pumped")
 
-program.command("dev", "Start the dev server").action(dev)
+program
+  .command("dev", "Start the dev server")
+  .option("--app <app>", "named app from src/apps")
+  .action(async (options: { app?: string }) => {
+    await dev(options.app)
+  })
 
 program
   .command("build", "Build server and/or cli bundles")
   .option("--target <target>", "server | cli | all", { default: "all" })
-  .action(async (options: { target: Target }) => {
-    await build(options.target)
+  .option("--app <app>", "named app from src/apps")
+  .action(async (options: { target: Target; app?: string }) => {
+    await build(options.target, options.app)
   })
 
 program.help()

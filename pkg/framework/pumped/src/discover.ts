@@ -10,9 +10,16 @@ export interface EntryDescriptor {
   file: string
 }
 
+/** Identifies a named application composition by name and source file. */
+export interface AppDescriptor {
+  name: string
+  file: string
+}
+
 export interface DiscoveryResult {
   entries: EntryDescriptor[]
   appFile: string | undefined
+  apps: AppDescriptor[]
 }
 
 const KINDS: EntryKind[] = ["server", "cli", "jobs", "agents", "workflows"]
@@ -47,6 +54,29 @@ export function discover(sourceDir: string): DiscoveryResult {
   const appFile = ["app.ts", "app.tsx", "app.js", "app.mjs"]
     .map((name) => join(root, name))
     .find((file) => existsSync(file))
+  const apps = listEntryFiles(join(root, "apps")).map((fileName) => ({
+    name: toKebabCase(fileName.replace(extname(fileName), "")),
+    file: join(root, "apps", fileName),
+  }))
 
-  return { entries, appFile }
+  return { entries, appFile, apps }
+}
+
+export function selectAppFile(discovery: DiscoveryResult, name?: string): string | undefined {
+  if (name === undefined || name === "default") {
+    if (name === undefined || discovery.appFile !== undefined) return discovery.appFile
+  } else {
+    const selected = discovery.apps.find((candidate) => candidate.name === name)
+    if (selected) return selected.file
+  }
+
+  const available = [
+    ...(discovery.appFile === undefined ? [] : ["default"]),
+    ...discovery.apps.map((candidate) => candidate.name),
+  ]
+  throw new Error(
+    available.length === 0
+      ? `app "${name}" was not found; no apps are available`
+      : `app "${name}" was not found; available apps: ${available.join(", ")}`
+  )
 }
