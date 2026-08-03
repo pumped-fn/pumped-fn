@@ -1,6 +1,6 @@
 # Null-hypothesis gates
 
-These executable gates compare the Pumped scaffold with the smaller Lite baseline. They print a
+These executable gates compare the Pumped app layer with the smaller Lite baseline. They print a
 compact live verdict and exit with a failure when the frozen requirement is not met. Generated
 captures are not checked in.
 

@@ -363,9 +363,6 @@ same flows the app serves.
 
 ## Roadmap
 
-The proposed application, named-app, system-graph, and production model is captured in
-[the application scaffold](SCAFFOLD.md).
-
 - System-manifest scan with build-time checks (unreachable entries, duplicate route/command names).
 - A dev graph endpoint / devtools view over the assembled scope.
 - Graph AOT: "unwrapping" atoms that are provably never substituted — no presets target them, no
