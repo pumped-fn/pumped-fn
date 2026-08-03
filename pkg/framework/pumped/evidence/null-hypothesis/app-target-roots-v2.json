@@ -46,8 +46,8 @@
       "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/server/http.ts": "2774dcd9927661ac960deb40e69dabc56ce6879cead964d19ba761581037f60c",
       "<repo>/pkg/framework/pumped/evidence/null-hypothesis/fixture/roots/src/workflows/report.ts": "5307716115ff9a980b1645d51b766cd9e78f2fccc71c183cbb2d038ec5b85a8e"
     },
-    "pumpedPackage": "4fd364077f47fadcdb90987ebb0f990dee547746766bda72ceb7464c67622edc",
-    "pumpedPackageBytes": 4363
+    "pumpedPackage": "b982c049366c1830b5e80737ddbcf73bc276b63aa11dbce7fa4e3f635efd78c7",
+    "pumpedPackageBytes": 9301
   },
   "cases": [
     {
@@ -260,5 +260,5 @@
     "totalCases": 6,
     "nullRejected": true
   },
-  "selfHash": "6f96c5377d05c1cb0262b7aaaa55b2712923e76d681251883f964600eb49504b"
+  "selfHash": "e90edc2fd608b8fa5ab36a917be3607bc4fef5c2d9d32146a66b02099ba58a6c"
 }

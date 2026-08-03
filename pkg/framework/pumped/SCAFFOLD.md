@@ -561,6 +561,22 @@ This rejects the shared-manifest counterexample. It does not yet reject all of R
 not declare different root sets, and artifacts do not yet carry an admitted app name and manifest
 hash. Those claims remain gated.
 
+### Risk 3 slice: truthful declared graph
+
+The frozen graph contains one server root, one flow, one atom, one required tag, and one app tag
+provider. Public extension hooks confirm the flow and atom that execute. Removing the tag must fail.
+Because factories are opaque functions, their bodies must remain explicit unknowns.
+
+| Evidence | Analyzer | Static graph | Runtime | Result |
+| --- | --- | --- | --- | --- |
+| `graph-v1.json` | absent | missing | exact | Rejected |
+| `graph-v2.json` | public handles | exact | exact | Admitted |
+
+V2 reports five nodes, four proven edges, and two `factory-body` unknowns without executing a
+factory during analysis. This rejects the smallest missing-edge counterexample. The full Risk 3
+matrix still needs resources, controllers, schedules, role-tag implementors, presets, extensions,
+and inline named execution before Pumped can claim broad graph coverage.
+
 ## Risk-first execution plan
 
 ### Phase 0: freeze the baseline

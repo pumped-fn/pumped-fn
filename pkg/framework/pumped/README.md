@@ -310,6 +310,29 @@ pumped build --app east --target all
 An unknown name fails with the available app names. `PUMPED_APP=east` provides the same selection
 when Vite is driven directly; an explicit `pumped.plugin({ app: "east" })` option takes precedence.
 
+## Graph analysis
+
+`analyze(manifest)` follows roots and recursively reads the declared dependencies on public Lite
+flow, atom, resource, controller, and tag handles. It does not execute factories:
+
+```ts
+import { analyze } from "@pumped-fn/pumped"
+
+const report = analyze({
+  app: appConfig,
+  entries: [
+    { kind: "server", name: "greet", file: "src/server/greet.ts", flow: greet },
+  ],
+})
+```
+
+`report.nodes` and `report.edges` are serializable. `report.idOf(handle)` maps the original public
+handle to its graph ID. `report.unknowns` keeps opaque factory bodies, context producers, error
+mappers, and extension hooks visible instead of claiming their hidden edges are absent.
+
+This slice analyzes an already assembled manifest. A command that loads the convention-generated
+manifest without running the app remains future work.
+
 ## Testing
 
 The scope is the single seam. Tests preset the scope directly and execute the same public handles.

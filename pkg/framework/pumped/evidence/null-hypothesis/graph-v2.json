@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "nullHypothesis": "Pumped cannot report a useful, truthful graph from public handles without missing edges or hiding opaque work.",
+  "frozenGate": {
+    "expected": {
+      "nodes": [
+        {
+          "id": "app",
+          "kind": "app",
+          "label": "app"
+        },
+        {
+          "id": "atom:directory",
+          "kind": "atom",
+          "label": "directory"
+        },
+        {
+          "id": "flow:greet",
+          "kind": "flow",
+          "label": "greet"
+        },
+        {
+          "id": "root:server:greet",
+          "kind": "root",
+          "label": "greet"
+        },
+        {
+          "id": "tag:example.graph.region",
+          "kind": "tag",
+          "label": "example.graph.region"
+        }
+      ],
+      "edges": [
+        {
+          "from": "app",
+          "to": "tag:example.graph.region",
+          "kind": "provides-tag"
+        },
+        {
+          "from": "flow:greet",
+          "to": "atom:directory",
+          "kind": "depends-on",
+          "key": "directory"
+        },
+        {
+          "from": "flow:greet",
+          "to": "tag:example.graph.region",
+          "kind": "reads-tag",
+          "key": "region",
+          "mode": "required"
+        },
+        {
+          "from": "root:server:greet",
+          "to": "flow:greet",
+          "kind": "executes"
+        }
+      ],
+      "unknowns": [
+        {
+          "from": "atom:directory",
+          "reason": "factory-body"
+        },
+        {
+          "from": "flow:greet",
+          "reason": "factory-body"
+        }
+      ]
+    },
+    "runtimeEvents": [
+      "flow:greet",
+      "atom:directory"
+    ],
+    "requiresMissingRequiredTagFailure": true,
+    "requiresFactoryBodiesMarkedUnknown": true
+  },
+  "inputs": {
+    "fixture": "93f828e60a3232426cee51494af3817f2977087f644ee58791f7e01b606e1f38",
+    "pumpedPackage": "b982c049366c1830b5e80737ddbcf73bc276b63aa11dbce7fa4e3f635efd78c7"
+  },
+  "analyzeAvailable": true,
+  "report": {
+    "nodes": [
+      {
+        "id": "app",
+        "kind": "app",
+        "label": "app"
+      },
+      {
+        "id": "atom:directory",
+        "kind": "atom",
+        "label": "directory"
+      },
+      {
+        "id": "flow:greet",
+        "kind": "flow",
+        "label": "greet"
+      },
+      {
+        "id": "root:server:greet",
+        "kind": "root",
+        "label": "greet"
+      },
+      {
+        "id": "tag:example.graph.region",
+        "kind": "tag",
+        "label": "example.graph.region"
+      }
+    ],
+    "edges": [
+      {
+        "from": "app",
+        "to": "tag:example.graph.region",
+        "kind": "provides-tag"
+      },
+      {
+        "from": "flow:greet",
+        "to": "atom:directory",
+        "kind": "depends-on",
+        "key": "directory"
+      },
+      {
+        "from": "flow:greet",
+        "to": "tag:example.graph.region",
+        "kind": "reads-tag",
+        "key": "region",
+        "mode": "required"
+      },
+      {
+        "from": "root:server:greet",
+        "to": "flow:greet",
+        "kind": "executes"
+      }
+    ],
+    "unknowns": [
+      {
+        "from": "atom:directory",
+        "reason": "factory-body"
+      },
+      {
+        "from": "flow:greet",
+        "reason": "factory-body"
+      }
+    ]
+  },
+  "runtime": {
+    "events": [
+      "flow:greet",
+      "atom:directory"
+    ],
+    "output": "Ada:default",
+    "missingTagRejected": true
+  },
+  "decision": {
+    "staticGraphExact": true,
+    "runtimeExact": true,
+    "nullRejected": true
+  },
+  "selfHash": "111ac10dba21a825a20b4c7ff297b7a7907396d846837a89c5d4f84af4da1120"
+}

@@ -61,6 +61,10 @@ authoring surface. Transport roots re-export the same flow handle and add metada
 `src/app.ts` supplies the default region tag. `src/apps/east.ts` derives from it and puts the east
 value first. The test replaces the directory atom with `preset()` and needs no module mock.
 
+The same test passes an assembled manifest to `analyze()`. It proves the two roots share one flow
+node, the flow declares its directory and region edges, and opaque factory work stays visible under
+`unknowns`.
+
 The production compiler emits `dist/server.mjs` with server roots and `dist/cli.mjs` with CLI roots.
 It does not put the other target's exclusive roots in either artifact.
 
@@ -76,5 +80,6 @@ not earn one.
 
 The dogfood build also exposes the next gate. Artifacts currently contain absolute source paths, and
 building east writes over the default files in `dist/`. The artifact still needs its selected app
-name and manifest hash. If those reproducibility gaps cannot be removed without making this example
-more complex, sunset Pumped and keep explicit Lite composition roots instead.
+name and manifest hash. Graph analysis also still needs a command that loads the generated manifest
+without starting the app. If those gaps cannot be removed without making this example more complex,
+sunset Pumped and keep explicit Lite composition roots instead.

@@ -1,4 +1,5 @@
 import { createScope, preset } from "@pumped-fn/pumped/app"
+import { analyze } from "@pumped-fn/pumped"
 import { describe, expect, it } from "vitest"
 import east from "../src/apps/east"
 import { directory, greet, region } from "../src/domain/greet"
@@ -19,5 +20,25 @@ describe("pumped tour", () => {
       message: "Hello, ADA from test",
     })
     await scope.dispose()
+  })
+
+  it("shows the declared graph without running a factory", () => {
+    const report = analyze({
+      app: east,
+      entries: [
+        { kind: "server", name: "greet", file: "src/server/greet.ts", flow: greet },
+        { kind: "cli", name: "greet", file: "src/cli/greet.ts", flow: greet },
+      ],
+    })
+
+    expect(report.idOf(greet)).toBe("flow:greet")
+    expect(report.idOf(directory)).toBe("atom:directory")
+    expect(report.edges).toContainEqual({
+      from: "flow:greet",
+      to: "atom:directory",
+      kind: "depends-on",
+      key: "directory",
+    })
+    expect(report.unknowns).toContainEqual({ from: "flow:greet", reason: "factory-body" })
   })
 })

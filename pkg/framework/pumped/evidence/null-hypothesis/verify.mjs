@@ -42,5 +42,15 @@ if (JSON.stringify(targetDecisions) !== JSON.stringify([false, true])) {
   throw new Error(`unexpected app target decisions: ${JSON.stringify(targetDecisions)}`)
 }
 
+const graphNames = ["graph-v1.json", "graph-v2.json"]
+const graphs = readEvidence(graphNames)
+verifyFrozenGate(graphNames, graphs)
+
+const graphDecisions = graphs.map((value) => value.decision.nullRejected)
+if (JSON.stringify(graphDecisions) !== JSON.stringify([false, true])) {
+  throw new Error(`unexpected graph decisions: ${JSON.stringify(graphDecisions)}`)
+}
+
 process.stdout.write(`verified authoring import lineage: ${authoringNames.join(", ")}\n`)
 process.stdout.write(`verified app target lineage: ${targetNames.join(", ")}\n`)
+process.stdout.write(`verified graph lineage: ${graphNames.join(", ")}\n`)

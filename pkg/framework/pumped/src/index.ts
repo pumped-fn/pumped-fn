@@ -7,9 +7,11 @@ import { runJobs } from "./runtime/jobs"
 import { runWorkflows } from "./runtime/workflows"
 import { createAppScope } from "./runtime/app-scope"
 import { normalizeAgentEntry } from "./runtime/agent"
+import { analyze } from "./analyze"
 
 export const pumped = {
   app,
+  analyze,
   route,
   command,
   workflowRun,
@@ -36,6 +38,10 @@ export namespace pumped {
   export type JobsRunner = import("./runtime/jobs").JobsRunner
   export type WorkflowsIo = import("./runtime/workflows").WorkflowsIo
   export type WorkflowsRunner = import("./runtime/workflows").WorkflowsRunner
+  export type GraphNode = import("./analyze").GraphNode
+  export type GraphEdge = import("./analyze").GraphEdge
+  export type GraphUnknown = import("./analyze").GraphUnknown
+  export type GraphReport = import("./analyze").GraphReport
 }
 
 export const p = pumped
@@ -54,10 +60,16 @@ export namespace p {
   export type JobsRunner = pumped.JobsRunner
   export type WorkflowsIo = pumped.WorkflowsIo
   export type WorkflowsRunner = pumped.WorkflowsRunner
+  export type GraphNode = pumped.GraphNode
+  export type GraphEdge = pumped.GraphEdge
+  export type GraphUnknown = pumped.GraphUnknown
+  export type GraphReport = pumped.GraphReport
 }
 
 export { route, command, workflowRun, jobRun }
 export { app }
+export { analyze }
+export type { GraphNode, GraphNodeKind, GraphEdge, GraphEdgeKind, GraphUnknown, GraphReport } from "./analyze"
 export { createServer, createAppScope, runCli, runJobs, runWorkflows }
 export type { AppDescriptor, EntryDescriptor, EntryKind } from "./discover"
 export { discover } from "./discover"

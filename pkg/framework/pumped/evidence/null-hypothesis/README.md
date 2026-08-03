@@ -58,4 +58,23 @@ node pkg/framework/pumped/evidence/null-hypothesis/verify.mjs
 kind, so zero passed. `app-target-roots-v2.json` uses target-specific manifests. All six builds
 contain the exact target roots and selected app closure, with no unrelated profile marker, so it
 rejects this null hypothesis. Its evidence hash is
-`6f96c5377d05c1cb0262b7aaaa55b2712923e76d681251883f964600eb49504b`.
+`e90edc2fd608b8fa5ab36a917be3607bc4fef5c2d9d32146a66b02099ba58a6c`.
+
+## Truthful graph
+
+This experiment freezes the smallest useful application graph: one server root executes a flow,
+the flow depends on one atom and one required tag, and the app provides that tag. Because factories
+are opaque functions, both factory bodies must remain explicit unknowns.
+
+The runtime probe uses public Lite extension hooks. It confirms that the expected flow and atom run,
+and that removing the required tag fails with its label.
+
+```bash
+node pkg/framework/pumped/evidence/null-hypothesis/capture-graph.mjs
+node pkg/framework/pumped/evidence/null-hypothesis/verify.mjs
+```
+
+`graph-v1.json` records the missing analyzer: runtime behavior passed, but no static report existed.
+`graph-v2.json` records the admitted slice. Its five nodes, four proven edges, and two explicit
+factory-body unknowns match the frozen report exactly. Its evidence hash is
+`111ac10dba21a825a20b4c7ff297b7a7907396d846837a89c5d4f84af4da1120`.
