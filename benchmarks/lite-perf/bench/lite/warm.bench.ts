@@ -1,22 +1,32 @@
-import { bench, describe } from "vitest"
+import { describe } from "vitest"
+import { bench } from "../quick"
 import { consume, resolvedController } from "./graphs"
 
 const { scope, atom: a, ctrl } = await resolvedController(() => 1)
+const batch = 256
 
 describe("warm paths (already resolved)", () => {
   bench("scope.resolve()", async () => {
-    consume(await scope.resolve(a))
+    for (let index = 0; index < batch; index++) {
+      consume(await scope.resolve(a))
+    }
   })
 
   bench("controller.get()", () => {
-    consume(ctrl.get())
+    for (let index = 0; index < batch; index++) {
+      consume(ctrl.get())
+    }
   })
 
   bench("controller.state", () => {
-    consume(ctrl.state)
+    for (let index = 0; index < batch; index++) {
+      consume(ctrl.state)
+    }
   })
 
   bench("scope.controller() lookup", () => {
-    consume(scope.controller(a))
+    for (let index = 0; index < batch; index++) {
+      consume(scope.controller(a))
+    }
   })
 })

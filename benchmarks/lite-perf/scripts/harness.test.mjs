@@ -301,6 +301,8 @@ test("full comparison reports 47 rows and both representative lanes", () => {
   assert.equal(result.pair_count, 5);
   assert.equal(result.required_directional_agreement, 5);
   assert.equal(result.row_count, 47);
+  assert.equal(result.candidate_affected_row_count, 43);
+  assert.equal(result.calibration_row_count, 4);
   assert.equal(result.lanes.lite.row_count, 39);
   assert.equal(result.lanes["lite-react"].row_count, 8);
   assert.equal(result.performance_regression_case_count, 0);
@@ -309,6 +311,22 @@ test("full comparison reports 47 rows and both representative lanes", () => {
   assert.equal(result.inconclusive_rows.length, 0);
   assert.equal(result.decision, "candidate_threshold_supported");
   assert.ok(result.representative_lane_ratio >= 1.1);
+});
+
+test("one-pair comparison provides a fast directional canary", () => {
+  const result = compareObservations(
+    observations("full", [1]),
+    "full",
+    manifest
+  );
+  assert.equal(result.pair_count, 1);
+  assert.equal(result.required_directional_agreement, 1);
+  assert.equal(result.row_count, 47);
+  assert.equal(result.performance_regression_case_count, 0);
+  assert.equal(result.evidence_scope, "directional_canary");
+  assert.equal(result.decision, "canary_clear");
+  assert.equal(result.lanes.lite.rows[0].classification, "canary_clear");
+  assert.equal(result.lanes.lite.rows[0].improvement_supported, false);
 });
 
 test("Lite-only comparison remains an explicit eight-row evidence gap", () => {
@@ -331,8 +349,8 @@ test("mixed pairs are inconclusive instead of false-green", () => {
     manifest
   );
   assert.equal(result.performance_regression_case_count, 0);
-  assert.equal(result.inconclusive_rows.length, 47);
-  assert.equal(result.performance_evidence_gap_count, 47);
+  assert.equal(result.inconclusive_rows.length, 43);
+  assert.equal(result.performance_evidence_gap_count, 43);
   assert.equal(result.decision, "evidence_inconclusive");
 });
 
@@ -342,9 +360,37 @@ test("five below-floor pairs become confirmed regressions", () => {
     "full",
     manifest
   );
-  assert.equal(result.performance_regression_case_count, 47);
+  assert.equal(result.performance_regression_case_count, 43);
   assert.equal(result.inconclusive_rows.length, 0);
   assert.equal(result.decision, "rejected_confirmed_regression");
+});
+
+test("literal parity floor rejects every below-one pair", () => {
+  const rejected = compareObservations(
+    observations("full", [0.99, 0.99, 0.99, 0.99, 0.99]),
+    "full",
+    manifest,
+    1
+  );
+  assert.equal(rejected.no_regression_floor, 1);
+  assert.equal(rejected.performance_regression_case_count, 43);
+  assert.equal(
+    rejected.lanes["lite-react"].rows[0].agreement_at_no_regression_floor,
+    0
+  );
+
+  const accepted = compareObservations(
+    observations("full", [1, 1, 1, 1, 1]),
+    "full",
+    manifest,
+    1
+  );
+  assert.equal(accepted.performance_regression_case_count, 0);
+  assert.equal(accepted.performance_evidence_gap_count, 0);
+  assert.equal(
+    accepted.lanes["lite-react"].rows[0].agreement_at_no_regression_floor,
+    5
+  );
 });
 
 test("observation validation accepts only pair labels 1 through 9", () => {
@@ -380,7 +426,7 @@ test("nine-pair 8 of 9 below floor confirms regression", () => {
     "full",
     manifest
   );
-  assert.equal(result.performance_regression_case_count, 47);
+  assert.equal(result.performance_regression_case_count, 43);
   assert.equal(result.performance_evidence_gap_count, 0);
   assert.equal(result.inconclusive_rows.length, 0);
   assert.equal(result.decision, "rejected_confirmed_regression");
@@ -393,8 +439,8 @@ test("nine-pair mixed direction remains fail-closed", () => {
     manifest
   );
   assert.equal(result.performance_regression_case_count, 0);
-  assert.equal(result.inconclusive_rows.length, 47);
-  assert.equal(result.performance_evidence_gap_count, 47);
+  assert.equal(result.inconclusive_rows.length, 43);
+  assert.equal(result.performance_evidence_gap_count, 43);
   assert.equal(result.decision, "evidence_inconclusive");
 });
 
@@ -406,7 +452,7 @@ test("comparison rejects unsupported pair counts and nine-pair order drift", () 
         "lite-only",
         manifest
       ),
-    /pair count must be 5 or 9/
+    /pair count must be 1, 5, or 9/
   );
 
   const wrongOrder = observations("lite-only", [1, 1, 1, 1, 1, 1, 1, 1, 1]);

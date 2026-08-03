@@ -58,7 +58,6 @@
     "@pumped-fn/lite": "workspace:*",
     "@pumped-fn/lite-hono": "workspace:*",
     "@types/node": "catalog:",
-    "@typescript/native-preview": "catalog:",
     "hono": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

@@ -1,4 +1,5 @@
-import { bench, describe } from "vitest"
+import { describe } from "vitest"
+import { bench } from "../quick"
 import { consume } from "./graphs"
 
 const map = new Map([["k", 1]])

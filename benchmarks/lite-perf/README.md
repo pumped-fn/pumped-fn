@@ -12,6 +12,20 @@ pnpm --dir benchmarks/lite-perf perf:test
 
 The harness test uses only Node built-ins. It proves exact 39/8 counts and rejects empty, missing, duplicate, non-finite, wrong-lane, wrong-order, environment-drifted, artifact-drifted, source-tree, and mixed false-green evidence.
 
+## Fast iteration
+
+The default row budget is intentionally short: 75 ms plus one 10 ms warmup, with batched operations inside each row. Run one sealed baseline/candidate pair with:
+
+```bash
+cd benchmarks/lite-perf
+node scripts/quick.mjs \
+  --baseline-root /tmp/lite-baseline \
+  --candidate-root ../.. \
+  --output-dir /tmp/lite-perf-quick
+```
+
+This is a directional canary at the practical `0.95` floor, not statistical release evidence. Use the five-pair protocol below only when stronger confidence is worth the additional runtime.
+
 Environment identity uses semantic bytes, not installation locations. Package name, version, and manifest bytes; Node version and binary bytes; browser provider version and manifest bytes; Chromium bytes; lockfile, config, harness, writer, rows, platform, kernel, architecture, and CPU remain fingerprinted. Dependency, Node, and browser installation paths are excluded. Checkout, command, working-directory, and raw-output paths remain observation provenance only. Baseline and candidate roots must use byte-identical benchmark-control files while keeping their product sources and built artifacts separate.
 
 ## Capture one independent process
@@ -168,12 +182,15 @@ Do not inspect or stop after pair 6, 7, or 8. The fallback is one predeclared se
 
 | Pair count | `no_regression`                          | `confirmed_regression`             | Improvement support                      |
 | ---------: | ---------------------------------------- | ---------------------------------- | ---------------------------------------- |
+|          1 | directional `canary_clear`               | directional `canary_regression`    | never claimed                            |
 |          5 | `5/5` ratios at or above `0.95`          | `5/5` ratios below `0.95`          | `5/5` ratios at or above `1.10`          |
 |          9 | at least `8/9` ratios at or above `0.95` | at least `8/9` ratios below `0.95` | at least `8/9` ratios at or above `1.10` |
 
+For literal no-penalty admission, pass --floor 1 to both the five-pair and nine-pair comparisons. The comparison records no_regression_floor as 1 and classifies only the 43 manifest rows that execute candidate code. The four interpretation floors remain sealed calibration evidence and are reported separately.
+
 Under independent fair directions at the tested threshold, the predeclared two-stage one-sided false-positive bound is `21/512 = 4.1015625%`: `16/512` for unanimous direction in the first five pairs plus `5/512` for the fallback-only path with exactly four of the first five and all four added pairs in the same direction.
 
-The comparator normalizes cold-resolve and invalidation-cascade rows as `baseline_p75 / candidate_p75`; every other row uses `candidate_hz / baseline_hz`. It reports every row, median/MAD, agreement at `0.95` and `1.10`, five-row Lite and three-row Lite React geometric means, and the smaller representative lane ratio. Mixed evidence is inconclusive, not no-regression. Do not check a constrained-host observation in as a performance baseline.
+The comparator normalizes cold-resolve, invalidation-cascade, and browser rows as `baseline_p75 / candidate_p75`; remaining Node rows use `candidate_hz / baseline_hz`. It reports every row, median/MAD, agreement at `0.95` and `1.10`, five-row Lite and three-row Lite React geometric means, and the smaller representative lane ratio. Mixed evidence is inconclusive, not no-regression. Do not check a constrained-host observation in as a performance baseline.
 
 Raw benchmark and behavior-probe commands remain available:
 
@@ -197,7 +214,9 @@ pnpm test
 
 ## Reading the numbers
 
-- browser-mode React numbers are relative, not absolute — compare rows, not browsers.
+- Browser-mode React rows use p75 latency because browser scheduling and GC create rare 100–700 ms pauses that make mean throughput non-robust.
 - Cold-resolve means are skewed by GC pauses from per-iteration scope creation (rme ±15% typical); prefer p75.
 - Listener callbacks must be distinct closures — identical function references dedupe in the listener `Set` and silently measure the single-listener fast path.
 - Cascade rows measure `set` + `scope.flush()`: the dominant cost is per-atom factory re-resolution (~2µs/node), not notification dispatch.
+- Warm access rows batch 256 operations so a sample measures the library path rather than the per-sample timer floor.
+- Browser rows use short batched samples by default so a complete exact-artifact canary finishes quickly. Use paired observations to distinguish a material regression from browser timer and GC noise.

@@ -25,6 +25,11 @@ interface UseAtomManualOptions {
 
 type UseAtomOptions = UseAtomSuspenseOptions | UseAtomManualOptions
 
+type ValueController<T> = Lite.Controller<T> & {
+  readonly value: T
+  _(listener: () => void): () => void
+}
+
 /** Reports atom data, loading, failure, and its controller. */
 interface UseAtomState<T> {
   data: T | undefined
@@ -108,8 +113,6 @@ type UseScopedValueOptions<State, Selected = never> =
   | UseScopedValueSelectSuspenseOptions<State, Selected>
   | UseScopedValueSelectManualOptions<State, Selected>
 
-type FlowInput<F> = F extends Lite.Flow<any, infer Input> ? Input : never
-type FlowOutput<F> = F extends Lite.Flow<infer Output, any> ? Output : never
 type ExecuteArgs<Input> = [Input] extends [void | undefined | null] ? [] | [input: Input] : [input: Input]
 type MaybePromise<T> = T | Promise<T>
 
@@ -489,18 +492,18 @@ function useExecutionContext(): Lite.ExecutionContext {
   return ctx
 }
 
-function useFlow<F extends Lite.Flow<any, any>>(
-  target: F,
-  options?: UseFlowOptions<FlowOutput<F>, FlowInput<F>>,
-): UseFlowState<FlowOutput<F>, ExecuteArgs<FlowInput<F>>> {
+function useFlow<Output, Input, Fault, Yield>(
+  target: Lite.Flow<Output, Input, Fault, Yield>,
+  options?: UseFlowOptions<Output, Input>,
+): UseFlowState<Output, ExecuteArgs<Input>> {
   const ctx = useExecutionContext()
   const optionsRef = useRef(options)
   const ownerRef = useRef(0)
-  const sourceRef = useRef<{ ctx: Lite.ExecutionContext; target: F } | null>(null)
+  const sourceRef = useRef<{ ctx: Lite.ExecutionContext; target: Lite.Flow<Output, Input, Fault, Yield> } | null>(null)
   const [snapshot, dispatch] = useReducer(
-    flowSnapshotReducer<FlowOutput<F>>,
+    flowSnapshotReducer<Output>,
     undefined,
-    idleFlowSnapshot<FlowOutput<F>>,
+    idleFlowSnapshot<Output>,
   )
   optionsRef.current = options
 
@@ -521,11 +524,11 @@ function useFlow<F extends Lite.Flow<any, any>>(
     dispatch({ type: 'reset' })
   }, [])
 
-  const execute = useCallback((...args: ExecuteArgs<FlowInput<F>>) => {
+  const execute = useCallback((...args: ExecuteArgs<Input>) => {
     const owner = ++ownerRef.current
-    const input = args[0] as FlowInput<F>
+    const input = args[0] as Input
     dispatch({ type: 'executing' })
-    void ctx.exec({ flow: target, input } as Lite.ExecFlowOptions<FlowOutput<F>, FlowInput<F>>).then(
+    void ctx.exec({ flow: target, input } as Lite.ExecFlowOptions<Output, Input, Yield>).then(
       (data) => {
         if (owner !== ownerRef.current) return
         dispatch({ type: 'success', data })
@@ -614,8 +617,6 @@ function useController<T>(atom: Lite.Atom<T>): Lite.Controller<T>
 function useController<T>(atom: Lite.Atom<T>, options: UseControllerOptions): Lite.Controller<T>
 function useController<T>(atom: Lite.Atom<T>, options?: UseControllerOptions): Lite.Controller<T> {
   const scope = useScope()
-  // scope.controller() is idempotent (caches by atom in a Map), so calling it
-  // every render is free and lets us skip a useMemo cell in the hook fiber.
   const ctrl = scope.controller(atom)
 
   if (options?.resolve) {
@@ -651,44 +652,36 @@ function useAtom<T>(atom: Lite.Atom<T>): T
 function useAtom<T>(atom: Lite.Atom<T>, options: UseAtomSuspenseOptions): T
 function useAtom<T>(atom: Lite.Atom<T>, options: UseAtomManualOptions): UseAtomState<T>
 function useAtom<T>(atom: Lite.Atom<T>, options?: UseAtomOptions): T | UseAtomState<T> {
-  const ctrl = useController(atom)
+  const scope = useContext(ScopeContext)
+  if (!scope) throw new Error('useScope must be used within a ScopeProvider')
+  const ctrl = scope.controller(atom) as ValueController<T>
   const ctrlState = ctrl.state
 
   const isSuspense = options?.suspense !== false
   const autoResolve = isSuspense ? options?.resolve !== false : !!options?.resolve
 
-  // Aggressive fast path for the canonical Suspense + auto-resolve case.
-  // Skips useSyncExternalStore's snapshot-cache bookkeeping in favor of a
-  // direct useReducer forceUpdate driven by a layout-effect subscription.
-  // The non-Suspense path retains the full tearing-safe implementation below.
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0)
-  const served = useRef<{ ctrl: Lite.Controller<T>; value: T } | null>(null)
+  const ctrlValue = ctrlState === 'resolved' ? ctrl.value : undefined
   useIsomorphicLayoutEffect(() => {
     if (!isSuspense) return
-    return ctrl.on('*', () => {
-      const last = served.current
-      if (last && last.ctrl === ctrl && (ctrl.state === 'resolved' || ctrl.state === 'resolving')) {
-        try {
-          if (Object.is(ctrl.get(), last.value)) return
-        } catch {}
-      }
+    const unsubscribe = ctrl._(forceUpdate)
+    const state = ctrl.state
+    if (
+      state !== ctrlState ||
+      (state === 'resolved' && !Object.is(ctrl.value, ctrlValue))
+    ) {
       forceUpdate()
-    })
+    }
+    return unsubscribe
   }, [ctrl, isSuspense])
   if (isSuspense) {
-    const s = ctrl.state
-    if (s === 'idle') {
+    if (ctrlState === 'idle') {
       if (autoResolve) throw getOrCreatePendingPromise(ctrl)
       throw new Error('Atom is not resolved. Set resolve: true or resolve the atom before rendering.')
     }
-    if (s === 'failed') throw ctrl.get()
-    try {
-      const value = ctrl.get()
-      served.current = { ctrl, value }
-      return value
-    } catch {
-      throw getOrCreatePendingPromise(ctrl)
-    }
+    if (ctrlState === 'failed') ctrl.get()
+    if (ctrlState !== 'resolved') throw getOrCreatePendingPromise(ctrl)
+    return ctrlValue as T
   }
 
   const stateCache = useRef<{
@@ -798,8 +791,9 @@ function useSelect<T, S>(
   selector: (value: T) => S,
   eqOrOptions?: ((a: S, b: S) => boolean) | UseSelectOptions<S>
 ): S | UseSelectState<S> {
-  const scope = useScope()
-  const ctrl = useController(atom)
+  const scope = useContext(ScopeContext)
+  if (!scope) throw new Error('useScope must be used within a ScopeProvider')
+  const ctrl = scope.controller(atom)
 
   const isOptions = typeof eqOrOptions === 'object' && eqOrOptions !== null
   const isSuspense = isOptions ? (eqOrOptions as UseSelectOptions<S>).suspense !== false : true
@@ -807,17 +801,12 @@ function useSelect<T, S>(
   const eq = isOptions ? (eqOrOptions as UseSelectOptions<S>).eq : eqOrOptions as ((a: S, b: S) => boolean) | undefined
   const eqFn = eq ?? Object.is
 
-  // Aggressive: when Suspense + resolved, delegate change detection to the
-  // core scope.select() handle. The handle runs the selector inside its own
-  // ctrl.on('resolved') listener and only notifies on *actual value change*,
-  // so 99/100 sibling components never even schedule a React re-render.
   const isResolved = ctrl.state === 'resolved'
   const handle = useMemo(() => {
     if (isSuspense && isResolved) {
       return scope.select(atom, selector, { eq: eqFn })
     }
     return null
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, atom, selector, eqFn, isSuspense, isResolved])
 
   useEffect(() => {
@@ -855,7 +844,6 @@ function useSelect<T, S>(
         throw new Error('Atom is not resolved. Set resolve: true or resolve the atom before rendering.')
       }
       if (state === 'failed') throw ctrl.get()
-      // Fast path when we have a handle: pure field read, no selector call.
       if (handle) return handle.get()
       let value: T
       try { value = ctrl.get() } catch { throw getOrCreatePendingPromise(ctrl) }
@@ -954,10 +942,6 @@ function useSelect<T, S>(
   }
 
   const subscribe = useCallback((onStoreChange: () => void) => {
-    // With a handle, change detection happens inside the handle itself.
-    // Only 1/100 components fires onStoreChange per mutation — the rest never
-    // schedule a React re-render. We still subscribe to ctrl.on('*') so state
-    // transitions (idle/failed/resolving) re-render for Suspense/Error flows.
     if (handle && isSuspense) {
       const offHandle = handle.subscribe(onStoreChange)
       const offCtrl = ctrl.on('*', () => {

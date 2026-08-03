@@ -2,7 +2,7 @@
 
 This is a sequence-diagram tour of Lite runtime behavior. Use it when you want to see how scopes,
 contexts, resources, controllers, tags, service calls, and extensions move at runtime. For API details,
-see `pkg/core/lite/dist/index.d.mts`.
+see `pkg/core/lite/dist/index.d.ts`.
 
 ## Boundary Ownership
 

@@ -21,4 +21,6 @@ export { resource, isResource } from "./resource"
 export { createScope, isStreamingExec, setControllerReadHook, shallowEqual } from "./scope"
 export { registerInTracker, startArrayTracking, stopArrayTracking, startTracking, stopTracking } from "./tracker"
 
-export const VERSION = "0.0.1"
+/** Current package version. */
+export const VERSION: string = manifest.version
+import manifest from "../package.json" with { type: "json" }

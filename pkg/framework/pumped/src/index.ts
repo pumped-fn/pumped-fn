@@ -7,6 +7,20 @@ import { runWorkflows } from "./runtime/workflows"
 import { createAppScope } from "./runtime/app-scope"
 import { normalizeAgentEntry } from "./runtime/agent"
 
+type PumpedRouteMeta = import("./tags").RouteMeta
+type PumpedCommandMeta = import("./tags").CommandMeta
+type PumpedWorkflowRunMeta = import("./tags").WorkflowRunMeta
+type PumpedJobRunMeta = import("./tags").JobRunMeta
+type PumpedManifest = import("./runtime/manifest").Manifest
+type PumpedManifestEntry = import("./runtime/manifest").ManifestEntry
+type PumpedManifestAgentMeta = import("./runtime/manifest").ManifestAgentMeta
+type PumpedConfig = import("./runtime/manifest").AppConfig
+type PumpedOptions = import("./plugin").PumpedOptions
+type PumpedJobsIo = import("./runtime/jobs").JobsIo
+type PumpedJobsRunner = import("./runtime/jobs").JobsRunner
+type PumpedWorkflowsIo = import("./runtime/workflows").WorkflowsIo
+type PumpedWorkflowsRunner = import("./runtime/workflows").WorkflowsRunner
+
 export const pumped = {
   route,
   command,
@@ -21,19 +35,19 @@ export const pumped = {
 } as const
 
 export namespace pumped {
-  export type RouteMeta = import("./tags").RouteMeta
-  export type CommandMeta = import("./tags").CommandMeta
-  export type WorkflowRunMeta = import("./tags").WorkflowRunMeta
-  export type JobRunMeta = import("./tags").JobRunMeta
-  export type Manifest = import("./runtime/manifest").Manifest
-  export type ManifestEntry = import("./runtime/manifest").ManifestEntry
-  export type ManifestAgentMeta = import("./runtime/manifest").ManifestAgentMeta
-  export type Config = import("./runtime/manifest").AppConfig
-  export type Options = import("./plugin").PumpedOptions
-  export type JobsIo = import("./runtime/jobs").JobsIo
-  export type JobsRunner = import("./runtime/jobs").JobsRunner
-  export type WorkflowsIo = import("./runtime/workflows").WorkflowsIo
-  export type WorkflowsRunner = import("./runtime/workflows").WorkflowsRunner
+  export type RouteMeta = PumpedRouteMeta
+  export type CommandMeta = PumpedCommandMeta
+  export type WorkflowRunMeta = PumpedWorkflowRunMeta
+  export type JobRunMeta = PumpedJobRunMeta
+  export type Manifest = PumpedManifest
+  export type ManifestEntry = PumpedManifestEntry
+  export type ManifestAgentMeta = PumpedManifestAgentMeta
+  export type Config = PumpedConfig
+  export type Options = PumpedOptions
+  export type JobsIo = PumpedJobsIo
+  export type JobsRunner = PumpedJobsRunner
+  export type WorkflowsIo = PumpedWorkflowsIo
+  export type WorkflowsRunner = PumpedWorkflowsRunner
 }
 
 export const p = pumped

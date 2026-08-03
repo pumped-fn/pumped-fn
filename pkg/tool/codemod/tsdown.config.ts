@@ -6,7 +6,7 @@ export default defineConfig({
     "src/cli.ts",
     "src/transforms/core-next-to-lite.ts",
   ],
-  dts: true,
+  dts: { tsconfig: "tsconfig.dts.json" },
   format: ["cjs", "esm"],
   outputOptions: {
     exports: "named",

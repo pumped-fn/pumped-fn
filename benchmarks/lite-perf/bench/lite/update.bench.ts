@@ -1,4 +1,5 @@
-import { bench, describe } from "vitest"
+import { describe } from "vitest"
+import { bench } from "../quick"
 import { noop, resolvedController, watchChain, watchFanout, watchFanoutSuppressed } from "./graphs"
 import { createScope } from "@pumped-fn/lite"
 

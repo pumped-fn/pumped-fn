@@ -13,7 +13,8 @@
           "group": "baselines (interpretation floors)",
           "name": "Map.get",
           "metric": "hz",
-          "representative": false
+          "representative": false,
+          "candidate_affected": false
         },
         {
           "id": "lite:bench/lite/baseline.bench.ts:baselines (interpretation floors):object literal allocation",
@@ -21,7 +22,8 @@
           "group": "baselines (interpretation floors)",
           "name": "object literal allocation",
           "metric": "hz",
-          "representative": false
+          "representative": false,
+          "candidate_affected": false
         },
         {
           "id": "lite:bench/lite/baseline.bench.ts:baselines (interpretation floors):await Promise.resolve(value)",
@@ -29,7 +31,8 @@
           "group": "baselines (interpretation floors)",
           "name": "await Promise.resolve(value)",
           "metric": "hz",
-          "representative": false
+          "representative": false,
+          "candidate_affected": false
         },
         {
           "id": "lite:bench/lite/baseline.bench.ts:baselines (interpretation floors):await new microtask chain (.then)",
@@ -37,7 +40,8 @@
           "group": "baselines (interpretation floors)",
           "name": "await new microtask chain (.then)",
           "metric": "hz",
-          "representative": false
+          "representative": false,
+          "candidate_affected": false
         },
         {
           "id": "lite:bench/lite/flow.bench.ts:execution context:createContext + close",
@@ -332,7 +336,7 @@
           "file": "bench/react/react.browser.bench.tsx",
           "group": "update propagation (act + set + flush)",
           "name": "100 useAtom consumers re-render",
-          "metric": "hz",
+          "metric": "p75",
           "representative": true
         },
         {
@@ -340,7 +344,7 @@
           "file": "bench/react/react.browser.bench.tsx",
           "group": "update propagation (act + set + flush)",
           "name": "100 useAtom consumers, identical value set (no re-render)",
-          "metric": "hz",
+          "metric": "p75",
           "representative": false
         },
         {
@@ -348,7 +352,7 @@
           "file": "bench/react/react.browser.bench.tsx",
           "group": "update propagation (act + set + flush)",
           "name": "100 useSelect consumers, selector hits (re-render)",
-          "metric": "hz",
+          "metric": "p75",
           "representative": true
         },
         {
@@ -356,7 +360,7 @@
           "file": "bench/react/react.browser.bench.tsx",
           "group": "update propagation (act + set + flush)",
           "name": "100 useSelect consumers, selector misses (no re-render)",
-          "metric": "hz",
+          "metric": "p75",
           "representative": false
         },
         {
@@ -364,7 +368,7 @@
           "file": "bench/react/react.browser.bench.tsx",
           "group": "update propagation (act + set + flush)",
           "name": "100 useSelect consumers, inline selector, hits",
-          "metric": "hz",
+          "metric": "p75",
           "representative": false
         },
         {
@@ -372,7 +376,7 @@
           "file": "bench/react/react.browser.bench.tsx",
           "group": "update propagation (act + set + flush)",
           "name": "parent re-render, 100 useAtom children, value unchanged",
-          "metric": "hz",
+          "metric": "p75",
           "representative": false
         },
         {
@@ -380,7 +384,7 @@
           "file": "bench/react/react.browser.bench.tsx",
           "group": "mount/unmount",
           "name": "mount + unmount 100 useAtom consumers",
-          "metric": "hz",
+          "metric": "p75",
           "representative": false
         },
         {
@@ -388,7 +392,7 @@
           "file": "bench/react/react.browser.bench.tsx",
           "group": "mount/unmount",
           "name": "mount + unmount 100 useSelect consumers",
-          "metric": "hz",
+          "metric": "p75",
           "representative": true
         }
       ]

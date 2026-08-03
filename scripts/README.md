@@ -13,6 +13,8 @@
 | `check-example-alignment.mjs` | Check example, guidance, package-map, dependency-policy, and script-surface drift. |
 | `check-inline-exec-contract.mjs` | Check inline `scope.run` and `ctx.exec` call sites for explicit names, parameters, inspectable callbacks, and graph dependencies when used. |
 | `check-inline-exec-contract.test.mjs` | Deterministic positive and negative fixtures for the inline execution contract checker. |
+| `check-packed-lite.mjs` | Pack Lite and Lite React, then verify docs, ESM, CJS, TS7 NodeNext, and Bundler consumers. |
+| `check-published-types.mjs` | Validate every public package root export with strict NodeNext ESM/CJS and Bundler consumers. |
 | `check-public-contract.mjs` | Check package metadata, migration evidence, public interface TSDoc, README fences, changesets, and PR provenance. |
 | `check-release-policy.mjs` | Check Changeset bump size, internal peer alignment, and the repository release policy. |
 | `check-release-policy.test.mjs` | Deterministic release-policy fixtures for core majors, pre-1 graduation, stable minors, widening, and stale peers. |

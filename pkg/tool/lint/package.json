@@ -30,15 +30,14 @@
   "scripts": {
     "build": "tsdown",
     "pretest": "pnpm build",
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "typescript": "catalog:"
+    "typescript-api": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@typescript/native-preview": "catalog:",
     "tsdown": "catalog:",
     "vitest": "catalog:"
   },

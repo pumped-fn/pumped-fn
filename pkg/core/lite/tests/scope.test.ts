@@ -56,6 +56,67 @@ describe("Scope", () => {
       expect(scope.controller(undefinedAtom).state).toBe("resolved")
     })
 
+    it("runs failing cold dependencies once", async () => {
+      const scope = createScope()
+      let directCalls = 0
+      let directCleanups = 0
+      const direct = atom({
+        factory: (ctx) => {
+          directCalls++
+          ctx.cleanup(() => { directCleanups++ })
+          throw new Error("direct failed")
+        },
+      })
+      const directParent = atom({
+        deps: { direct },
+        factory: (_, { direct }) => direct,
+      })
+
+      await expect(scope.resolve(directParent)).rejects.toThrow("direct failed")
+      expect(directCalls).toBe(1)
+
+      let controllerCalls = 0
+      let controllerCleanups = 0
+      const controlled = atom({
+        factory: (ctx) => {
+          controllerCalls++
+          ctx.cleanup(() => { controllerCleanups++ })
+          throw new Error("controller failed")
+        },
+      })
+      const controllerParent = atom({
+        deps: { controlled: controller(controlled, { resolve: true }) },
+        factory: (_, { controlled }) => controlled.get(),
+      })
+
+      await expect(scope.resolve(controllerParent)).rejects.toThrow("controller failed")
+      expect(controllerCalls).toBe(1)
+      await scope.dispose()
+      expect(directCleanups).toBe(1)
+      expect(controllerCleanups).toBe(1)
+    })
+
+    it("supports immutable atoms without changing their public shape", async () => {
+      const normal = atom({ factory: () => 1 })
+      const normalKeys = Object.keys(normal)
+      const normalScope = createScope()
+      await normalScope.resolve(normal)
+      normalScope.controller(normal)
+      expect(Object.keys(normal)).toEqual(normalKeys)
+
+      const frozen = Object.freeze(atom({ factory: () => 2 }))
+      const sealed = Object.seal(atom({ factory: () => 3 }))
+      const fixed = Object.preventExtensions(atom({ factory: () => 4 }))
+      const scope = createScope()
+
+      await expect(scope.resolve(frozen)).resolves.toBe(2)
+      await expect(scope.resolve(sealed)).resolves.toBe(3)
+      await expect(scope.resolve(fixed)).resolves.toBe(4)
+      expect(scope.controller(frozen).get()).toBe(2)
+      expect(scope.controller(sealed).get()).toBe(3)
+      expect(scope.controller(fixed).get()).toBe(4)
+    })
+
     it("allows extensions to resolve atoms during init", async () => {
       const configAtom = atom({ factory: () => "config" })
       let initValue: string | undefined

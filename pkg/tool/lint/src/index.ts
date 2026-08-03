@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises"
 import { basename, extname, resolve } from "node:path"
-import ts from "typescript"
+import ts from "typescript-api"
 
 export type RuleId =
   | "pumped/config-via-tags"

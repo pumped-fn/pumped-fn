@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { cpus, machine, platform, release } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
@@ -49,6 +49,14 @@ export function hashObject(value) {
   return sha256(canonical(value));
 }
 
+function controlFingerprint() {
+  const scan = (path) => readdirSync(path, { withFileTypes: true }).flatMap((entry) => {
+    const next = resolve(path, entry.name);
+    return entry.isDirectory() ? scan(next) : [{ path: relative(packageRoot, next).split(sep).join("/"), sha256: sha256File(next) }];
+  });
+  return hashObject([resolve(packageRoot, "bench"), resolve(packageRoot, "tests")].flatMap(scan).sort((a, b) => a.path.localeCompare(b.path)));
+}
+
 export function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
@@ -82,6 +90,7 @@ export function loadManifest(path = manifestPath) {
       if (ids.has(row.id)) throw new Error(`${lane} duplicate row: ${row.id}`);
       ids.add(row.id);
       const latency =
+        lane === "lite-react" ||
         row.group === "cold resolve (fresh scope per iteration)" ||
         row.group === "invalidation cascade (set + flush)";
       if (row.metric !== (latency ? "p75" : "hz"))
@@ -207,16 +216,16 @@ export function extractRows(
 }
 
 const moduleFiles = {
-  "@pumped-fn/lite": resolve(repoRoot, "pkg/core/lite/dist/index.mjs"),
-  "@pumped-fn/lite-react": resolve(
+  "@pumped-fn/lite": process.env.PUMPED_PERF_LITE_DIST ?? resolve(repoRoot, "pkg/core/lite/dist/index.mjs"),
+  "@pumped-fn/lite-react": process.env.PUMPED_PERF_LITE_REACT_DIST ?? resolve(
     repoRoot,
     "pkg/react/lite-react/dist/index.mjs"
   ),
 };
 
 const packageFiles = {
-  "@pumped-fn/lite": resolve(repoRoot, "pkg/core/lite/package.json"),
-  "@pumped-fn/lite-react": resolve(
+  "@pumped-fn/lite": process.env.PUMPED_PERF_LITE_PACKAGE ?? resolve(repoRoot, "pkg/core/lite/package.json"),
+  "@pumped-fn/lite-react": process.env.PUMPED_PERF_LITE_REACT_PACKAGE ?? resolve(
     repoRoot,
     "pkg/react/lite-react/package.json"
   ),
@@ -326,6 +335,11 @@ function cpuRecord() {
   };
 }
 
+function cpuAffinity() {
+  if (platform() !== "linux") return null
+  return readFileSync("/proc/self/status", "utf8").match(/^Cpus_allowed_list:\s*(.+)$/m)?.[1] ?? null
+}
+
 function browserRecord(lane) {
   if (lane === "lite") return { required: false, provider: "none" };
   const playwrightPackage = packageRecord("playwright");
@@ -363,6 +377,7 @@ export function collectEnvironment(
       browser_provider: browserProvider.identity,
       config_sha256: sha256File(configPath),
       harness_sha256: sha256File(fileURLToPath(import.meta.url)),
+      control_sha256: controlFingerprint(),
       observation_writer: {
         path: normalizePath(relative(packageRoot, observationWriter)),
         sha256: sha256File(observationWriter),
@@ -374,7 +389,7 @@ export function collectEnvironment(
       machine: machine(),
       kernel: release(),
     },
-    cpu: cpuRecord(),
+    cpu: { ...cpuRecord(), affinity: cpuAffinity() },
     lock: {
       path: "pnpm-lock.yaml",
       sha256: sha256File(resolve(repoRoot, "pnpm-lock.yaml")),
@@ -454,11 +469,17 @@ function round(value) {
   return Math.round(value * 1e6) / 1e6;
 }
 
-function classify(ratios, requiredDirectionalAgreement) {
-  const passing = ratios.filter((ratio) => ratio >= 0.95).length;
-  if (passing >= requiredDirectionalAgreement) return "no_regression";
+function classify(
+  ratios,
+  requiredDirectionalAgreement,
+  noRegressionFloor,
+  canary
+) {
+  const passing = ratios.filter((ratio) => ratio >= noRegressionFloor).length;
+  if (passing >= requiredDirectionalAgreement)
+    return canary ? "canary_clear" : "no_regression";
   if (ratios.length - passing >= requiredDirectionalAgreement)
-    return "confirmed_regression";
+    return canary ? "canary_regression" : "confirmed_regression";
   return "inconclusive";
 }
 
@@ -474,7 +495,8 @@ function laneComparison(
   observations,
   manifest,
   pairCount,
-  requiredDirectionalAgreement
+  requiredDirectionalAgreement,
+  noRegressionFloor
 ) {
   const definition = manifest.lanes[lane];
   const pairs = Array.from({ length: pairCount }, (_, index) => index + 1);
@@ -518,18 +540,26 @@ function laneComparison(
       name: expected.name,
       metric: expected.metric,
       representative: expected.representative,
+      candidate_affected: expected.candidate_affected !== false,
       paired_ratios: pairedRatios,
       median_ratio: round(ratioMedian),
       mad: round(
         median(pairedRatios.map((ratio) => Math.abs(ratio - ratioMedian)))
       ),
       agreement_at_0_95: pairedRatios.filter((ratio) => ratio >= 0.95).length,
+      agreement_at_no_regression_floor: pairedRatios.filter(
+        (ratio) => ratio >= noRegressionFloor
+      ).length,
       agreement_at_1_10: pairedRatios.filter((ratio) => ratio >= 1.1).length,
-      classification: classify(pairedRatios, requiredDirectionalAgreement),
-      improvement_supported: supportsImprovement(
+      classification: classify(
         pairedRatios,
-        requiredDirectionalAgreement
+        requiredDirectionalAgreement,
+        noRegressionFloor,
+        pairCount === 1
       ),
+      improvement_supported:
+        pairCount > 1 &&
+        supportsImprovement(pairedRatios, requiredDirectionalAgreement),
     };
   });
   const representativeRows = rows.filter((row) => row.representative);
@@ -554,12 +584,19 @@ function laneComparison(
         median(pairScores.map((ratio) => Math.abs(ratio - scoreMedian)))
       ),
       agreement_at_0_95: pairScores.filter((ratio) => ratio >= 0.95).length,
+      agreement_at_no_regression_floor: pairScores.filter(
+        (ratio) => ratio >= noRegressionFloor
+      ).length,
       agreement_at_1_10: pairScores.filter((ratio) => ratio >= 1.1).length,
-      classification: classify(pairScores, requiredDirectionalAgreement),
-      improvement_supported: supportsImprovement(
+      classification: classify(
         pairScores,
-        requiredDirectionalAgreement
+        requiredDirectionalAgreement,
+        noRegressionFloor,
+        pairCount === 1
       ),
+      improvement_supported:
+        pairCount > 1 &&
+        supportsImprovement(pairScores, requiredDirectionalAgreement),
     },
   };
 }
@@ -574,8 +611,11 @@ function artifactEntryHash(observations, variant, collection, packageName) {
 export function compareObservations(
   observations,
   mode,
-  manifest = loadManifest()
+  manifest = loadManifest(),
+  noRegressionFloor = 0.95
 ) {
+  if (!Number.isFinite(noRegressionFloor) || noRegressionFloor <= 0)
+    throw new Error("no-regression floor must be finite and positive");
   const lanes =
     mode === "full"
       ? ["lite", "lite-react"]
@@ -584,9 +624,9 @@ export function compareObservations(
       : null;
   if (!lanes) throw new Error("mode must be full or lite-only");
   const pairCount = observations.length / (lanes.length * 2);
-  if (!Number.isInteger(pairCount) || ![5, 9].includes(pairCount))
-    throw new Error("comparison pair count must be 5 or 9");
-  const requiredDirectionalAgreement = pairCount === 5 ? 5 : 8;
+  if (!Number.isInteger(pairCount) || ![1, 5, 9].includes(pairCount))
+    throw new Error("comparison pair count must be 1, 5, or 9");
+  const requiredDirectionalAgreement = pairCount === 9 ? 8 : pairCount;
   for (const observation of observations)
     validateObservation(observation, manifest);
   const observedLanes = [
@@ -643,7 +683,8 @@ export function compareObservations(
       laneObservations,
       manifest,
       pairCount,
-      requiredDirectionalAgreement
+      requiredDirectionalAgreement,
+      noRegressionFloor
     );
   }
   if (mode === "full") {
@@ -673,11 +714,23 @@ export function compareObservations(
     }
   }
   const rows = Object.values(laneReports).flatMap((report) => report.rows);
-  const regressions = rows
-    .filter((row) => row.classification === "confirmed_regression")
+  const candidateRows = rows.filter((row) => row.candidate_affected);
+  const calibrationRows = rows.filter((row) => !row.candidate_affected);
+  const regressions = candidateRows
+    .filter((row) =>
+      ["confirmed_regression", "canary_regression"].includes(
+        row.classification
+      )
+    )
     .map((row) => row.id);
-  const inconclusive = rows
+  const inconclusive = candidateRows
     .filter((row) => row.classification === "inconclusive")
+    .map((row) => row.id);
+  const calibrationGaps = calibrationRows
+    .filter(
+      (row) =>
+        !["no_regression", "canary_clear"].includes(row.classification)
+    )
     .map((row) => row.id);
   const missingLaneRows =
     mode === "lite-only" ? manifest.lanes["lite-react"].expected_count : 0;
@@ -689,8 +742,15 @@ export function compareObservations(
         )
       : null;
   const performanceEvidenceGapCount = missingLaneRows + inconclusive.length;
+  const evidenceScope = pairCount === 1 ? "directional_canary" : "admission";
   const decision =
-    regressions.length > 0
+    pairCount === 1
+      ? regressions.length > 0
+        ? "canary_regression"
+        : mode === "lite-only"
+        ? "lite_only_canary"
+        : "canary_clear"
+      : regressions.length > 0
       ? "rejected_confirmed_regression"
       : inconclusive.length > 0
       ? "evidence_inconclusive"
@@ -704,13 +764,19 @@ export function compareObservations(
   return {
     schema: "pumped-fn.lite-perf-comparison.v1",
     mode,
+    evidence_scope: evidenceScope,
     pair_count: pairCount,
     required_directional_agreement: requiredDirectionalAgreement,
+    no_regression_floor: noRegressionFloor,
     pair_order: Array.from({ length: pairCount }, (_, index) =>
       index % 2 === 0 ? "baseline-candidate" : "candidate-baseline"
     ),
     raw_unit: "one independent Vitest process summary per lane",
     row_count: rows.length,
+    candidate_affected_row_count: candidateRows.length,
+    calibration_row_count: calibrationRows.length,
+    calibration_evidence_gap_count: calibrationGaps.length,
+    calibration_evidence_gaps: calibrationGaps,
     environment_fingerprints,
     artifact_identities,
     lanes: laneReports,
