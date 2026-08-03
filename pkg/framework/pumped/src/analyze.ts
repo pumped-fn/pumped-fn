@@ -7,7 +7,7 @@ import {
   isTagged,
   type Lite,
 } from "@pumped-fn/lite"
-import type { Manifest } from "./runtime/manifest"
+import { normalizeTagInput, type Manifest } from "./runtime/manifest"
 
 /** Kinds of structure Pumped can identify without running application factories. */
 export type GraphNodeKind = "app" | "root" | "flow" | "atom" | "resource" | "tag" | "extension"
@@ -173,8 +173,8 @@ export function analyze(manifest: Manifest): GraphReport {
   nodes.push(app)
   usedIds.add(app.id)
 
-  for (const tagged of manifest.app?.tags ?? []) {
-    if (isTagged(tagged)) edges.push({ from: app.id, to: addTag(tagged.tag).id, kind: "provides-tag" })
+  for (const tagged of normalizeTagInput(manifest.app?.tags)) {
+    edges.push({ from: app.id, to: addTag(tagged.tag).id, kind: "provides-tag" })
   }
 
   for (const extension of manifest.app?.extensions ?? []) {

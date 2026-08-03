@@ -535,7 +535,7 @@ allowed at most 256 bytes over the Lite entry.
 | --- | --- | ---: | ---: | ---: | --- |
 | `authoring-import-v1.json` | package root | 166 | 1,923,432 | 1,921,862 | Rejected |
 | `authoring-import-v2.json` | `/app` with metadata tags | 4 | 3,417 | 1,847 | Rejected |
-| `authoring-import-v3.json` | `/app` without metadata tags | 2 | 3,152 | 0 | Admitted |
+| `authoring-import-v3.json` | `/app` without metadata tags | 2 | 4,236 | 0 | Admitted |
 
 All three retain exact Lite handle identity. V1 pulled the Node framework into the browser build. V2
 removed the Node framework but retained metadata tag creation. V3 moves route and command metadata

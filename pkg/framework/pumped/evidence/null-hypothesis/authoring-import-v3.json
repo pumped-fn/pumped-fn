@@ -14,13 +14,13 @@
   "inputs": {
     "liteFixture": "163b903f0a70b4a7f58b5423af2ba52c5327839e75cc1b5bf6ac367bfe7d2333",
     "metaFixture": "0e2dd36146370bc1db04a9e2853d083a56ba9daf3ba8f2effe07c48bbb368e86",
-    "litePackage": "605dfb34478df2ffb9f529be513470b940780bff94cef0373abf9f626b768c4a",
-    "metaPackage": "a1044d3367a043924444cd6040260230fd0c8c7271deaf69141ff5736f9e17bf"
+    "litePackage": "8758407e23a555dd164b35ce7bdc60273a05b4130c0c8fb78bd8fb674f8222fe",
+    "metaPackage": "3c6867597783e719a74e499292ef42c8c6d4b787404f5006f67389a0f45ae30a"
   },
   "cases": {
     "lite": {
       "status": "built",
-      "emittedBytes": 3152,
+      "emittedBytes": 4236,
       "moduleCount": 2,
       "modules": [
         "<repo>/pkg/core/lite/dist/index.mjs",
@@ -30,7 +30,7 @@
     },
     "meta": {
       "status": "built",
-      "emittedBytes": 3152,
+      "emittedBytes": 4236,
       "moduleCount": 2,
       "modules": [
         "<repo>/pkg/core/lite/dist/index.mjs",
@@ -45,5 +45,5 @@
     "metaGatePass": true,
     "nullRejected": true
   },
-  "selfHash": "200e20f72b7d29e52925e63c5abe31feae5ff0e97b1d526aa6f1f38153e77c2f"
+  "selfHash": "c4aa6ff6490958395eafd2a42e68644a8f611e1e68292962bd8291b49494f1fe"
 }

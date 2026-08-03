@@ -32,7 +32,7 @@ gate while it still re-exported metadata tags. It removed Node framework modules
 extra bytes, so the gate still failed.
 
 `authoring-import-v3.json` tests `/app` after metadata moves to the separate lightweight `/meta`
-entry. It emits the same 3,152 bytes as Lite, keeps exact handle identity, and references no forbidden
+entry. It emits the same 4,236 bytes as Lite, keeps exact handle identity, and references no forbidden
 framework module, so it rejects the null hypothesis under the frozen gate.
 
 Each file records the full module lists, emitted bytes, decision, input hashes, and a SHA-256 hash of
@@ -58,7 +58,7 @@ node pkg/framework/pumped/evidence/null-hypothesis/verify.mjs
 kind, so zero passed. `app-target-roots-v2.json` uses target-specific manifests. All six builds
 contain the exact target roots and selected app closure, with no unrelated profile marker, so it
 rejects this null hypothesis. Its evidence hash is
-`e90edc2fd608b8fa5ab36a917be3607bc4fef5c2d9d32146a66b02099ba58a6c`.
+`9d6cad23a9ee68df6c5d3423c7e15f1a04f1a274a4548f262850d655774dc0bb`.
 
 ## Truthful graph
 
@@ -77,4 +77,4 @@ node pkg/framework/pumped/evidence/null-hypothesis/verify.mjs
 `graph-v1.json` records the missing analyzer: runtime behavior passed, but no static report existed.
 `graph-v2.json` records the admitted slice. Its five nodes, four proven edges, and two explicit
 factory-body unknowns match the frozen report exactly. Its evidence hash is
-`111ac10dba21a825a20b4c7ff297b7a7907396d846837a89c5d4f84af4da1120`.
+`6485d863b0f6996beca36f3886274fbcfe8950b1f1f14bf394118aa988d9100a`.

@@ -31,17 +31,17 @@ describe("app", () => {
     const baseContext = tag<string>({ label: "context.base" })
     const addedContext = tag<string>({ label: "context.added" })
     const base = app({
-      tags: [region("base")],
+      tags: region("base"),
       presets: [preset(store, "base")],
       extensions: [{ name: "base" }],
-      context: () => [baseContext("base")],
+      context: () => baseContext("base"),
       mapError: () => ({ status: 500, body: "base" }),
     })
     const composed = app(base, {
-      tags: [region("east")],
+      tags: [[region("east")]],
       presets: [preset(store, "east")],
       extensions: [{ name: "east" }],
-      context: () => [addedContext("east")],
+      context: () => [[addedContext("east")]],
       mapError: (error) => error === "east" ? { status: 409, body: "east" } : undefined,
     })
 
@@ -49,7 +49,7 @@ describe("app", () => {
     expect(region.collect(composed.tags ?? [])).toEqual(["east", "base"])
     expect(composed.presets?.map((value) => value.value)).toEqual(["base", "east"])
     expect(composed.extensions?.map((extension) => extension.name)).toEqual(["base", "east"])
-    expect(composed.context?.().map((value) => value.value)).toEqual(["east", "base"])
+    expect(composed.context?.()).toEqual([addedContext("east"), baseContext("base")])
     expect(composed.mapError?.("east")).toEqual({ status: 409, body: "east" })
     expect(composed.mapError?.("other")).toEqual({ status: 500, body: "base" })
 

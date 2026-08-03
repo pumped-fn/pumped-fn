@@ -1,4 +1,4 @@
-import type { AppConfig } from "./runtime/manifest"
+import { normalizeTagInput, type AppConfig } from "./runtime/manifest"
 
 export * from "@pumped-fn/lite"
 
@@ -19,10 +19,13 @@ export function app(base: AppConfig = {}, additions?: AppConfig): AppConfig {
 
   return {
     presets: [...(base.presets ?? []), ...(additions.presets ?? [])],
-    tags: [...(additions.tags ?? []), ...(base.tags ?? [])],
+    tags: [...normalizeTagInput(additions.tags), ...normalizeTagInput(base.tags)],
     extensions: [...(base.extensions ?? []), ...(additions.extensions ?? [])],
     context: addedContext && baseContext
-      ? (request) => [...addedContext(request), ...baseContext(request)]
+      ? (request) => [
+          ...normalizeTagInput(addedContext(request)),
+          ...normalizeTagInput(baseContext(request)),
+        ]
       : addedContext ?? baseContext,
     mapError: addedMapError && baseMapError
       ? (error) => addedMapError(error) ?? baseMapError(error)

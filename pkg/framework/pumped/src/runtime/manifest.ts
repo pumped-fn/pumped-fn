@@ -1,7 +1,21 @@
-import type { Lite } from "@pumped-fn/lite"
+import { isTagged, type Lite } from "@pumped-fn/lite"
 import type { EntryKind } from "../discover"
 
-type TagInput = Lite.Tagged<any> | readonly TagInput[]
+type TagInput = Lite.TagInput
+
+export function normalizeTagInput(input: TagInput | undefined): Lite.Tagged<any>[] {
+  if (input === undefined) return []
+  const normalized: Lite.Tagged<any>[] = []
+  const append = (value: TagInput): void => {
+    if (isTagged(value)) {
+      normalized.push(value)
+      return
+    }
+    for (const nested of value) append(nested)
+  }
+  append(input)
+  return normalized
+}
 
 export interface AppConfig {
   presets?: Lite.Preset<any, any>[]

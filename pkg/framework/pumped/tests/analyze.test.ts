@@ -13,7 +13,7 @@ describe("analyze", () => {
       factory: (context, { directory, region }) => `${directory.displayName(context.input.name)}:${region}`,
     })
     const report = analyze({
-      app: app({ tags: [region("default")] }),
+      app: app({ tags: [[region("default")]] }),
       entries: [{ kind: "server", name: "greet", file: "src/server/greet.ts", flow: greet }],
     })
 
