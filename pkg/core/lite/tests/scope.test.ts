@@ -148,6 +148,64 @@ describe("Scope", () => {
       })
       expect(await scope2.resolve(configAtom)).toEqual({ port: 9999 })
     })
+
+    it("uses presets through cold synchronous dependency paths", async () => {
+      let calls = 0
+      const source = atom({
+        factory: () => {
+          calls++
+          return "real"
+        },
+      })
+      const direct = atom({
+        deps: { source },
+        factory: (_, { source }) => source,
+      })
+      const controlled = atom({
+        deps: { source: controller(source, { resolve: true }) },
+        factory: (_, { source }) => source.get(),
+      })
+      const middle = atom({
+        deps: { source },
+        factory: (_, { source }) => `middle:${source}`,
+      })
+      const transitive = atom({
+        deps: { middle },
+        factory: (_, { middle }) => `outer:${middle}`,
+      })
+
+      await expect(createScope({ presets: [preset(source, "fake")] }).resolve(direct)).resolves.toBe("fake")
+      await expect(createScope({ presets: [preset(source, "fake")] }).resolve(controlled)).resolves.toBe("fake")
+      await expect(createScope({ presets: [preset(source, "fake")] }).resolve(transitive)).resolves.toBe("outer:middle:fake")
+
+      const replacement = atom({ factory: () => "replacement" })
+      await expect(createScope({ presets: [preset(source, replacement)] }).resolve(direct)).resolves.toBe("replacement")
+      expect(calls).toBe(0)
+    })
+
+    it("waits for dependency release before resolving it again", async () => {
+      const events: string[] = []
+      const source = atom({
+        factory: (ctx) => {
+          events.push("acquire")
+          ctx.cleanup(() => { events.push("cleanup") })
+          return events.length
+        },
+      })
+      const dependent = atom({
+        deps: { source },
+        factory: (_, { source }) => source,
+      })
+      const scope = createScope()
+
+      await scope.resolve(source)
+      const release = scope.release(source)
+      const resolving = scope.resolve(dependent)
+
+      await release
+      await resolving
+      expect(events).toEqual(["acquire", "cleanup", "acquire"])
+    })
   })
 
   describe("scope.controller()", () => {
@@ -341,6 +399,30 @@ describe("Scope", () => {
       await scope.flush()
       expect(listenerCalls).toBe(1)
       expect(ctrl.get().port).toBe(8080)
+    })
+
+    it("refreshes value notifications after all listeners unsubscribe", async () => {
+      const subject = atom({ factory: () => "v1" })
+      const scope = createScope()
+      await scope.resolve(subject)
+      const ctrl = scope.controller(subject) as Lite.Controller<string> & {
+        _(listener: () => void): () => void
+      }
+      let firstCalls = 0
+      const off = ctrl._(() => { firstCalls++ })
+
+      ctrl.set("v2")
+      await scope.flush()
+      expect(firstCalls).toBe(1)
+      off()
+
+      ctrl.set("v3")
+      await scope.flush()
+      let secondCalls = 0
+      ctrl._(() => { secondCalls++ })
+      ctrl.set("v2")
+      await scope.flush()
+      expect(secondCalls).toBe(1)
     })
 
     it("propagates errors from auto-resolved controller", async () => {

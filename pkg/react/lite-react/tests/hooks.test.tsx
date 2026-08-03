@@ -1291,6 +1291,42 @@ describe('useAtom - invalidation', () => {
       expect(screen.getByTestId('value')).toHaveTextContent('2')
     })
   })
+
+  it('re-renders after unmounting and subscribing again', async () => {
+    const subject = atom({ factory: () => 'v1' })
+    const scope = createScope()
+    await scope.resolve(subject)
+    const ctrl = scope.controller(subject)
+
+    function Reader() {
+      return <div data-testid="remount-value">{useAtom(subject)}</div>
+    }
+
+    const first = render(
+      <ScopeProvider scope={scope}>
+        <Reader />
+      </ScopeProvider>
+    )
+    expect(screen.getByTestId('remount-value')).toHaveTextContent('v1')
+    first.unmount()
+
+    ctrl.set('v2')
+    await scope.flush()
+    render(
+      <ScopeProvider scope={scope}>
+        <Reader />
+      </ScopeProvider>
+    )
+    expect(screen.getByTestId('remount-value')).toHaveTextContent('v2')
+
+    await act(async () => {
+      ctrl.set('v1')
+      await scope.flush()
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('remount-value')).toHaveTextContent('v1')
+    })
+  })
 })
 
 describe('useSelect - equality filtering', () => {

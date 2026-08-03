@@ -747,13 +747,10 @@ class ScopeImpl implements Lite.Scope {
     const entry = this.getOrCreateEntry(atom)
     this.cancelGCTimer(entry)
     entry.gcPending = false
-    let listeners = entry.valueListeners
-    if (!listeners) {
-      listeners = entry.valueListeners = new Set()
-      if (entry.hasValue) {
-        entry.valueReady = true
-        entry.notifiedValue = entry.value
-      }
+    const listeners = entry.valueListeners ??= new Set()
+    if (!listeners.size) {
+      entry.valueReady = entry.hasValue
+      if (entry.hasValue) entry.notifiedValue = entry.value
     }
     listeners.add(listener)
     return () => {
@@ -1029,6 +1026,7 @@ class ScopeImpl implements Lite.Scope {
 
   private tryResolveCurrentTick<T>(atom: Lite.Atom<T>, path?: Set<Lite.Atom<unknown>>): Promise<T> | null {
     if (this.hasResolvePipeline()) return null
+    if (this.presets?.has(atom) || this.releasing?.has(atom)) return null
 
     const entry = this.getOrCreateEntry(atom)
     if (entry.state !== 'idle') return null

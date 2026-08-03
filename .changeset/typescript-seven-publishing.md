@@ -10,7 +10,6 @@
 "@pumped-fn/lite-extension-sync": patch
 "@pumped-fn/lite-extension-sync-nats": patch
 "@pumped-fn/lite-hono": patch
-"@pumped-fn/lite-tanstack-start": patch
 "@pumped-fn/pumped": patch
 "@pumped-fn/lite-react-json-render": patch
 "@pumped-fn/lite-render-core": patch

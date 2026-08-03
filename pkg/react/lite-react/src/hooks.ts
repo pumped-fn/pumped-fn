@@ -30,6 +30,10 @@ type ValueController<T> = Lite.Controller<T> & {
   _(listener: () => void): () => void
 }
 
+function isValueController<T>(ctrl: Lite.Controller<T>): ctrl is ValueController<T> {
+  return '_' in ctrl && 'value' in ctrl
+}
+
 /** Reports atom data, loading, failure, and its controller. */
 interface UseAtomState<T> {
   data: T | undefined
@@ -654,26 +658,31 @@ function useAtom<T>(atom: Lite.Atom<T>, options: UseAtomManualOptions): UseAtomS
 function useAtom<T>(atom: Lite.Atom<T>, options?: UseAtomOptions): T | UseAtomState<T> {
   const scope = useContext(ScopeContext)
   if (!scope) throw new Error('useScope must be used within a ScopeProvider')
-  const ctrl = scope.controller(atom) as ValueController<T>
+  const ctrl = scope.controller(atom)
+  const valueCtrl = isValueController(ctrl) ? ctrl : undefined
   const ctrlState = ctrl.state
 
   const isSuspense = options?.suspense !== false
   const autoResolve = isSuspense ? options?.resolve !== false : !!options?.resolve
 
   const [, forceUpdate] = useReducer((x: number) => x + 1, 0)
-  const ctrlValue = ctrlState === 'resolved' ? ctrl.value : undefined
+  const ctrlValue = ctrlState === 'resolved'
+    ? valueCtrl ? valueCtrl.value : ctrl.get()
+    : undefined
   useIsomorphicLayoutEffect(() => {
     if (!isSuspense) return
-    const unsubscribe = ctrl._(forceUpdate)
+    const unsubscribe = valueCtrl
+      ? valueCtrl._(forceUpdate)
+      : ctrl.on('*', forceUpdate)
     const state = ctrl.state
     if (
       state !== ctrlState ||
-      (state === 'resolved' && !Object.is(ctrl.value, ctrlValue))
+      (state === 'resolved' && !Object.is(valueCtrl ? valueCtrl.value : ctrl.get(), ctrlValue))
     ) {
       forceUpdate()
     }
     return unsubscribe
-  }, [ctrl, isSuspense])
+  }, [ctrl, valueCtrl, isSuspense])
   if (isSuspense) {
     if (ctrlState === 'idle') {
       if (autoResolve) throw getOrCreatePendingPromise(ctrl)

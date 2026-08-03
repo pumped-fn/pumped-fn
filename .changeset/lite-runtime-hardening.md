@@ -1,5 +1,5 @@
 ---
-"@pumped-fn/lite": patch
+"@pumped-fn/lite": minor
 "@pumped-fn/lite-react": patch
 ---
 

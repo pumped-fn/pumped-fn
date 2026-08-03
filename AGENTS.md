@@ -34,16 +34,17 @@ The scope is the single seam: given only `createScope({presets, tags, extensions
 
 - Core: `pkg/core/lite`; React: `pkg/react/lite-react`.
 - TypeScript: 7.0.2 native declarations through tsdown's automatic TypeScript 7 generator. Package-local `tsconfig.dts.json` files clear workspace `paths`; without that physical config, downstream builds leak declarations into upstream source trees. Legacy Compiler API consumers use the explicit `typescript-api` alias.
-- Final ESM SHA-256: Lite `97367e8d…e9c043`; Lite React `5c722814…29658`.
-- Final CJS SHA-256: Lite `a4785cb5…5e692`; Lite React `1651fa42…bb724`.
-- Combined emitted ESM+CJS is 136,959 bytes and 38,694 bytes with gzip -9. Current main at `c59d70dd` is 253,912 raw and 54,670 gzip, so adoption removes 46.06% raw and 29.22% gzip.
-- The latest packed-consumer run produced 83,049-byte Lite and 23,182-byte Lite React tarballs. The gate verifies docs, ESM, CJS, NodeNext, Bundler, TS 7.0.2, and exported `VERSION` equality.
+- Final ESM SHA-256: Lite `3c3ecba9…6c51a9`; Lite React `111af8fb…fa8b6`.
+- Final CJS SHA-256: Lite `f2f9e8b7…00bc0a`; Lite React `57c4d4e5…69a0d2`.
+- Combined emitted ESM+CJS is 137,243 bytes and 38,784 bytes with gzip -9. Current main at `c59d70dd` is 253,912 raw and 54,670 gzip, so adoption removes 45.95% raw and 29.06% gzip.
+- The latest packed-consumer run produced 83,078-byte Lite and 23,245-byte Lite React tarballs. The gate verifies docs, ESM, CJS, NodeNext, Bundler, TS 7.0.2, and exported `VERSION` equality.
 
 ### Correctness and memory
 
-- Lite: 250 tests. Lite React: 69 browser tests. The full shipping workspace, downstream extensions, SDKs, examples, differential browser suite, declarations, builds, and packed consumers pass.
+- Lite: 253 tests. Lite React: 70 browser tests. The full shipping workspace, downstream extensions, SDKs, examples, differential browser suite, declarations, builds, and packed consumers pass.
 - Atom handles remain immutable public definitions. Scope-owned caches preserve multi-scope identity. A cold synchronous failure executes its factory and cleanup once.
 - React subscribes in a layout effect and rechecks state/value after subscription, closing the render-to-subscribe race without mutating atom handles.
+- Cold synchronous dependency traversal falls back to the full resolution pipeline for presets and active release flights. Value subscriptions refresh their comparison baseline when the first listener returns after a gap.
 - Final five-pair retained-heap ratios candidate/baseline: atom 1.0000, scope .3327, cell .4216, controller .9999, listener 1.000045, native owner .9998, selection .9998, tag 1.0000, tagged 1.0000, tag context .9999.
 - The memory script calls the 0.0045% listener delta a confirmed regression because its classifier has no tolerance. Treat it as measurement-level parity, not a material allocation claim. Evidence SHA-256: `172451f6…e27e2`.
 
