@@ -1,5 +1,11 @@
 # @pumped-fn/lite-react-json-render
 
+## 0.1.3
+
+### Patch Changes
+
+- cb45cc9: Accept one bound tag, flat tag lists, or nested tag lists in every public `tags` configuration. Runtime normalization preserves order and duplicates while stored unit metadata remains flat. Framework, extension, React, and lint adapters accept the same input contract.
+
 ## 0.1.2
 
 ### Patch Changes
