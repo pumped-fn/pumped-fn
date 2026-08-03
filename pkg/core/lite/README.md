@@ -103,7 +103,7 @@ const loadUser = flow({
   factory: (ctx, deps) => deps.users.byId(ctx.input.id),
 })
 
-const scope = createScope({ tags: [tenant("acme")] })
+const scope = createScope({ tags: tenant("acme") })
 const user = await scope.run({ flow: loadUser, input: { id: "u1" } })
 
 if (user.name !== "acme:u1") throw new Error("unexpected user")

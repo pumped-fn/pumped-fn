@@ -14,13 +14,13 @@ import { createScope } from "@pumped-fn/lite"
 import * as claude from "@pumped-fn/sdk-claude"
 
 const scope = createScope({
-  tags: [claude.config({
+  tags: claude.config({
     auth: { kind: "global" },
     cwd: process.cwd(),
     roots: [],
     permission: "deny",
     shutdownTimeoutMs: 1_000,
-  })],
+  }),
 })
 const ctx = scope.createContext()
 await ctx.resolve(claude.claudeLeases)
@@ -80,13 +80,13 @@ import * as claude from "@pumped-fn/sdk-claude"
 import { createScope } from "@pumped-fn/lite"
 
 const scope = createScope({
-  tags: [claude.config({
+  tags: claude.config({
     auth: { kind: "global" },
     cwd: process.cwd(),
     roots: [],
     permission: "deny",
     shutdownTimeoutMs: 1_000,
-  })],
+  }),
 })
 
 const ctx = scope.createContext()

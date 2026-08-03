@@ -24,12 +24,12 @@ const convert = flow({
   name: "convert",
   parse: (raw) => z.object(amount).parse(raw),
   deps: { rate },
-  tags: [mcpToolMeta({ description: "Convert an amount", inputSchema: amount })],
+  tags: mcpToolMeta({ description: "Convert an amount", inputSchema: amount }),
   factory: (ctx, { rate }) => ({ converted: ctx.input.amount * rate }),
 })
 
 const scope = createScope({
-  tags: [mcpConfig({ name: "billing", version: "1.0.0", tools: [convert] })],
+  tags: mcpConfig({ name: "billing", version: "1.0.0", tools: [convert] }),
 })
 const ctx = scope.createContext()
 

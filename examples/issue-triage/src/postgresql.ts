@@ -21,7 +21,7 @@ export const postgresql = flow({
     plan: tags.required(config.plan),
     clock: tags.required(config.clock),
   },
-  tags: [step({ workflow: true, kind: "database" })],
+  tags: step({ workflow: true, kind: "database" }),
   factory: async (ctx, { pool, plan, clock }): Promise<Evidence> => {
     if (ctx.input.sql !== plan.databaseQuery || !isReadOnlySQL(ctx.input.sql)) {
       throw new TriageError("authorize", ctx.input.sql, "Database request does not match the configured read-only query")

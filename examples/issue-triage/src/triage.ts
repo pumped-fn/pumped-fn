@@ -330,11 +330,11 @@ export const victoriaEvidence = flow({
 
 export const collectEvidence = flow({
   name: "issue_triage_collect_evidence",
-  tags: [agent.config.tool({
+  tags: agent.config.tool({
     version: "1",
     description: "Collect cited repository, PostgreSQL, and Victoria evidence under the session authority.",
     input: issueIntakeShape,
-  })],
+  }),
   parse: typed<IssueIntake>(),
   deps: {
     repository: controller(repositoryEvidence),

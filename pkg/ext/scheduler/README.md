@@ -93,7 +93,7 @@ const nightlySweep = scheduler.schedule({
   input: () => undefined,
 })
 
-const scope = createScope({ tags: [scheduler.backend(scheduler.inProcess())] })
+const scope = createScope({ tags: scheduler.backend(scheduler.inProcess()) })
 const registration = await scope.resolve(nightlySweep)
 registration.next() // next scheduled Date, or undefined
 await registration.trigger() // run one tick immediately, awaiting it

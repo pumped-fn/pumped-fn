@@ -19,7 +19,7 @@ const createdAt = flow({
 })
 
 const scope = createScope({
-  tags: [clock({ now: () => new Date("2026-07-09T00:00:00.000Z") })],
+  tags: clock({ now: () => new Date("2026-07-09T00:00:00.000Z") }),
 })
 const ctx = scope.createContext()
 const value = await ctx.exec({ flow: createdAt })
@@ -100,7 +100,7 @@ const route = flow({
 
 const scope = createScope({
   presets: [preset(endpoint, "test")],
-  tags: [tenant("acme")],
+  tags: tenant("acme"),
   extensions: [],
 })
 const ctx = scope.createContext()
@@ -150,7 +150,7 @@ const summarize = flow({
   factory: async (ctx, { prefix, model }) => `${prefix}:${await model.exec({ input: ctx.input })}`,
 })
 
-const scope = createScope({ tags: [model(fake)] })
+const scope = createScope({ tags: model(fake) })
 const ctx = scope.createContext()
 const result = await ctx.exec({ flow: summarize, input: { prompt: "hello" } })
 

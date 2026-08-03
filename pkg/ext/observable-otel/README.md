@@ -15,7 +15,7 @@ const sink = otel.sink()
 
 const scope = createScope({
   extensions: [observable.extension()],
-  tags: [observable.runtime({ sinks: [sink] })],
+  tags: observable.runtime({ sinks: [sink] }),
 })
 ```
 

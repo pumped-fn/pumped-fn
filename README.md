@@ -48,7 +48,7 @@ export const saveInvoice = flow({
 })
 
 const scope = createScope({
-  tags: [clock({ now: () => new Date() })],
+  tags: clock({ now: () => new Date() }),
 })
 
 await scope.run({ flow: saveInvoice, input: { id: "inv-1" } })
@@ -64,7 +64,7 @@ const fake: Db = {
 
 const testScope = createScope({
   presets: [preset(db, fake)],
-  tags: [clock({ now: () => new Date("2026-07-05T12:00:00.000Z") })],
+  tags: clock({ now: () => new Date("2026-07-05T12:00:00.000Z") }),
 })
 
 const result = await testScope.run({ flow: saveInvoice, input: { id: "inv-1" } })

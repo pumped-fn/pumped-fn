@@ -348,7 +348,7 @@ describe("invoice triage patterns", () => {
       extensions: runtime.extensions,
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        ...scripted([
+        scripted([
           json({ vendor: first.vendor, amount: first.amount, dueDate: first.dueDate }),
           json({
             vendor: second.vendor,
@@ -362,7 +362,7 @@ describe("invoice triage patterns", () => {
         clock({ now: () => now }),
       ],
     })
-    const ctx = scope.createContext({ tags: [workflowRun({ taskId: "stream", runId: "run-1" })] })
+    const ctx = scope.createContext({ tags: workflowRun({ taskId: "stream", runId: "run-1" }) })
     const stream = ctx.execStream({ flow: importBatch, input: { invoices: [first, second] } })
     const progress: ImportProgress[] = []
 
@@ -397,14 +397,14 @@ describe("invoice triage patterns", () => {
       extensions: runtime.extensions,
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        ...scripted([
+        scripted([
           json({ risk: "review", reason: "manual approval" }),
           json(),
         ]),
         clock({ now: () => now }),
       ],
     })
-    const ctx = scope.createContext({ tags: [workflowRun({ taskId: "exec", runId: "run-1" })] })
+    const ctx = scope.createContext({ tags: workflowRun({ taskId: "exec", runId: "run-1" }) })
 
     await expect(ctx.exec({
       flow: importBatch,
@@ -437,7 +437,7 @@ describe("invoice triage patterns", () => {
         },
       ],
       tags: [
-        ...scripted([
+        scripted([
           json({ vendor: first.vendor, amount: first.amount, dueDate: first.dueDate }),
           json({ vendor: second.vendor, amount: second.amount, dueDate: second.dueDate }),
         ]),
@@ -469,7 +469,7 @@ describe("invoice triage patterns", () => {
       extensions: runtime.extensions,
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        ...scripted(["not json"]),
+        scripted(["not json"]),
         clock({ now: () => now }),
       ],
     })
@@ -535,7 +535,7 @@ describe("invoice triage patterns", () => {
     const scope = createScope({
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        ...gate.tags,
+        gate.tags,
         clock({ now: () => now }),
       ],
     })
@@ -574,7 +574,7 @@ describe("invoice triage patterns", () => {
     const scope = createScope({
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        ...gate.tags,
+        gate.tags,
         clock({ now: () => now }),
       ],
     })
@@ -619,7 +619,7 @@ describe("invoice triage patterns", () => {
     const scope = createScope({
       presets: [preset(database, await pgliteDatabase())],
       tags: [
-        ...gate.tags,
+        gate.tags,
         clock({ now: () => now }),
       ],
     })
@@ -723,7 +723,7 @@ describe("invoice triage patterns", () => {
     const recovered = createScope({
       presets: [preset(database, db)],
       tags: [
-        ...gate.tags,
+        gate.tags,
         clock({ now: () => now }),
       ],
     })
@@ -748,7 +748,7 @@ describe("invoice triage patterns", () => {
     const batch = [invoice("inv-recover-1"), invoice("inv-recover-2", { vendor: "Contoso Hardware", amount: 4_500 })]
     const first = createScope({
       presets: [preset(database, db)],
-      tags: [clock({ now: () => now })],
+      tags: clock({ now: () => now }),
     })
     const firstCtx = first.createContext()
 
@@ -765,7 +765,7 @@ describe("invoice triage patterns", () => {
     const second = createScope({
       presets: [preset(database, db)],
       tags: [
-        ...gate.tags,
+        gate.tags,
         clock({ now: () => now }),
       ],
     })
@@ -797,7 +797,7 @@ describe("invoice triage patterns", () => {
     }
     const first = createScope({
       presets: [preset(database, db)],
-      tags: [clock(failingClock)],
+      tags: clock(failingClock),
     })
     const firstCtx = first.createContext()
 
@@ -810,7 +810,7 @@ describe("invoice triage patterns", () => {
 
     const second = createScope({
       presets: [preset(database, db)],
-      tags: [clock({ now: () => now })],
+      tags: clock({ now: () => now }),
     })
     const secondCtx = second.createContext()
 
@@ -842,7 +842,7 @@ describe("invoice triage patterns", () => {
     }) as typeof db
     const scope = createScope({
       presets: [preset(database, failing)],
-      tags: [...scripted([json()]), clock({ now: () => now })],
+      tags: [scripted([json()]), clock({ now: () => now })],
     })
     const ctx = scope.createContext()
 
@@ -861,7 +861,7 @@ describe("invoice triage patterns", () => {
     const item = invoice("inv-wake-after-commit")
     const scope = createScope({
       presets: [preset(database, await pgliteDatabase())],
-      tags: [clock({ now: () => now })],
+      tags: clock({ now: () => now }),
     })
     const ctx = scope.createContext()
     const changes = scope.changes(queueSignal)[Symbol.asyncIterator]()
@@ -897,7 +897,7 @@ describe("invoice triage patterns", () => {
           level: "info",
           flow: "errors",
         }),
-        ...scripted([
+        scripted([
           json({ risk: "review", reason: "needs approval" }),
           json({ risk: "review", reason: "needs approval" }),
           json({ risk: "review", reason: "needs approval" }),
@@ -908,7 +908,7 @@ describe("invoice triage patterns", () => {
     const log = scope.createContext()
     const watching = log.exec({ flow: watchReviewQueue })
     await recorder.waitFor(1)
-    const ctx = scope.createContext({ tags: [workflowRun({ taskId: "changes", runId: "run-1" })] })
+    const ctx = scope.createContext({ tags: workflowRun({ taskId: "changes", runId: "run-1" }) })
 
     await ctx.exec({
       flow: importBatch,
@@ -961,8 +961,8 @@ describe("invoice triage patterns", () => {
 
   it("concurrent-settle: a second worker settling the same invoice cannot overwrite or double-audit", async () => {
     const db = await pgliteDatabase()
-    const winner = createScope({ presets: [preset(database, db)], tags: [clock({ now: () => now })] })
-    const loser = createScope({ presets: [preset(database, db)], tags: [clock({ now: () => now })] })
+    const winner = createScope({ presets: [preset(database, db)], tags: clock({ now: () => now }) })
+    const loser = createScope({ presets: [preset(database, db)], tags: clock({ now: () => now }) })
     const winnerCtx = winner.createContext()
     const loserCtx = loser.createContext()
     const item = invoice("inv-race-settle")
@@ -1039,7 +1039,7 @@ describe("invoice triage patterns", () => {
   it("pattern: dailyReport summarizes totals, categories, and overdue invoices", async () => {
     const scope = createScope({
       presets: [preset(database, await pgliteDatabase())],
-      tags: [clock({ now: () => now })],
+      tags: clock({ now: () => now }),
     })
     const ctx = scope.createContext()
     await ctx.exec({ flow: seedStored, input: [
@@ -1131,7 +1131,7 @@ describe("invoice triage patterns", () => {
       presets: [preset(database, await pgliteDatabase())],
       tags: [
         observable.runtime({ sinks: [otel.sink({ tracer: recorded.tracer })] }),
-        ...scripted([json({
+        scripted([json({
           vendor: source.vendor,
           amount: source.amount,
           dueDate: source.dueDate,
@@ -1183,7 +1183,7 @@ describe("invoice triage patterns", () => {
       presets: [preset(database, await pgliteDatabase())],
       tags: [
         observable.runtime({ sinks: [otel.sink()] }),
-        ...scripted([json({
+        scripted([json({
           vendor: source.vendor,
           amount: source.amount,
           dueDate: source.dueDate,

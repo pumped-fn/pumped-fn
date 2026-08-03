@@ -119,7 +119,7 @@ function getAtomsForTag(tag: Lite.Tag<unknown, boolean>): Lite.Atom<unknown>[] {
  * const name = tag<string>({ label: "name" })
  * const greeting = atom({
  *   factory: (ctx) => "value",
- *   tags: [name("greeting")]
+ *   tags: name("greeting")
  * })
  * ```
  */

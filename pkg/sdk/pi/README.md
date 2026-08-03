@@ -9,7 +9,7 @@ import { createScope } from "@pumped-fn/lite"
 import * as pi from "@pumped-fn/sdk-pi"
 
 const scope = createScope({
-  tags: [pi.piConfig({ provider: "anthropic", modelId: "claude-sonnet-4-5" })],
+  tags: pi.piConfig({ provider: "anthropic", modelId: "claude-sonnet-4-5" }),
 })
 const ctx = scope.createContext()
 await ctx.exec({ flow: pi.piTurn, input: {

@@ -21,7 +21,7 @@ export async function closeApp(): Promise<void> {
 
 export async function handleUser(request: Request): Promise<Response> {
   const ctx = scope.createContext({
-    tags: [requestId(request.headers.get("x-request-id") ?? "missing")],
+    tags: requestId(request.headers.get("x-request-id") ?? "missing"),
   })
 
   try {

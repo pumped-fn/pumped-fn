@@ -8,7 +8,7 @@ export const process: sandbox.Run = flow({
   name: "issue-triage.process.run",
   parse: typed<sandbox.ExecInput>(),
   deps: { policy: tags.required(sandbox.policy), spawn: spawnProcess, timers },
-  tags: [step({ workflow: true, kind: "sandbox" })],
+  tags: step({ workflow: true, kind: "sandbox" }),
   factory: async function* (ctx, { policy, spawn, timers }): AsyncGenerator<sandbox.ExecEvent, sandbox.ExecResult, unknown> {
     const child = spawn(ctx.input.command, [...(ctx.input.args ?? [])], {
       signal: ctx.signal,

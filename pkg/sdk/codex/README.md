@@ -9,10 +9,10 @@ import { createScope } from "@pumped-fn/lite"
 import * as codex from "@pumped-fn/sdk-codex"
 
 const scope = createScope({
-  tags: [codex.codexConfig({
+  tags: codex.codexConfig({
     auth: { kind: "global" },
     cwd: "/absolute/path/to/project",
-  })],
+  }),
 })
 const ctx = scope.createContext()
 await ctx.exec({ flow: codex.codexTurn, input: {
@@ -53,13 +53,13 @@ import * as codex from "@pumped-fn/sdk-codex"
 import { createScope } from "@pumped-fn/lite"
 
 const scope = createScope({
-  tags: [codex.config({
+  tags: codex.config({
     auth: { kind: "global" },
     cwd: process.cwd(),
     additionalDirectories: [],
     permission: "deny",
     shutdownTimeoutMs: 5_000,
-  })],
+  }),
 })
 const ctx = scope.createContext()
 await ctx.resolve(codex.engine)

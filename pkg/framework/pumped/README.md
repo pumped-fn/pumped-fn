@@ -264,7 +264,7 @@ import { actor, configureAccount, createMemoryStore, store } from "./domain"
 
 const scope = createScope({
   presets: [preset(store, createMemoryStore())],
-  tags: [actor({ id: "ops-1", role: "operator" })],
+  tags: actor({ id: "ops-1", role: "operator" }),
 })
 
 const account = await scope.createContext().exec({

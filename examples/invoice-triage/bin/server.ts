@@ -37,7 +37,7 @@ const scope = createScope({
 export const app = new Hono<{ Variables: { ctx: Lite.ExecutionContext } }>()
 
 app.use(async (context, next) => {
-  const ctx = scope.createContext({ tags: [requestId(randomUUID())] })
+  const ctx = scope.createContext({ tags: requestId(randomUUID()) })
   context.set("ctx", ctx)
   try {
     await next()

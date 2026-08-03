@@ -218,7 +218,7 @@ export const dailyReport = flow({
     listStored: controller(listStored),
     clock: tags.required(clock),
   },
-  tags: [step({ workflow: true, kind: "report" })],
+  tags: step({ workflow: true, kind: "report" }),
   factory: async (_ctx, { listStored, clock }): Promise<DailyReport> => {
     const byCategory = categoryCounts()
     const stored = await listStored.exec()
@@ -244,7 +244,7 @@ export const sendReminder = flow({
     notifier: tags.required(notifier),
     reminderRecipient: tags.required(reminderRecipient),
   },
-  tags: [step({ workflow: true, kind: "store" })],
+  tags: step({ workflow: true, kind: "store" }),
   factory: async (ctx, { db, clock, markReminderSent, notifier, reminderRecipient }): Promise<ReminderResult> => {
     const invoice = await markReminderSent.exec({ input: { invoiceId: ctx.input.invoiceId } })
     if (invoice === undefined) return { invoiceId: ctx.input.invoiceId, sent: false }
@@ -262,7 +262,7 @@ export const sendReminder = flow({
         fn: (target, content) => target.send(content),
         params: [notifier, message],
         name: "notifier.send",
-        tags: [step({ workflow: true, kind: "email" })],
+        tags: step({ workflow: true, kind: "email" }),
       })
     } catch (error) {
       const failedAt = clock.now()
@@ -295,7 +295,7 @@ export const sendReminders = flow({
     reminderWindowDays: tags.required(reminderWindowDays),
     sendReminder: controller(sendReminder),
   },
-  tags: [step({ workflow: true, kind: "reminders" })],
+  tags: step({ workflow: true, kind: "reminders" }),
   factory: async (_ctx, { listStored, clock, reminderWindowDays, sendReminder }): Promise<ReminderSummary> => {
     const sent: string[] = []
     const start = utcDay(clock.now())

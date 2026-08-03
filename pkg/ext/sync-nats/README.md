@@ -14,12 +14,10 @@ const kv = await new Kvm(nc).create("drafts", { history: 5 })
 
 const scope = createScope({
   extensions: [sync.extension()],
-  tags: [
-    sync.runtime({
-      peer: "worker-1",
-      transport: nats.kv(kv),
-    }),
-  ],
+  tags: sync.runtime({
+    peer: "worker-1",
+    transport: nats.kv(kv),
+  }),
 })
 ```
 
