@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-tanstack-start",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": false,
   "description": "TanStack Start middleware helpers for @pumped-fn/lite execution contexts",
   "type": "module",
