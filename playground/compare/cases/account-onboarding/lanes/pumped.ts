@@ -70,7 +70,7 @@ export async function startPumped(fixture: Fixture, trace?: Trace): Promise<Awai
       return next()
     },
   }]
-  const scope = createScope({ extensions, tags: caseFixture(fixture) })
+  const scope = createScope({ extensions, tags: [caseFixture(fixture)] })
   const root = scope.createContext()
   await root.resolve(database)
 

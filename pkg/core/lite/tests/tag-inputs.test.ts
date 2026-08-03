@@ -44,7 +44,7 @@ describe("tag inputs", () => {
     const ctx = scope.createContext()
     await expect(ctx.exec({
       name: "invalid-inline-tags",
-      fn: () => undefined,
+      fn: () => {},
       params: [],
       tags: [marker("ok"), null] as never,
     })).rejects.toThrow("tags must contain only tagged values and arrays")
