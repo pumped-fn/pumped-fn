@@ -4,13 +4,15 @@
 
 A scope compiler, not a runtime. `pumped` discovers flows on disk, assembles them into one
 `@pumped-fn/lite` scope, and drives that scope under a run mode — dev server, test, or production
-build. One graph, three projections:
+build. One graph, four projections:
 
 - **Dev** observes the graph through Vite's module runner with HMR; atom identity survives reloads.
 - **Test** substitutes into the graph with a plain `createScope({presets})` — no framework import,
   no plugin, no discovery.
 - **Prod** compiles the graph: `pumped build` bundles the discovered manifest into a server and/or
   CLI entry ahead of time.
+- **Inspect** loads only the selected manifest: `pumped graph` prints its static nodes, edges, and
+  honest unknowns without starting HTTP, jobs, or workflows.
 
 ## Layout conventions
 
@@ -311,6 +313,11 @@ pumped build --app east --target all
 Default artifacts are written to `dist/`. Named app artifacts are isolated under
 `dist/apps/<app>/`.
 
+Every artifact embeds a stable identity containing its selected app, target, and SHA-256 manifest
+hash. Manifest file names are project-relative, such as `src/server/greet.ts`; checkout paths do not
+enter production output. The hash covers the selected bundled module closure, including local
+imports outside the app root.
+
 An unknown name fails with the available app names. `PUMPED_APP=east` provides the same selection
 when Vite is driven directly; an explicit `pumped.plugin({ app: "east" })` option takes precedence.
 
@@ -332,10 +339,19 @@ const report = analyze({
 
 `report.nodes` and `report.edges` are serializable. `report.idOf(handle)` maps the original public
 handle to its graph ID. `report.unknowns` keeps opaque factory bodies, context producers, error
-mappers, and extension hooks visible instead of claiming their hidden edges are absent.
+mappers, and extension hooks visible instead of claiming their hidden edges are absent. Tags passed
+through a flow controller are reported with their providers and handle implementors.
 
-This slice analyzes an already assembled manifest. A command that loads the convention-generated
-manifest without running the app remains future work.
+Inspect a convention-generated manifest directly:
+
+```bash
+pumped graph --app east --target server
+```
+
+The command prints the manifest identity and static report as JSON. It compiles and imports only the
+selected manifest. It does not start HTTP, resolve job schedules, or run workflows. Inline flow
+execution inside a factory remains covered by that factory's explicit `factory-body` unknown;
+runtime extensions can observe the concrete child execution.
 
 ## Testing
 

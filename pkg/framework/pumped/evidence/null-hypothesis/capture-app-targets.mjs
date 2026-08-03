@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { build, version as viteVersion } from "vite"
@@ -6,6 +7,9 @@ import { pumped } from "@pumped-fn/pumped"
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, "../../../../..")
 const fixtureRoot = resolve(here, "fixture/roots")
+const cli = resolve(root, "pkg/framework/pumped/dist/cli.mjs")
+const profileFile = resolve(fixtureRoot, "src/profile.ts")
+const sharedFile = resolve(fixtureRoot, "../shared.ts")
 const rootMarkers = {
   server: "ROOT_SERVER",
   cli: "ROOT_CLI",
@@ -44,14 +48,23 @@ function buildConfig(target) {
 
 process.chdir(root)
 
-async function capture(appName, target) {
+async function capture(appName, target, probeFile) {
   const config = buildConfig(target)
   const result = await build({
     ...config,
     configFile: false,
     logLevel: "silent",
     root: fixtureRoot,
-    plugins: pumped.plugin({ dir: "src", app: appName }),
+    plugins: [
+      ...(probeFile ? [{
+        name: "manifest-hash-probe",
+        enforce: "pre",
+        transform: (code, id) => id === probeFile
+          ? `${code}\nexport const manifestHashProbe = "changed"\n`
+          : undefined,
+      }] : []),
+      ...pumped.plugin({ dir: "src", app: appName }),
+    ],
     build: {
       ...config.build,
       minify: false,
@@ -68,9 +81,16 @@ async function capture(appName, target) {
   const includedApps = Object.entries(appMarkers)
     .filter(([, marker]) => code.includes(marker))
     .map(([name]) => name)
+  const hashes = code.match(/sha256:[a-f0-9]{64}/g) ?? []
+  const stablePaths = !code.includes(fixtureRoot) && !code.includes(root)
+  const identityExact = code.includes(`"app": "${appName}"`)
+    && code.includes(`"target": "${target}"`)
+    && hashes.length === 1
   const expected = expectedRoots[target]
   const pass = JSON.stringify(includedRoots.sort()) === JSON.stringify([...expected].sort())
     && JSON.stringify(includedApps) === JSON.stringify(expectedApps[appName])
+    && stablePaths
+    && identityExact
 
   return {
     app: appName,
@@ -79,6 +99,9 @@ async function capture(appName, target) {
     expectedApps: expectedApps[appName],
     includedRoots,
     includedApps,
+    stablePaths,
+    identityExact,
+    manifestHash: hashes[0],
     pass,
   }
 }
@@ -90,6 +113,19 @@ async function createEvidence() {
       cases.push(await capture(appName, target))
     }
   }
+  const hashes = cases.map((item) => item.manifestHash)
+  const uniqueHashes = new Set(hashes).size === cases.length
+  const eastServer = cases.find((item) => item.app === "east" && item.target === "server")
+  const changedEastServer = await capture("east", "server", profileFile)
+  const changedOutsideRoot = await capture("east", "server", sharedFile)
+  const command = spawnSync(process.execPath, [cli, "graph", "--app", "east", "--target", "server"], {
+    cwd: fixtureRoot,
+    encoding: "utf8",
+  })
+  const commandHash = command.status === 0 ? JSON.parse(command.stdout).identity.hash : undefined
+  const contentSensitiveHash = eastServer.manifestHash !== changedEastServer.manifestHash
+  const outsideRootContentSensitiveHash = eastServer.manifestHash !== changedOutsideRoot.manifestHash
+  const commandHashMatchesArtifact = commandHash === eastServer.manifestHash
   return {
     schemaVersion: 1,
     nullHypothesis: "Selecting an app and build target does not isolate the intended production roots.",
@@ -97,6 +133,12 @@ async function createEvidence() {
       selectedAppOnly: true,
       exactAppsBySelection: expectedApps,
       exactRootsByTarget: expectedRoots,
+      requiresStablePaths: true,
+      requiresExactIdentity: true,
+      requiresUniqueManifestHashes: true,
+      requiresContentSensitiveManifestHash: true,
+      requiresOutsideRootContentSensitiveManifestHash: true,
+      requiresCommandArtifactHashMatch: true,
       cases: Object.keys(appMarkers).length * Object.keys(expectedRoots).length,
     },
     environment: {
@@ -107,7 +149,15 @@ async function createEvidence() {
     decision: {
       passedCases: cases.filter((item) => item.pass).length,
       totalCases: cases.length,
-      nullRejected: cases.every((item) => item.pass),
+      uniqueHashes,
+      contentSensitiveHash,
+      outsideRootContentSensitiveHash,
+      commandHashMatchesArtifact,
+      nullRejected: cases.every((item) => item.pass)
+        && uniqueHashes
+        && contentSensitiveHash
+        && outsideRootContentSensitiveHash
+        && commandHashMatchesArtifact,
     },
   }
 }

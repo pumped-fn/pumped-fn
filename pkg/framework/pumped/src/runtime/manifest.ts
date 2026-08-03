@@ -65,7 +65,15 @@ export interface ManifestEntry {
   agent?: ManifestAgentMeta
 }
 
+/** Stable application and target identity embedded in a generated production manifest. */
+export interface ManifestIdentity {
+  app: string
+  target: "server" | "cli"
+  hash: string
+}
+
 export interface Manifest {
+  identity?: ManifestIdentity
   app: AppConfig | undefined
   entries: readonly ManifestEntry[]
 }

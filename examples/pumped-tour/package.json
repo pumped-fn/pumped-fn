@@ -7,6 +7,8 @@
     "build:east": "node ../../pkg/framework/pumped/dist/cli.mjs build --app east --target all",
     "dev": "node ../../pkg/framework/pumped/dist/cli.mjs dev",
     "dev:east": "node ../../pkg/framework/pumped/dist/cli.mjs dev --app east",
+    "graph": "node ../../pkg/framework/pumped/dist/cli.mjs graph",
+    "graph:east": "node ../../pkg/framework/pumped/dist/cli.mjs graph --app east --target server",
     "server": "node dist/server.mjs",
     "server:east": "node dist/apps/east/server.mjs",
     "cli": "node dist/cli.mjs",

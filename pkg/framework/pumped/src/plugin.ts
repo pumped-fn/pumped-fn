@@ -1,10 +1,12 @@
+import { createHash } from "node:crypto"
+import { isAbsolute, relative } from "node:path"
 import { pumpedHmr } from "@pumped-fn/lite-hmr"
 import { getRequestListener } from "@hono/node-server"
 import { isRunnableDevEnvironment, type Plugin, type RunnableDevEnvironment } from "vite"
 import type { Lite } from "@pumped-fn/lite"
 import { discover, selectAppFile } from "./discover"
 import { generateManifest } from "./codegen"
-import { selectTargetEntries } from "./build-config"
+import { selectTargetEntries, type BuildTarget } from "./build-config"
 import { createDevRunner } from "./runtime/dev-runner"
 import type { Manifest } from "./runtime/manifest"
 import type { JobsRunner } from "./runtime/jobs"
@@ -24,13 +26,17 @@ const RESOLVED_ENTRY_SERVER_ID = "\0pumped:entry-server"
 const ENTRY_CLI_ID = "virtual:pumped/entry-cli"
 const RESOLVED_ENTRY_CLI_ID = "\0pumped:entry-cli"
 
+export function manifestId(target: BuildTarget): string {
+  return target === "server" ? MANIFEST_SERVER_ID : MANIFEST_CLI_ID
+}
+
 export const ENTRY_SERVER_SOURCE = `
 import { pumped } from "@pumped-fn/pumped"
 import { hono } from "@pumped-fn/lite-hono"
 import { serve } from "@hono/node-server"
-import { app as manifestApp, entries } from ${JSON.stringify(MANIFEST_SERVER_ID)}
+import { app as manifestApp, entries, identity } from ${JSON.stringify(MANIFEST_SERVER_ID)}
 
-const manifest = { app: manifestApp, entries }
+const manifest = { identity, app: manifestApp, entries }
 const lite = hono.adapter()
 const scope = pumped.createAppScope(manifest, [lite])
 const { app: honoApp } = pumped.createServer(manifest, { scope, lite })
@@ -43,15 +49,16 @@ serve({ fetch: honoApp.fetch, port })
 
 export const ENTRY_CLI_SOURCE = `
 import { pumped } from "@pumped-fn/pumped"
-import { app as manifestApp, entries } from ${JSON.stringify(MANIFEST_CLI_ID)}
+import { app as manifestApp, entries, identity } from ${JSON.stringify(MANIFEST_CLI_ID)}
 
-await pumped.runCli({ app: manifestApp, entries }, process.argv.slice(2))
+await pumped.runCli({ identity, app: manifestApp, entries }, process.argv.slice(2))
 `
 
 export function pumped(options: PumpedOptions = {}): Plugin[] {
   const dir = options.dir ?? "src"
   const selectedApp = options.app ?? process.env["PUMPED_APP"]
   let root = process.cwd()
+  let generatedManifest: { id: string; hash: string } | undefined
 
   function sourceDir(): string {
     return `${root}/${dir}`
@@ -89,14 +96,57 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
       if (id === RESOLVED_MANIFEST_SERVER_ID || id === RESOLVED_MANIFEST_CLI_ID) {
         const discovery = discover(sourceDir())
         const target = id === RESOLVED_MANIFEST_SERVER_ID ? "server" : "cli"
-        return generateManifest(
+        const source = generateManifest(
           selectTargetEntries(discovery.entries, target),
-          selectAppFile(discovery, selectedApp)
+          selectAppFile(discovery, selectedApp),
+          { root, app: selectedApp ?? "default", target }
         )
+        generatedManifest = { id, hash: source.match(/sha256:[a-f0-9]{64}/)![0] }
+        return source
       }
       if (id === RESOLVED_ENTRY_SERVER_ID) return ENTRY_SERVER_SOURCE
       if (id === RESOLVED_ENTRY_CLI_ID) return ENTRY_CLI_SOURCE
       return undefined
+    },
+
+    renderChunk(code) {
+      const manifest = generatedManifest
+      if (!manifest || !code.includes(manifest.hash)) return null
+      const modules: { id: string; code: string }[] = []
+      const absoluteIds: string[] = []
+      const visited = new Set<string>()
+      const normalizedRoot = root.replaceAll("\\", "/")
+      const visit = (id: string): void => {
+        if (visited.has(id)) return
+        visited.add(id)
+        const module = this.getModuleInfo(id)
+        if (!module) return
+        if (isAbsolute(id)) absoluteIds.push(id)
+        modules.push({
+          id: id === manifest.id
+            ? id
+            : isAbsolute(id)
+              ? relative(root, id).replaceAll("\\", "/")
+              : id,
+          code: module.code ?? "",
+        })
+        for (const imported of [...module.importedIds, ...module.dynamicallyImportedIds]) visit(imported)
+      }
+      visit(manifest.id)
+      absoluteIds.sort((left, right) => right.length - left.length)
+      for (const module of modules) {
+        module.code = module.code.replaceAll("\\", "/")
+        for (const id of absoluteIds) {
+          module.code = module.code.replaceAll(
+            id.replaceAll("\\", "/"),
+            relative(root, id).replaceAll("\\", "/")
+          )
+        }
+        module.code = module.code.replaceAll(normalizedRoot, "<root>")
+      }
+      modules.sort((left, right) => left.id.localeCompare(right.id))
+      const hash = `sha256:${createHash("sha256").update(JSON.stringify(modules)).digest("hex")}`
+      return { code: code.replaceAll(manifest.hash, hash), map: null }
     },
 
     configureServer(server) {

@@ -30,7 +30,9 @@ export namespace pumped {
   export type WorkflowRunMeta = import("./tags").WorkflowRunMeta
   export type JobRunMeta = import("./tags").JobRunMeta
   export type Manifest = import("./runtime/manifest").Manifest
+  export type ManifestIdentity = import("./runtime/manifest").ManifestIdentity
   export type ManifestEntry = import("./runtime/manifest").ManifestEntry
+  export type ManifestGenerationOptions = import("./codegen").ManifestGenerationOptions
   export type ManifestAgentMeta = import("./runtime/manifest").ManifestAgentMeta
   export type Config = import("./runtime/manifest").AppConfig
   export type Options = import("./plugin").PumpedOptions
@@ -52,7 +54,9 @@ export namespace p {
   export type WorkflowRunMeta = pumped.WorkflowRunMeta
   export type JobRunMeta = pumped.JobRunMeta
   export type Manifest = pumped.Manifest
+  export type ManifestIdentity = pumped.ManifestIdentity
   export type ManifestEntry = pumped.ManifestEntry
+  export type ManifestGenerationOptions = pumped.ManifestGenerationOptions
   export type ManifestAgentMeta = pumped.ManifestAgentMeta
   export type Config = pumped.Config
   export type Options = pumped.Options
@@ -74,4 +78,6 @@ export { createServer, createAppScope, runCli, runJobs, runWorkflows }
 export type { AppDescriptor, EntryDescriptor, EntryKind } from "./discover"
 export { discover } from "./discover"
 export { generateManifest } from "./codegen"
+export type { ManifestGenerationOptions } from "./codegen"
+export type { ManifestIdentity } from "./runtime/manifest"
 export { normalizeAgentEntry } from "./runtime/agent"

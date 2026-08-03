@@ -1,4 +1,4 @@
-import { atom, flow, preset, tag, tags, typed } from "@pumped-fn/lite"
+import { atom, controller, flow, preset, tag, tags, typed } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
 import { analyze } from "../src/analyze"
 import { app } from "../src/app"
@@ -87,6 +87,36 @@ describe("analyze", () => {
       kind: "implemented-by",
     })
     expect(report.idOf(implementation)).toBe("flow:implementation")
+  })
+
+  it("reports tags supplied through a flow controller", () => {
+    const implementation = flow({ name: "implementation", factory: () => "ok" })
+    const model = tag<typeof implementation>({ label: "example.graph.model" })
+    const child = flow({
+      name: "child",
+      deps: { model: tags.required(model) },
+      factory: (_context, { model }) => model.exec(),
+    })
+    const parent = flow({
+      name: "parent",
+      deps: { child: controller(child, { tags: model(implementation) }) },
+      factory: (_context, { child }) => child.exec(),
+    })
+    const report = analyze({
+      app: undefined,
+      entries: [{ kind: "server", name: "parent", file: "src/server/parent.ts", flow: parent }],
+    })
+
+    expect(report.edges).toContainEqual({
+      from: "flow:parent",
+      to: "tag:example.graph.model",
+      kind: "provides-tag",
+    })
+    expect(report.edges).toContainEqual({
+      from: "tag:example.graph.model",
+      to: "flow:implementation",
+      kind: "implemented-by",
+    })
   })
 
   it("marks function preset replacements as opaque", () => {

@@ -42,6 +42,14 @@ pnpm -F @pumped-fn/pumped-tour cli:east greet --json '{"name":"Ada"}'
 
 Its output ends with `from east`.
 
+Inspect the east manifest without starting the app:
+
+```bash
+pnpm -F @pumped-fn/pumped-tour graph:east
+```
+
+The JSON identity says `east` and `server`, followed by the static graph and explicit unknowns.
+
 ## Canonical Shape
 
 ```text
@@ -67,7 +75,8 @@ node, the flow declares its directory and region edges, and opaque factory work 
 
 The production compiler emits `dist/server.mjs` with server roots and `dist/cli.mjs` with CLI roots.
 Named apps use their own directory, such as `dist/apps/east/`, so builds cannot mix app selections.
-No artifact contains the other target's exclusive roots.
+Each artifact embeds its app, target, and manifest hash with project-relative source names. No
+artifact contains the other target's exclusive roots or an absolute checkout path.
 
 ## Package boundary verdict
 
@@ -75,12 +84,6 @@ This example gives `@pumped-fn/pumped` one clear job that Lite does not own: com
 into runnable target manifests and own their HTTP, CLI, job, workflow, and development lifecycle.
 The `/app` entry is intentionally only a lightweight authoring bridge.
 
-The current verdict is to keep the package experimental. It removes two hand-written composition
-roots and their build wiring in this small app, so the compiler earns a boundary. `app()` alone would
-not earn one.
-
-The dogfood build also exposes the next gate. Artifacts currently contain absolute source paths.
-The artifact still needs its selected app name and manifest hash. Graph analysis also still needs a
-command that loads the generated manifest without starting the app. If those gaps cannot be removed
-without making this example more complex, sunset Pumped and keep explicit Lite composition roots
-instead.
+The verdict is to keep the package experimental. It removes two hand-written composition roots and
+their build wiring, emits isolated and identified production artifacts, and inspects the generated
+graph without starting the app. The compiler earns a boundary. `app()` alone would not earn one.

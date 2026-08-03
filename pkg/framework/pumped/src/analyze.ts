@@ -169,6 +169,9 @@ export function analyze(manifest: Manifest): GraphReport {
         const controlledNode = controlled && visitUnit(controlled, key)
         if (controlledNode) edges.push({ from: node.id, to: controlledNode.id, kind: "controls", key })
         else addUnknown(node.id, `dependency:${key}`)
+        if ("tags" in dependency) {
+          for (const tagged of dependency.tags ?? []) addTagBinding(node, tagged, "provides-tag")
+        }
         continue
       }
 
