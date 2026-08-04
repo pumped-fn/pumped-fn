@@ -40,18 +40,24 @@ const packageDirectories = readdirSync(join(root, "pkg"), { withFileTypes: true 
   .map((directory) => ({ directory, manifest: readJson(join(directory, "package.json")) }))
   .filter(({ manifest }) => manifest.private !== true);
 const packagesByName = new Map(packageDirectories.map((entry) => [entry.manifest.name, entry]));
-const basePackageDirectories = execFileSync("git", ["ls-tree", "-r", "--name-only", base, "--", "pkg"], {
+const packageManifestsAt = (ref) => execFileSync("git", ["ls-tree", "-r", "--name-only", ref, "--", "pkg"], {
   cwd: root,
   encoding: "utf8",
 })
   .split("\n")
   .filter((path) => /^pkg\/[^/]+\/[^/]+\/package\.json$/u.test(path))
   .map((path) => ({
-    manifest: JSON.parse(execFileSync("git", ["show", `${base}:${path}`], { cwd: root, encoding: "utf8" })),
+    manifest: JSON.parse(execFileSync("git", ["show", `${ref}:${path}`], { cwd: root, encoding: "utf8" })),
     path,
   }))
   .filter(({ manifest }) => manifest.private !== true);
+const basePackageDirectories = packageManifestsAt(base);
 const basePackagesByName = new Map(basePackageDirectories.map((entry) => [entry.manifest.name, entry]));
+const baseParent = execFileSync("git", ["rev-list", "--parents", "-n", "1", base], { cwd: root, encoding: "utf8" })
+  .trim()
+  .split(" ")[1];
+const baseParentPackagesByName = new Map((baseParent ? packageManifestsAt(baseParent) : [])
+  .map((entry) => [entry.manifest.name, entry]));
 
 const escapeRegExp = (value) => value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
 
@@ -342,8 +348,14 @@ for (const { directory, manifest } of packageDirectories) {
   }
   for (const change of changesets.filter((entry) => entry.package === manifest.name && entry.bump === "major")) {
     const previous = basePackagesByName.get(manifest.name)?.manifest;
+    const ancestor = baseParentPackagesByName.get(manifest.name)?.manifest;
     const currentMajor = Number.parseInt(String(manifest.version).split(".")[0], 10);
-    const previousMajor = previous
+    const previousMajor = previous && ancestor
+      && manifest.version === ancestor.version
+      && Number.parseInt(String(previous.version).split(".")[0], 10)
+        === Number.parseInt(String(ancestor.version).split(".")[0], 10) + 1
+      ? Number.parseInt(String(ancestor.version).split(".")[0], 10)
+      : previous
       ? Number.parseInt(String(previous.version).split(".")[0], 10)
       : currentMajor;
     const targetMajor = previousMajor + 1;

@@ -183,6 +183,22 @@ describe("release policy checker", () => {
     assert.equal(result.output.metrics.version_delta_gap_count, 0)
   })
 
+  it("accepts correcting a version applied before Changesets consumes the plan", () => {
+    const directory = createFixture(true)
+    write(directory, "pkg/ext/pre/package.json", manifest("@pumped-fn/fixture-pre", "1.0.0", {
+      "@pumped-fn/fixture-core": "^2.0.0",
+    }))
+    execFileSync("git", ["add", "."], { cwd: directory })
+    execFileSync("git", ["commit", "-qm", "premature version"], { cwd: directory })
+    write(directory, "pkg/ext/pre/package.json", manifest("@pumped-fn/fixture-pre", "0.2.0", {
+      "@pumped-fn/fixture-core": "^2.0.0",
+    }))
+    const result = run(directory)
+    assert.equal(result.status, 0)
+    assert.equal(result.output.metrics.version_delta_gap_count, 0)
+    assert.equal(result.output.metrics.unauthorized_major_count, 0)
+  })
+
   it("recovers a consumed Changesets plan from the base commit", () => {
     const directory = createFixture(true)
     execFileSync("git", ["add", ".changeset/release.md"], { cwd: directory })

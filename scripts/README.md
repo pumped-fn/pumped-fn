@@ -16,8 +16,8 @@
 | `check-packed-lite.mjs` | Pack Lite and Lite React, then verify docs, ESM, CJS, TS7 NodeNext, and Bundler consumers. |
 | `check-published-types.mjs` | Validate every public package root export with strict NodeNext ESM/CJS and Bundler consumers. |
 | `check-public-contract.mjs` | Check package metadata, migration evidence, public interface TSDoc, README fences, changesets, and PR provenance. |
-| `check-release-policy.mjs` | Check Changeset bump size, internal peer alignment, and the repository release policy. |
-| `check-release-policy.test.mjs` | Deterministic release-policy fixtures for core majors, pre-1 graduation, stable minors, widening, and stale peers. |
+| `check-release-policy.mjs` | Check Changeset bump size, corrected early versions, internal peer alignment, and the repository release policy. |
+| `check-release-policy.test.mjs` | Deterministic release-policy fixtures for core majors, pre-1 graduation, early version correction, stable minors, widening, and stale peers. |
 | `check-public-contract.test.mjs` | Deterministic positive and negative fixtures for the public contract checker. |
 | `get-release-title.sh` | Release workflow helper for Changesets PR titles. |
 
