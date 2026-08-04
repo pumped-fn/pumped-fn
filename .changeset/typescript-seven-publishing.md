@@ -25,5 +25,4 @@
 "@pumped-fn/lite-lint": patch
 ---
 
-Publish TypeScript 7 declarations through the native compiler with matching ESM and CommonJS type entrypoints.
-Keep the TanStack Start adapter ESM-only to match its ESM-only peer runtime.
+Publish declarations with TypeScript 7.0.2 through tsdown's package-local `tsconfig.dts.json` files, keeping ESM and CommonJS type entrypoints aligned. Legacy Compiler API consumers use the `typescript-api` alias.
