@@ -29,3 +29,22 @@ export function buildConfig(target: BuildTarget, app?: string) {
     },
   }
 }
+
+/**
+ * Builds the manifest alone so `pumped graph` can read its identity. Declares no SSR
+ * externalization of its own, so the module closure behind the embedded content hash matches the
+ * production build byte for byte.
+ */
+export function manifestConfig(input: string, outDir: string) {
+  return {
+    build: {
+      ssr: true as const,
+      outDir,
+      emptyOutDir: true,
+      rollupOptions: {
+        input,
+        output: { entryFileNames: "manifest.mjs" },
+      },
+    },
+  }
+}

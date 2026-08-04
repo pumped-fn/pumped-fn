@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url"
 import { cac } from "cac"
 import { build as viteBuild, createServer as createViteServer, loadConfigFromFile } from "vite"
 import { analyze } from "./analyze"
-import { buildConfig, type BuildTarget } from "./build-config"
+import { buildConfig, manifestConfig, type BuildTarget } from "./build-config"
 import { manifestId, pumped } from "./plugin"
 import type { Manifest, ManifestIdentity } from "./runtime/manifest"
 
@@ -62,15 +62,7 @@ async function loadManifest(target: BuildTarget, selectedApp?: string): Promise<
     await viteBuild({
       ...userConfig,
       logLevel: "silent",
-      build: {
-        ssr: true,
-        outDir,
-        emptyOutDir: true,
-        rollupOptions: {
-          input: manifestId(target),
-          output: { entryFileNames: "manifest.mjs" },
-        },
-      },
+      ...manifestConfig(manifestId(target), outDir),
     })
     return await import(pathToFileURL(join(outDir, "manifest.mjs")).href) as GeneratedManifest
   } finally {
