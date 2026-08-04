@@ -1,5 +1,11 @@
 # @pumped-fn/pumped
 
+## 0.3.0
+
+### Minor Changes
+
+- 6b853ee: Add lightweight app and metadata entrypoints, deterministic named app composition and selection, target-specific production manifests, and truthful static analysis of declared graph edges.
+
 ## 0.2.2
 
 ### Patch Changes

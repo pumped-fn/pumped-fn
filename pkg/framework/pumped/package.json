@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/pumped",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "private": false,
   "description": "Convention-driven scope compiler: discover flows on disk, assemble a scope, drive it as CLI or HTTP server",
   "type": "module",
@@ -19,6 +19,26 @@
       "require": {
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
+      }
+    },
+    "./app": {
+      "import": {
+        "types": "./dist/app.d.mts",
+        "default": "./dist/app.mjs"
+      },
+      "require": {
+        "types": "./dist/app.d.cts",
+        "default": "./dist/app.cjs"
+      }
+    },
+    "./meta": {
+      "import": {
+        "types": "./dist/meta.d.mts",
+        "default": "./dist/meta.mjs"
+      },
+      "require": {
+        "types": "./dist/meta.d.cts",
+        "default": "./dist/meta.cjs"
       }
     }
   },

@@ -156,6 +156,7 @@ Read the checklist: [How to review pumped-fn code](docs/code-review-guide.md).
 | Path | What it shows |
 | --- | --- |
 | `examples` | [Examples index](examples/README.md). |
+| `examples/pumped-tour` | [Small Pumped app with shared HTTP and CLI roots, named app composition, production builds, and scope-seam tests.](examples/pumped-tour/README.md) |
 | `examples/issue-triage` | [GitHub issue triage with durable leases, per-delivery SDK sessions, repository/PostgreSQL/Victoria evidence, deterministic review, and idempotent publication.](examples/issue-triage/README.md) |
 | `examples/invoice-triage` | [Canonical Postgres-backed invoice import and triage with traced store, model, review, and reminder edges.](examples/invoice-triage/README.md) |
 

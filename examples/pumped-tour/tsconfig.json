@@ -1,0 +1,32 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": [
+      "node",
+      "vitest"
+    ],
+    "paths": {
+      "@pumped-fn/lite": [
+        "../../pkg/core/lite/src/index.ts"
+      ],
+      "@pumped-fn/pumped": [
+        "../../pkg/framework/pumped/src/index.ts"
+      ],
+      "@pumped-fn/pumped/app": [
+        "../../pkg/framework/pumped/src/app.ts"
+      ],
+      "@pumped-fn/pumped/meta": [
+        "../../pkg/framework/pumped/src/meta.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "vitest.config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

@@ -4,9 +4,10 @@ import { generateManifest } from "../src/codegen"
 
 describe("generateManifest output", () => {
   it("parses as plain ECMAScript with no TypeScript-only syntax", () => {
-    const source = generateManifest(
+    const { source } = generateManifest(
       [{ kind: "server", name: "book-space", file: "/abs/src/server/book-space.ts" }],
-      "/abs/src/app.ts"
+      "/abs/src/app.ts",
+      { root: "/abs", app: "default", target: "server" }
     )
 
     expect(() => Parser.parse(source, { ecmaVersion: "latest", sourceType: "module" })).not.toThrow()
@@ -14,7 +15,7 @@ describe("generateManifest output", () => {
   })
 
   it("parses as plain ECMAScript with no app.ts present", () => {
-    const source = generateManifest([], undefined)
+    const { source } = generateManifest([], undefined, { root: "/abs", app: "default", target: "server" })
 
     expect(() => Parser.parse(source, { ecmaVersion: "latest", sourceType: "module" })).not.toThrow()
     expect(source).not.toMatch(/\bas const\b/)

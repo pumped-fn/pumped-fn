@@ -398,6 +398,37 @@ importers:
         specifier: 'catalog:'
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
+  examples/pumped-tour:
+    dependencies:
+      '@hono/node-server':
+        specifier: 'catalog:'
+        version: 2.0.6(hono@4.12.27)
+      '@pumped-fn/lite':
+        specifier: workspace:*
+        version: link:../../pkg/core/lite
+      '@pumped-fn/lite-hono':
+        specifier: workspace:*
+        version: link:../../pkg/framework/hono
+      '@pumped-fn/pumped':
+        specifier: workspace:*
+        version: link:../../pkg/framework/pumped
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.27
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.8)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
   pkg/core/lite:
     devDependencies:
       '@types/node':
