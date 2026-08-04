@@ -91,6 +91,8 @@ sequenceDiagram
 - Custom equality for complex comparisons
 - Selector logic is reevaluated when the store changes or you pass a new selector function, so prop-driven selectors stay in sync without waiting for another atom update
 
+Lite controllers may expose a private '_' value-change listener and a 'value' getter; lite-react feature-detects them via '_' in ctrl && 'value' in ctrl and falls back to the public ctrl.on("*") API when absent, so mixed lite/lite-react versions keep working. '_' is intentionally absent from the public Controller type and must not be used by consumers.
+
 ---
 
 ## Execution-Scoped Resources

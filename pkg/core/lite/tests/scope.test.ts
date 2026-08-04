@@ -56,6 +56,67 @@ describe("Scope", () => {
       expect(scope.controller(undefinedAtom).state).toBe("resolved")
     })
 
+    it("runs failing cold dependencies once", async () => {
+      const scope = createScope()
+      let directCalls = 0
+      let directCleanups = 0
+      const direct = atom({
+        factory: (ctx) => {
+          directCalls++
+          ctx.cleanup(() => { directCleanups++ })
+          throw new Error("direct failed")
+        },
+      })
+      const directParent = atom({
+        deps: { direct },
+        factory: (_, { direct }) => direct,
+      })
+
+      await expect(scope.resolve(directParent)).rejects.toThrow("direct failed")
+      expect(directCalls).toBe(1)
+
+      let controllerCalls = 0
+      let controllerCleanups = 0
+      const controlled = atom({
+        factory: (ctx) => {
+          controllerCalls++
+          ctx.cleanup(() => { controllerCleanups++ })
+          throw new Error("controller failed")
+        },
+      })
+      const controllerParent = atom({
+        deps: { controlled: controller(controlled, { resolve: true }) },
+        factory: (_, { controlled }) => controlled.get(),
+      })
+
+      await expect(scope.resolve(controllerParent)).rejects.toThrow("controller failed")
+      expect(controllerCalls).toBe(1)
+      await scope.dispose()
+      expect(directCleanups).toBe(1)
+      expect(controllerCleanups).toBe(1)
+    })
+
+    it("supports immutable atoms without changing their public shape", async () => {
+      const normal = atom({ factory: () => 1 })
+      const normalKeys = Object.keys(normal)
+      const normalScope = createScope()
+      await normalScope.resolve(normal)
+      normalScope.controller(normal)
+      expect(Object.keys(normal)).toEqual(normalKeys)
+
+      const frozen = Object.freeze(atom({ factory: () => 2 }))
+      const sealed = Object.seal(atom({ factory: () => 3 }))
+      const fixed = Object.preventExtensions(atom({ factory: () => 4 }))
+      const scope = createScope()
+
+      await expect(scope.resolve(frozen)).resolves.toBe(2)
+      await expect(scope.resolve(sealed)).resolves.toBe(3)
+      await expect(scope.resolve(fixed)).resolves.toBe(4)
+      expect(scope.controller(frozen).get()).toBe(2)
+      expect(scope.controller(sealed).get()).toBe(3)
+      expect(scope.controller(fixed).get()).toBe(4)
+    })
+
     it("allows extensions to resolve atoms during init", async () => {
       const configAtom = atom({ factory: () => "config" })
       let initValue: string | undefined
@@ -86,6 +147,64 @@ describe("Scope", () => {
         presets: [preset(configAtom, testConfigAtom)],
       })
       expect(await scope2.resolve(configAtom)).toEqual({ port: 9999 })
+    })
+
+    it("uses presets through cold synchronous dependency paths", async () => {
+      let calls = 0
+      const source = atom({
+        factory: () => {
+          calls++
+          return "real"
+        },
+      })
+      const direct = atom({
+        deps: { source },
+        factory: (_, { source }) => source,
+      })
+      const controlled = atom({
+        deps: { source: controller(source, { resolve: true }) },
+        factory: (_, { source }) => source.get(),
+      })
+      const middle = atom({
+        deps: { source },
+        factory: (_, { source }) => `middle:${source}`,
+      })
+      const transitive = atom({
+        deps: { middle },
+        factory: (_, { middle }) => `outer:${middle}`,
+      })
+
+      await expect(createScope({ presets: [preset(source, "fake")] }).resolve(direct)).resolves.toBe("fake")
+      await expect(createScope({ presets: [preset(source, "fake")] }).resolve(controlled)).resolves.toBe("fake")
+      await expect(createScope({ presets: [preset(source, "fake")] }).resolve(transitive)).resolves.toBe("outer:middle:fake")
+
+      const replacement = atom({ factory: () => "replacement" })
+      await expect(createScope({ presets: [preset(source, replacement)] }).resolve(direct)).resolves.toBe("replacement")
+      expect(calls).toBe(0)
+    })
+
+    it("waits for dependency release before resolving it again", async () => {
+      const events: string[] = []
+      const source = atom({
+        factory: (ctx) => {
+          events.push("acquire")
+          ctx.cleanup(() => { events.push("cleanup") })
+          return events.length
+        },
+      })
+      const dependent = atom({
+        deps: { source },
+        factory: (_, { source }) => source,
+      })
+      const scope = createScope()
+
+      await scope.resolve(source)
+      const release = scope.release(source)
+      const resolving = scope.resolve(dependent)
+
+      await release
+      await resolving
+      expect(events).toEqual(["acquire", "cleanup", "acquire"])
     })
   })
 
@@ -280,6 +399,30 @@ describe("Scope", () => {
       await scope.flush()
       expect(listenerCalls).toBe(1)
       expect(ctrl.get().port).toBe(8080)
+    })
+
+    it("refreshes value notifications after all listeners unsubscribe", async () => {
+      const subject = atom({ factory: () => "v1" })
+      const scope = createScope()
+      await scope.resolve(subject)
+      const ctrl = scope.controller(subject) as Lite.Controller<string> & {
+        _(listener: () => void): () => void
+      }
+      let firstCalls = 0
+      const off = ctrl._(() => { firstCalls++ })
+
+      ctrl.set("v2")
+      await scope.flush()
+      expect(firstCalls).toBe(1)
+      off()
+
+      ctrl.set("v3")
+      await scope.flush()
+      let secondCalls = 0
+      ctrl._(() => { secondCalls++ })
+      ctrl.set("v2")
+      await scope.flush()
+      expect(secondCalls).toBe(1)
     })
 
     it("propagates errors from auto-resolved controller", async () => {

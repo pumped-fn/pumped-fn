@@ -95,7 +95,7 @@ console.log(await scope.run({ flow: greet, input: { name: "Ada" } }))
 await scope.dispose()
 ```
 
-The core package has zero runtime dependencies and ~12 kB min+gzip.
+The core package has zero runtime dependencies and ~15 kB min+gzip.
 
 ## Mental model
 

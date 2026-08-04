@@ -9,6 +9,26 @@ import { createAppScope } from "./runtime/app-scope"
 import { normalizeAgentEntry } from "./runtime/agent"
 import { analyze } from "./analyze"
 
+type PumpedRouteMeta = import("./tags").RouteMeta
+type PumpedCommandMeta = import("./tags").CommandMeta
+type PumpedWorkflowRunMeta = import("./tags").WorkflowRunMeta
+type PumpedJobRunMeta = import("./tags").JobRunMeta
+type PumpedManifest = import("./runtime/manifest").Manifest
+type PumpedManifestIdentity = import("./runtime/manifest").ManifestIdentity
+type PumpedManifestEntry = import("./runtime/manifest").ManifestEntry
+type PumpedManifestGenerationOptions = import("./codegen").ManifestGenerationOptions
+type PumpedManifestAgentMeta = import("./runtime/manifest").ManifestAgentMeta
+type PumpedConfig = import("./runtime/manifest").AppConfig
+type PumpedOptions = import("./plugin").PumpedOptions
+type PumpedJobsIo = import("./runtime/jobs").JobsIo
+type PumpedJobsRunner = import("./runtime/jobs").JobsRunner
+type PumpedWorkflowsIo = import("./runtime/workflows").WorkflowsIo
+type PumpedWorkflowsRunner = import("./runtime/workflows").WorkflowsRunner
+type PumpedGraphNode = import("./analyze").GraphNode
+type PumpedGraphEdge = import("./analyze").GraphEdge
+type PumpedGraphUnknown = import("./analyze").GraphUnknown
+type PumpedGraphReport = import("./analyze").GraphReport
+
 export const pumped = {
   app,
   analyze,
@@ -25,25 +45,25 @@ export const pumped = {
 } as const
 
 export namespace pumped {
-  export type RouteMeta = import("./tags").RouteMeta
-  export type CommandMeta = import("./tags").CommandMeta
-  export type WorkflowRunMeta = import("./tags").WorkflowRunMeta
-  export type JobRunMeta = import("./tags").JobRunMeta
-  export type Manifest = import("./runtime/manifest").Manifest
-  export type ManifestIdentity = import("./runtime/manifest").ManifestIdentity
-  export type ManifestEntry = import("./runtime/manifest").ManifestEntry
-  export type ManifestGenerationOptions = import("./codegen").ManifestGenerationOptions
-  export type ManifestAgentMeta = import("./runtime/manifest").ManifestAgentMeta
-  export type Config = import("./runtime/manifest").AppConfig
-  export type Options = import("./plugin").PumpedOptions
-  export type JobsIo = import("./runtime/jobs").JobsIo
-  export type JobsRunner = import("./runtime/jobs").JobsRunner
-  export type WorkflowsIo = import("./runtime/workflows").WorkflowsIo
-  export type WorkflowsRunner = import("./runtime/workflows").WorkflowsRunner
-  export type GraphNode = import("./analyze").GraphNode
-  export type GraphEdge = import("./analyze").GraphEdge
-  export type GraphUnknown = import("./analyze").GraphUnknown
-  export type GraphReport = import("./analyze").GraphReport
+  export type RouteMeta = PumpedRouteMeta
+  export type CommandMeta = PumpedCommandMeta
+  export type WorkflowRunMeta = PumpedWorkflowRunMeta
+  export type JobRunMeta = PumpedJobRunMeta
+  export type Manifest = PumpedManifest
+  export type ManifestIdentity = PumpedManifestIdentity
+  export type ManifestEntry = PumpedManifestEntry
+  export type ManifestGenerationOptions = PumpedManifestGenerationOptions
+  export type ManifestAgentMeta = PumpedManifestAgentMeta
+  export type Config = PumpedConfig
+  export type Options = PumpedOptions
+  export type JobsIo = PumpedJobsIo
+  export type JobsRunner = PumpedJobsRunner
+  export type WorkflowsIo = PumpedWorkflowsIo
+  export type WorkflowsRunner = PumpedWorkflowsRunner
+  export type GraphNode = PumpedGraphNode
+  export type GraphEdge = PumpedGraphEdge
+  export type GraphUnknown = PumpedGraphUnknown
+  export type GraphReport = PumpedGraphReport
 }
 
 export const p = pumped

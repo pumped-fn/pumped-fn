@@ -28,6 +28,9 @@ export function shallowEqual(a: unknown, b: unknown): boolean {
 }
 
 const controllerReadHooks: Array<(ctrl: Lite.Controller<unknown>) => void> = []
+const complete = Promise.resolve()
+const noExtensions: Lite.Extension[] = []
+const noTags: Lite.Tagged<any>[] = []
 
 interface Cleanup {
   fn: (...args: any[]) => MaybePromise<void>
@@ -49,6 +52,12 @@ interface PendingSet<T> {
   hasValue: boolean
   value?: T
   updates: Update<T>[]
+}
+
+interface WatchEdge {
+  target: Lite.Atom<unknown>
+  previous: unknown
+  eq: (previous: any, next: any) => boolean
 }
 
 function runCleanup(cleanup: Cleanup): MaybePromise<void> {
@@ -179,13 +188,18 @@ interface AtomEntry<T> {
   hasValue: boolean
   error?: Error
   generation: AtomGeneration<T>
-  resolvingListeners: Set<Listener>
-  resolvedListeners: Set<Listener>
-  allListeners: Set<Listener>
+  resolvingListeners?: Set<Listener>
+  resolvedListener?: Listener
+  resolvedListeners?: Set<Listener>
+  allListeners?: Set<Listener>
   pendingInvalidate: boolean
   pendingSet?: PendingSet<T>
   data?: ContextDataImpl
-  dependents: Set<Lite.Atom<unknown>>
+  dependents?: Set<Lite.Atom<unknown>>
+  watchers?: Set<WatchEdge>
+  valueListeners?: Set<Listener>
+  valueReady?: boolean
+  notifiedValue?: T
   gcPending: boolean
   gcQueued: boolean
   gcScheduled: ReturnType<typeof setTimeout> | null
@@ -198,13 +212,9 @@ class AtomEntryImpl<T> implements AtomEntry<T> {
   hasValue = false
   error: Error | undefined = undefined
   generation: AtomGeneration<T>
-  resolvingListeners = new Set<Listener>()
-  resolvedListeners = new Set<Listener>()
-  allListeners = new Set<Listener>()
   pendingInvalidate = false
   pendingSet: PendingSet<T> | undefined = undefined
   data: ContextDataImpl | undefined = undefined
-  dependents = new Set<Lite.Atom<unknown>>()
   gcPending = false
   gcQueued = false
   gcScheduled: ReturnType<typeof setTimeout> | null = null
@@ -295,6 +305,10 @@ function isAtomControllerDep(dep: Lite.ControllerDep<unknown>): dep is Lite.Atom
   return dep.atom !== undefined
 }
 
+function isAsyncFactory(fn: Function): boolean {
+  return fn.constructor.name === "AsyncFunction"
+}
+
 function getAsyncIterator<T>(source: StreamSource<T>): AsyncIterator<T> {
   const iterate = (source as AsyncIterable<T>)[Symbol.asyncIterator]
   return iterate ? iterate.call(source) : source as AsyncIterator<T>
@@ -331,15 +345,20 @@ function throwListenerErrors(errors: unknown[]): void {
   throw new AggregateError(errors, "Listener notification failed")
 }
 
+function notifyListener(listener: Listener | undefined, errors?: unknown[]): void {
+  if (!listener) return
+  try {
+    listener()
+  } catch (error) {
+    if (!errors) throw error
+    errors.push(error)
+  }
+}
+
 function notifyListeners(listeners: Set<Listener> | undefined, errors?: unknown[]): void {
   if (!listeners?.size) return
   if (listeners.size === 1) {
-    try {
-      listeners.values().next().value!()
-    } catch (error) {
-      if (!errors) throw error
-      errors.push(error)
-    }
+    notifyListener(listeners.values().next().value, errors)
     return
   }
   const failures = errors ?? []
@@ -447,11 +466,17 @@ class ControllerImpl<T> implements Lite.Controller<T> {
   }
 
   get state(): AtomState {
-    const e = this.resolveEntry()
+    const e = this._entryCache ?? this.resolveEntry()
     return e?.state ?? 'idle'
   }
 
+  get value(): T {
+    return this.get()
+  }
+
   get(): T {
+    const cached = this._entryCache
+    if (!controllerReadHooks.length && cached?.hasValue) return cached.value as T
     for (let i = controllerReadHooks.length - 1; i >= 0; i--) {
       controllerReadHooks[i]!(this)
     }
@@ -484,6 +509,10 @@ class ControllerImpl<T> implements Lite.Controller<T> {
 
   on<Args extends unknown[]>(event: ListenerEvent, listener: (...args: Args) => void, ...params: Args): () => void {
     return this.scope.addListener(this.atom, event, listener, params)
+  }
+
+  _(listener: Listener): () => void {
+    return this.scope.addValueListener(this.atom, listener)
   }
 }
 
@@ -526,19 +555,20 @@ class ResourceControllerImpl<T> implements Lite.ResourceController<T> {
 
 class ScopeImpl implements Lite.Scope {
   private cache = new Map<Lite.Atom<unknown>, AtomEntry<unknown>>()
-  private releasing = new Map<Lite.Atom<unknown>, ReleaseFlight>()
-  private presets = new Map<Lite.Atom<unknown> | Lite.Flow<unknown, unknown, any, unknown> | Lite.Resource<unknown>, unknown>()
-  private stateListeners = new Map<AtomState, Map<Lite.Atom<unknown>, Set<Listener>>>()
-  private invalidationQueue: Lite.Atom<unknown>[] = []
-  private invalidationQueued = new Set<Lite.Atom<unknown>>()
+  private releasing?: Map<Lite.Atom<unknown>, ReleaseFlight>
+  private presets?: Map<Lite.Atom<unknown> | Lite.Flow<unknown, unknown, any, unknown> | Lite.Resource<unknown>, unknown>
+  private stateListeners?: Map<AtomState, Map<Lite.Atom<unknown>, Set<Listener>>>
+  private invalidationQueue?: Lite.Atom<unknown>[]
+  private invalidationQueued?: Set<Lite.Atom<unknown>>
+  private invalidationIndex = 0
   private invalidationChain: Set<Lite.Atom<unknown>> | null = null
   private chainPromise: Promise<void> | null = null
   private chainError: unknown = null
   private initialized = false
   private disposed = false
-  private disposeListeners = new Set<Listener>()
+  private disposeListeners?: Set<Listener>
   private controllers = new Map<Lite.Atom<unknown>, ControllerImpl<unknown>>()
-  private streamHubs = new Map<Lite.Atom<unknown>, StreamHub<unknown>>()
+  private streamHubs?: Map<Lite.Atom<unknown>, StreamHub<unknown>>
   private closeReason: DOMException | undefined
   private gcOptions: Required<Lite.GCOptions>
   readonly extensions: Lite.Extension[]
@@ -558,9 +588,10 @@ class ScopeImpl implements Lite.Scope {
       return
     }
 
-    if (!this.invalidationQueued.has(atom)) {
-      this.invalidationQueued.add(atom)
-      this.invalidationQueue.push(atom)
+    const queued = this.invalidationQueued ??= new Set()
+    if (!queued.has(atom)) {
+      queued.add(atom)
+      ;(this.invalidationQueue ??= []).push(atom)
     }
 
     if (!this.chainPromise) {
@@ -575,26 +606,34 @@ class ScopeImpl implements Lite.Scope {
 
   private async processInvalidationChain(): Promise<void> {
     try {
-      while (this.invalidationQueue.length > 0 && !this.disposed) {
-        const atom = this.invalidationQueue.shift()!
-        this.invalidationQueued.delete(atom)
+      while (this.invalidationQueue && this.invalidationIndex < this.invalidationQueue.length && !this.disposed) {
+        const atom = this.invalidationQueue[this.invalidationIndex++]!
+        this.invalidationQueued!.delete(atom)
         const result = this.doInvalidateSequential(atom)
         if (result) await result
       }
     } finally {
+      this.invalidationQueue = undefined
+      this.invalidationQueued = undefined
+      this.invalidationIndex = 0
       this.invalidationChain = null
       this.chainPromise = null
     }
   }
 
   constructor(options?: Lite.ScopeOptions) {
-    this.extensions = options?.extensions ?? []
-    this.tags = normalizeTags(options?.tags) ?? []
-    this.resolveExts = this.extensions.filter(e => e.wrapResolve)
-    this.execExts = this.extensions.filter(e => e.wrapExec)
+    this.extensions = options?.extensions ?? noExtensions
+    this.tags = normalizeTags(options?.tags) ?? noTags
+    if (this.extensions.length) {
+      this.resolveExts = this.extensions.filter(e => e.wrapResolve)
+      this.execExts = this.extensions.filter(e => e.wrapExec)
+    } else {
+      this.resolveExts = noExtensions
+      this.execExts = noExtensions
+    }
 
     for (const p of options?.presets ?? []) {
-      this.presets.set(p.target, p.value)
+      ;(this.presets ??= new Map()).set(p.target, p.value)
     }
 
     this.gcOptions = {
@@ -602,7 +641,12 @@ class ScopeImpl implements Lite.Scope {
       graceMs: options?.gc?.graceMs ?? 3000,
     }
 
-    this.ready = this.init()
+    if (this.extensions.some(extension => extension.init)) {
+      this.ready = this.init()
+    } else {
+      this.initialized = true
+      this.ready = complete
+    }
   }
 
   private async init(): Promise<void> {
@@ -671,12 +715,31 @@ class ScopeImpl implements Lite.Scope {
     const entry = this.getOrCreateEntry(atom)
     this.cancelGCTimer(entry)
     entry.gcPending = false
-    const listeners = event === 'resolving'
-      ? entry.resolvingListeners
-      : event === 'resolved'
-        ? entry.resolvedListeners
-        : entry.allListeners
     const registered = bindListener(listener, params)
+    if (event === 'resolved') {
+      if (!entry.resolvedListener && !entry.resolvedListeners) {
+        entry.resolvedListener = registered
+      } else {
+        const listeners = entry.resolvedListeners ??= new Set(entry.resolvedListener ? [entry.resolvedListener] : undefined)
+        entry.resolvedListener = undefined
+        listeners.add(registered)
+      }
+      return () => {
+        if (entry.resolvedListener === registered) entry.resolvedListener = undefined
+        else {
+          const listeners = entry.resolvedListeners
+          listeners?.delete(registered)
+          if (listeners?.size === 1) {
+            entry.resolvedListener = listeners.values().next().value
+            entry.resolvedListeners = undefined
+          }
+        }
+        this.maybeScheduleGCEntry(atom, entry as AtomEntry<unknown>)
+      }
+    }
+    const listeners = event === 'resolving'
+      ? entry.resolvingListeners ??= new Set()
+      : entry.allListeners ??= new Set()
     listeners.add(registered)
     return () => {
       listeners.delete(registered)
@@ -684,8 +747,24 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
+  addValueListener<T>(atom: Lite.Atom<T>, listener: Listener): () => void {
+    const entry = this.getOrCreateEntry(atom)
+    this.cancelGCTimer(entry)
+    entry.gcPending = false
+    const listeners = entry.valueListeners ??= new Set()
+    if (!listeners.size) {
+      entry.valueReady = entry.hasValue
+      if (entry.hasValue) entry.notifiedValue = entry.value
+    }
+    listeners.add(listener)
+    return () => {
+      listeners.delete(listener)
+      this.maybeScheduleGCEntry(atom, entry as AtomEntry<unknown>)
+    }
+  }
+
   private hasSubscribers(entry: AtomEntry<unknown>): boolean {
-    return entry.resolvingListeners.size > 0 || entry.resolvedListeners.size > 0 || entry.allListeners.size > 0
+    return !!(entry.resolvingListeners?.size || entry.resolvedListener || entry.resolvedListeners?.size || entry.allListeners?.size || entry.valueListeners?.size)
   }
 
   private canQueueGC<T>(atom: Lite.Atom<T>, entry: AtomEntry<unknown>): boolean {
@@ -693,7 +772,7 @@ class ScopeImpl implements Lite.Scope {
       && !atom.keepAlive
       && entry.state !== 'idle'
       && !this.hasSubscribers(entry)
-      && entry.dependents.size === 0
+      && !entry.dependents?.size
       && !entry.gcScheduled
       && !entry.gcQueued
   }
@@ -702,7 +781,7 @@ class ScopeImpl implements Lite.Scope {
     return !this.disposed
       && this.cache.get(atom) === entry
       && !this.hasSubscribers(entry)
-      && entry.dependents.size === 0
+      && !entry.dependents?.size
       && !entry.gcScheduled
   }
 
@@ -719,12 +798,13 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private canExecuteGC(entry: AtomEntry<unknown>): boolean {
-    return !this.hasSubscribers(entry) && entry.dependents.size === 0
+    return !this.hasSubscribers(entry) && !entry.dependents?.size
   }
 
   private trackDependent<T>(atom: Lite.Atom<T>, dependentAtom?: Lite.Atom<unknown>): void {
     if (!dependentAtom) return
-    this.getEntry(atom)?.dependents.add(dependentAtom)
+    const entry = this.getEntry(atom)
+    if (entry) (entry.dependents ??= new Set()).add(dependentAtom)
   }
 
   private maybeScheduleGCEntry<T>(atom: Lite.Atom<T>, entry?: AtomEntry<unknown>): void {
@@ -757,28 +837,54 @@ class ScopeImpl implements Lite.Scope {
         const dep = atom.deps[key]!
         const depAtom = isControllerDep(dep) && isAtomControllerDep(dep) ? dep.atom : dep
         if (!isAtom(depAtom)) continue
-        this.cache.get(depAtom)?.dependents.delete(atom)
+        this.cache.get(depAtom)?.dependents?.delete(atom)
         this.maybeScheduleGCEntry(depAtom)
       }
     }
   }
 
   private notifyEntry(entry: AtomEntry<unknown>, event: 'resolving' | 'resolved', errors?: unknown[]): void {
+    const listeners = event === 'resolving' ? entry.resolvingListeners : entry.resolvedListeners
+    if (!errors && !entry.watchers?.size && !entry.valueListeners?.size && !entry.allListeners?.size) {
+      if (event === 'resolved') entry.resolvedListener?.()
+      notifyListeners(listeners)
+      return
+    }
     const failures = errors ?? []
-    notifyListeners(event === 'resolving' ? entry.resolvingListeners : entry.resolvedListeners, failures)
+    if (event === 'resolved' && entry.watchers?.size) {
+      for (const edge of entry.watchers) {
+        try {
+          const previous = edge.previous
+          edge.previous = entry.value
+          if (!edge.eq(previous, entry.value)) this.scheduleInvalidation(edge.target)
+        } catch (error) {
+          failures.push(error)
+        }
+      }
+    }
+    if (event === 'resolved' && entry.valueListeners?.size) {
+      if (!entry.valueReady || !Object.is(entry.notifiedValue, entry.value)) {
+        entry.valueReady = true
+        entry.notifiedValue = entry.value
+        notifyListeners(entry.valueListeners, failures)
+      }
+    }
+    if (event === 'resolved') notifyListener(entry.resolvedListener, failures)
+    notifyListeners(listeners, failures)
     notifyListeners(entry.allListeners, failures)
     if (!errors) throwListenerErrors(failures)
   }
 
   private notifyEntryAll(entry: AtomEntry<unknown>, errors?: unknown[]): void {
     const failures = errors ?? []
+    entry.valueReady = false
+    notifyListeners(entry.valueListeners, failures)
     notifyListeners(entry.allListeners, failures)
     if (!errors) throwListenerErrors(failures)
   }
 
   private emitStateChange(state: AtomState, atom: Lite.Atom<unknown>, errors?: unknown[]): void {
-    if (this.stateListeners.size === 0) return
-    const stateMap = this.stateListeners.get(state)
+    const stateMap = this.stateListeners?.get(state)
     if (!stateMap) return
     notifyListeners(stateMap.get(atom), errors)
   }
@@ -789,10 +895,11 @@ class ScopeImpl implements Lite.Scope {
     listener: (...args: Args) => void,
     ...params: Args
   ): () => void {
-    let stateMap = this.stateListeners.get(event)
+    const stateListeners = this.stateListeners ??= new Map()
+    let stateMap = stateListeners.get(event)
     if (!stateMap) {
       stateMap = new Map()
-      this.stateListeners.set(event, stateMap)
+      stateListeners.set(event, stateMap)
     }
     let listeners = stateMap.get(atom)
     if (!listeners) {
@@ -810,7 +917,7 @@ class ScopeImpl implements Lite.Scope {
       if (capturedListeners.size === 0) {
         capturedStateMap.delete(atom)
         if (capturedStateMap.size === 0) {
-          this.stateListeners.delete(event)
+          stateListeners.delete(event)
         }
       }
     }
@@ -818,28 +925,40 @@ class ScopeImpl implements Lite.Scope {
 
   private onDispose<Args extends unknown[]>(listener: (...args: Args) => void, ...params: Args): () => void {
     const registered = bindListener(listener, params)
-    this.disposeListeners.add(registered)
+    const listeners = this.disposeListeners ??= new Set()
+    listeners.add(registered)
     return () => {
-      this.disposeListeners.delete(registered)
+      listeners.delete(registered)
     }
   }
 
   private emitDispose(): void {
+    if (!this.disposeListeners) return
     const listeners = [...this.disposeListeners]
-    this.disposeListeners.clear()
+    this.disposeListeners = undefined
     for (let i = 0; i < listeners.length; i++) listeners[i]!()
   }
 
   private tryResolveSyncDeps(
     graph: DepsGraph,
-    dependentAtom?: Lite.Atom<unknown>
+    dependentAtom: Lite.Atom<unknown> | undefined,
+    path: Set<Lite.Atom<unknown>>,
   ): Record<string, unknown> | null {
     const result: Record<string, unknown> = {}
 
     for (let i = 0; i < graph.atoms.length; i++) {
       const [key, dep] = graph.atoms[i]!
-      const cachedEntry = this.cache.get(dep)
-      if (cachedEntry?.state !== 'resolved') return null
+      let cachedEntry = this.cache.get(dep)
+      if (cachedEntry?.state !== 'resolved') {
+        if (isAsyncFactory(dep.factory)) return null
+        const pending = this.tryResolveCurrentTick(dep, path)
+        if (!pending) return null
+        cachedEntry = this.cache.get(dep)
+        if (cachedEntry?.state !== 'resolved') {
+          void pending.catch(() => undefined)
+          return null
+        }
+      }
       result[key] = cachedEntry.value
       this.trackDependent(dep, dependentAtom)
     }
@@ -853,13 +972,22 @@ class ScopeImpl implements Lite.Scope {
       }
       const ctrl = this.controller(dep.atom)
       if (dep.resolve) {
-        const cachedCtrlEntry = this.cache.get(dep.atom)
-        if (cachedCtrlEntry?.state !== 'resolved') return null
+        let cachedCtrlEntry = this.cache.get(dep.atom)
+        if (cachedCtrlEntry?.state !== 'resolved') {
+          if (isAsyncFactory(dep.atom.factory)) return null
+          const pending = this.tryResolveCurrentTick(dep.atom, path)
+          if (!pending) return null
+          cachedCtrlEntry = this.cache.get(dep.atom)
+          if (cachedCtrlEntry?.state !== 'resolved') {
+            void pending.catch(() => undefined)
+            return null
+          }
+        }
         result[key] = ctrl
         this.trackDependent(dep.atom, dependentAtom)
         if (dep.watch) {
           if (!dependentAtom) return null
-          this.wireWatch(dep, ctrl, dependentAtom)
+          this.wireWatch(dep, dependentAtom)
         }
       } else {
         result[key] = ctrl
@@ -901,17 +1029,25 @@ class ScopeImpl implements Lite.Scope {
     return result
   }
 
-  private tryResolveCurrentTick<T>(atom: Lite.Atom<T>): Promise<T> | null {
+  private tryResolveCurrentTick<T>(atom: Lite.Atom<T>, path?: Set<Lite.Atom<unknown>>): Promise<T> | null {
     if (this.hasResolvePipeline()) return null
+    if (this.presets?.has(atom) || this.releasing?.has(atom)) return null
 
     const entry = this.getOrCreateEntry(atom)
     if (entry.state !== 'idle') return null
 
     let resolvedDeps: Record<string, unknown> | null = null
     if (atom.deps) {
+      const active = path ?? new Set()
+      if (active.has(atom)) return null
+      active.add(atom)
       const graph = classifyDeps(atom.deps)
-      if (!graph.syncable) return null
-      resolvedDeps = this.tryResolveSyncDeps(graph, atom)
+      if (!graph.syncable) {
+        active.delete(atom)
+        return null
+      }
+      resolvedDeps = this.tryResolveSyncDeps(graph, atom, active)
+      active.delete(atom)
       if (!resolvedDeps) return null
     }
 
@@ -949,7 +1085,12 @@ class ScopeImpl implements Lite.Scope {
       this.notifyEntryAll(entry as AtomEntry<unknown>, listenerErrors)
       this.handlePostResolveError(atom, entry)
       this.finishGeneration(atom, entry, generation)
-      return Promise.reject(entry.error)
+      const failure = Promise.reject<T>(entry.error)
+      generation.pending = failure
+      void failure.catch(() => {
+        if (generation.pending === failure) generation.pending = undefined
+      })
+      return failure
     }
 
     if (value != null && typeof (value as any).then === 'function') {
@@ -1039,7 +1180,7 @@ class ScopeImpl implements Lite.Scope {
   resolve<T>(atom: Lite.Atom<T>): Promise<T> {
     if (this.disposed) return Promise.reject(new Error("Scope is disposed"))
 
-    const flight = this.releasing.get(atom)
+    const flight = this.releasing?.get(atom)
     if (flight) return flight.promise.then(() => this.resolve(atom))
 
     if (!this.initialized) {
@@ -1061,7 +1202,7 @@ class ScopeImpl implements Lite.Scope {
       return Promise.reject(new Error("Circular dependency detected"))
     }
 
-    if (this.presets.has(atom)) {
+    if (this.presets?.has(atom)) {
       const presetValue = this.presets.get(atom)
       if (isAtom(presetValue)) {
         return this.resolve(presetValue as Lite.Atom<T>)
@@ -1075,6 +1216,8 @@ class ScopeImpl implements Lite.Scope {
       this.notifyEntry(newEntry as AtomEntry<unknown>, 'resolved')
       return Promise.resolve(newEntry.value)
     }
+
+    if (isAsyncFactory(atom.factory)) return this.resolveAndTrack(atom)
 
     const syncResult = this.tryResolveCurrentTick(atom)
     if (syncResult) return syncResult
@@ -1267,7 +1410,7 @@ class ScopeImpl implements Lite.Scope {
           result[key] = ctrl
           this.trackDependent(dep.atom, dependentAtom)
           if (dep.watch) {
-            this.wireWatch(dep, ctrl, dependentAtom!)
+            this.wireWatch(dep, dependentAtom!)
           }
         } else {
           parallel.push(
@@ -1275,7 +1418,7 @@ class ScopeImpl implements Lite.Scope {
               result[key] = ctrl
               this.trackDependent(dep.atom, dependentAtom)
               if (dep.watch) {
-                this.wireWatch(dep, ctrl, dependentAtom!)
+                this.wireWatch(dep, dependentAtom!)
               }
             })
           )
@@ -1570,18 +1713,17 @@ class ScopeImpl implements Lite.Scope {
     } as Lite.ExecFlowOptions<Output, Input>)
   }
 
-  private wireWatch(dep: Lite.AtomControllerDep<unknown>, ctrl: Lite.Controller<unknown>, dependentAtom: Lite.Atom<unknown>): void {
-    const eq = dep.eq ?? shallowEqual
-    let prev = ctrl.get() as unknown
-    const unsub = this.on("resolved", dep.atom, () => {
-      const next = ctrl.get() as unknown
-      if (!eq(prev, next)) {
-        this.scheduleInvalidation(dependentAtom)
-      }
-      prev = next
-    })
+  private wireWatch(dep: Lite.AtomControllerDep<unknown>, dependentAtom: Lite.Atom<unknown>): void {
+    const entry = this.getEntry(dep.atom)!
+    const edge: WatchEdge = {
+      target: dependentAtom,
+      previous: entry.value,
+      eq: dep.eq ?? shallowEqual,
+    }
+    const watchers = entry.watchers ??= new Set()
+    watchers.add(edge)
     const generation = this.getEntry(dependentAtom)?.generation
-    if (generation) (generation.cleanups ??= []).push({ fn: unsub, params: [] })
+    if (generation) (generation.cleanups ??= []).push({ fn: () => { watchers.delete(edge) }, params: [] })
   }
 
   private wireResourceWatch(
@@ -1691,7 +1833,7 @@ class ScopeImpl implements Lite.Scope {
   private atomChanges<T>(atom: Lite.Atom<T>): Latest<T>
   private atomChanges<T>(atom: Lite.Atom<T>, options: Lite.ChangesOptions): Latest<Lite.AtomChange<T>>
   private atomChanges<T>(atom: Lite.Atom<T>, options?: Lite.ChangesOptions): Latest<T | Lite.AtomChange<T>> {
-    const presetValue = this.presets.get(atom)
+    const presetValue = this.presets?.get(atom)
     if (isAtom(presetValue)) {
       return options ? this.atomChanges(presetValue as Lite.Atom<T>, options) : this.atomChanges(presetValue as Lite.Atom<T>)
     }
@@ -1742,7 +1884,7 @@ class ScopeImpl implements Lite.Scope {
 
   resolveStream<T>(atom: Lite.Atom<StreamSource<T>>): AsyncIterable<T> {
     if (this.disposed) throw new Error("Scope is disposed")
-    const presetValue = this.presets.get(atom as Lite.Atom<unknown>)
+    const presetValue = this.presets?.get(atom as Lite.Atom<unknown>)
     if (isAtom(presetValue)) return this.resolveStream(presetValue as Lite.Atom<StreamSource<T>>)
     const hub = this.getStreamHub(atom)
     const stream = latest<T>()
@@ -1769,7 +1911,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private getStreamHub<T>(atom: Lite.Atom<StreamSource<T>>): StreamHub<T> {
-    const cached = this.streamHubs.get(atom as Lite.Atom<unknown>) as StreamHub<T> | undefined
+    const cached = this.streamHubs?.get(atom as Lite.Atom<unknown>) as StreamHub<T> | undefined
     if (cached) return cached
     const hub: StreamHub<T> = {
       atom,
@@ -1787,7 +1929,7 @@ class ScopeImpl implements Lite.Scope {
         if (entry?.state === "failed" && entry.error) this.finishStreamHub(hub, true, entry.error)
       }),
     ]
-    this.streamHubs.set(atom as Lite.Atom<unknown>, hub as StreamHub<unknown>)
+    ;(this.streamHubs ??= new Map()).set(atom as Lite.Atom<unknown>, hub as StreamHub<unknown>)
     return hub
   }
 
@@ -1855,12 +1997,12 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private stopStreamHubForAtom(atom: Lite.Atom<unknown>): Promise<void> {
-    const hub = this.streamHubs.get(atom)
+    const hub = this.streamHubs?.get(atom)
     return hub ? this.stopStreamHub(hub) : Promise.resolve()
   }
 
   private releaseStreamHub(atom: Lite.Atom<unknown>): Promise<void> {
-    const hub = this.streamHubs.get(atom)
+    const hub = this.streamHubs?.get(atom)
     return hub ? this.releaseStreamHubInstance(hub) : Promise.resolve()
   }
 
@@ -1870,6 +2012,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private async releaseStreamHubs(): Promise<void> {
+    if (!this.streamHubs) return
     for (const hub of [...this.streamHubs.values()]) {
       await this.releaseStreamHubInstance(hub)
     }
@@ -1880,7 +2023,7 @@ class ScopeImpl implements Lite.Scope {
     hub.version++
     hub.iterator = undefined
     hub.source = undefined
-    this.streamHubs.delete(hub.atom as Lite.Atom<unknown>)
+    this.streamHubs?.delete(hub.atom as Lite.Atom<unknown>)
     this.cleanupStreamHub(hub)
     const views = [...hub.views]
     hub.views.clear()
@@ -1896,7 +2039,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   getFlowPreset<O, I, Y>(flow: Lite.Flow<O, I, any, Y>): Lite.PresetValue<O, I, Y> | undefined {
-    return this.presets.get(flow as Lite.Flow<unknown, unknown, any, unknown>) as Lite.PresetValue<O, I, Y> | undefined
+    return this.presets?.get(flow as Lite.Flow<unknown, unknown, any, unknown>) as Lite.PresetValue<O, I, Y> | undefined
   }
 
   resolveResource<T>(
@@ -1977,7 +2120,7 @@ class ScopeImpl implements Lite.Scope {
     entry: ResourceEntry<T>,
     resourcePath: Set<Lite.Resource<unknown>>,
   ): Promise<T> {
-    if (this.presets.has(resource)) {
+    if (this.presets?.has(resource)) {
       const presetValue = this.presets.get(resource)
       if (isResource(presetValue)) {
         return this.resolveResource(presetValue as Lite.Resource<T>, receiverCtx, resourcePath)
@@ -2054,7 +2197,12 @@ class ScopeImpl implements Lite.Scope {
     entry.error = undefined
     entry.pendingInvalidate = false
     entry.resolvedPromise = undefined
-    if (this.stateListeners.size) this.emitStateChange('resolved', atom)
+    if (!this.stateListeners && !entry.watchers?.size && !entry.allListeners?.size && !entry.valueListeners?.size) {
+      entry.resolvedListener?.()
+      notifyListeners(entry.resolvedListeners)
+      return
+    }
+    if (this.stateListeners) this.emitStateChange('resolved', atom)
     this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
   }
 
@@ -2084,7 +2232,12 @@ class ScopeImpl implements Lite.Scope {
     entry.error = undefined
     entry.pendingInvalidate = false
     entry.resolvedPromise = undefined
-    if (this.stateListeners.size) this.emitStateChange('resolved', atom)
+    if (!this.stateListeners && !entry.watchers?.size && !entry.allListeners?.size && !entry.valueListeners?.size) {
+      entry.resolvedListener?.()
+      notifyListeners(entry.resolvedListeners)
+      return
+    }
+    if (this.stateListeners) this.emitStateChange('resolved', atom)
     this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
   }
 
@@ -2106,7 +2259,8 @@ class ScopeImpl implements Lite.Scope {
       entry.error = undefined
       entry.pendingInvalidate = false
       entry.resolvedPromise = undefined
-      if (this.stateListeners.size) this.emitStateChange('resolved', atom)
+      if (!this.stateListeners && !entry.watchers?.size && !entry.resolvedListener && !entry.resolvedListeners?.size && !entry.allListeners?.size && !entry.valueListeners?.size) return
+      if (this.stateListeners) this.emitStateChange('resolved', atom)
       this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
       return
     }
@@ -2125,7 +2279,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private async doInvalidateAsync<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, previousValue: T | undefined): Promise<void> {
-    if (this.streamHubs.has(atom as Lite.Atom<unknown>)) await this.stopStreamHubForAtom(atom as Lite.Atom<unknown>)
+    if (this.streamHubs?.has(atom as Lite.Atom<unknown>)) await this.stopStreamHubForAtom(atom as Lite.Atom<unknown>)
 
     const { generation, cleanups } = this.replaceGeneration(entry)
     if (cleanups?.length) await runCleanupsSafe(cleanups)
@@ -2152,7 +2306,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private releaseGeneration<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, generation: AtomGeneration<T>): Promise<void> {
-    const flight = this.releasing.get(atom)
+    const flight = this.releasing?.get(atom)
     if (flight?.entry === entry && flight.generation === generation) return Promise.resolve()
     if (this.cache.get(atom) !== entry || entry.generation !== generation) return Promise.resolve()
     if (generation.resolving) {
@@ -2163,7 +2317,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   release<T>(atom: Lite.Atom<T>): Promise<void> {
-    const active = this.releasing.get(atom)
+    const active = this.releasing?.get(atom)
     if (active) return active.promise
 
     const entry = this.cache.get(atom) as AtomEntry<T> | undefined
@@ -2172,16 +2326,20 @@ class ScopeImpl implements Lite.Scope {
     this.cache.delete(atom)
 
     const releasePromise = Promise.resolve().then(() => this.releaseEntry(atom, entry, generation))
-    this.releasing.set(atom, { entry, generation, promise: releasePromise })
+    const releasing = this.releasing ??= new Map()
+    releasing.set(atom, { entry, generation, promise: releasePromise })
     const finishRelease = () => {
-      if (this.releasing.get(atom)?.promise === releasePromise) this.releasing.delete(atom)
+      if (releasing.get(atom)?.promise === releasePromise) {
+        releasing.delete(atom)
+        if (!releasing.size && this.releasing === releasing) this.releasing = undefined
+      }
     }
     void releasePromise.then(finishRelease, finishRelease)
     return releasePromise
   }
 
   private async releaseEntry<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, generation: AtomGeneration<T>): Promise<void> {
-    if (this.streamHubs.has(atom as Lite.Atom<unknown>)) await this.releaseStreamHub(atom as Lite.Atom<unknown>)
+    if (this.streamHubs?.has(atom as Lite.Atom<unknown>)) await this.releaseStreamHub(atom as Lite.Atom<unknown>)
 
     this.cancelGCTimer(entry)
 
@@ -2198,7 +2356,7 @@ class ScopeImpl implements Lite.Scope {
         const dep = atom.deps[key]!
         const depAtom = isControllerDep(dep) && isAtomControllerDep(dep) ? dep.atom : dep
         if (!isAtom(depAtom)) continue
-        this.cache.get(depAtom)?.dependents.delete(atom)
+        this.cache.get(depAtom)?.dependents?.delete(atom)
         this.maybeScheduleGCEntry(depAtom)
       }
     }
@@ -2211,7 +2369,7 @@ class ScopeImpl implements Lite.Scope {
 
     this.controllers.delete(atom)
 
-    for (const [state, stateMap] of this.stateListeners) {
+    if (this.stateListeners) for (const [state, stateMap] of this.stateListeners) {
       stateMap.delete(atom)
       if (stateMap.size === 0) this.stateListeners.delete(state)
     }
@@ -2224,11 +2382,12 @@ class ScopeImpl implements Lite.Scope {
     }
 
     this.disposed = true
-    if (this.streamHubs.size > 0) await this.releaseStreamHubs()
+    if (this.streamHubs?.size) await this.releaseStreamHubs()
     this.emitDispose()
 
-    this.invalidationQueue.length = 0
-    this.invalidationQueued.clear()
+    this.invalidationQueue = undefined
+    this.invalidationQueued = undefined
+    this.invalidationIndex = 0
     this.invalidationChain = null
     this.chainPromise = null
 
@@ -2246,7 +2405,7 @@ class ScopeImpl implements Lite.Scope {
     for (const atom of atoms) {
       await this.release(atom as Lite.Atom<unknown>)
     }
-    await Promise.all([...this.releasing.values()].map(({ promise }) => promise))
+    if (this.releasing) await Promise.all([...this.releasing.values()].map(({ promise }) => promise))
   }
 
   async flush(): Promise<void> {

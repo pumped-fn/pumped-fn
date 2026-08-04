@@ -1,4 +1,5 @@
-import { bench, describe } from "vitest"
+import { describe } from "vitest"
+import { bench } from "../quick"
 import { noop, resolvedController } from "./graphs"
 
 const { scope, atom: objAtom, ctrl } = await resolvedController(() => ({ hot: 0, cold: 0 }))

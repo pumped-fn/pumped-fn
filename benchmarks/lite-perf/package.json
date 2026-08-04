@@ -12,6 +12,7 @@
     "perf:capture:all": "node scripts/capture-all.mjs",
     "perf:record": "node scripts/record.mjs",
     "perf:compare": "node scripts/compare.mjs",
+    "perf:quick": "node scripts/quick.mjs",
     "perf:test": "node scripts/harness.test.mjs",
     "test": "vitest run tests"
   },

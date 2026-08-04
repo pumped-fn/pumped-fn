@@ -1,4 +1,5 @@
-import { bench, describe } from "vitest"
+import { describe } from "vitest"
+import { bench } from "../quick"
 import { atom, createScope } from "@pumped-fn/lite"
 import { asyncChain, consume, syncChain, wide } from "./graphs"
 
@@ -17,7 +18,9 @@ const diamondTip = atom({
 
 describe("creation", () => {
   bench("atom() no deps", () => {
-    consume(atom({ factory: () => 1 }))
+    let created = atom({ factory: () => 1 })
+    for (let index = 1; index < 256; index++) created = atom({ factory: () => 1 })
+    consume(created)
   })
 
   bench("createScope()", () => {

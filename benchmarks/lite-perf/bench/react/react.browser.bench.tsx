@@ -1,4 +1,5 @@
-import { bench, describe } from "vitest"
+import { describe } from "vitest"
+import { bench } from "../quick"
 import * as React from "react"
 import { act } from "react"
 import { createRoot } from "react-dom/client"
@@ -78,58 +79,79 @@ let fanHot = 0
 let selHot = 0
 let selCold = 0
 let inlineHot = 0
+const batch = 4
+const renderBatch = 2
+const parentBatch = 8
+const mountBatch = 4
+const atomMountBatch = 4
 
 describe("update propagation (act + set + flush)", () => {
   bench("100 useAtom consumers re-render", async () => {
-    await act(async () => {
-      fanCtrl.set({ hot: ++fanHot, cold: 0 })
-      await scope.flush()
-    })
+    for (let index = 0; index < renderBatch; index++) {
+      await act(async () => {
+        fanCtrl.set({ hot: ++fanHot, cold: 0 })
+        await scope.flush()
+      })
+    }
   })
 
   bench("100 useAtom consumers, identical value set (no re-render)", async () => {
-    await act(async () => {
-      fanCtrl.set(fanCtrl.get())
-      await scope.flush()
-    })
+    for (let index = 0; index < batch; index++) {
+      await act(async () => {
+        fanCtrl.set(fanCtrl.get())
+        await scope.flush()
+      })
+    }
   })
 
   bench("100 useSelect consumers, selector hits (re-render)", async () => {
-    await act(async () => {
-      selCtrl.set({ hot: ++selHot, cold: selCold })
-      await scope.flush()
-    })
+    for (let index = 0; index < renderBatch; index++) {
+      await act(async () => {
+        selCtrl.set({ hot: ++selHot, cold: selCold })
+        await scope.flush()
+      })
+    }
   })
 
   bench("100 useSelect consumers, selector misses (no re-render)", async () => {
-    await act(async () => {
-      selCtrl.set({ hot: selHot, cold: ++selCold })
-      await scope.flush()
-    })
+    for (let index = 0; index < batch; index++) {
+      await act(async () => {
+        selCtrl.set({ hot: selHot, cold: ++selCold })
+        await scope.flush()
+      })
+    }
   })
 
   bench("100 useSelect consumers, inline selector, hits", async () => {
-    await act(async () => {
-      inlineCtrl.set({ hot: ++inlineHot, cold: 0 })
-      await scope.flush()
-    })
+    for (let index = 0; index < renderBatch; index++) {
+      await act(async () => {
+        inlineCtrl.set({ hot: ++inlineHot, cold: 0 })
+        await scope.flush()
+      })
+    }
   })
 
   bench("parent re-render, 100 useAtom children, value unchanged", () => {
-    act(() => forceParent())
+    for (let index = 0; index < parentBatch; index++) {
+      act(() => forceParent())
+    }
   })
 })
 
 describe("mount/unmount", () => {
   bench("mount + unmount 100 useAtom consumers", () => {
-    const root = createRoot(document.createElement("div"))
-    act(() => root.render(wrap(<Many n={100} C={AtomReader} />)))
-    act(() => root.unmount())
+    for (let index = 0; index < atomMountBatch; index++) {
+      const root = createRoot(document.createElement("div"))
+      act(() => root.render(wrap(<Many n={100} C={AtomReader} />)))
+      act(() => root.unmount())
+    }
   })
 
   bench("mount + unmount 100 useSelect consumers", () => {
-    const root = createRoot(document.createElement("div"))
-    act(() => root.render(wrap(<Many n={100} C={SelectReader} />)))
-    act(() => root.unmount())
+    for (let index = 0; index < mountBatch; index++) {
+      const root = createRoot(document.createElement("div"))
+      act(() => root.render(wrap(<Many n={100} C={SelectReader} />)))
+      act(() => root.unmount())
+    }
   })
 })

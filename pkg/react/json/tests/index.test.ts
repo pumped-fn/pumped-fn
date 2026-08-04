@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createScope, flow, tag, typed } from '@pumped-fn/lite'
 import { scopedValue } from '@pumped-fn/lite-react'
-import type { StateStore } from '@json-render/core'
+import type { StateModel, StateStore } from '@json-render/core'
 import { flowAction, flowHandlers, scopedValueStateStore } from '../src'
 
 interface FormState {
@@ -100,8 +100,8 @@ describe('scopedValueStateStore', () => {
     const access = await app.resolve(ctx)
     const store = scopedValueStateStore({
       value: access,
-      selector: (state) => state.ui,
-      updater: (next, value) => value.set({ ...value.getSnapshot(), ui: next as AppState['ui'] }),
+      selector: (state: AppState): StateModel => state.ui,
+      updater: (next: StateModel, value: typeof access) => value.set({ ...value.getSnapshot(), ui: next as AppState['ui'] }),
     })
 
     expect(store.get('/count')).toBe(1)
@@ -127,11 +127,11 @@ describe('flowHandlers', () => {
       name: 'submit-json-render-order',
       parse(raw) {
         const params = raw as { item: unknown; quantity: unknown }
-        if (typeof params.item !== 'string') throw new Error('missing item')
-        if (typeof params.quantity !== 'number') throw new Error('missing quantity')
+        if (typeof params['item'] !== 'string') throw new Error('missing item')
+        if (typeof params['quantity'] !== 'number') throw new Error('missing quantity')
         return {
-          item: params.item,
-          quantity: params.quantity,
+          item: params['item'],
+          quantity: params['quantity'],
         }
       },
       factory: (ctx) => `${ctx.input.quantity}x ${ctx.input.item}`,
@@ -140,8 +140,8 @@ describe('flowHandlers', () => {
     const ctx = scope.createContext()
     const handlers = flowHandlers({ ctx, actions: { submit } })
 
-    await expect(handlers.submit({ item: 'Coffee', quantity: 2 })).resolves.toBe('2x Coffee')
-    await expect(handlers.submit({ item: 'Coffee', quantity: '2' })).rejects.toThrow(
+    await expect(handlers['submit']({ item: 'Coffee', quantity: 2 })).resolves.toBe('2x Coffee')
+    await expect(handlers['submit']({ item: 'Coffee', quantity: '2' })).rejects.toThrow(
       'Failed to parse flow input "submit-json-render-order"'
     )
 
@@ -166,14 +166,14 @@ describe('flowHandlers', () => {
       actions: {
         record: flowAction({
           flow: record,
-          input: (params) => ({ quantity: Number(params.quantity) }),
+          input: (params) => ({ quantity: Number(params['quantity']) }),
           name: 'json-render.record',
           tags: actionSource('json-render'),
         }),
       },
     })
 
-    await expect(handlers.record({ quantity: '5' })).resolves.toEqual({
+    await expect(handlers['record']({ quantity: '5' })).resolves.toEqual({
       input: {
         quantity: 5,
       },
@@ -189,7 +189,7 @@ describe('flowHandlers', () => {
     const fail = flow({
       name: 'fail-json-render-action',
       parse: typed<{ message: string }>(),
-      factory: (ctx) => {
+      factory: (ctx): string => {
         throw new Error(ctx.input.message)
       },
     })
@@ -197,7 +197,7 @@ describe('flowHandlers', () => {
     const ctx = scope.createContext()
     const handlers = flowHandlers({ ctx, actions: { fail } })
 
-    await expect(handlers.fail({ message: 'rejected by Lite' })).rejects.toThrow('rejected by Lite')
+    await expect(handlers['fail']({ message: 'rejected by Lite' })).rejects.toThrow('rejected by Lite')
 
     await ctx.close()
     await scope.dispose()

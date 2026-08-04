@@ -18,7 +18,10 @@ if (args["input-dir"] && args.input.length > 0)
 if (args.pairs !== undefined && !args["input-dir"])
   throw new Error("--pairs requires --input-dir");
 const pairCount = Number(args.pairs ?? 5);
-if (![5, 9].includes(pairCount)) throw new Error("pairs must be 5 or 9");
+if (![1, 5, 9].includes(pairCount)) throw new Error("pairs must be 1, 5, or 9");
+const noRegressionFloor = Number(args.floor ?? 0.95);
+if (!Number.isFinite(noRegressionFloor) || noRegressionFloor <= 0)
+  throw new Error("floor must be finite and positive");
 const lanes =
   args.mode === "full"
     ? ["lite", "lite-react"]
@@ -43,7 +46,8 @@ const inputPaths = args["input-dir"]
 const comparison = compareObservations(
   inputPaths.map(readJson),
   args.mode,
-  loadManifest()
+  loadManifest(),
+  noRegressionFloor
 );
 const output = resolve(args.output);
 const value = { ...comparison, comparison_sha256: hashObject(comparison) };
@@ -56,7 +60,10 @@ process.stdout.write(
     decision: value.decision,
     pair_count: value.pair_count,
     required_directional_agreement: value.required_directional_agreement,
+    no_regression_floor: value.no_regression_floor,
     rows: value.row_count,
+    candidate_affected_rows: value.candidate_affected_row_count,
+    calibration_gaps: value.calibration_evidence_gap_count,
     regressions: value.performance_regression_case_count,
     evidence_gaps: value.performance_evidence_gap_count,
     representative_lane_ratio: value.representative_lane_ratio,

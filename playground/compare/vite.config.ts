@@ -39,7 +39,7 @@ function collectPackage(files: Record<string, string>, name: string, packageDir:
 
 function buildEditorTypesPayload(): string {
   const libs: Record<string, string> = {}
-  const typescriptLib = dirname(resolvePackageDir("typescript", compareDir)) + "/typescript/lib"
+  const typescriptLib = dirname(resolvePackageDir("typescript-api", compareDir)) + "/typescript/lib"
   for (const entry of readdirSync(typescriptLib)) {
     if (entry.startsWith("lib.") && entry.endsWith(".d.ts") && !excludedLibs.test(entry)) {
       libs[`/${entry}`] = readFileSync(join(typescriptLib, entry), "utf8")
@@ -83,6 +83,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@pumped-fn/lite": join(liteDir, "src/index.ts"),
+      typescript: join(compareDir, "src/editor/typescript-compat.ts"),
     },
   },
   server: {

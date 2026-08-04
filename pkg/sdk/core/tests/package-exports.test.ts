@@ -140,7 +140,7 @@ it("rejects canonical subpath-only types from the packed root declaration", asyn
     ].join("\n"))
     await expect(exec("pnpm", ["exec", "tsc", "--project", join(fixture, "tsconfig.json")], {
       cwd: packageRoot,
-    })).rejects.toMatchObject({ code: 2 })
+    })).rejects.toMatchObject({ code: 1 })
   }
 }, 30_000)
 

@@ -5,7 +5,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "node ../../pkg/tool/lint/dist/cli.mjs src tests bin",
     "start": "node --import tsx bin/daemon.ts",
     "server": "node --import tsx bin/server.ts",
@@ -31,7 +31,6 @@
     "@pumped-fn/sdk-test": "workspace:*",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
-    "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

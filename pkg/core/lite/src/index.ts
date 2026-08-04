@@ -21,4 +21,7 @@ export { resource, isResource } from "./resource"
 export { createScope, isStreamingExec, setControllerReadHook, shallowEqual } from "./scope"
 export { registerInTracker, startArrayTracking, stopArrayTracking, startTracking, stopTracking } from "./tracker"
 
-export const VERSION = "0.0.1"
+declare const __PUMPED_LITE_VERSION__: string
+
+/** Current package version. */
+export const VERSION: string = typeof __PUMPED_LITE_VERSION__ === "string" ? __PUMPED_LITE_VERSION__ : "0.0.0-source"

@@ -4,10 +4,10 @@ import { fileURLToPath } from "node:url"
 import { playwright } from "@vitest/browser-playwright"
 import { configDefaults, defineConfig } from "vitest/config"
 
-const liteDist = fileURLToPath(
+const liteDist = process.env.PUMPED_PERF_LITE_DIST ?? fileURLToPath(
   new URL("../../pkg/core/lite/dist/index.mjs", import.meta.url),
 )
-const liteReactDist = fileURLToPath(
+const liteReactDist = process.env.PUMPED_PERF_LITE_REACT_DIST ?? fileURLToPath(
   new URL("../../pkg/react/lite-react/dist/index.mjs", import.meta.url),
 )
 const benchmarkRoot = fileURLToPath(new URL(".", import.meta.url))

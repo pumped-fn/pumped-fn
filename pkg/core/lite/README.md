@@ -12,7 +12,7 @@ BFF routes, workers, CLIs, React roots, and tests.
 npm install @pumped-fn/lite
 ```
 
-Upgrading from older versions: see [`MIGRATION.md`](./MIGRATION.md).
+Upgrading from older versions: see [`MIGRATION.md`](https://github.com/pumped-fn/pumped-fn/blob/main/pkg/core/lite/MIGRATION.md).
 
 ## What It Owns
 
@@ -565,9 +565,9 @@ composition roots. See [Observability](../../../docs/observability.md).
 | `ctx.exec(options)` | Execute a child flow or function; optional `signal` joins caller cancellation with context lifetime |
 | `flowHandle.prepare(options)` | Activate a controller child with its tags; `ready` resolves after dependencies and resources, then `exec()` or `execStream()` runs once |
 
-Complete type reference: [`dist/index.d.mts`](./dist/index.d.mts)
+Complete type reference: [`dist/index.d.ts`](./dist/index.d.ts)
 
-Patterns: [`PATTERNS.md`](./PATTERNS.md)
+Patterns: [`PATTERNS.md`](https://github.com/pumped-fn/pumped-fn/blob/main/pkg/core/lite/PATTERNS.md)
 
 React integration: [`@pumped-fn/lite-react`](../../react/lite-react/README.md)
 
@@ -578,7 +578,7 @@ MIT
 ## Next
 
 - [Docs index](../../../docs/README.md)
-- [Patterns](./PATTERNS.md)
+- [Patterns](https://github.com/pumped-fn/pumped-fn/blob/main/pkg/core/lite/PATTERNS.md)
 - [Invoice triage example](../../../examples/invoice-triage/README.md)
 
 ---

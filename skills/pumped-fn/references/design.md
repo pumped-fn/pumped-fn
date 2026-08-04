@@ -111,7 +111,7 @@ const session = resource({
 })
 ```
 
-Watch placement is type-enforced (misplacement fails tsgo): `controller(upstreamResource, { resolve: true, watch: true })` belongs only in resource deps; atom watch belongs only in atom deps. To carry an atom value into a session resource, interpose a self-re-establishing resource that owns a `ctx.changes(atom)` subscription, cancels it with `ctx.cleanup`, and expose that bridge through a watched resource controller to the session. Retargeting then closes the old session and opens the replacement lazily on next use. Manually closing and reopening it inside a flow is the anti-pattern. Every session must also bind closure to scope disposal with `ctx.cleanup`, or to its execution outcome with `ctx.onClose`.
+Watch placement is type-enforced (misplacement fails tsc): `controller(upstreamResource, { resolve: true, watch: true })` belongs only in resource deps; atom watch belongs only in atom deps. To carry an atom value into a session resource, interpose a self-re-establishing resource that owns a `ctx.changes(atom)` subscription, cancels it with `ctx.cleanup`, and expose that bridge through a watched resource controller to the session. Retargeting then closes the old session and opens the replacement lazily on next use. Manually closing and reopening it inside a flow is the anti-pattern. Every session must also bind closure to scope disposal with `ctx.cleanup`, or to its execution outcome with `ctx.onClose`.
 
 Extensions live at roots. Wrappers must call/return `next()`; register outcome work with `ctx.onClose`, or await `next()` before recording settled data. Foreign-edge parameters remain traceable only through `params`.
 

@@ -1,4 +1,5 @@
-import { bench, describe } from "vitest"
+import { describe } from "vitest"
+import { bench } from "../quick"
 import { flow, type Lite } from "@pumped-fn/lite"
 import { consume, noop, resolvedController } from "./graphs"
 
@@ -14,7 +15,7 @@ for (let i = 0; i < 9; i++) {
   nested = flow({ factory: async (ctx) => (await ctx.exec({ flow: inner })) + 1 })
 }
 
-const fnTarget = (_ctx: Lite.ExecutionContext, x: number) => x
+const fnTarget = (x: number) => x
 
 describe("execution context", () => {
   bench("createContext + close", async () => {
@@ -31,7 +32,7 @@ describe("execution context", () => {
   })
 
   bench("exec fn", async () => {
-    consume(await parent.exec({ fn: fnTarget, params: [7] }))
+    consume(await parent.exec({ name: "bench", fn: fnTarget, params: [7] }))
   })
 
   bench("exec nested flows depth 10", async () => {

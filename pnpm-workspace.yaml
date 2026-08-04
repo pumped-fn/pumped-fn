@@ -55,11 +55,11 @@ allowBuilds:
 packageExtensions:
   bun-ffi-structs@*:
     peerDependencies:
-      typescript: ^5.0.0 || ^6.0.0
+      typescript: ^5.0.0 || ^6.0.0 || ^7.0.0
 
 peerDependencyRules:
   allowedVersions:
-    typescript: ^5.0.0 || ^6.0.0
+    typescript: ^5.0.0 || ^6.0.0 || ^7.0.0
 
 catalog:
   "@agentclientprotocol/sdk": 1.2.1
@@ -92,7 +92,6 @@ catalog:
   "@types/react": 19.2.15
   "@types/react-dom": 19.2.3
   "@vitejs/plugin-react": 6.0.3
-  "@typescript/native-preview": 7.0.0-dev.20260526.1
   "@valibot/to-json-schema": 1.7.1
   "@vitest/browser-playwright": 4.1.8
   "@vitest/coverage-v8": 4.1.8
@@ -117,9 +116,10 @@ catalog:
   react: 19.2.6
   react-dom: 19.2.6
   reflect-metadata: 0.2.2
-  tsdown: 0.22.0
+  tsdown: 0.22.14
   tsx: 4.22.3
-  typescript: 6.0.3
+  typescript: 7.0.2
+  typescript-api: npm:typescript@6.0.3
   unrun: 0.3.1
   valibot: 1.4.2
   vite: 8.0.16
@@ -190,15 +190,6 @@ minimumReleaseAgeExclude:
   - '@rolldown/binding-win32-x64-msvc@1.0.2'
   - tsdown@0.22.0
   - tsx@4.22.3
-  - typescript@6.0.3
-  - '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260526.1'
-  - '@typescript/native-preview-darwin-x64@7.0.0-dev.20260526.1'
-  - '@typescript/native-preview-linux-arm64@7.0.0-dev.20260526.1'
-  - '@typescript/native-preview-linux-arm@7.0.0-dev.20260526.1'
-  - '@typescript/native-preview-linux-x64@7.0.0-dev.20260526.1'
-  - '@typescript/native-preview-win32-arm64@7.0.0-dev.20260526.1'
-  - '@typescript/native-preview-win32-x64@7.0.0-dev.20260526.1'
-  - '@typescript/native-preview@7.0.0-dev.20260526.1'
   - unrun@0.3.1
   - vite@8.0.16
   - vitest@4.1.8

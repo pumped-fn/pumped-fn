@@ -1,9 +1,10 @@
 import type { Lite } from "@pumped-fn/lite"
-import type { Env as HonoEnv, MiddlewareHandler } from "hono"
+import type { MiddlewareHandler } from "hono"
 import { createMiddleware } from "hono/factory"
 
+type BaseEnv = import("hono").Env
 type TagInput = Lite.Tagged<any> | readonly TagInput[]
-type EnvVariables<E extends HonoEnv> = E extends { Variables: infer Variables extends object } ? Variables : {}
+type EnvVariables<E extends BaseEnv> = E extends { Variables: infer Variables extends object } ? Variables : {}
 
 const contextKey = "lite"
 
@@ -12,14 +13,14 @@ interface HonoKeyOptions<Key extends string = string> {
 }
 
 type HonoEnvShape<
-  E extends HonoEnv = HonoEnv,
+  E extends BaseEnv = BaseEnv,
   Key extends string = typeof contextKey,
 > = E & {
   Variables: EnvVariables<E> & Record<Key, Lite.ExecutionContext>
 }
 
 interface HonoOptions<
-  E extends HonoEnv = HonoEnv,
+  E extends BaseEnv = BaseEnv,
 > {
   tags?: (request: Request) => TagInput
   close?: boolean
@@ -27,7 +28,7 @@ interface HonoOptions<
 
 interface HonoAdapter<Key extends string = typeof contextKey> {
   readonly name: string
-  middleware<E extends HonoEnv = HonoEnv>(
+  middleware<E extends BaseEnv = BaseEnv>(
     middlewareOptions?: HonoOptions<E>
   ): MiddlewareHandler<HonoEnvShape<E, Key>>
 }
@@ -47,7 +48,7 @@ function bindAdapter<const Key extends string>(key: Key): HonoAdapter<Key> & Lit
     init(nextScope: Lite.Scope) {
       scope = nextScope
     },
-    middleware<E extends HonoEnv = HonoEnv>(
+    middleware<E extends BaseEnv = BaseEnv>(
       middlewareOptions?: HonoOptions<E>
     ): MiddlewareHandler<HonoEnvShape<E, Key>> {
       const close = middlewareOptions?.close ?? true
@@ -79,9 +80,9 @@ export const hono = { contextKey, adapter } as const
 export namespace hono {
   export type KeyOptions<Key extends string = string> = HonoKeyOptions<Key>
   export type Env<
-    E extends HonoEnv = HonoEnv,
+    E extends BaseEnv = BaseEnv,
     Key extends string = typeof contextKey,
   > = HonoEnvShape<E, Key>
-  export type Options<E extends HonoEnv = HonoEnv> = HonoOptions<E>
+  export type Options<E extends BaseEnv = BaseEnv> = HonoOptions<E>
   export type Adapter<Key extends string = typeof contextKey> = HonoAdapter<Key>
 }

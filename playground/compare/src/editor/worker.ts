@@ -1,7 +1,7 @@
 import { createSystem, createVirtualTypeScriptEnvironment } from "@typescript/vfs"
 import { createWorker } from "@valtown/codemirror-ts/worker"
 import * as Comlink from "comlink"
-import ts from "typescript"
+import ts from "typescript-api"
 import payload from "virtual:editor-types"
 import { sandboxFiles } from "../sandbox-files"
 
@@ -16,15 +16,20 @@ Comlink.expose(
       fsMap.set(path, source)
       rootFiles.push(path)
     }
-    return createVirtualTypeScriptEnvironment(createSystem(fsMap), rootFiles, ts, {
-      target: ts.ScriptTarget.ES2022,
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.Bundler,
-      strict: true,
-      esModuleInterop: true,
-      experimentalDecorators: true,
-      emitDecoratorMetadata: true,
-      skipLibCheck: true,
-    })
+    return createVirtualTypeScriptEnvironment(
+      createSystem(fsMap),
+      rootFiles,
+      ts as unknown as Parameters<typeof createVirtualTypeScriptEnvironment>[2],
+      {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        strict: true,
+        esModuleInterop: true,
+        experimentalDecorators: true,
+        emitDecoratorMetadata: true,
+        skipLibCheck: true,
+      },
+    )
   }),
 )

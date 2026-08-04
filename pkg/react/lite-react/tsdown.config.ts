@@ -2,8 +2,9 @@ import { defineConfig } from "tsdown";
 
 export default defineConfig({
   entry: ["src/index.ts"],
-  dts: true,
+  dts: { tsconfig: "tsconfig.dts.json" },
   format: ["cjs", "esm"],
   clean: true,
+  minify: true,
   banner: { js: "'use client';" },
 });

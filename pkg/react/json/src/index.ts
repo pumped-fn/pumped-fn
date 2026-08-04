@@ -6,9 +6,10 @@ import { useRef } from 'react'
 
 type TagInput = Lite.Tagged<any> | readonly TagInput[]
 type ScopedValueStateSource<State extends object> = Pick<ScopedValueAccess<State>, 'getSnapshot' | 'set' | 'subscribe'>
+type FlowYield<Flow> = Flow extends Lite.Flow<any, any, any, infer Yield> ? Yield : never
 type JsonRenderActionParams = Record<string, unknown>
 type FlowActionHandlerResult<Target> =
-  Target extends Lite.Flow<infer Output, any>
+  Target extends Lite.Flow<infer Output, any, any, any>
     ? Output
     : Target extends FlowActionOptions<infer Flow>
       ? Lite.Utils.FlowOutput<Flow>
@@ -16,8 +17,8 @@ type FlowActionHandlerResult<Target> =
 type FlowHandlers<Actions extends FlowActionTargets> = {
   [Name in keyof Actions]: ActionHandler<JsonRenderActionParams, FlowActionHandlerResult<Actions[Name]>>
 }
-type FlowActionTargets = Record<string, FlowActionTarget<Lite.Flow<any, any>>>
-type FlowActionTarget<Flow extends Lite.Flow<any, any>> = Flow | FlowActionOptions<Flow>
+type FlowActionTargets = Record<string, FlowActionTarget<Lite.Flow<any, any, any, any>>>
+type FlowActionTarget<Flow extends Lite.Flow<any, any, any, any>> = Flow | FlowActionOptions<Flow>
 
 /** Adapts a complete scoped-value state object to a JSON Render store. */
 interface ScopedValueStateStoreOptions<State extends object = StateModel> {
@@ -31,25 +32,25 @@ interface ScopedValueStateStoreSliceOptions<State extends object> {
   updater(nextState: StateModel, value: ScopedValueStateSource<State>): void
 }
 
-interface FlowActionBaseOptions<Flow extends Lite.Flow<any, any>> {
+interface FlowActionBaseOptions<Flow extends Lite.Flow<any, any, any, any>> {
   flow: Flow
   name?: string
   tags?: TagInput
 }
 
 /** Maps JSON Render action parameters to a typed flow input. */
-interface FlowActionInputOptions<Flow extends Lite.Flow<any, any>> extends FlowActionBaseOptions<Flow> {
+interface FlowActionInputOptions<Flow extends Lite.Flow<any, any, any, any>> extends FlowActionBaseOptions<Flow> {
   input(params: JsonRenderActionParams): Lite.Utils.FlowInput<Flow>
   rawInput?: never
 }
 
 /** Maps JSON Render action parameters to raw flow input. */
-interface FlowActionRawInputOptions<Flow extends Lite.Flow<any, any>> extends FlowActionBaseOptions<Flow> {
+interface FlowActionRawInputOptions<Flow extends Lite.Flow<any, any, any, any>> extends FlowActionBaseOptions<Flow> {
   rawInput?(params: JsonRenderActionParams): unknown
   input?: never
 }
 
-type FlowActionOptions<Flow extends Lite.Flow<any, any>> =
+type FlowActionOptions<Flow extends Lite.Flow<any, any, any, any>> =
   | FlowActionInputOptions<Flow>
   | FlowActionRawInputOptions<Flow>
 
@@ -61,7 +62,7 @@ interface FlowHandlersOptions<Actions extends FlowActionTargets> {
 
 interface FlowActionHandlerCell {
   ctx: Lite.ExecutionContext
-  target: FlowActionTarget<Lite.Flow<any, any>>
+  target: FlowActionTarget<Lite.Flow<any, any, any, any>>
 }
 
 interface FlowHandlersRef {
@@ -103,7 +104,7 @@ function scopedValueStateStore<State extends object>(
   })
 }
 
-function flowAction<Flow extends Lite.Flow<any, any>>(options: FlowActionOptions<Flow>): FlowActionOptions<Flow> {
+function flowAction<Flow extends Lite.Flow<any, any, any, any>>(options: FlowActionOptions<Flow>): FlowActionOptions<Flow> {
   return options
 }
 
@@ -155,14 +156,14 @@ function useFlowHandlers<const Actions extends FlowActionTargets>(
   return handlers as FlowHandlers<Actions>
 }
 
-function flowActionHandler<Flow extends Lite.Flow<any, any>>(
+function flowActionHandler<Flow extends Lite.Flow<any, any, any, any>>(
   ctx: Lite.ExecutionContext,
   target: FlowActionTarget<Flow>
 ): ActionHandler<JsonRenderActionParams, Lite.Utils.FlowOutput<Flow>> {
   if ('flow' in target) {
     return (params) => {
       if (target.input) {
-        return ctx.exec<Lite.Utils.FlowOutput<Flow>, Lite.Utils.FlowInput<Flow>>({
+        return ctx.exec<Lite.Utils.FlowOutput<Flow>, Lite.Utils.FlowInput<Flow>, FlowYield<Flow>>({
           flow: target.flow,
           input: target.input(params),
           name: target.name,
@@ -170,7 +171,7 @@ function flowActionHandler<Flow extends Lite.Flow<any, any>>(
         })
       }
 
-      return ctx.exec<Lite.Utils.FlowOutput<Flow>, Lite.Utils.FlowInput<Flow>>({
+      return ctx.exec<Lite.Utils.FlowOutput<Flow>, Lite.Utils.FlowInput<Flow>, FlowYield<Flow>>({
         flow: target.flow,
         rawInput: target.rawInput ? target.rawInput(params) : params,
         name: target.name,
@@ -179,7 +180,7 @@ function flowActionHandler<Flow extends Lite.Flow<any, any>>(
     }
   }
 
-  return (params) => ctx.exec<Lite.Utils.FlowOutput<Flow>, Lite.Utils.FlowInput<Flow>>({
+  return (params) => ctx.exec<Lite.Utils.FlowOutput<Flow>, Lite.Utils.FlowInput<Flow>, FlowYield<Flow>>({
     flow: target,
     rawInput: params,
   })

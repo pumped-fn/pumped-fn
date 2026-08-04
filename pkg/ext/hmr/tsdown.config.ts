@@ -10,7 +10,7 @@ export default defineConfig({
       },
     },
   },
-  dts: true,
+  dts: { tsconfig: "tsconfig.dts.json" },
   clean: true,
   splitting: false,
   fixedExtension: false,

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
-import { Component, type ReactNode, Suspense } from 'react'
+import { Component, type ReactNode, Suspense, useLayoutEffect } from 'react'
 import { type Lite } from '@pumped-fn/lite'
 import { tag, tags } from '@pumped-fn/lite'
 import { atom, createScope, flow, preset, resource, scopedValue, ExecutionContextProvider, ScopeProvider, useScope, useExecutionContext, useFlow, useAtom, useSelect, useController, useResource, useScopedValue } from '../src'
@@ -124,7 +124,7 @@ describe('ExecutionContextProvider + useFlow', () => {
     const fail = flow({
       name: 'fail-profile',
       parse: (raw: unknown) => String(raw),
-      factory: () => {
+      factory: (): string => {
         throw 'bad-profile'
       },
     })
@@ -1174,6 +1174,35 @@ describe('useAtom - state handling', () => {
 })
 
 describe('useAtom - invalidation', () => {
+  it('rechecks the atom after subscribing during commit', async () => {
+    const testAtom = atom({ factory: () => 0 })
+    const scope = createScope()
+    await scope.resolve(testAtom)
+    const ctrl = scope.controller(testAtom)
+
+    function Mutator() {
+      useLayoutEffect(() => {
+        ctrl.set(1)
+      }, [])
+      return null
+    }
+
+    function Reader() {
+      return <div data-testid="commit-value">{useAtom(testAtom)}</div>
+    }
+
+    render(
+      <ScopeProvider scope={scope}>
+        <Mutator />
+        <Reader />
+      </ScopeProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('commit-value')).toHaveTextContent('1')
+    })
+  })
+
   it('returns stale value during re-resolution without Suspense flash', async () => {
     let callCount = 0
     const testAtom = atom({
@@ -1260,6 +1289,42 @@ describe('useAtom - invalidation', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('value')).toHaveTextContent('2')
+    })
+  })
+
+  it('re-renders after unmounting and subscribing again', async () => {
+    const subject = atom({ factory: () => 'v1' })
+    const scope = createScope()
+    await scope.resolve(subject)
+    const ctrl = scope.controller(subject)
+
+    function Reader() {
+      return <div data-testid="remount-value">{useAtom(subject)}</div>
+    }
+
+    const first = render(
+      <ScopeProvider scope={scope}>
+        <Reader />
+      </ScopeProvider>
+    )
+    expect(screen.getByTestId('remount-value')).toHaveTextContent('v1')
+    first.unmount()
+
+    ctrl.set('v2')
+    await scope.flush()
+    render(
+      <ScopeProvider scope={scope}>
+        <Reader />
+      </ScopeProvider>
+    )
+    expect(screen.getByTestId('remount-value')).toHaveTextContent('v2')
+
+    await act(async () => {
+      ctrl.set('v1')
+      await scope.flush()
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('remount-value')).toHaveTextContent('v1')
     })
   })
 })

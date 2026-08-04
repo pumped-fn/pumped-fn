@@ -8,7 +8,7 @@ import { extractDocBlocks } from "./docs-harness"
 const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), "..")
 const preludePath = join(pkgRoot, "tests", "doc-prelude.d.ts")
 
-const tsgoBin = join(pkgRoot, "node_modules", ".bin", "tsgo")
+const tscBin = join(pkgRoot, "node_modules", ".bin", "tsc")
 
 const REFERENCE_PREAMBLE = `/// <reference path="${preludePath}" />\n`
 const IMPORT_PREAMBLE = `import {
@@ -55,8 +55,8 @@ const SKIP_MANIFEST: Array<{ id: string; reason: string }> = [
 
 const skipIds = new Set(SKIP_MANIFEST.map((e) => e.id))
 
-function runTsgo(dir: string): string {
-  const result = spawnSync(tsgoBin, ["--noEmit", "-p", dir], {
+function runTsc(dir: string): string {
+  const result = spawnSync(tscBin, ["--noEmit", "-p", dir], {
     encoding: "utf-8",
     timeout: 60_000,
   })
@@ -106,12 +106,12 @@ function parseDiagnostics(output: string, blocks: ReturnType<typeof extractDocBl
 
 describe("docs-examples", () => {
   describe("RULE A — typecheck all blocks", () => {
-    it("all doc blocks compile under strict tsgo with prelude", async () => {
+    it("all doc blocks compile under strict tsc with prelude", async () => {
       const allBlocks = extractDocBlocks()
       const blocks = allBlocks.filter((b) => !skipIds.has(b.id))
       const tmp = writeTempDir(blocks, true)
       try {
-        const output = runTsgo(tmp)
+        const output = runTsc(tmp)
         const errors = parseDiagnostics(output, blocks)
         if (errors.length > 0) {
           throw new Error(
@@ -132,7 +132,7 @@ describe("docs-examples", () => {
       const tmp = writeTempDir(blocks, false)
       let selfContainedIndices: number[] = []
       try {
-        const output = runTsgo(tmp)
+        const output = runTsc(tmp)
         const errorIdxSet = new Set<number>()
         for (const line of output.split("\n")) {
           const m = line.match(/block-(\d+)\.ts\(/)

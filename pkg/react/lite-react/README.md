@@ -442,7 +442,7 @@ It also exports:
 - `useResource`
 - `useScopedValue`
 
-Complete type reference: [`dist/index.d.mts`](https://github.com/pumped-fn/pumped-fn/blob/main/pkg/react/lite-react/dist/index.d.mts)
+Complete type reference: [`dist/index.d.ts`](https://github.com/pumped-fn/pumped-fn/blob/main/pkg/react/lite-react/dist/index.d.ts)
 
 Patterns and guardrails: [`PATTERNS.md`](https://github.com/pumped-fn/pumped-fn/blob/main/pkg/react/lite-react/PATTERNS.md)
 

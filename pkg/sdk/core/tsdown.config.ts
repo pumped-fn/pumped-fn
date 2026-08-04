@@ -8,7 +8,7 @@ export default defineConfig({
     validation: "src/validation.ts",
     sandbox: "src/sandbox.ts",
   },
-  dts: true,
+  dts: { tsconfig: "tsconfig.dts.json" },
   format: ["cjs", "esm"],
   clean: true,
 });
