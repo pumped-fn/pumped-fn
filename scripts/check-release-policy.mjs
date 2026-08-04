@@ -101,17 +101,32 @@ for (const change of changesets) {
   if (!current || rank[change.bump] > rank[current.bump]) bumps.set(change.package, change)
 }
 
-const basePackageDirectories = runGit(["ls-tree", "-r", "--name-only", base, "--", "pkg"])
+const packageManifestsAt = (ref) => runGit(["ls-tree", "-r", "--name-only", ref, "--", "pkg"])
   .split("\n")
   .filter((path) => /^pkg\/[^/]+\/[^/]+\/package\.json$/u.test(path))
-  .map((path) => ({ path, manifest: JSON.parse(runGit(["show", `${base}:${path}`])) }))
+  .map((path) => ({ path, manifest: JSON.parse(runGit(["show", `${ref}:${path}`])) }))
   .filter(({ manifest }) => manifest.private !== true)
+const basePackageDirectories = packageManifestsAt(base)
 const baseManifests = new Map(basePackageDirectories.map((entry) => [entry.manifest.name, entry.manifest]))
+const baseParent = runGit(["rev-list", "--parents", "-n", "1", base]).trim().split(" ")[1]
+const baseParentManifests = new Map((baseParent ? packageManifestsAt(baseParent) : [])
+  .map((entry) => [entry.manifest.name, entry.manifest]))
+const isVersionCorrection = (entry, previous, change) => {
+  const ancestor = baseParentManifests.get(entry.manifest.name)
+  return previous !== undefined
+    && ancestor !== undefined
+    && change !== undefined
+    && entry.manifest.version === ancestor.version
+    && previous.version === nextVersion(ancestor.version, change.bump)
+}
 const releases = new Map([...bumps].flatMap(([name, change]) => {
   const entry = packages.get(name)
   if (!entry) return []
   const previous = baseManifests.get(name)
-  return [[name, nextVersion(previous?.version ?? entry.manifest.version, change.bump)]]
+  const version = isVersionCorrection(entry, previous, change)
+    ? entry.manifest.version
+    : previous?.version ?? entry.manifest.version
+  return [[name, nextVersion(version, change.bump)]]
 }))
 
 const unauthorizedMajors = []
@@ -126,7 +141,10 @@ for (const [name, change] of bumps) {
   const entry = packages.get(name)
   if (!entry || change.bump !== "major") continue
   const previous = baseManifests.get(name)
-  const baseMajor = semver.major(previous?.version ?? entry.manifest.version)
+  const version = isVersionCorrection(entry, previous, change)
+    ? entry.manifest.version
+    : previous?.version ?? entry.manifest.version
+  const baseMajor = semver.major(version)
   if (baseMajor > 0 && !majorReleasePackages.has(name)) {
     unauthorizedMajors.push({ package: name, version: entry.manifest.version, changeset: change.path })
   }
@@ -135,7 +153,7 @@ for (const [name, change] of bumps) {
 for (const entry of packageDirectories) {
   const previous = baseManifests.get(entry.manifest.name)
   const declared = bumps.get(entry.manifest.name)
-  if (previous && previous.version !== entry.manifest.version) {
+  if (previous && previous.version !== entry.manifest.version && !isVersionCorrection(entry, previous, declared)) {
     const expected = declared ? nextVersion(previous.version, declared.bump) : null
     if (entry.manifest.version !== expected) {
       versionDeltaGaps.push({
