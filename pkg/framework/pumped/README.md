@@ -4,13 +4,15 @@
 
 A scope compiler, not a runtime. `pumped` discovers flows on disk, assembles them into one
 `@pumped-fn/lite` scope, and drives that scope under a run mode — dev server, test, or production
-build. One graph, three projections:
+build. One graph, four projections:
 
 - **Dev** observes the graph through Vite's module runner with HMR; atom identity survives reloads.
 - **Test** substitutes into the graph with a plain `createScope({presets})` — no framework import,
   no plugin, no discovery.
 - **Prod** compiles the graph: `pumped build` bundles the discovered manifest into a server and/or
   CLI entry ahead of time.
+- **Inspect** loads only the selected manifest: `pumped graph` prints its static nodes, edges, and
+  honest unknowns without starting HTTP, jobs, or workflows.
 
 ## Layout conventions
 
@@ -29,8 +31,10 @@ Discovery is flat and convention-driven under `src/`:
 - `src/workflows/*.ts` — one file per workflow, default export is a flow. Each entry runs once at
   server boot in its own context tagged with `pumped.workflowRun({ taskId, runId })`; a workflow that
   returns ends its run. No durability/resume in this increment — see "Workflow tag" below.
-- `src/app.ts` (optional) — the scope config seam: `{ presets, tags, extensions, context(req?) }`,
-  typed against `pumped.Config`.
+- `src/app.ts` (optional) — the scope config seam, declared with `app({ presets, tags, extensions,
+  context, mapError })`.
+- `src/apps/*.ts` (optional) — named app compositions selected with `--app`; each file default-exports
+  an `app()` definition and can derive from `src/app.ts`.
 
 ### Provider wiring for agents
 
@@ -39,9 +43,12 @@ like any other tag. Wiring a provider is a one-liner on the app config:
 
 ```ts
 // src/app.ts
+import { app } from "@pumped-fn/pumped/app"
 import { claude, claudeConfig } from "@pumped-fn/sdk-claude"
 
-export default { tags: [claude, claudeConfig({ auth: { kind: "global" } })] }
+export default app({
+  tags: [claude, claudeConfig({ auth: { kind: "global" } })],
+})
 ```
 
 ### One scope per process
@@ -136,7 +143,7 @@ nodes, below). Don't object-spread the handle — spreading forks the flow's nod
 presets targeting the original shared flow silently miss the copy.
 
 ```ts
-import { route } from "@pumped-fn/pumped"
+import { route } from "@pumped-fn/pumped/meta"
 import { listInvoices } from "../domain/invoices"
 
 export { listInvoices as default }
@@ -224,9 +231,12 @@ compile error instead of a silent `undefined` status.
 
 ## Quick start
 
-Everything is available three ways: the `pumped` namespace, its `p` alias (zod-style),
-and direct named exports — `import { p } from "@pumped-fn/pumped"` then `p.schedule(...)`,
-or `import { schedule } from "@pumped-fn/pumped"` and destructure what you use.
+Framework operations are available through the `pumped` namespace, its `p` alias, and direct named
+exports. The lightweight `@pumped-fn/pumped/app` entry re-exports the exact Lite authoring handles,
+and `@pumped-fn/pumped/meta` exposes Pumped route and command metadata without loading the Node
+framework.
+
+The runnable [Pumped tour](../../../examples/pumped-tour/README.md) is the smallest complete example.
 
 ```ts
 // vite.config.ts
@@ -240,7 +250,7 @@ export default defineConfig({
 
 ```ts
 // src/server/greet.ts
-import { flow, typed } from "@pumped-fn/lite"
+import { flow, typed } from "@pumped-fn/pumped/app"
 
 export default flow({
   parse: typed<{ name: string }>(),
@@ -253,10 +263,101 @@ pumped dev              # Vite dev server with HMR over the discovered graph
 pumped build --target all   # emits dist/server.mjs and dist/cli.mjs
 ```
 
+Production builds use target-specific manifests. The server artifact includes server, agent, job,
+and workflow roots. The CLI artifact includes CLI and agent roots. A target does not import entry
+files owned only by the other target.
+
+## Application composition
+
+`app()` checks an application definition without creating a scope or starting work. A single
+argument is returned intact:
+
+```ts
+import { app, tag } from "@pumped-fn/pumped/app"
+
+const region = tag<string>({ label: "region" })
+
+export default app({
+  tags: [region("default")],
+})
+```
+
+A second argument derives a composition from a base app:
+
+```ts
+// src/apps/east.ts
+import { app } from "@pumped-fn/pumped/app"
+import { logging } from "@pumped-fn/lite-extension-logging"
+import base from "../app"
+import region from "../tags/region"
+
+export default app(base, {
+  tags: [region("east")],
+  extensions: [logging.extension()],
+})
+```
+
+Derived tags appear before base tags, so a single-value lookup selects the derived value and
+`tags.all()` retains both in precedence order. Presets keep base-first order so the derived preset
+replaces the same target when the scope is built. Extensions remain base-first. Context tag
+producers compose in derived-first order, and a derived error mapper falls back to the base mapper.
+
+`src/app.ts` is selected by default. A flat file under `src/apps/` is selected by its kebab-case
+filename:
+
+```bash
+pumped dev --app east
+pumped build --app east --target all
+```
+
+Default artifacts are written to `dist/`. Named app artifacts are isolated under
+`dist/apps/<app>/`.
+
+Every artifact embeds a stable identity containing its selected app, target, and SHA-256 manifest
+hash. Manifest file names are project-relative, such as `src/server/greet.ts`; checkout paths do not
+enter production output. The hash covers the selected bundled module closure, including local
+imports outside the app root.
+
+An unknown name fails with the available app names. `PUMPED_APP=east` provides the same selection
+when Vite is driven directly; an explicit `pumped.plugin({ app: "east" })` option takes precedence.
+
+## Graph analysis
+
+`analyze(manifest)` follows roots and recursively reads the declared dependencies on public Lite
+flow, atom, resource, controller, and tag handles. It does not execute factories:
+
+```ts
+import { analyze } from "@pumped-fn/pumped"
+
+const report = analyze({
+  app: appConfig,
+  entries: [
+    { kind: "server", name: "greet", file: "src/server/greet.ts", flow: greet },
+  ],
+})
+```
+
+`report.nodes` and `report.edges` are serializable. `report.idOf(handle)` maps the original public
+handle to its graph ID. `report.unknowns` keeps opaque factory bodies, context producers, error
+mappers, and extension hooks visible instead of claiming their hidden edges are absent. Tags passed
+through a flow controller are reported with their providers and handle implementors.
+
+Inspect a convention-generated manifest directly:
+
+```bash
+pumped graph --app east --target server
+```
+
+The command prints the manifest identity and static report as JSON. It compiles and imports only the
+selected manifest. It does not start HTTP, resolve job schedules, or run workflows. Inline flow
+execution inside a factory remains covered by that factory's explicit `factory-body` unknown;
+runtime extensions can observe the concrete child execution.
+
 ## Testing
 
-The scope is the single seam. Domain flows never import `@pumped-fn/pumped`; tests preset the scope
-directly and exec flows through it:
+The scope is the single seam. Tests preset the scope directly and execute the same public handles.
+Shared libraries can import `@pumped-fn/lite`; application code can use the exact re-exports from
+`@pumped-fn/pumped/app`. Neither path needs discovery or a plugin:
 
 ```ts
 import { createScope, preset } from "@pumped-fn/lite"
@@ -280,7 +381,6 @@ same flows the app serves.
 
 - System-manifest scan with build-time checks (unreachable entries, duplicate route/command names).
 - A dev graph endpoint / devtools view over the assembled scope.
-- Reachability-based per-target builds, so `server`/`cli` bundles only pull what they use.
 - Graph AOT: "unwrapping" atoms that are provably never substituted — no presets target them, no
   runtime tags, no lifecycle — into folded constants or plain functions. Dev and test always
   interpret the graph; prod compiles it.

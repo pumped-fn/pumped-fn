@@ -1,4 +1,5 @@
 import { route, command, workflowRun, jobRun } from "./tags"
+import { app } from "./app"
 import { pumped as pumpedPlugin } from "./plugin"
 import { createServer } from "./runtime/serve"
 import { runCli } from "./runtime/cli"
@@ -6,8 +7,11 @@ import { runJobs } from "./runtime/jobs"
 import { runWorkflows } from "./runtime/workflows"
 import { createAppScope } from "./runtime/app-scope"
 import { normalizeAgentEntry } from "./runtime/agent"
+import { analyze } from "./analyze"
 
 export const pumped = {
+  app,
+  analyze,
   route,
   command,
   workflowRun,
@@ -26,7 +30,9 @@ export namespace pumped {
   export type WorkflowRunMeta = import("./tags").WorkflowRunMeta
   export type JobRunMeta = import("./tags").JobRunMeta
   export type Manifest = import("./runtime/manifest").Manifest
+  export type ManifestIdentity = import("./runtime/manifest").ManifestIdentity
   export type ManifestEntry = import("./runtime/manifest").ManifestEntry
+  export type ManifestGenerationOptions = import("./codegen").ManifestGenerationOptions
   export type ManifestAgentMeta = import("./runtime/manifest").ManifestAgentMeta
   export type Config = import("./runtime/manifest").AppConfig
   export type Options = import("./plugin").PumpedOptions
@@ -34,6 +40,10 @@ export namespace pumped {
   export type JobsRunner = import("./runtime/jobs").JobsRunner
   export type WorkflowsIo = import("./runtime/workflows").WorkflowsIo
   export type WorkflowsRunner = import("./runtime/workflows").WorkflowsRunner
+  export type GraphNode = import("./analyze").GraphNode
+  export type GraphEdge = import("./analyze").GraphEdge
+  export type GraphUnknown = import("./analyze").GraphUnknown
+  export type GraphReport = import("./analyze").GraphReport
 }
 
 export const p = pumped
@@ -44,7 +54,9 @@ export namespace p {
   export type WorkflowRunMeta = pumped.WorkflowRunMeta
   export type JobRunMeta = pumped.JobRunMeta
   export type Manifest = pumped.Manifest
+  export type ManifestIdentity = pumped.ManifestIdentity
   export type ManifestEntry = pumped.ManifestEntry
+  export type ManifestGenerationOptions = pumped.ManifestGenerationOptions
   export type ManifestAgentMeta = pumped.ManifestAgentMeta
   export type Config = pumped.Config
   export type Options = pumped.Options
@@ -52,11 +64,20 @@ export namespace p {
   export type JobsRunner = pumped.JobsRunner
   export type WorkflowsIo = pumped.WorkflowsIo
   export type WorkflowsRunner = pumped.WorkflowsRunner
+  export type GraphNode = pumped.GraphNode
+  export type GraphEdge = pumped.GraphEdge
+  export type GraphUnknown = pumped.GraphUnknown
+  export type GraphReport = pumped.GraphReport
 }
 
 export { route, command, workflowRun, jobRun }
+export { app }
+export { analyze }
+export type { GraphNode, GraphNodeKind, GraphEdge, GraphEdgeKind, GraphUnknown, GraphReport } from "./analyze"
 export { createServer, createAppScope, runCli, runJobs, runWorkflows }
-export type { EntryDescriptor, EntryKind } from "./discover"
+export type { AppDescriptor, EntryDescriptor, EntryKind } from "./discover"
 export { discover } from "./discover"
 export { generateManifest } from "./codegen"
+export type { ManifestGenerationOptions } from "./codegen"
+export type { ManifestIdentity } from "./runtime/manifest"
 export { normalizeAgentEntry } from "./runtime/agent"

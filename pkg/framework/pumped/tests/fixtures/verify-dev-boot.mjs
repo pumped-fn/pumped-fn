@@ -17,7 +17,7 @@ try {
   const { createScope, isAtom } = await ssrEnvironment.runner.import("@pumped-fn/lite")
   const { scheduler } = await ssrEnvironment.runner.import("@pumped-fn/lite-extension-scheduler")
 
-  const manifest = await ssrEnvironment.runner.import("virtual:pumped/manifest")
+  const manifest = await ssrEnvironment.runner.import("virtual:pumped/manifest/server")
   const entry = manifest.entries.find((candidate) => candidate.kind === "jobs")
   if (!entry) throw new Error("expected a jobs entry to be discovered")
 
