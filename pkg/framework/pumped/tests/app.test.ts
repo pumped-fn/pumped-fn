@@ -17,10 +17,12 @@ import { route as metaRoute } from "../src/meta"
 import { route as rootRoute } from "../src/tags"
 
 describe("app", () => {
-  it("keeps a single app config intact", () => {
+  it("keeps a single app config intact without sharing the caller reference", () => {
     const config = { tags: [] }
+    const single = app(config)
 
-    expect(app(config)).toBe(config)
+    expect(single).toEqual(config)
+    expect(single).not.toBe(config)
     expect(app()).toEqual({})
     expect(pumped.app).toBe(app)
     expect(p.app).toBe(app)

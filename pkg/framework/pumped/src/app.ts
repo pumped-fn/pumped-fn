@@ -10,7 +10,7 @@ export function app(): AppConfig
 export function app<const Config extends AppConfig>(config: Config): Config
 export function app(base: AppConfig, additions: AppConfig): AppConfig
 export function app(base: AppConfig = {}, additions?: AppConfig): AppConfig {
-  if (!additions) return base
+  if (!additions) return { ...base }
 
   const baseContext = base.context
   const addedContext = additions.context

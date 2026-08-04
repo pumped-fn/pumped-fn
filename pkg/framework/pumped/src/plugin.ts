@@ -96,12 +96,12 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
       if (id === RESOLVED_MANIFEST_SERVER_ID || id === RESOLVED_MANIFEST_CLI_ID) {
         const discovery = discover(sourceDir())
         const target = id === RESOLVED_MANIFEST_SERVER_ID ? "server" : "cli"
-        const source = generateManifest(
+        const { source, identity } = generateManifest(
           selectTargetEntries(discovery.entries, target),
           selectAppFile(discovery, selectedApp),
           { root, app: selectedApp ?? "default", target }
         )
-        generatedManifest = { id, hash: source.match(/sha256:[a-f0-9]{64}/)![0] }
+        generatedManifest = { id, hash: identity.hash }
         return source
       }
       if (id === RESOLVED_ENTRY_SERVER_ID) return ENTRY_SERVER_SOURCE

@@ -47,6 +47,9 @@ async function buildTarget(target: "server" | "cli", selectedApp?: string): Prom
 
 async function build(target: Target, selectedApp?: string): Promise<void> {
   await withSelectedApp(selectedApp, async () => {
+    if (target === "all") {
+      rmSync(buildConfig("server", selectedApp).build.outDir, { recursive: true, force: true })
+    }
     if (target === "server" || target === "all") await buildTarget("server", selectedApp)
     if (target === "cli" || target === "all") await buildTarget("cli", selectedApp)
   })
@@ -59,7 +62,6 @@ async function loadManifest(target: BuildTarget, selectedApp?: string): Promise<
     await viteBuild({
       ...userConfig,
       logLevel: "silent",
-      ssr: { noExternal: true },
       build: {
         ssr: true,
         outDir,

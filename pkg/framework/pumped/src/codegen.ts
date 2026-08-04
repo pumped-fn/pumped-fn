@@ -1,12 +1,19 @@
 import { createHash } from "node:crypto"
 import { relative } from "node:path"
 import type { EntryDescriptor } from "./discover"
+import type { ManifestIdentity } from "./runtime/manifest"
 
 /** Stable project inputs used to identify a generated target manifest. */
 export interface ManifestGenerationOptions {
   root: string
   app: string
   target: "server" | "cli"
+}
+
+/** Generated manifest module source plus the identity embedded in it. */
+export interface GeneratedManifestSource {
+  source: string
+  identity: ManifestIdentity
 }
 
 function entryVar(index: number): string {
@@ -21,7 +28,7 @@ export function generateManifest(
   entries: EntryDescriptor[],
   appFile: string | undefined,
   options: ManifestGenerationOptions
-): string {
+): GeneratedManifestSource {
   const describedEntries = entries.map((entry) => ({
     kind: entry.kind,
     name: entry.name,
@@ -35,7 +42,7 @@ export function generateManifest(
       `${left.kind}:${left.name}:${left.file}`.localeCompare(`${right.kind}:${right.name}:${right.file}`)
     )),
   }
-  const identity = {
+  const identity: ManifestIdentity = {
     app: options.app,
     target: options.target,
     hash: `sha256:${createHash("sha256").update(JSON.stringify(descriptor)).digest("hex")}`,
@@ -68,7 +75,7 @@ export function generateManifest(
     "}",
   ].join("\n")
 
-  return [
+  const source = [
     ...entryImports,
     ...(helperImport ? [helperImport] : []),
     appImport,
@@ -83,4 +90,6 @@ export function generateManifest(
     "]",
     "",
   ].join("\n")
+
+  return { source, identity }
 }

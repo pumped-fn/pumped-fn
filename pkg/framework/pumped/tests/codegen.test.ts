@@ -13,17 +13,17 @@ describe("generateManifest", () => {
       "/second/src/apps/east.ts",
       { root: "/second", app: "east", target: "server" }
     )
-    const firstIdentity = first.split("\n").find((line) => line.startsWith("export const identity"))
-    const secondIdentity = second.split("\n").find((line) => line.startsWith("export const identity"))
-
-    expect(first).toContain('file: "src/server/book-space.ts"')
-    expect(first).not.toContain('file: "/first/src/server/book-space.ts"')
-    expect(firstIdentity).toMatch(/"app":"east","target":"server","hash":"sha256:[a-f0-9]{64}"/)
-    expect(firstIdentity).toBe(secondIdentity)
+    expect(first.source).toContain('file: "src/server/book-space.ts"')
+    expect(first.source).not.toContain('file: "/first/src/server/book-space.ts"')
+    expect(first.identity.app).toBe("east")
+    expect(first.identity.target).toBe("server")
+    expect(first.identity.hash).toMatch(/^sha256:[a-f0-9]{64}$/)
+    expect(first.identity).toEqual(second.identity)
+    expect(first.source).toContain(`export const identity = ${JSON.stringify(first.identity)}`)
   })
 
   it("emits static imports and an entries array with an app.ts import", () => {
-    const source = generateManifest(
+    const { source } = generateManifest(
       [{ kind: "server", name: "book-space", file: "/abs/src/server/book-space.ts" }],
       "/abs/src/app.ts",
       { root: "/abs", app: "default", target: "server" }
@@ -54,7 +54,7 @@ describe("generateManifest", () => {
   })
 
   it("falls back to an undefined app when there is no app.ts", () => {
-    const source = generateManifest([], undefined, { root: "/abs", app: "default", target: "server" })
+    const { source } = generateManifest([], undefined, { root: "/abs", app: "default", target: "server" })
 
     expect(source).toBe(
       [
@@ -85,7 +85,7 @@ describe("generateManifest", () => {
     const file = join(dir, "no-default.mjs")
     writeFileSync(file, "export const meta = { not: 'default' }\n")
 
-    const source = generateManifest(
+    const { source } = generateManifest(
       [{ kind: "server", name: "no-default", file }],
       undefined,
       { root: dir, app: "default", target: "server" }
