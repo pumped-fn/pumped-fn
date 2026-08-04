@@ -1,5 +1,11 @@
 # @pumped-fn/sdk-just-bash
 
+## 3.0.1
+
+### Patch Changes
+
+- 344862e: Publish declarations with TypeScript 7.0.2 through tsdown's package-local `tsconfig.dts.json` files, keeping ESM and CommonJS type entrypoints aligned. Legacy Compiler API consumers use the `typescript-api` alias.
+
 ## 3.0.0
 
 ### Major Changes
