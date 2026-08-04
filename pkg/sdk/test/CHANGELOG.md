@@ -1,5 +1,13 @@
 # @pumped-fn/sdk-test
 
+## 3.0.1
+
+### Patch Changes
+
+- 344862e: Publish declarations with TypeScript 7.0.2 through tsdown's package-local `tsconfig.dts.json` files, keeping ESM and CommonJS type entrypoints aligned. Legacy Compiler API consumers use the `typescript-api` alias.
+- Updated dependencies [344862e]
+  - @pumped-fn/lite-extension-suspense@1.1.4
+
 ## 3.0.0
 
 ### Major Changes
