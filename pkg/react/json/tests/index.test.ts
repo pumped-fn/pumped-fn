@@ -127,10 +127,10 @@ describe('flowHandlers', () => {
       name: 'submit-json-render-order',
       parse(raw) {
         const params = raw as { item: unknown; quantity: unknown }
-        if (typeof params.item !== 'string') throw new Error('missing item')
+        if (typeof params['item'] !== 'string') throw new Error('missing item')
         if (typeof params['quantity'] !== 'number') throw new Error('missing quantity')
         return {
-          item: params.item,
+          item: params['item'],
           quantity: params['quantity'],
         }
       },
@@ -140,8 +140,8 @@ describe('flowHandlers', () => {
     const ctx = scope.createContext()
     const handlers = flowHandlers({ ctx, actions: { submit } })
 
-    await expect(handlers.submit({ item: 'Coffee', quantity: 2 })).resolves.toBe('2x Coffee')
-    await expect(handlers.submit({ item: 'Coffee', quantity: '2' })).rejects.toThrow(
+    await expect(handlers['submit']({ item: 'Coffee', quantity: 2 })).resolves.toBe('2x Coffee')
+    await expect(handlers['submit']({ item: 'Coffee', quantity: '2' })).rejects.toThrow(
       'Failed to parse flow input "submit-json-render-order"'
     )
 
@@ -173,7 +173,7 @@ describe('flowHandlers', () => {
       },
     })
 
-    await expect(handlers.record({ quantity: '5' })).resolves.toEqual({
+    await expect(handlers['record']({ quantity: '5' })).resolves.toEqual({
       input: {
         quantity: 5,
       },

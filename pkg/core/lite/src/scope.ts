@@ -305,6 +305,10 @@ function isAtomControllerDep(dep: Lite.ControllerDep<unknown>): dep is Lite.Atom
   return dep.atom !== undefined
 }
 
+function isAsyncFactory(fn: Function): boolean {
+  return fn.constructor.name === "AsyncFunction"
+}
+
 function getAsyncIterator<T>(source: StreamSource<T>): AsyncIterator<T> {
   const iterate = (source as AsyncIterable<T>)[Symbol.asyncIterator]
   return iterate ? iterate.call(source) : source as AsyncIterator<T>
@@ -850,8 +854,9 @@ class ScopeImpl implements Lite.Scope {
     if (event === 'resolved' && entry.watchers?.size) {
       for (const edge of entry.watchers) {
         try {
-          if (!edge.eq(edge.previous, entry.value)) this.scheduleInvalidation(edge.target)
+          const previous = edge.previous
           edge.previous = entry.value
+          if (!edge.eq(previous, entry.value)) this.scheduleInvalidation(edge.target)
         } catch (error) {
           failures.push(error)
         }
@@ -945,7 +950,7 @@ class ScopeImpl implements Lite.Scope {
       const [key, dep] = graph.atoms[i]!
       let cachedEntry = this.cache.get(dep)
       if (cachedEntry?.state !== 'resolved') {
-        if (dep.factory.constructor.name === "AsyncFunction") return null
+        if (isAsyncFactory(dep.factory)) return null
         const pending = this.tryResolveCurrentTick(dep, path)
         if (!pending) return null
         cachedEntry = this.cache.get(dep)
@@ -969,7 +974,7 @@ class ScopeImpl implements Lite.Scope {
       if (dep.resolve) {
         let cachedCtrlEntry = this.cache.get(dep.atom)
         if (cachedCtrlEntry?.state !== 'resolved') {
-          if (dep.atom.factory.constructor.name === "AsyncFunction") return null
+          if (isAsyncFactory(dep.atom.factory)) return null
           const pending = this.tryResolveCurrentTick(dep.atom, path)
           if (!pending) return null
           cachedCtrlEntry = this.cache.get(dep.atom)
@@ -1212,7 +1217,7 @@ class ScopeImpl implements Lite.Scope {
       return Promise.resolve(newEntry.value)
     }
 
-    if (atom.factory.constructor.name === "AsyncFunction") return this.resolveAndTrack(atom)
+    if (isAsyncFactory(atom.factory)) return this.resolveAndTrack(atom)
 
     const syncResult = this.tryResolveCurrentTick(atom)
     if (syncResult) return syncResult

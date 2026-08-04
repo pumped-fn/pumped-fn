@@ -435,6 +435,11 @@ function readyLoad<T>(data: T): Load<T> {
   return { status: 'ready', data, error: undefined }
 }
 
+function throwAtomFailure<T>(ctrl: Lite.Controller<T>): never {
+  ctrl.get()
+  throw new Error('Failed atom returned without throwing')
+}
+
 function getOrCreatePendingPromise<T>(ctrl: Lite.Controller<T>): Promise<T> {
   let pending = pendingPromises.get(ctrl) as Promise<T> | undefined
   if (!pending) {
@@ -688,7 +693,7 @@ function useAtom<T>(atom: Lite.Atom<T>, options?: UseAtomOptions): T | UseAtomSt
       if (autoResolve) throw getOrCreatePendingPromise(ctrl)
       throw new Error('Atom is not resolved. Set resolve: true or resolve the atom before rendering.')
     }
-    if (ctrlState === 'failed') ctrl.get()
+    if (ctrlState === 'failed') throwAtomFailure(ctrl)
     if (ctrlState !== 'resolved') throw getOrCreatePendingPromise(ctrl)
     return ctrlValue as T
   }

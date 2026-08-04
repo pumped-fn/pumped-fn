@@ -1,14 +1,15 @@
 import { execFile } from "node:child_process"
 import { globSync } from "node:fs"
 import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
-import { dirname, resolve } from "node:path"
+import { tmpdir } from "node:os"
+import { dirname, join, resolve } from "node:path"
 import { promisify } from "node:util"
 
 const exec = promisify(execFile)
 const repo = resolve(import.meta.dirname, "..")
 const leaked = globSync("pkg/*/*/src/**/*.d.ts", { cwd: repo }).sort()
 if (leaked.length) throw new Error(`source declaration leak:\n${leaked.join("\n")}`)
-const root = await mkdtemp(resolve(repo, ".published-types-"))
+const root = await mkdtemp(join(tmpdir(), "pumped-published-types-"))
 
 try {
   const packages = await Promise.all(
@@ -95,7 +96,7 @@ async function check(tsc, project) {
   } catch (error) {
     const diagnostics = String(error.stdout)
       .split("\n")
-      .filter((line) => /^(?:\.\.\/)?pkg\/.*\(\d+,\d+\): error TS|^all\.[mc]ts\(\d+,\d+\): error TS/.test(line))
+      .filter((line) => /(?:pkg\/.*|all\.[mc]ts).*\(\d+,\d+\): error TS/.test(line))
     if (diagnostics.length === 0) return
     throw new Error(diagnostics.join("\n"))
   }
