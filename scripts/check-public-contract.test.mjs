@@ -75,6 +75,27 @@ describe("public contract checker", () => {
     });
   });
 
+  it("accepts major migration evidence after correcting an early version change", () => {
+    const directory = fixture("valid");
+    const packagePath = join(directory, "pkg/core/demo/package.json");
+    const manifest = JSON.parse(readFileSync(packagePath, "utf8"));
+    manifest.version = "0.2.0";
+    writeFileSync(packagePath, `${JSON.stringify(manifest, null, 2)}\n`);
+    writeFileSync(join(directory, "pkg/core/demo/MIGRATION.md"), "# Migration to 1.0.0\n");
+    writeFileSync(join(directory, "pkg/core/demo/README.md"), "# Fixture\n\n## Migration to 1.0.0\n");
+    execFileSync("git", ["add", "."], { cwd: directory });
+    execFileSync("git", ["commit", "-qm", "published version"], { cwd: directory });
+    manifest.version = "1.0.0";
+    writeFileSync(packagePath, `${JSON.stringify(manifest, null, 2)}\n`);
+    execFileSync("git", ["add", packagePath], { cwd: directory });
+    execFileSync("git", ["commit", "-qm", "premature version"], { cwd: directory });
+    manifest.version = "0.2.0";
+    writeFileSync(packagePath, `${JSON.stringify(manifest, null, 2)}\n`);
+    const result = execute(directory);
+    assert.equal(result.status, 0);
+    assert.equal(result.output.metrics.major_migration_evidence_gap_count, 0);
+  });
+
   it("reports every direct negative fixture metric deterministically", () => {
     const first = run("invalid");
     const second = run("invalid");
