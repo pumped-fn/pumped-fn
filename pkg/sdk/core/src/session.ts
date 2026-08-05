@@ -194,7 +194,8 @@ export interface AttemptSettlement {
 export interface AdmitWorkInput {
   readonly id: WorkId
   readonly parentId?: WorkId
-  readonly branchId: BranchId
+  /** Defaults to the session record's current branch. */
+  readonly branchId?: BranchId
   readonly role: string
   readonly policy: "all" | "fail-fast"
   readonly authority?: AuthorityConstraints
@@ -1436,17 +1437,24 @@ class Runtime implements SessionRuntime {
   private admit(input: AdmitWorkInput): ActiveAttempt {
     this.assertActive()
     if (this.#status !== "open") throw new Error(`Session ${this.#record.id} does not admit work while ${this.#status}`)
+    const branchId = input.branchId ?? this.#record.currentBranchId
     const existing = this.#record.work.find((item) => item.id === input.id)
     if (existing) {
       if (existing.status !== "ready") throw new Error(`Work ${input.id} already exists`)
-      return this.resume(existing, input)
+      return this.resume(existing, input, branchId)
     }
-    const branch = this.branch(input.branchId)
+    const branch = this.branch(branchId)
     const parent = input.parentId === undefined ? undefined : this.workRecord(input.parentId)
     if (parent && parent.branchId !== branch.id) throw new Error(`Work ${parent.id} is not on branch ${branch.id}`)
     const authority = narrowAuthority(parent?.authority ?? branch.authority, input.authority ?? {})
 
-    const work = Object.freeze({ ...input, status: "working" as const, attempt: 1, authority })
+    const work: WorkRecord = Object.freeze({
+      ...input,
+      branchId,
+      status: "working",
+      attempt: 1,
+      authority,
+    })
     const attempt = Object.freeze({
       workId: work.id,
       attempt: work.attempt,
@@ -1479,9 +1487,9 @@ class Runtime implements SessionRuntime {
     return value
   }
 
-  private resume(existing: WorkRecord, input: AdmitWorkInput): ActiveAttempt {
+  private resume(existing: WorkRecord, input: AdmitWorkInput, branchId: BranchId): ActiveAttempt {
     if (
-      existing.branchId !== input.branchId
+      existing.branchId !== branchId
       || existing.role !== input.role
       || existing.policy !== input.policy
       || existing.parentId !== input.parentId

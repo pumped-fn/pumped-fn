@@ -338,6 +338,181 @@ describe("session runtime", () => {
     await scope.dispose()
   })
 
+  it("stores the session.run branch default explicitly and still deduplicates by work id", async () => {
+    const bound = authorityValue()
+    const turn = flow({ name: "test.defaulted-work", factory: () => "done" })
+    const scope = createScope({ tags: [
+      authority(bound),
+      record(initial(bound)),
+      clock(fixedClock),
+      execution.turn({ flow: turn }),
+    ] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+
+    await expect(ctx.exec({
+      flow: run,
+      input: {
+        work: { id: "defaulted", role: "test", policy: "all" },
+        input: undefined,
+      },
+    })).resolves.toBe("done")
+    expect(runtime.record.work).toMatchObject([{
+      id: "defaulted",
+      branchId: "main",
+      role: "test",
+      policy: "all",
+      status: "completed",
+    }])
+    await expect(ctx.exec({
+      flow: run,
+      input: {
+        work: { id: "defaulted", role: "test", policy: "all" },
+        input: undefined,
+      },
+    })).rejects.toThrow("Work defaulted already exists")
+    expect(runtime.record.work).toHaveLength(1)
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("compares the resolved branch default when ready work resumes", async () => {
+    const bound = authorityValue()
+    const inspect = flow({
+      name: "test.defaulted-resume",
+      deps: {
+        work: tags.required(current.work),
+        attempt: tags.required(current.attempt),
+      },
+      factory: (_ctx, { work, attempt }) => `${work.branchId}:${work.policy}:${attempt.attempt}`,
+    })
+    const scope = createScope({ tags: [
+      authority(bound),
+      record(initial(bound)),
+      clock(fixedClock),
+      execution.turn({ flow: inspect }),
+    ] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+    const creator = runtime.work.admit({ id: "creator", role: "test", policy: "all" })
+    runtime.work.settle("creator", creator.record.attempt, { status: "completed" })
+    const child = runtime.branches.fork({
+      id: "child",
+      parentId: "main",
+      workId: "creator",
+      authority: {},
+    })
+    runtime.park({
+      work: { id: "resumable", role: "test", policy: "all" },
+      intent: {
+        id: "resume-defaults",
+        dueAt: "2026-07-15T00:00:00.000Z",
+        priority: 1,
+        expectedSessionVersion: 0,
+      },
+    })
+    runtime.wake("resume-defaults", runtime.previewWake("resume-defaults"))
+
+    await expect(ctx.exec({
+      flow: run,
+      input: {
+        work: { id: "resumable", branchId: child.id, role: "test", policy: "all" },
+        input: undefined,
+      },
+    })).rejects.toThrow("Work resumable resume contract changed")
+    await expect(ctx.exec({
+      flow: run,
+      input: {
+        work: { id: "resumable", role: "test", policy: "fail-fast" },
+        input: undefined,
+      },
+    })).rejects.toThrow("Work resumable resume contract changed")
+    expect(runtime.record.work.find((work) => work.id === "resumable")).toMatchObject({
+      branchId: "main",
+      policy: "all",
+      status: "ready",
+      attempt: 2,
+    })
+    await expect(ctx.exec({
+      flow: run,
+      input: {
+        work: { id: "resumable", role: "test", policy: "all" },
+        input: undefined,
+      },
+    })).resolves.toBe("main:all:2")
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("derives an omitted branch from the recorded current branch", async () => {
+    const bound = authorityValue()
+    const setupScope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const setup = setupScope.createContext()
+    const setupRuntime = await setup.resolve(session)
+    const creator = setupRuntime.work.admit({ id: "creator", role: "test", policy: "all" })
+    setupRuntime.work.settle("creator", creator.record.attempt, { status: "completed" })
+    const child = setupRuntime.branches.fork({
+      id: "current-child",
+      parentId: "main",
+      workId: "creator",
+      authority: {},
+    })
+    const loaded = Object.freeze({ ...setupRuntime.record, currentBranchId: child.id })
+    await setup.close()
+    await setupScope.dispose()
+
+    const turn = flow({ name: "test.current-branch-default", factory: () => "done" })
+    const scope = createScope({ tags: [
+      authority(bound),
+      record(loaded),
+      clock(fixedClock),
+      execution.turn({ flow: turn }),
+    ] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+
+    await expect(ctx.exec({
+      flow: run,
+      input: {
+        work: { id: "child-work", role: "test", policy: "all" },
+        input: undefined,
+      },
+    })).resolves.toBe("done")
+    expect(runtime.record.work.find((work) => work.id === "child-work")).toMatchObject({
+      branchId: "current-child",
+      policy: "all",
+    })
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("joins multiple work items admitted with the branch default", async () => {
+    const bound = authorityValue()
+    const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })
+    const ctx = scope.createContext()
+    const runtime = await ctx.resolve(session)
+    const first = runtime.work.admit({ id: "first-defaulted", role: "test", policy: "all" })
+    const second = runtime.work.admit({ id: "second-defaulted", role: "test", policy: "all" })
+    const joined = ctx.exec({
+      flow: join,
+      input: { workIds: [first.record.workId, second.record.workId], policy: "all" },
+    })
+
+    runtime.work.settle(second.record.workId, second.record.attempt, { status: "completed" })
+    runtime.work.settle(first.record.workId, first.record.attempt, { status: "completed" })
+    await expect(joined).resolves.toEqual([{ status: "completed" }, { status: "completed" }])
+    expect(runtime.record.work.filter((work) => work.id.endsWith("-defaulted"))).toMatchObject([
+      { branchId: "main", policy: "all" },
+      { branchId: "main", policy: "all" },
+    ])
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
   it("requires a turn binding when the run graph activates", async () => {
     const bound = authorityValue()
     const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })

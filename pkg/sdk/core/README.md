@@ -142,6 +142,22 @@ A step `timeoutMs` rejects at the deadline and aborts the `abortSignal` tag. Ste
 | `session.store.*`, `session.memory.*`, `session.scheduler.*` | Effect implementors |
 | `session.observation.*` | Safe execution projection for extensions |
 
+### Work admission
+
+`session.run` requires a stable work identity, role, and failure policy. Branch has an unconditional default:
+
+```ts
+const work: session.AdmitWorkInput = {
+  id: "review-42",
+  role: "reviewer",
+  policy: "all",
+}
+```
+
+At admission, an omitted `branchId` resolves to `session.record.currentBranchId`. The resulting `WorkRecord` stores the effective branch and explicit policy. A ready work item may resume with the same omitted branch, but a later explicit branch that resolves differently fails the resume contract.
+
+`id` stays required because it is the deduplication and resume key. `role` stays required because admission has no unconditional, recorded source from which to choose one. `policy` stays required because it controls failure handling. Defaulting it to `"all"` would be fail-open: an orchestrator carrying `work.policy` into `session.join` would leave sibling work running after a child fails.
+
 Executing the entry flow recursively activates its complete declared dependency tree before its factory starts. Required tags are checked at runtime during activation. Missing role config, validation, provider, session, tool backend, or store bindings fail at that boundary. Static missing-tag analysis is not part of this release.
 
 The full-tree activation is also the test model. A test supplies tags or presets at `createScope`, executes the public entry flow, and gets the same tree with selected edges replaced. It does not mock every descendant.
