@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/sdk-codex",
-  "version": "3.0.1",
+  "version": "4.0.0",
   "private": false,
   "description": "Codex CLI model provider for @pumped-fn/sdk",
   "type": "module",
