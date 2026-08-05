@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/sdk",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "private": false,
   "description": "Agent workflow and app helpers for @pumped-fn/lite",
   "type": "module",
