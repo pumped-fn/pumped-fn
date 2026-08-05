@@ -10,7 +10,6 @@ integration("invokes the authenticated Claude CLI", async () => {
       auth: { kind: "global" },
       cwd: process.cwd(),
       roots: [],
-      permission: "deny",
       shutdownTimeoutMs: 1_000,
     })],
   })

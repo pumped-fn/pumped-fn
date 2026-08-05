@@ -287,6 +287,95 @@ describe("session review regressions", () => {
     }
   })
 
+  it("truncates sandbox command events and results to the UTF-8 output limit", async () => {
+    const bound = createAuthority({
+      tenant: "tenant-a",
+      roots: ["/workspace"],
+      permissions: [],
+      tools: [],
+      sandbox: { roots: ["/workspace"], commands: ["echo"], write: false, network: false },
+    })
+    const execute = flow({
+      name: "review.sandbox.exec-output",
+      parse: typed<sandbox.ExecInput>(),
+      factory: async function* (): AsyncGenerator<sandbox.CommandOutputEvent, sandbox.ExecResult, unknown> {
+        yield { type: "stdout", content: "éé" }
+        yield { type: "stderr", content: "abc" }
+        return { stdout: "éé", stderr: "abc", exitCode: 0 }
+      },
+    })
+    const scope = createScope({ tags: [
+      authority(bound),
+      record(initial(bound)),
+      clock(fixedClock),
+      sandbox.policy({
+        roots: ["/workspace"],
+        write: false,
+        network: false,
+        commands: ["echo"],
+        timeoutMs: 1_000,
+        maxOutputBytes: 5,
+      }),
+      sandbox.impl.run(execute),
+    ] })
+    const ctx = scope.createContext()
+    const stream = ctx.execStream({ flow: sandbox.exec, input: { command: "echo" } })
+    const events: sandbox.CommandOutputEvent[] = []
+
+    for await (const event of stream) events.push(event)
+    await expect(stream.result).resolves.toEqual({ stdout: "éé", stderr: "a", exitCode: 0 })
+    expect(events).toEqual([
+      { type: "stdout", content: "éé" },
+      { type: "stderr", content: "a" },
+    ])
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("aborts sandbox command bindings at the policy timeout", async () => {
+    const bound = createAuthority({
+      tenant: "tenant-a",
+      roots: ["/workspace"],
+      permissions: [],
+      tools: [],
+      sandbox: { roots: ["/workspace"], commands: ["wait"], write: false, network: false },
+    })
+    const execute = flow({
+      name: "review.sandbox.exec-timeout",
+      parse: typed<sandbox.ExecInput>(),
+      factory: async function* (ctx): AsyncGenerator<sandbox.CommandOutputEvent, sandbox.ExecResult, unknown> {
+        await new Promise<never>((_resolve, reject) => {
+          ctx.signal.addEventListener("abort", () => reject(ctx.signal.reason), { once: true })
+        })
+        return { stdout: "", stderr: "", exitCode: 0 }
+      },
+    })
+    const scope = createScope({ tags: [
+      authority(bound),
+      record(initial(bound)),
+      clock(fixedClock),
+      sandbox.policy({
+        roots: ["/workspace"],
+        write: false,
+        network: false,
+        commands: ["wait"],
+        timeoutMs: 5,
+        maxOutputBytes: 1_024,
+      }),
+      sandbox.impl.run(execute),
+    ] })
+    const ctx = scope.createContext()
+
+    await expect(ctx.exec({
+      flow: sandbox.exec,
+      input: { command: "wait" },
+    })).rejects.toThrow("Sandbox command timed out after 5ms")
+
+    await ctx.close({ ok: false, error: new Error("expected") })
+    await scope.dispose()
+  })
+
   it("rejects invalid merge inputs without changing branch state", async () => {
     const bound = authorityValue()
     const scope = createScope({ tags: [authority(bound), record(initial(bound)), clock(fixedClock)] })

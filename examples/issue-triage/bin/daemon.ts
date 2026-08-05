@@ -67,7 +67,7 @@ const scope = createScope({
     session.clock({ now: () => new Date().toISOString() }),
     session.execution.turn({ flow: agent.turn }),
     sdkValidation.engine(createZodSdkEngine()),
-    pi.piConfig(values.model),
+    pi.piConfig({ auth: { kind: "api-key" }, ...values.model }),
     pi.piAttemptBinding,
     logging.runtime({
       flow: "all",

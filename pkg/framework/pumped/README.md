@@ -47,7 +47,12 @@ import { app } from "@pumped-fn/pumped/app"
 import { claude, claudeConfig } from "@pumped-fn/sdk-claude"
 
 export default app({
-  tags: [claude, claudeConfig({ auth: { kind: "global" } })],
+  tags: [claude, claudeConfig({
+    auth: { kind: "global" },
+    cwd: process.cwd(),
+    roots: [],
+    shutdownTimeoutMs: 1_000,
+  })],
 })
 ```
 

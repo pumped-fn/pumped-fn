@@ -10,7 +10,7 @@ const integration = it.skipIf(
 
 integration("invokes pi-ai with a configured provider key", async () => {
   const scope = createScope({
-    tags: [piConfig({ provider: "anthropic", modelId: selected!.id, apiKeyEnv: "ANTHROPIC_API_KEY" })],
+    tags: [piConfig({ auth: { kind: "api-key", env: "ANTHROPIC_API_KEY" }, provider: "anthropic", modelId: selected!.id })],
   })
   const ctx = scope.createContext()
 

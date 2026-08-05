@@ -45,7 +45,7 @@ describe("agent runtime tags", () => {
     })
     const scope = createScope()
     const ctx = scope.createContext({ tags: [workflowRun({ taskId: "workflow-missing-extension", runId: "run" })] })
-    await expect(ctx.exec({ flow: root })).rejects.toThrow('Tag "workflow.runtime" not found')
+    await expect(ctx.exec({ flow: root })).rejects.toThrow('Tag "workflow.context" not found')
     await ctx.close({ ok: false, error: new Error("expected") })
     await scope.dispose()
   })

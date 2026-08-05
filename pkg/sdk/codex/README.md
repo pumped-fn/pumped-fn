@@ -9,13 +9,13 @@ import { createScope } from "@pumped-fn/lite"
 import * as codex from "@pumped-fn/sdk-codex"
 
 const scope = createScope({
-  tags: codex.codexConfig({
+  tags: codex.config({
     auth: { kind: "global" },
     cwd: "/absolute/path/to/project",
   }),
 })
 const ctx = scope.createContext()
-await ctx.exec({ flow: codex.codexTurn, input: {
+await ctx.exec({ flow: codex.turn, input: {
   agentName: "triage",
   instructions: "Triage the ticket.",
   messages: [{ role: "user", content: "Login fails after refresh." }],
@@ -45,7 +45,7 @@ rejected in split and `--flag=value` forms.
 
 ACP uses `@agentclientprotocol/codex-acp` over stdio through the official TypeScript client. Its auth,
 working directory, extra roots, permission policy, and shutdown bound are required. Paths must be
-absolute. An empty `additionalDirectories` array means no extra roots. Every permission decision is
+absolute. An empty `roots` array means no extra roots. Every permission decision is
 emitted as a provider status event by streaming attempts.
 
 ```ts
@@ -53,17 +53,17 @@ import * as codex from "@pumped-fn/sdk-codex"
 import { createScope } from "@pumped-fn/lite"
 
 const scope = createScope({
-  tags: codex.config({
+  tags: codex.codexAcpConfig({
     auth: { kind: "global" },
     cwd: process.cwd(),
-    additionalDirectories: [],
+    roots: [],
     permission: "deny",
     shutdownTimeoutMs: 5_000,
   }),
 })
 const ctx = scope.createContext()
-await ctx.resolve(codex.engine)
-await ctx.exec({ flow: codex.turn, input: {
+await ctx.resolve(codex.acp)
+await ctx.exec({ flow: codex.codexAcpTurn, input: {
   agentName: "triage",
   instructions: "Triage the ticket.",
   messages: [{ role: "user", content: "Login fails after refresh." }],
@@ -73,10 +73,11 @@ await ctx.close()
 await scope.dispose()
 ```
 
-ACP applies the same current-work check to `cwd`, `additionalDirectories`, and granted write and
+ACP applies the same current-work check to `cwd`, `roots`, and granted write and
 network capabilities before starting its process or creating a session.
 
-Each ACP prompt sends `cwd`, `additionalDirectories`, and `mcpServers: []`. Pumped-fn tool collection
+Each ACP prompt maps `roots` to the ACP protocol's `additionalDirectories` field and sends
+`mcpServers: []`. Pumped-fn tool collection
 and MCP projection remain deferred. Abort sends `session/cancel`, releases local correlation state,
 and waits at most `shutdownTimeoutMs` for the remote prompt and cancellation to settle. A timed-out
 prompt terminates and releases its transport before a replacement can start. Failed termination
@@ -99,9 +100,17 @@ no rejected update queue.
 
 The stable CLI handles remain `codex`, `codexTurn`, and `codexRun`; ACP keeps `codexAcp`,
 `codexAcpTurn`, `codexAcpPrompt`, `codexAcpConfig`, and `acp`. Package-module imports expose the
-managed ACP aliases `config`, `engine`, `run`, `turn`, and `provider`. They are the same graph handles,
-not a facade object or shared scope factory. Tests can preset `run` or `engine` through `createScope`
-without changing the agent graph.
+CLI aliases `config`, `run`, `turn`, and `provider`. They are the same graph handles, not a facade
+object or shared scope factory. There is no generic `engine` alias; preset the CLI `run` edge or the
+ACP `acp` resource by its explicit name.
+
+## Migration to 4.0.0
+
+| Before | Now |
+|---|---|
+| ACP aliases `config`, `run`, `turn`, and `provider` | CLI aliases; use `codexAcpConfig`, `codexAcpPrompt`, `codexAcpTurn`, and `codexAcp` for ACP |
+| `engine` | removed; use `acp` for the ACP process resource |
+| ACP config `additionalDirectories` | `roots` |
 
 ## Migration to 3.0.0
 

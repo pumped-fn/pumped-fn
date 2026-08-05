@@ -1,7 +1,6 @@
 import { flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 import {
   extension as suspenseExtension,
-  formatSuspenseStepKey,
   stepCounter,
   type SuspenseEventLog,
   type SuspenseExecEvent,
@@ -14,7 +13,7 @@ import { model } from "./model.js"
 
 export { model }
 
-export type WorkerKind = "code" | "llm" | "cli" | string
+export type WorkerKind = "code" | "llm" | "cli" | (string & {})
 
 export type StepCounter = SuspenseStepCounter
 export type WorkflowStepKey = SuspenseStepKey
@@ -29,7 +28,7 @@ export interface ExecEvent {
   readonly targetName: string
   readonly input: unknown
 }
-/** Configures workflow, remote, durability, worker kind, and timeout behavior for a step. */
+/** Configures workflow, remote, durability, worker kind, and cooperative timeout behavior for a step. */
 export interface Step {
   workflow?: boolean
   remote?: boolean
@@ -38,7 +37,7 @@ export interface Step {
   timeoutMs?: number
 }
 
-export { SuspendSignal, SuspenseSignal } from "@pumped-fn/lite-extension-suspense"
+export { SuspendSignal } from "@pumped-fn/lite-extension-suspense"
 
 /** Delegates a traced execution while preserving the local continuation. */
 export interface RemoteRunner {
@@ -59,10 +58,6 @@ export interface ExtensionOptions {
 
 export const step = tag<Step>({ label: "agent.step", default: {} })
 
-export function formatStepKey(key: WorkflowStepKey): string {
-  return formatSuspenseStepKey(key)
-}
-
 /** Identifies the task and run attached to an execution scope. */
 export interface WorkflowRunOptions {
   taskId: string
@@ -75,15 +70,8 @@ export interface WorkflowContext {
   readonly runId: string
 }
 
-/** Exposes the task and run identity resolved for agent execution. */
-export interface Runtime {
-  readonly taskId: string
-  readonly runId: string
-}
-
 export const workflowRun = tag<WorkflowRunOptions>({ label: "workflow.run" })
-export const workflow = tag<WorkflowContext>({ label: "workflow.runtime" })
-export const runtime = tag<Runtime>({ label: "agent.runtime" })
+export const workflow = tag<WorkflowContext>({ label: "workflow.context" })
 export const abortSignal = tag<AbortSignal>({ label: "workflow.abortSignal" })
 
 const activeWorkflowEvent = tag<WorkflowExecEvent>({ label: "workflow.event" })
@@ -100,8 +88,8 @@ export function workflowExtension(options: WorkflowExtensionOptions): Lite.Exten
     ...base,
     async wrapExec(next, target, ctx) {
       const wrapExec = base.wrapExec
-      if (!wrapExec) return withRuntimeTag(ctx, workflow, workflowRuntimeOf(ctx, options), next)
-      return withRuntimeTag(ctx, workflow, workflowRuntimeOf(ctx, options), () => wrapExec(next, target, ctx))
+      if (!wrapExec) return withTag(ctx, workflow, workflowContextOf(ctx, options), next)
+      return withTag(ctx, workflow, workflowContextOf(ctx, options), () => wrapExec(next, target, ctx))
     },
   }
 }
@@ -110,11 +98,10 @@ export function extension(options: ExtensionOptions = {}): Lite.Extension {
   return {
     name: "sdk",
     async wrapExec(next, target, ctx) {
-      return withRuntimeTag(ctx, runtime, runtimeOf(ctx), async () => {
-        if (stepOf(target, ctx).remote !== true) return next()
-        if (!options.remoteRunner) throw new Error("Remote step requires remoteRunner")
-        return options.remoteRunner.run(execEvent(target, ctx), next)
-      })
+      if (!ctx.data.seekTag(workflow)) throw new Error("sdk extension requires workflow extension to run first")
+      if (stepOf(target, ctx).remote !== true) return next()
+      if (!options.remoteRunner) throw new Error("Remote step requires remoteRunner")
+      return options.remoteRunner.run(execEvent(target, ctx), next)
     },
   }
 }
@@ -179,7 +166,7 @@ function nextWorkflowKey(
   return { taskId: foundTaskId, runId: foundRunId, step: counter.next++ }
 }
 
-function workflowRuntimeOf(
+function workflowContextOf(
   ctx: Lite.ExecutionContext,
   options: Pick<WorkflowExtensionOptions, "defaultTaskId" | "defaultRunId">
 ): WorkflowContext {
@@ -190,27 +177,18 @@ function workflowRuntimeOf(
   }
 }
 
-function runtimeOf(ctx: Lite.ExecutionContext): Runtime {
-  const config = ctx.data.seekTag(workflow)
-  if (!config) throw new Error("agent extension requires workflow extension")
-  return {
-    taskId: config.taskId,
-    runId: config.runId,
-  }
-}
-
-function withRuntimeTag<T, R>(
+function withTag<T, R>(
   ctx: Lite.ExecutionContext,
-  runtimeTag: Lite.Tag<T, boolean>,
+  targetTag: Lite.Tag<T, boolean>,
   value: T,
   next: () => Promise<R>
 ): Promise<R> {
-  const hadPrevious = ctx.data.hasTag(runtimeTag)
-  const previous = ctx.data.getTag(runtimeTag)
-  ctx.data.setTag(runtimeTag, value)
+  const hadPrevious = ctx.data.hasTag(targetTag)
+  const previous = ctx.data.getTag(targetTag)
+  ctx.data.setTag(targetTag, value)
   return next().finally(() => {
-    if (hadPrevious) ctx.data.setTag(runtimeTag, previous as T)
-    else ctx.data.deleteTag(runtimeTag)
+    if (hadPrevious) ctx.data.setTag(targetTag, previous as T)
+    else ctx.data.deleteTag(targetTag)
   })
 }
 
@@ -240,7 +218,7 @@ function runTimer(target: Lite.ExecTarget, ctx: Lite.ExecutionContext, next: () 
   if (timeoutMs === undefined) return next()
   const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
-  return withRuntimeTag(ctx, abortSignal, controller.signal, () =>
+  return withTag(ctx, abortSignal, controller.signal, () =>
     Promise.race([
       next(),
       new Promise<never>((_, reject) => {
@@ -280,18 +258,27 @@ export interface CliIsolateOptions {
   env?: Record<string, string | undefined>
 }
 
-/** Captures a CLI worker's output, exit code, and terminating signal. */
+/** Captures a successful CLI worker run. Failures throw CliWorkerError with details in error.result. */
 export interface CliResult {
+  stdout: string
+  stderr: string
+  exitCode: 0
+  signal: null
+}
+
+/** Captures output and process status for a failed CLI worker run. */
+export interface CliFailureResult {
   stdout: string
   stderr: string
   exitCode: number | null
   signal: string | null
 }
 
+/** Reports a CLI worker failure and exposes its process details through result. */
 export class CliWorkerError extends Error {
   override readonly name = "CliWorkerError"
 
-  constructor(message: string, readonly result: CliResult) {
+  constructor(message: string, readonly result: CliFailureResult) {
     super(message)
   }
 }
@@ -311,36 +298,35 @@ export interface RunCliOptions {
 export async function runCli(options: RunCliOptions): Promise<CliResult> {
   const { execFile } = await import("node:child_process")
   const prepared = await prepareCli(options)
-  return new Promise((resolve, reject) => {
+  return new Promise<CliResult>((resolve, reject) => {
     const child = execFile(prepared.command, [...prepared.args], {
       cwd: prepared.cwd,
       env: prepared.env,
       timeout: options.timeoutMs,
       signal: options.signal,
-    }, async (error, stdout, stderr) => {
-      await prepared.cleanup()
+    }, (error, stdout, stderr) => {
       const execError = error as ExecFileError | null
-      const exitCode = typeof execError?.code === "number" ? execError.code : error ? null : 0
-      const signal = execError?.signal ?? null
-      const result = { stdout: String(stdout), stderr: String(stderr), exitCode, signal }
-      if (execError?.killed && options.timeoutMs !== undefined) {
+      if (!execError) {
+        resolve({ stdout: String(stdout), stderr: String(stderr), exitCode: 0, signal: null })
+        return
+      }
+      const exitCode = typeof execError.code === "number" ? execError.code : null
+      const signal = execError.signal ?? null
+      const result: CliFailureResult = { stdout: String(stdout), stderr: String(stderr), exitCode, signal }
+      if (execError.killed && options.timeoutMs !== undefined) {
         reject(new CliWorkerError(`CLI command timed out after ${options.timeoutMs}ms`, result))
         return
       }
-      if (execError?.name === "AbortError") {
+      if (execError.name === "AbortError") {
         reject(new CliWorkerError("CLI command aborted", result))
         return
       }
-      if (error) {
-        const label = exitCode === null ? error.message : `CLI command failed with exit code ${exitCode}`
-        reject(new CliWorkerError(label, result))
-        return
-      }
-      resolve(result)
+      const label = exitCode === null ? execError.message : `CLI command failed with exit code ${exitCode}`
+      reject(new CliWorkerError(label, result))
     })
 
     child.stdin?.end(options.stdin)
-  })
+  }).finally(() => prepared.cleanup())
 }
 
 interface PreparedCli {
@@ -530,9 +516,9 @@ export function formatModelPrompt(request: ModelRequest): string {
 
 export function parseModelResponse(output: string): ModelResponse {
   const value = readJson(output)
-  if (!isRecord(value)) return { content: output, stop: true }
+  if (!isModelResponseRecord(value)) throw new ModelResponseParseError(output)
   const response: ModelResponse = {
-    content: typeof value["content"] === "string" ? value["content"] : output,
+    content: value.content,
     stop: typeof value["stop"] === "boolean" ? value["stop"] : true,
   }
   const guard = guardTextOf(value["guard"] ?? value["antiGoal"])
@@ -546,25 +532,62 @@ export function parseModelResponse(output: string): ModelResponse {
   return response
 }
 
+/** Reports model output that does not contain a valid JSON response object. */
+export class ModelResponseParseError extends Error {
+  override readonly name = "ModelResponseParseError"
+
+  constructor(readonly output: string) {
+    super("Model response must contain a valid JSON object")
+  }
+}
+
 function readJson(output: string): unknown {
   const trimmed = output.trim()
   if (!trimmed) return undefined
-  try {
-    return JSON.parse(trimmed) as unknown
-  } catch {
-    const start = trimmed.indexOf("{")
-    const end = trimmed.lastIndexOf("}")
-    if (start === -1 || end <= start) return undefined
-    try {
-      return JSON.parse(trimmed.slice(start, end + 1)) as unknown
-    } catch {
-      return undefined
-    }
+  const direct = parseJson(trimmed)
+  if (isModelResponseRecord(direct)) return direct
+  for (let start = trimmed.indexOf("{"); start !== -1; start = trimmed.indexOf("{", start + 1)) {
+    const end = jsonObjectEnd(trimmed, start)
+    if (end === undefined) continue
+    const value = parseJson(trimmed.slice(start, end))
+    if (isModelResponseRecord(value)) return value
   }
+  return undefined
+}
+
+function parseJson(value: string): unknown {
+  try {
+    return JSON.parse(value) as unknown
+  } catch {
+    return undefined
+  }
+}
+
+function jsonObjectEnd(value: string, start: number): number | undefined {
+  let depth = 0
+  let quoted = false
+  let escaped = false
+  for (let index = start; index < value.length; index++) {
+    const character = value[index]!
+    if (quoted) {
+      if (escaped) escaped = false
+      else if (character === "\\") escaped = true
+      else if (character === '"') quoted = false
+      continue
+    }
+    if (character === '"') quoted = true
+    else if (character === "{") depth++
+    else if (character === "}" && --depth === 0) return index + 1
+  }
+  return undefined
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isModelResponseRecord(value: unknown): value is Record<string, unknown> & { content: string } {
+  return isRecord(value) && typeof value["content"] === "string"
 }
 
 function skillCallsOf(value: unknown): SkillCall[] | undefined {
@@ -817,10 +840,6 @@ export interface RunRecord {
 /** Provides workflow event storage with task and run filtering. */
 export interface RunLog extends WorkflowEventLog {
   entries(query?: Partial<RunQuery>): MaybePromise<readonly WorkflowStepEntry[]>
-}
-
-export function judge(options: Judge): Judge {
-  return options
 }
 
 export function suite(options: SuiteOptions): Suite {

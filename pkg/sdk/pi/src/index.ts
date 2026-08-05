@@ -26,12 +26,14 @@ import {
 import * as agent from "@pumped-fn/sdk/agent"
 import * as session from "@pumped-fn/sdk/session"
 
-/** Selects a Pi provider, model, thinking level, and API-key environment variable. */
+export type PiAuth = { kind: "api-key"; env?: string }
+
+/** Selects Pi authentication, provider, model, and thinking level. */
 export interface PiConfig {
+  auth: PiAuth
   provider: string
   modelId: string
   thinking?: "minimal" | "low" | "medium" | "high" | "xhigh"
-  apiKeyEnv?: string
 }
 
 export class PiProviderError extends Error {
@@ -106,7 +108,7 @@ export const piAttempt: agent.Attempt = flow({
       messages: ctx.input.messages.flatMap((message, index) => messagesOf(message, selected, clock(), index)),
       ...(tools.length ? { tools } : {}),
     }
-    const apiKey = config.apiKeyEnv ? requireEnvironment(environment, config.apiKeyEnv, config) : undefined
+    const apiKey = config.auth.env ? requireEnvironment(environment, config.auth.env, config) : undefined
     const controller = new AbortController()
     const abort = () => controller.abort(signal.reason)
     signal.addEventListener("abort", abort, { once: true })
@@ -128,7 +130,7 @@ export const piAttempt: agent.Attempt = flow({
         throw new PiProviderError(response.errorMessage ?? `pi-ai ${response.stopReason}`, config.provider, config.modelId)
       }
       completed = true
-      return responseOf(response, tools)
+      return responseOf(response, tools, config)
     } finally {
       signal.removeEventListener("abort", abort)
       if (!completed) controller.abort(new DOMException("Pi attempt stream closed", "AbortError"))
@@ -365,7 +367,7 @@ function emptyUsage(): AssistantMessage["usage"] {
   }
 }
 
-function responseOf(response: AssistantMessage, tools: Tool[]): ModelResponse {
+function responseOf(response: AssistantMessage, tools: Tool[], config: PiConfig): ModelResponse {
   const calls = response.content.filter((item): item is PiToolCall => item.type === "toolCall")
   for (const call of calls) validateToolCall(tools, call)
   const toolCalls = calls.filter((call) => call.name !== "load_skill" && call.name !== "call_subagent")
@@ -377,11 +379,11 @@ function responseOf(response: AssistantMessage, tools: Tool[]): ModelResponse {
       .map((item) => item.text)
       .join(""),
     ...(toolCalls.length ? { toolCalls: toolCalls.map((call) => ({ name: call.name, input: call.arguments, id: call.id })) } : {}),
-    ...(skillCalls.length ? { skillCalls: skillCalls.map((call) => ({ name: stringArgument(call, "name"), id: call.id })) } : {}),
+    ...(skillCalls.length ? { skillCalls: skillCalls.map((call) => ({ name: stringArgument(call, "name", config), id: call.id })) } : {}),
     ...(subagentCalls.length ? {
       subagentCalls: subagentCalls.map((call) => ({
-        name: stringArgument(call, "name"),
-        input: { prompt: stringArgument(call, "prompt") },
+        name: stringArgument(call, "name", config),
+        input: { prompt: stringArgument(call, "prompt", config) },
         id: call.id,
       })),
     } : {}),
@@ -389,8 +391,8 @@ function responseOf(response: AssistantMessage, tools: Tool[]): ModelResponse {
   }
 }
 
-function stringArgument(call: PiToolCall, name: string): string {
+function stringArgument(call: PiToolCall, name: string, config: PiConfig): string {
   const value: unknown = call.arguments[name]
   if (typeof value === "string") return value
-  throw new PiProviderError(`pi-ai tool "${call.name}" requires string argument "${name}"`, call.name, name)
+  throw new PiProviderError(`pi-ai tool "${call.name}" requires string argument "${name}"`, config.provider, config.modelId)
 }

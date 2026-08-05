@@ -3,10 +3,11 @@ import { posix } from "node:path"
 import { flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 import * as session from "./session.js"
 
-/** Defines the roots, effects, commands, and resource limits enforced by a sandbox. */
+/** Defines sandbox limits enforced by the SDK. The run binding must enforce physical network access. */
 export interface Policy {
   readonly roots: readonly string[]
   readonly write: boolean
+  /** Declares network access; the sandbox.impl.run binding must enforce this setting. */
   readonly network: boolean
   readonly commands: readonly string[]
   readonly timeoutMs: number
@@ -37,13 +38,13 @@ export interface ExecResult {
   readonly exitCode: number
 }
 
-export type ExecEvent =
+export type CommandOutputEvent =
   | { readonly type: "stdout"; readonly content: string }
   | { readonly type: "stderr"; readonly content: string }
 
 export type Read = Lite.Flow<string, ReadInput>
 export type Write = Lite.Flow<void, WriteInput>
-export type Run = Lite.Flow<ExecResult, ExecInput, never, ExecEvent>
+export type Run = Lite.Flow<ExecResult, ExecInput, never, CommandOutputEvent>
 
 export class PolicyError extends Error {
   constructor(readonly reason: string) {
@@ -102,16 +103,49 @@ export const exec: Run = flow({
     policy: tags.required(policy),
     run: tags.required(impl.run),
   },
-  factory: async function* (ctx, { authority, runtime, policy: value, run }): AsyncGenerator<ExecEvent, ExecResult, unknown> {
+  factory: async function* (ctx, { authority, runtime, policy: value, run }): AsyncGenerator<CommandOutputEvent, ExecResult, unknown> {
     assertPolicy(authority ?? runtime.authority, value)
     if (!value.commands.includes(ctx.input.command)) {
       throw new PolicyError(`command ${JSON.stringify(ctx.input.command)} is not allowed`)
     }
-    const stream = run.execStream({ input: ctx.input })
-    for await (const event of stream) yield event
-    return stream.result
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      controller.abort(new Error(`Sandbox command timed out after ${value.timeoutMs}ms`))
+    }, value.timeoutMs)
+    const budget = { remaining: value.maxOutputBytes }
+    try {
+      const stream = run.execStream({ input: ctx.input, signal: controller.signal })
+      for await (const event of stream) {
+        const content = truncateUtf8(event.content, budget)
+        if (content) yield { ...event, content }
+      }
+      controller.signal.throwIfAborted()
+      return truncateExecResult(await stream.result, value.maxOutputBytes)
+    } finally {
+      clearTimeout(timer)
+    }
   },
 })
+
+function truncateExecResult(result: ExecResult, maxOutputBytes: number): ExecResult {
+  const budget = { remaining: maxOutputBytes }
+  return {
+    stdout: truncateUtf8(result.stdout, budget),
+    stderr: truncateUtf8(result.stderr, budget),
+    exitCode: result.exitCode,
+  }
+}
+
+function truncateUtf8(content: string, budget: { remaining: number }): string {
+  const encoded = new TextEncoder().encode(content)
+  if (encoded.byteLength <= budget.remaining) {
+    budget.remaining -= encoded.byteLength
+    return content
+  }
+  const selected = encoded.subarray(0, budget.remaining)
+  budget.remaining = 0
+  return new TextDecoder().decode(selected, { stream: true })
+}
 
 function assertPolicy(authority: session.Authority, value: Policy): void {
   if (!Number.isFinite(value.timeoutMs) || value.timeoutMs <= 0) {

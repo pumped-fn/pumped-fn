@@ -9,7 +9,11 @@ import { createScope } from "@pumped-fn/lite"
 import * as pi from "@pumped-fn/sdk-pi"
 
 const scope = createScope({
-  tags: pi.piConfig({ provider: "anthropic", modelId: "claude-sonnet-4-5" }),
+  tags: pi.piConfig({
+    auth: { kind: "api-key" },
+    provider: "anthropic",
+    modelId: "claude-sonnet-4-5",
+  }),
 })
 const ctx = scope.createContext()
 await ctx.exec({ flow: pi.piTurn, input: {
@@ -22,14 +26,22 @@ await ctx.close()
 await scope.dispose()
 ```
 
-Set `apiKeyEnv` to resolve an explicit provider key through the environment adapter. Without it,
+Set `auth.env` to resolve an explicit provider key through the environment adapter. Without it,
 pi-ai uses its provider auth chain. `supportedModels` lists the catalog, while `models` is the
 scope-owned collection edge. Native model tool calls become SDK tool, skill, and subagent calls;
 the session runtime owns the resulting model lifecycle event.
 
 `piAttempt` maps pi-ai text, thinking, and lifecycle events to the provider-neutral SDK `ModelEvent`
 stream. Its final result is the same `ModelResponse` returned by `piTurn`; the scalar turn drains the
-attempt. `piAttemptBinding` injects the stream through `agent.impl.attempt`.
+attempt. `piAttemptBinding` injects the stream through `agent.impl.attempt`. There is no generic
+`engine` alias; `models` names the collection seam that tests preset.
+
+## Migration to 4.0.0
+
+| Before | Now |
+|---|---|
+| `apiKeyEnv: "ANTHROPIC_API_KEY"` | `auth: { kind: "api-key", env: "ANTHROPIC_API_KEY" }` |
+| no `apiKeyEnv` | `auth: { kind: "api-key" }` |
 
 ## Migration to 3.0.0
 

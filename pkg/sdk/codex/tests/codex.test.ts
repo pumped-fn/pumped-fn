@@ -8,6 +8,7 @@ import { expect, expectTypeOf, it } from "vitest"
 import * as session from "@pumped-fn/sdk/session"
 import * as codexModule from "../src/index"
 import {
+  acp,
   codex,
   codexAttempt,
   codexAcp,
@@ -18,7 +19,6 @@ import {
   codexConfig,
   codexRun,
   codexTurn,
-  engine,
   type CodexConfig,
 } from "../src/index"
 
@@ -100,10 +100,10 @@ it("normalizes the CLI attempt without changing its scalar response", async () =
 it("provides ACP through a preset prompt edge", async () => {
   const scope = createScope({
     presets: [preset(codexAcpAttempt, fakeAcp)],
-    tags: [codexModule.provider, codexModule.config({
+    tags: [codexAcp, codexAcpConfig({
       auth: { kind: "global" },
       cwd: process.cwd(),
-      additionalDirectories: [],
+      roots: [],
       permission: "deny",
       shutdownTimeoutMs: 5_000,
     })],
@@ -371,25 +371,24 @@ it("binds the ACP resource before spawning its child", async () => {
       auth: { kind: "global" },
       command: "must-not-start",
       cwd: root,
-      additionalDirectories: [],
+      roots: [],
       permission: "deny",
       shutdownTimeoutMs: 100,
     })],
   })
   const ctx = scope.createContext({ tags: [session.current.authority(broad), session.current.work(work)] })
 
-  await expect(ctx.resolve(engine)).rejects.toThrow("Codex authority does not match current work")
+  await expect(ctx.resolve(acp)).rejects.toThrow("Codex authority does not match current work")
   await ctx.close()
   await scope.dispose()
   await rm(root, { recursive: true })
 })
 
-it("exports the managed ACP path as module namespace handles", () => {
-  expect(codexModule.config).toBe(codexAcpConfig)
-  expect(codexModule.engine).toBe(engine)
-  expect(codexModule.run).toBe(codexAcpPrompt)
-  expect(codexModule.turn).toBe(codexAcpTurn)
-  expect(codexModule.provider).toBe(codexAcp)
+it("exports the CLI path as module namespace handles", () => {
+  expect(codexModule.config).toBe(codexConfig)
+  expect(codexModule.run).toBe(codexRun)
+  expect(codexModule.turn).toBe(codexTurn)
+  expect(codexModule.provider).toBe(codex)
   expectTypeOf(codexModule.turn).toMatchTypeOf<Model>()
 })
 

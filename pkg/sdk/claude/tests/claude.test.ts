@@ -18,7 +18,7 @@ import {
   claudeSession,
   claudeTurn,
   clock,
-  engine,
+  spawnProcess,
   ClaudeShutdownError,
   type ClaudeLeaseManager,
 } from "../src/index"
@@ -84,18 +84,18 @@ it("can replace the model tag per context", async () => {
 
 it("exposes aligned package-module handles without a facade", () => {
   expect(claudeModule.config).toBe(claudeConfig)
-  expect(claudeModule.engine).toBe(engine)
+  expect(claudeModule.spawnProcess).toBe(spawnProcess)
   expect(claudeModule.run).toBe(claudeRun)
   expect(claudeModule.turn).toBe(claudeTurn)
   expect(claudeModule.provider).toBe(claude)
-  expectTypeOf(claudeModule.engine).not.toBeAny()
+  expectTypeOf(claudeModule.spawnProcess).not.toBeAny()
 })
 
 it("exposes the canonical turn to attempt graph and retained scalar compatibility graph", () => {
   expect(claudeTurn.deps).toMatchObject({ attempt: { flow: claudeAttempt } })
   expect(claudeAttempt.deps).toMatchObject({ leases: claudeLeases })
   expect(claudeRun.deps).toMatchObject({ session: claudeSession })
-  expect(claudeSession.deps).toMatchObject({ engine })
+  expect(claudeSession.deps).toMatchObject({ spawnProcess })
 })
 
 it("normalizes a managed lease stream and releases its transient process", async () => {
@@ -148,7 +148,7 @@ it("normalizes a managed lease stream and releases its transient process", async
 it("cancels a managed Claude lease when its stream consumer returns", async () => {
   const harness = createHarness()
   const scope = createScope({
-    presets: [preset(engine, harness.engine)],
+    presets: [preset(spawnProcess, harness.spawnProcess)],
     tags: [claudeConfig(managedConfig())],
   })
   const ctx = scope.createContext({ tags: [session.record(sessionRecord("consumer"))] })
@@ -163,7 +163,9 @@ it("cancels a managed Claude lease when its stream consumer returns", async () =
   const result = stream.result.catch(() => undefined)
   await expect(iterator.return?.()).resolves.toMatchObject({ done: true })
   await result
-  expect(harness.signals).toEqual(["SIGINT"])
+  expect(harness.controlInterrupts).toBe(1)
+  expect(harness.signals).toEqual([])
+  expect(harness.ends).toBe(1)
   expect(harness.live).toBe(false)
 
   await ctx.close()
@@ -308,10 +310,10 @@ it("isolates managed leases by branch within one logical session", async () => {
   await scope.dispose()
 })
 
-it("runs sequential stream-json prompts through a scope-owned engine", async () => {
+it("runs sequential stream-json prompts through a scope-owned process", async () => {
   const harness = createHarness()
   const scope = createScope({
-    presets: [preset(engine, harness.engine)],
+    presets: [preset(spawnProcess, harness.spawnProcess)],
     tags: [claudeConfig(managedConfig({ roots: ["/tmp/extra"] }))],
   })
   const ctx = scope.createContext()
@@ -351,7 +353,7 @@ it("runs sequential stream-json prompts through a scope-owned engine", async () 
 it("poisons a managed lease before child failure settles queued prompts", async () => {
   const harness = createHarness()
   const scope = createScope({
-    presets: [preset(engine, harness.engine)],
+    presets: [preset(spawnProcess, harness.spawnProcess)],
     tags: [claudeConfig(managedConfig())],
   })
   const ctx = scope.createContext()
@@ -369,11 +371,11 @@ it("poisons a managed lease before child failure settles queued prompts", async 
   await scope.dispose()
 })
 
-it("interrupts an active prompt and awaits child close", async () => {
-  const harness = createHarness({ closeOnEnd: false, closeOnInterrupt: false })
+it("interrupts an active prompt without closing the child", async () => {
+  const harness = createHarness({ closeOnEnd: false })
   const controller = new AbortController()
   const scope = createScope({
-    presets: [preset(engine, harness.engine)],
+    presets: [preset(spawnProcess, harness.spawnProcess)],
     tags: [claudeConfig(managedConfig())],
   })
   const ctx = scope.createContext()
@@ -383,9 +385,11 @@ it("interrupts an active prompt and awaits child close", async () => {
 
   controller.abort()
   await expect(prompt).rejects.toMatchObject({ name: "AbortError" })
-  await expect(queued).rejects.toThrow("Claude session is closed")
-  expect(harness.interrupts).toBe(1)
+  await expect(queued).rejects.toMatchObject({ name: "AbortError" })
+  expect(harness.controlInterrupts).toBe(1)
+  expect(harness.signals).toEqual([])
   expect(harness.prompts).toEqual(["wait"])
+  expect(harness.live).toBe(true)
 
   let closed = false
   const close = ctx.close().then(() => {
@@ -400,9 +404,37 @@ it("interrupts an active prompt and awaits child close", async () => {
   expect(harness.live).toBe(false)
 })
 
-it("requires config through the graph before the engine starts", async () => {
+it("keeps a session usable after an aborted prompt", async () => {
   const harness = createHarness()
-  const scope = createScope({ presets: [preset(engine, harness.engine)] })
+  const controller = new AbortController()
+  const scope = createScope({
+    presets: [preset(spawnProcess, harness.spawnProcess)],
+    tags: [claudeConfig(managedConfig())],
+  })
+  const ctx = scope.createContext()
+  const aborted = ctx.exec({ flow: claudeRun, input: { prompt: "abort" }, signal: controller.signal })
+  await harness.writes(1)
+
+  controller.abort()
+  await expect(aborted).rejects.toMatchObject({ name: "AbortError" })
+  expect(harness.controlInterrupts).toBe(1)
+  expect(harness.signals).toEqual([])
+  expect(harness.live).toBe(true)
+
+  const next = ctx.exec({ flow: claudeRun, input: { prompt: "next" } })
+  await harness.writes(2)
+  harness.result("done")
+  await expect(next).resolves.toBe("done")
+  expect(harness.prompts).toEqual(["abort", "next"])
+
+  await ctx.close()
+  await scope.dispose()
+  expect(harness.live).toBe(false)
+})
+
+it("requires config through the graph before the process starts", async () => {
+  const harness = createHarness()
+  const scope = createScope({ presets: [preset(spawnProcess, harness.spawnProcess)] })
   const ctx = scope.createContext()
 
   await expect(ctx.exec({ flow: claudeRun, input: { prompt: "blocked" } })).rejects.toThrow()
@@ -413,12 +445,12 @@ it("requires config through the graph before the engine starts", async () => {
 })
 
 it.each([
-  [{ auth: { kind: "global" }, cwd: process.cwd(), roots: ["relative"], permission: "deny", shutdownTimeoutMs: 25 }, "roots must contain only absolute paths"],
-  [{ auth: { kind: "global" }, cwd: "relative", roots: [], permission: "deny", shutdownTimeoutMs: 25 }, "cwd must be an absolute path"],
+  [{ auth: { kind: "global" }, cwd: process.cwd(), roots: ["relative"], shutdownTimeoutMs: 25 }, "roots must contain only absolute paths"],
+  [{ auth: { kind: "global" }, cwd: "relative", roots: [], shutdownTimeoutMs: 25 }, "cwd must be an absolute path"],
 ] as const)("fails closed on incomplete managed authority %#", async (value, message) => {
   const harness = createHarness()
   const scope = createScope({
-    presets: [preset(engine, harness.engine)],
+    presets: [preset(spawnProcess, harness.spawnProcess)],
     tags: [claudeConfig(value)],
   })
   const ctx = scope.createContext()
@@ -433,7 +465,7 @@ it.each([
 it("rejects managed Claude roots outside current work authority before spawning", async () => {
   const harness = createHarness()
   const scope = createScope({
-    presets: [preset(engine, harness.engine)],
+    presets: [preset(spawnProcess, harness.spawnProcess)],
     tags: [claudeConfig(managedConfig())],
   })
   const authority = testAuthority([], false, true)
@@ -487,7 +519,7 @@ it("rejects a Claude root that escapes through a symlink", async () => {
   const runtime = { authority, record: sessionProvenanceRecord(authority, branch, work, attempt) } as session.SessionRuntime
   const harness = createHarness()
   const scope = createScope({
-    presets: [preset(engine, harness.engine)],
+    presets: [preset(spawnProcess, harness.spawnProcess)],
     tags: [claudeConfig(managedConfig({ cwd: escape }))],
   })
   const ctx = scope.createContext({ tags: [
@@ -506,10 +538,10 @@ it("rejects a Claude root that escapes through a symlink", async () => {
   await rm(root, { recursive: true })
 })
 
-it("requires a positive shutdown bound before the engine starts", async () => {
+it("requires a positive shutdown bound before the process starts", async () => {
   const harness = createHarness()
   const scope = createScope({
-    presets: [preset(engine, harness.engine)],
+    presets: [preset(spawnProcess, harness.spawnProcess)],
     tags: [claudeConfig(managedConfig({ shutdownTimeoutMs: 0 }))],
   })
   const ctx = scope.createContext()
@@ -525,7 +557,7 @@ it("escalates graceful close to SIGKILL within the second bound", async () => {
   const harness = createHarness({ closeOnEnd: false, closeOnSignals: ["SIGKILL"] })
   const timers = createClock()
   const scope = createScope({
-    presets: [preset(clock, timers.clock), preset(engine, harness.engine)],
+    presets: [preset(clock, timers.clock), preset(spawnProcess, harness.spawnProcess)],
     tags: [claudeConfig(managedConfig())],
   })
   const ctx = scope.createContext()
@@ -545,7 +577,7 @@ it("fails closed when the child ignores SIGKILL past the second bound", async ()
   const harness = createHarness({ closeOnEnd: false, closeOnSignals: [] })
   const timers = createClock()
   const scope = createScope({
-    presets: [preset(clock, timers.clock), preset(engine, harness.engine)],
+    presets: [preset(clock, timers.clock), preset(spawnProcess, harness.spawnProcess)],
     tags: [claudeConfig(managedConfig())],
   })
   const ctx = scope.createContext()
@@ -567,7 +599,7 @@ it("fails closed when the child ignores SIGKILL past the second bound", async ()
 it("terminates exactly once across repeated context close and scope dispose", async () => {
   const harness = createHarness()
   const scope = createScope({
-    presets: [preset(engine, harness.engine)],
+    presets: [preset(spawnProcess, harness.spawnProcess)],
     tags: [claudeConfig(managedConfig())],
   })
   const ctx = scope.createContext()
@@ -586,19 +618,19 @@ function managedConfig(overrides: Partial<Parameters<typeof claudeConfig>[0]> = 
     auth: { kind: "global" },
     cwd: process.cwd(),
     roots: [],
-    permission: "deny",
     shutdownTimeoutMs: 25,
     ...overrides,
   }
 }
 
-function createHarness(options: { closeOnEnd?: boolean; closeOnInterrupt?: boolean; closeOnSignals?: NodeJS.Signals[] } = {}) {
+function createHarness(options: { closeOnEnd?: boolean; closeOnSignals?: NodeJS.Signals[] } = {}) {
   const input = new PassThrough()
   const output = new PassThrough()
   const error = new PassThrough()
   const prompts: string[] = []
   let spawned: { command: string; args: readonly string[]; cwd: string | URL | undefined } | undefined
   const signals: NodeJS.Signals[] = []
+  let controlInterrupts = 0
   let ends = 0
   let live = true
   let buffered = ""
@@ -608,7 +640,13 @@ function createHarness(options: { closeOnEnd?: boolean; closeOnInterrupt?: boole
     const lines = buffered.split("\n")
     buffered = lines.pop() ?? ""
     for (const line of lines) {
-      const message = JSON.parse(line) as { message: { content: string } }
+      const message = JSON.parse(line) as
+        | { type: "control_request"; request: { subtype: "interrupt" } }
+        | { type: "user"; message: { content: string } }
+      if (message.type === "control_request") {
+        controlInterrupts++
+        continue
+      }
       prompts.push(message.message.content)
     }
   })
@@ -625,7 +663,7 @@ function createHarness(options: { closeOnEnd?: boolean; closeOnInterrupt?: boole
     stderr: error,
     kill: (signal: NodeJS.Signals = "SIGTERM") => {
       signals.push(signal)
-      const configured = options.closeOnSignals ?? (options.closeOnInterrupt === false ? [] : ["SIGINT", "SIGTERM", "SIGKILL"])
+      const configured = options.closeOnSignals ?? ["SIGINT", "SIGTERM", "SIGKILL"]
       if (configured.includes(signal)) close()
       return true
     },
@@ -637,9 +675,9 @@ function createHarness(options: { closeOnEnd?: boolean; closeOnInterrupt?: boole
   const replacement = ((command: string, args: readonly string[], spawnOptions: SpawnOptionsWithoutStdio) => {
     spawned = { command, args, cwd: spawnOptions.cwd }
     return child
-  }) as Lite.Utils.AtomValue<typeof engine>
+  }) as Lite.Utils.AtomValue<typeof spawnProcess>
   return {
-    engine: replacement,
+    spawnProcess: replacement,
     prompts,
     result(value: string) {
       output.write(`${JSON.stringify({ type: "result", result: value, is_error: false })}\n`)
@@ -656,8 +694,8 @@ function createHarness(options: { closeOnEnd?: boolean; closeOnInterrupt?: boole
     get options() {
       return spawned
     },
-    get interrupts() {
-      return signals.filter((signal) => signal === "SIGINT").length
+    get controlInterrupts() {
+      return controlInterrupts
     },
     get signals() {
       return signals

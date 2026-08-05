@@ -10,7 +10,7 @@ import { createScope, preset } from "@pumped-fn/lite"
 import { type Model, type ModelRequest } from "@pumped-fn/sdk"
 import * as session from "@pumped-fn/sdk/session"
 import { expect, expectTypeOf, it } from "vitest"
-import { models, piAttempt, piConfig, piTurn, supportedModels } from "../src/index"
+import { models, piAttempt, piConfig, PiProviderError, piTurn, supportedModels } from "../src/index"
 
 const selected: PiModel<Api> = {
   id: "test-model",
@@ -150,7 +150,7 @@ it("requires session provenance before using a bound provider", async () => {
   })
   const scope = createScope({
     presets: [preset(models, collection())],
-    tags: [piConfig({ provider: "test", modelId: "test-model" })],
+    tags: [piConfig({ auth: { kind: "api-key" }, provider: "test", modelId: "test-model" })],
   })
   const ctx = scope.createContext({ tags: [session.current.authority(authority)] })
 
@@ -171,7 +171,7 @@ it("rejects a forged authority body before using a bound provider", async () => 
   const provenance = piProvenance(authority)
   const scope = createScope({
     presets: [preset(models, collection())],
-    tags: [piConfig({ provider: "test", modelId: "test-model" })],
+    tags: [piConfig({ auth: { kind: "api-key" }, provider: "test", modelId: "test-model" })],
   })
   const ctx = scope.createContext({ tags: [
     session.current.authority(forged),
@@ -202,7 +202,7 @@ it("rejects a bound provider when runtime membership is stale", async () => {
   } as session.SessionRuntime
   const scope = createScope({
     presets: [preset(models, collection())],
-    tags: [piConfig({ provider: "test", modelId: "test-model" })],
+    tags: [piConfig({ auth: { kind: "api-key" }, provider: "test", modelId: "test-model" })],
   })
   const ctx = scope.createContext({ tags: [
     session.current.authority(authority),
@@ -221,7 +221,7 @@ it("rejects a bound provider when runtime membership is stale", async () => {
 it("maps native pi-ai tool calls", async () => {
   const scope = createScope({
     presets: [preset(models, collection())],
-    tags: [piConfig({ provider: "test", modelId: "test-model" })],
+    tags: [piConfig({ auth: { kind: "api-key" }, provider: "test", modelId: "test-model" })],
   })
   const ctx = scope.createContext()
 
@@ -253,10 +253,37 @@ it("maps native pi-ai tool calls", async () => {
   await scope.dispose()
 })
 
+it("reports the configured provider and model for malformed built-in tool arguments", async () => {
+  const malformed: AssistantMessage = {
+    ...response,
+    content: [{ type: "toolCall", id: "skill-1", name: "load_skill", arguments: { name: 7 } }],
+  }
+  const scope = createScope({
+    presets: [preset(models, collection(malformed))],
+    tags: [piConfig({ auth: { kind: "api-key" }, provider: "test", modelId: "test-model" })],
+  })
+  const ctx = scope.createContext()
+
+  await expect(ctx.exec({
+    flow: piTurn,
+    input: {
+      ...request(),
+      skills: [{ name: "7", description: "Numeric skill name." }],
+    },
+  })).rejects.toMatchObject({
+    name: "PiProviderError",
+    provider: "test",
+    modelId: "test-model",
+  } satisfies Partial<PiProviderError>)
+
+  await ctx.close({ ok: false, error: new Error("expected") })
+  await scope.dispose()
+})
+
 it("normalizes pi-ai stream events without changing the scalar result", async () => {
   const scope = createScope({
     presets: [preset(models, collection())],
-    tags: [piConfig({ provider: "test", modelId: "test-model" })],
+    tags: [piConfig({ auth: { kind: "api-key" }, provider: "test", modelId: "test-model" })],
   })
   const ctx = scope.createContext()
   const input: ModelRequest = {
@@ -294,7 +321,7 @@ it("publishes resolved capability schemas to pi-ai", async () => {
   }
   const scope = createScope({
     presets: [preset(models, collectionWithSchema)],
-    tags: [piConfig({ provider: "test", modelId: "test-model" })],
+    tags: [piConfig({ auth: { kind: "api-key" }, provider: "test", modelId: "test-model" })],
   })
   const ctx = scope.createContext()
   const inputSchema = {
@@ -334,7 +361,7 @@ it("aborts the pi-ai producer when the consumer stops", async () => {
   }
   const scope = createScope({
     presets: [preset(models, waiting)],
-    tags: [piConfig({ provider: "test", modelId: "test-model" })],
+    tags: [piConfig({ auth: { kind: "api-key" }, provider: "test", modelId: "test-model" })],
   })
   const ctx = scope.createContext()
   const stream = ctx.execStream({ flow: piAttempt, input: {
@@ -369,7 +396,7 @@ it("isolates consumer aborts across pi-ai attempt contexts", async () => {
   }
   const scope = createScope({
     presets: [preset(models, waiting)],
-    tags: [piConfig({ provider: "test", modelId: "test-model" })],
+    tags: [piConfig({ auth: { kind: "api-key" }, provider: "test", modelId: "test-model" })],
   })
   const firstContext = scope.createContext()
   const secondContext = scope.createContext()
@@ -399,7 +426,7 @@ it("isolates consumer aborts across pi-ai attempt contexts", async () => {
 it("lists models and rejects unsupported selections", async () => {
   const scope = createScope({
     presets: [preset(models, collection())],
-    tags: [piConfig({ provider: "test", modelId: "missing" })],
+    tags: [piConfig({ auth: { kind: "api-key" }, provider: "test", modelId: "missing" })],
   })
   const ctx = scope.createContext()
 

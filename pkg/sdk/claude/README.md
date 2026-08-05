@@ -18,7 +18,6 @@ const scope = createScope({
     auth: { kind: "global" },
     cwd: process.cwd(),
     roots: [],
-    permission: "deny",
     shutdownTimeoutMs: 1_000,
   }),
 })
@@ -51,7 +50,6 @@ claude.config({
   auth: { kind: "token", env: "MY_CLAUDE_TOKEN" },
   cwd: process.cwd(),
   roots: [],
-  permission: "deny",
   shutdownTimeoutMs: 1_000,
 })
 ```
@@ -64,15 +62,17 @@ releases only the selected session lease. A child process error poisons its leas
 prompt settles, so queued prompts reject without starting.
 
 The scalar turn drains `claudeAttempt`. `claudeRun` and `claudeSession` remain direct prompt
-compatibility handles. `roots` lists extra absolute roots; `[]` means no extra roots. Permission policy is explicit and fail-closed. This
+compatibility handles. `roots` lists extra absolute roots; `[]` means no extra roots. Permission is
+always denied and is not configurable. This
 integration exposes no Claude tools or MCP servers. The managed config has no free-form CLI argument
-escape hatch. Abort and cleanup request graceful shutdown, wait `shutdownTimeoutMs`, send `SIGKILL`,
-then wait the same bound again. A child still alive after the second bound makes cleanup reject with
-`ClaudeShutdownError`; it is never reported as closed.
+escape hatch. Prompt abort sends an in-band interrupt and keeps the process alive. Cleanup requests
+graceful shutdown, waits `shutdownTimeoutMs`, sends `SIGKILL`, then waits the same bound again. A child
+still alive after the second bound makes cleanup reject with `ClaudeShutdownError`; it is never
+reported as closed.
 
 The stable handles remain `claude`, `claudeTurn`, `claudeRun`, and `claudeConfig`. The streaming
 handles are `claudeAttempt`, `claudeAttemptBinding`, and `claudeLeases`. Tests can replace
-`claudeAttempt`, `claudeLeases`, or the process `engine` with a scope preset. Package-module imports also expose aligned
+`claudeAttempt`, `claudeLeases`, or `spawnProcess` with a scope preset. Package-module imports also expose aligned
 aliases:
 
 ```ts
@@ -84,7 +84,6 @@ const scope = createScope({
     auth: { kind: "global" },
     cwd: process.cwd(),
     roots: [],
-    permission: "deny",
     shutdownTimeoutMs: 1_000,
   }),
 })
@@ -101,9 +100,17 @@ await ctx.close()
 await scope.dispose()
 ```
 
-`config`, `engine`, `run`, `turn`, and `provider` are aliases to the same graph handles. Use
+`config`, `run`, `turn`, and `provider` are aliases to the same graph handles. There is no generic
+`engine` alias; `spawnProcess` names the process seam that tests preset. Use
 `claudeAttemptBinding` when composing `agent.turn`; `provider` remains the scalar model tag. Tests
-can preset `claudeAttempt`, `claudeLeases`, or `engine` through `createScope` without changing the caller.
+can preset `claudeAttempt`, `claudeLeases`, or `spawnProcess` through `createScope` without changing the caller.
+
+## Migration to 4.0.0
+
+| Before | Now |
+|---|---|
+| `permission: "deny"` | remove the field; deny is hardcoded |
+| `engine` | `spawnProcess` |
 
 ## Migration to 3.0.0
 

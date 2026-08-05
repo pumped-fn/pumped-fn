@@ -136,7 +136,7 @@ export interface CodexAcpConfig {
   command?: string
   args?: readonly string[]
   cwd: string
-  additionalDirectories: readonly string[]
+  roots: readonly string[]
   permission: "grant" | "deny"
   shutdownTimeoutMs: number
 }
@@ -162,8 +162,8 @@ export const acp = resource({
     const effectiveConfig = boundAuthority ? authorizeAcpConfig(config, boundAuthority) : config
     if (!effectiveConfig.auth) throw new CodexConfigError("ACP auth must be explicitly set")
     if (!absolutePath(effectiveConfig.cwd)) throw new CodexConfigError("ACP cwd must be absolute")
-    if (effectiveConfig.additionalDirectories.some((directory) => !absolutePath(directory))) {
-      throw new CodexConfigError("ACP additionalDirectories must be absolute")
+    if (effectiveConfig.roots.some((root) => !absolutePath(root))) {
+      throw new CodexConfigError("ACP roots must be absolute")
     }
     if (!Number.isFinite(effectiveConfig.shutdownTimeoutMs) || effectiveConfig.shutdownTimeoutMs <= 0) {
       throw new CodexConfigError("ACP shutdownTimeoutMs must be greater than zero")
@@ -495,11 +495,10 @@ export const codexAcpTurn = flow({
 export const codexAcp = model(codexAcpTurn)
 
 export {
-  codexAcpConfig as config,
-  acp as engine,
-  codexAcpPrompt as run,
-  codexAcpTurn as turn,
-  codexAcp as provider,
+  codexConfig as config,
+  codexRun as run,
+  codexTurn as turn,
+  codex as provider,
 }
 
 function requiredEnvironment(environment: NodeJS.ProcessEnv, name: string): string {
@@ -670,7 +669,7 @@ function authorizeAcpConfig(config: CodexAcpConfig, authority: session.Authority
   return {
     ...config,
     cwd: canonicalPath(config.cwd),
-    additionalDirectories: config.additionalDirectories.map(canonicalPath),
+    roots: config.roots.map(canonicalPath),
   }
 }
 
@@ -731,7 +730,7 @@ function assertCliAuthority(config: CodexConfig, authority: session.Authority): 
 }
 
 function assertAcpAuthority(config: CodexAcpConfig, authority: session.Authority): void {
-  assertRoots("ACP", [config.cwd, ...config.additionalDirectories], authority)
+  assertRoots("ACP", [config.cwd, ...config.roots], authority)
   if (config.permission === "grant" && !authority.sandbox.write) {
     throw new CodexConfigError("ACP write exceeds current work authority")
   }
@@ -741,12 +740,8 @@ function assertAcpAuthority(config: CodexAcpConfig, authority: session.Authority
 }
 
 function permissionAllowed(request: RequestPermissionRequest, authority: session.Authority): boolean {
-  const title = request.toolCall.title ?? ""
   const kind = request.toolCall.kind ?? ""
-  return authority.permissions.includes(title)
-    || authority.permissions.includes(kind)
-    || authority.tools.includes(title)
-    || authority.tools.includes(kind)
+  return authority.permissions.includes(kind) || authority.tools.includes(kind)
 }
 
 function assertRoots(provider: "Codex" | "ACP", roots: readonly string[], authority: session.Authority): void {
@@ -779,7 +774,7 @@ async function createAcpSession(
 ): Promise<string> {
   const pending = agent.buildSession({
     cwd: config.cwd,
-    additionalDirectories: [...config.additionalDirectories],
+    additionalDirectories: [...config.roots],
     mcpServers: [],
   }).start()
   let active: ActiveSession

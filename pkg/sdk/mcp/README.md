@@ -38,11 +38,10 @@ const server = await ctx.resolve(mcpServer)
 await server.connect(new StdioServerTransport())
 ```
 
-The MCP SDK validates and coerces arguments against each flow's `inputSchema`, then the handler
-execs the flow with that value as raw input. A flow's own `parse` re-runs on it, so put any
-coercion in `inputSchema` and keep the exposed flow `typed<T>()` (or its `parse` non-transforming) —
-otherwise a `z.string().transform(Number)` would transform twice. A thrown error's message becomes
-the `isError` result text sent to the client, so throw client-safe messages. Cleanup closes the
+The MCP SDK validates arguments against each flow's `inputSchema`, then the handler execs the flow
+with the validated value as raw input. A flow's own `parse` runs after MCP validation, so its input
+must match the schema's output. A thrown error's message becomes the `isError` result text sent to
+the client, so throw client-safe messages. Cleanup closes the
 server and drains in-flight calls; for a clean shutdown, close the client before disposing the
 scope. For tests, connect an `InMemoryTransport.createLinkedPair()` instead of stdio.
 

@@ -55,7 +55,8 @@ lines.on("line", (line) => {
     send({ jsonrpc: "2.0", id: pending, result: { stopReason: "cancelled" } })
     pending = undefined
   } else if (message.id === 99) {
-    send({ jsonrpc: "2.0", method: "session/update", params: { sessionId: "probe-session", update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ cwd: globalThis.session.cwd, additionalDirectories: globalThis.session.additionalDirectories, mcpServers: globalThis.session.mcpServers, permission: message.result, pid: process.pid }) } } } })
+    const payload = JSON.stringify({ cwd: globalThis.session.cwd, additionalDirectories: globalThis.session.additionalDirectories, mcpServers: globalThis.session.mcpServers, permission: message.result, pid: process.pid })
+    send({ jsonrpc: "2.0", method: "session/update", params: { sessionId: "probe-session", update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ content: payload, stop: true }) } } } })
     send({ jsonrpc: "2.0", id: active, result: { stopReason: "end_turn" } })
   }
 })
@@ -186,10 +187,14 @@ function managedConfig(source = agent, shutdownTimeoutMs = 5_000) {
     command: process.execPath,
     args: ["--input-type=module", "--eval", source],
     cwd: process.cwd(),
-    additionalDirectories: ["/tmp"],
+    roots: ["/tmp"],
     permission: "deny",
     shutdownTimeoutMs,
   })
+}
+
+function modelContent(output: string): string {
+  return (JSON.parse(output) as { content: string }).content
 }
 
 it("passes explicit roots with no MCP servers and leaves no live state after close", async () => {
@@ -198,7 +203,7 @@ it("passes explicit roots with no MCP servers and leaves no live state after clo
     tags: [session.current.authority(testAuthority([process.cwd(), "/tmp"]))],
   })
   const boundary = await ctx.resolve(acp)
-  const output = JSON.parse(await ctx.exec({ flow: codexAcpPrompt, input: request })) as {
+  const output = JSON.parse(modelContent(await ctx.exec({ flow: codexAcpPrompt, input: request }))) as {
     cwd: string
     additionalDirectories: string[]
     mcpServers: unknown[]
@@ -721,13 +726,42 @@ it("never selects an allow_always ACP permission", async () => {
       command: process.execPath,
       args: ["--input-type=module", "--eval", allowAlwaysAgent],
       cwd,
-      additionalDirectories: [],
+      roots: [],
       permission: "grant",
       shutdownTimeoutMs: 5_000,
     })],
   })
   const ctx = scope.createContext({ tags: [session.current.authority(authority)] })
-  const output = JSON.parse(await ctx.exec({ flow: codexAcpPrompt, input: request })) as { permission: unknown }
+  const output = JSON.parse(modelContent(await ctx.exec({ flow: codexAcpPrompt, input: request }))) as { permission: unknown }
+
+  expect(output.permission).toEqual({ outcome: { outcome: "cancelled" } })
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("does not grant an ACP permission from a spoofed title", async () => {
+  const cwd = process.cwd()
+  const authority = session.createAuthority({
+    tenant: "codex-acp-test",
+    roots: [cwd],
+    permissions: ["write"],
+    tools: [],
+    sandbox: { roots: [cwd], commands: [], write: true, network: true },
+  })
+  const scope = createScope({
+    presets: [preset(spawnProcess, managedProcess(agent))],
+    tags: [codexAcpConfig({
+      auth: { kind: "global" },
+      command: process.execPath,
+      args: ["--input-type=module", "--eval", agent],
+      cwd,
+      roots: [],
+      permission: "grant",
+      shutdownTimeoutMs: 5_000,
+    })],
+  })
+  const ctx = scope.createContext({ tags: [session.current.authority(authority)] })
+  const output = JSON.parse(modelContent(await ctx.exec({ flow: codexAcpPrompt, input: request }))) as { permission: unknown }
 
   expect(output.permission).toEqual({ outcome: { outcome: "cancelled" } })
   await ctx.close()
@@ -745,7 +779,7 @@ it("rejects an ACP directory that escapes authority through a symlink", async ()
   const scope = createScope({ tags: [codexAcpConfig({
     auth: { kind: "global" },
     cwd: allowed,
-    additionalDirectories: [escape],
+    roots: [escape],
     permission: "deny",
     shutdownTimeoutMs: 10,
   })] })
@@ -769,7 +803,7 @@ it.each([
     tags: [codexAcpConfig({
       auth: { kind: "global" },
       cwd,
-      additionalDirectories: [],
+      roots: [],
       permission: "grant",
       shutdownTimeoutMs: 25,
     })],
@@ -784,13 +818,13 @@ it.each([
 
 it.each([
   ["cwd", ".", [], "ACP cwd must be absolute"],
-  ["additional directory", process.cwd(), ["relative"], "ACP additionalDirectories must be absolute"],
-])("rejects a relative ACP %s before spawning", async (_label, cwd, additionalDirectories, message) => {
+  ["root", process.cwd(), ["relative"], "ACP roots must be absolute"],
+])("rejects a relative ACP %s before spawning", async (_label, cwd, roots, message) => {
   const scope = createScope({
     tags: [codexAcpConfig({
       auth: { kind: "global" },
       cwd,
-      additionalDirectories,
+      roots,
       permission: "deny",
       shutdownTimeoutMs: 5_000,
     })],
@@ -817,7 +851,7 @@ it("fails closed without explicit ACP auth", async () => {
     presets: [preset(spawnProcess, harness.spawn)],
     tags: [codexAcpConfig({
       cwd: process.cwd(),
-      additionalDirectories: [],
+      roots: [],
       permission: "deny",
       shutdownTimeoutMs: 5_000,
     } as Parameters<typeof codexAcpConfig>[0])],
@@ -843,7 +877,7 @@ it("declares API-key environment and escalates a stubborn child once", async () 
     tags: [codexAcpConfig({
       auth: { kind: "api-key", env: "MY_CODEX_KEY" },
       cwd: process.cwd(),
-      additionalDirectories: [],
+      roots: [],
       permission: "deny",
       shutdownTimeoutMs: 10,
     })],
@@ -877,7 +911,7 @@ it("rejects with a typed error after both shutdown bounds", async () => {
     tags: [codexAcpConfig({
       auth: { kind: "global" },
       cwd: process.cwd(),
-      additionalDirectories: [],
+      roots: [],
       permission: "deny",
       shutdownTimeoutMs: 10,
     })],
@@ -1023,6 +1057,13 @@ function managedProcess(source: string): Lite.Utils.AtomValue<typeof spawnProces
             pending.delete(id)
           }
         } else if (message.id === 99 && activePrompt !== undefined) {
+          const payload = JSON.stringify({
+            cwd: sessionConfig?.cwd,
+            additionalDirectories: sessionConfig?.additionalDirectories,
+            mcpServers: sessionConfig?.mcpServers,
+            permission: message.result,
+            pid: 2_147_483_647,
+          })
           send({
             jsonrpc: "2.0",
             method: "session/update",
@@ -1032,13 +1073,7 @@ function managedProcess(source: string): Lite.Utils.AtomValue<typeof spawnProces
                 sessionUpdate: "agent_message_chunk",
                 content: {
                   type: "text",
-                  text: JSON.stringify({
-                    cwd: sessionConfig?.cwd,
-                    additionalDirectories: sessionConfig?.additionalDirectories,
-                    mcpServers: sessionConfig?.mcpServers,
-                    permission: message.result,
-                    pid: 2_147_483_647,
-                  }),
+                  text: JSON.stringify({ content: payload, stop: true }),
                 },
               },
             },
