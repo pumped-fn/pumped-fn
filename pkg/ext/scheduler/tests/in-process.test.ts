@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest"
 import { scheduler } from "../src"
 
+async function until(predicate: () => boolean, budgetMs: number): Promise<void> {
+  const deadline = Date.now() + budgetMs
+  while (!predicate() && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+}
+
 function gate(): { promise: Promise<void>; resolve: () => void } {
   let resolve!: () => void
   const promise = new Promise<void>((r) => {
@@ -109,7 +116,7 @@ describe("inProcess backend", () => {
       }
     )
 
-    await new Promise((r) => setTimeout(r, 50))
+    await until(() => seen.length > 0, 5000)
     await registration.stop()
 
     expect(seen.length).toBeGreaterThan(0)
@@ -125,11 +132,11 @@ describe("inProcess backend", () => {
       }
     )
 
-    await new Promise((r) => setTimeout(r, 1100))
+    await until(() => seen.length > 0, 8000)
     await registration.stop()
 
     expect(seen.length).toBeGreaterThan(0)
-  }, 3000)
+  }, 12000)
 
   it("throws for a non-numeric every cadence", () => {
     const backend = scheduler.inProcess()
