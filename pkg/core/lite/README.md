@@ -20,7 +20,7 @@ Lite owns the application boundary below framework adapters:
 
 - A `Scope` owns long-lived graph values and their cleanup.
 - An `ExecutionContext` owns one request, job, command, action, or UI boundary.
-- Every execution context exposes one effective `signal`; closing a context aborts and joins its descendants before resource cleanup.
+- Every execution context exposes one effective `signal`; closing a context aborts and joins its structured descendants before resource cleanup. An explicit detached stream is aborted and released without joining its eventual settlement.
 - `atom()` defines scope-owned transports, capabilities, state, derived data, and caches.
 - `flow()` defines execution work with optional typed or parsed input.
 - `resource()` defines execution-context-owned values such as transactions, request loggers, spans, action buffers, and drafts.
@@ -503,6 +503,8 @@ caller asks, so backpressure is inherent and no element is dropped. Each invocat
 
 > **Note:** Breaking out of the loop cancels the invocation — the generator's `finally` runs, resources clean up, and `onClose` observes `{ ok: false, aborted: true }`, distinguishable from success and failure. A transaction resource should roll back on both error and abandonment.
 
+`ctx.execDetachedStream(options)` is the opt-in form for work whose caller must stop waiting even when the generator ignores cancellation. It inherits tags and other context data through the same parent chain as `ctx.execStream`. Natural completion and failure retain normal stream settlement. On consumer return or parent close, Lite rejects `result` with `AbortError`, aborts and closes the child context, severs its parent data link, removes the stream from the parent's joined lifetime, and observes the late generator outcome without forwarding it. Lite-owned timers, subscriptions, current-owned resources, and stream registrations are released by child close; boundary-owned resources keep their normal parent lifetime. Parent close and scope disposal do not wait for the generator's eventual settlement. JavaScript work that ignores the signal can still run, but later graph work sees a closed child context and its rejection is contained.
+
 > **Note:** Reading `stream.result` before iterating throws — a caller that only wants the final output uses `exec`. A non-generator factory whose output is an async iterable fails the execution: returned iterables would outlive their context; yield from a generator flow or use an iterable atom with `resolveStream` instead.
 
 > **Note:** Streaming invocations are visible to extensions as `streaming` on the exec target. The suspense extension refuses to journal them (`replay` throws) until stream replay semantics exist.
@@ -562,6 +564,7 @@ composition roots. See [Observability](../../../docs/observability.md).
 | `scope.run(options)` | Execute one flow, traced function, or named inline dependency operation in a temporary context and close it with the outcome |
 | `scope.runStream(options)` | Stream one generator flow from a temporary context; completion or cancellation closes it |
 | `ctx.execStream(options)` | Consume a generator flow's yields; `result` carries the final output, break cancels |
+| `ctx.execDetachedStream(options)` | Stream an inherited child whose abandonment aborts and closes it without joining late settlement |
 | `ctx.exec(options)` | Execute a child flow or function; optional `signal` joins caller cancellation with context lifetime |
 | `flowHandle.prepare(options)` | Activate a controller child with its tags; `ready` resolves after dependencies and resources, then `exec()` or `execStream()` runs once |
 

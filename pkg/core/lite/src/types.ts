@@ -282,6 +282,11 @@ export namespace Lite {
       Result,
     >(options: ExecDepsOptions<D, Args, Result>): Promise<Awaited<Result>>
     execStream<Output, Yield, Input>(options: ExecFlowOptions<Output, Input, Yield>): FlowStream<Yield, Output>
+    /**
+     * Executes a streaming child with inherited context data without joining its eventual settlement.
+     * Abandonment aborts and closes the child while late yields and settlement are ignored.
+     */
+    execDetachedStream<Output, Yield, Input>(options: ExecFlowOptions<Output, Input, Yield>): FlowStream<Yield, Output>
     changes<T>(atom: Atom<T>): AsyncIterable<T>
     changes<T>(atom: Atom<T>, options: ChangesOptions): AsyncIterable<AtomChange<T>>
     changes<T>(handle: SelectHandle<T>): AsyncIterable<T>
