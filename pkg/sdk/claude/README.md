@@ -111,6 +111,7 @@ can preset `claudeAttempt`, `claudeLeases`, or `spawnProcess` through `createSco
 |---|---|
 | `permission: "deny"` | remove the field; deny is hardcoded |
 | `engine` | `spawnProcess` |
+| `isolate` | remove the field; each logical session already owns an isolated process |
 
 ## Migration to 3.0.0
 

@@ -30,10 +30,13 @@ const victoriaShape = z.object({
   tenant: z.string().min(1).optional(),
 }).strict()
 const modelShape = z.object({
+  auth: z.object({
+    kind: z.literal("api-key"),
+    env: z.string().min(1).optional(),
+  }).strict(),
   provider: z.string().min(1),
   modelId: z.string().min(1),
   thinking: z.enum(["minimal", "low", "medium", "high", "xhigh"]).optional(),
-  apiKeyEnv: z.string().min(1).optional(),
 }).strict()
 
 export type GitHubConfig = z.infer<typeof githubShape>
@@ -108,10 +111,13 @@ export function loadEnvironment(environment: NodeJS.ProcessEnv) {
       ...(value.VICTORIA_TENANT === undefined ? {} : { tenant: value.VICTORIA_TENANT }),
     }),
     model: modelShape.parse({
+      auth: {
+        kind: "api-key",
+        ...(value.MODEL_API_KEY_ENV === undefined ? {} : { env: value.MODEL_API_KEY_ENV }),
+      },
       provider: value.MODEL_PROVIDER,
       modelId: value.MODEL_ID,
       ...(value.MODEL_THINKING === undefined ? {} : { thinking: value.MODEL_THINKING }),
-      ...(value.MODEL_API_KEY_ENV === undefined ? {} : { apiKeyEnv: value.MODEL_API_KEY_ENV }),
     }),
     controlDatabaseUrl: value.CONTROL_DATABASE_URL,
     targetDatabaseUrl: value.TARGET_DATABASE_URL,

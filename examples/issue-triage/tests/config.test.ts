@@ -42,6 +42,7 @@ describe("issue triage configuration", () => {
         maxEvidenceBytes: 65_536,
       },
       model: {
+        auth: { kind: "api-key", env: "PI_API_KEY" },
         provider: "pi",
         modelId: "test-model",
       },

@@ -318,7 +318,7 @@ const sandboxPolicy = sandbox.policy({
 })
 ```
 
-Add `sandboxPolicy` and application flows bound through `sandbox.impl.read`, `sandbox.impl.write`, and `sandbox.impl.run` to the session scope. The policy must fit the bound session authority. A missing implementation or wider policy fails before the effect. The SDK aborts `sandbox.exec` after `timeoutMs` and truncates its streamed and returned UTF-8 output to `maxOutputBytes`. The `sandbox.impl.run` binding must observe its execution signal to stop timed-out work and must enforce the `network` setting in its process or runtime isolation.
+Add `sandboxPolicy` and application flows bound through `sandbox.impl.read`, `sandbox.impl.write`, and `sandbox.impl.run` to the session scope. The policy must fit the bound session authority. A missing implementation or wider policy fails before the effect. At `timeoutMs`, the SDK aborts the run binding's execution signal. When the binding finishes, the SDK checks that signal and rejects instead of delivering a result if the deadline passed. A binding that ignores the signal can keep `sandbox.exec` pending and can keep emitting output until it finishes, so the binding must observe the signal to stop its underlying work. Deadline enforcement independent of binding cooperation is planned for a later major release and is not part of 4.0.1. The SDK caps streamed and returned UTF-8 output at `maxOutputBytes`. When it cuts an event, that event and the final result carry `truncated: true`. When it cuts only the returned output, the result carries `truncated: true`. The run binding must enforce the `network` setting in its process or runtime isolation.
 
 ## Deliberate absences
 

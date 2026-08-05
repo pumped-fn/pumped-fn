@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events"
 import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "node:child_process"
 import { createScope, flow, preset, typed, type Lite } from "@pumped-fn/lite"
-import { complete, model, type Model, type ModelRequest } from "@pumped-fn/sdk"
+import { complete, model, ModelResponseParseError, type Model, type ModelRequest } from "@pumped-fn/sdk"
 import * as session from "@pumped-fn/sdk/session"
 import { expect, expectTypeOf, it } from "vitest"
 import { join } from "node:path"
@@ -19,6 +19,7 @@ import {
   claudeTurn,
   clock,
   spawnProcess,
+  ClaudeInterruptError,
   ClaudeShutdownError,
   type ClaudeLeaseManager,
 } from "../src/index"
@@ -145,6 +146,64 @@ it("normalizes a managed lease stream and releases its transient process", async
   await scope.dispose()
 })
 
+it("keeps a bound lease after a malformed model reply", async () => {
+  const prompted: string[] = []
+  const released: string[] = []
+  const leases: ClaudeLeaseManager = {
+    prompt: (sessionId) => {
+      prompted.push(sessionId)
+      return {
+        events: (async function* () {
+          yield { type: "provider_status", status: "started" } as const
+          yield { type: "provider_status", status: "completed" } as const
+        })(),
+        result: Promise.resolve(prompted.length === 1
+          ? "plain provider prose"
+          : JSON.stringify({ content: "recovered", stop: true })),
+      }
+    },
+    release: async (sessionId) => {
+      released.push(sessionId)
+    },
+    transient: () => "unused",
+  }
+  const scope = createScope({ presets: [preset(claudeLeases, leases)] })
+  const ctx = scope.createContext({ tags: [session.record(sessionRecord("persistent"))] })
+
+  await expect(ctx.exec({ flow: claudeAttempt, input: request })).rejects.toBeInstanceOf(ModelResponseParseError)
+  await expect(ctx.exec({ flow: claudeAttempt, input: request })).resolves.toEqual({ content: "recovered", stop: true })
+  expect(prompted).toEqual(["persistent", "persistent"])
+  expect(released).toEqual([])
+
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("releases a transient lease after a malformed model reply", async () => {
+  const released: string[] = []
+  const leases: ClaudeLeaseManager = {
+    prompt: () => ({
+      events: (async function* () {
+        yield { type: "provider_status", status: "started" } as const
+        yield { type: "provider_status", status: "completed" } as const
+      })(),
+      result: Promise.resolve("plain provider prose"),
+    }),
+    release: async (sessionId) => {
+      released.push(sessionId)
+    },
+    transient: () => "transient-malformed",
+  }
+  const scope = createScope({ presets: [preset(claudeLeases, leases)] })
+  const ctx = scope.createContext()
+
+  await expect(ctx.exec({ flow: claudeAttempt, input: request })).rejects.toBeInstanceOf(ModelResponseParseError)
+  expect(released).toEqual(["transient-malformed"])
+
+  await ctx.close()
+  await scope.dispose()
+})
+
 it("cancels a managed Claude lease when its stream consumer returns", async () => {
   const harness = createHarness()
   const scope = createScope({
@@ -164,8 +223,8 @@ it("cancels a managed Claude lease when its stream consumer returns", async () =
   await expect(iterator.return?.()).resolves.toMatchObject({ done: true })
   await result
   expect(harness.controlInterrupts).toBe(1)
-  expect(harness.signals).toEqual([])
-  expect(harness.ends).toBe(1)
+  expect(harness.signals).toEqual(["SIGINT"])
+  expect(harness.ends).toBe(0)
   expect(harness.live).toBe(false)
 
   await ctx.close()
@@ -385,11 +444,12 @@ it("interrupts an active prompt without closing the child", async () => {
 
   controller.abort()
   await expect(prompt).rejects.toMatchObject({ name: "AbortError" })
-  await expect(queued).rejects.toMatchObject({ name: "AbortError" })
   expect(harness.controlInterrupts).toBe(1)
   expect(harness.signals).toEqual([])
   expect(harness.prompts).toEqual(["wait"])
   expect(harness.live).toBe(true)
+  harness.result("discarded")
+  await expect(queued).rejects.toMatchObject({ name: "AbortError" })
 
   let closed = false
   const close = ctx.close().then(() => {
@@ -422,6 +482,9 @@ it("keeps a session usable after an aborted prompt", async () => {
   expect(harness.live).toBe(true)
 
   const next = ctx.exec({ flow: claudeRun, input: { prompt: "next" } })
+  await new Promise((resolve) => setImmediate(resolve))
+  expect(harness.prompts).toEqual(["abort"])
+  harness.result("late aborted result")
   await harness.writes(2)
   harness.result("done")
   await expect(next).resolves.toBe("done")
@@ -430,6 +493,111 @@ it("keeps a session usable after an aborted prompt", async () => {
   await ctx.close()
   await scope.dispose()
   expect(harness.live).toBe(false)
+})
+
+it("fails queued prompts when an interrupted session never emits a result", async () => {
+  const harness = createHarness()
+  const timers = createClock()
+  const controller = new AbortController()
+  const scope = createScope({
+    presets: [preset(clock, timers.clock), preset(spawnProcess, harness.spawnProcess)],
+    tags: [claudeConfig(managedConfig())],
+  })
+  const ctx = scope.createContext()
+  const first = ctx.exec({ flow: claudeRun, input: { prompt: "first" }, signal: controller.signal })
+  await harness.writes(1)
+
+  controller.abort()
+  await expect(first).rejects.toMatchObject({ name: "AbortError" })
+  const queued = ctx.exec({ flow: claudeRun, input: { prompt: "queued" } })
+  const failure = queued.catch((error: unknown) => error)
+  await new Promise((resolve) => setImmediate(resolve))
+  expect(harness.prompts).toEqual(["first"])
+
+  await timers.advance()
+
+  expect(await failure).toEqual(expect.objectContaining({
+    name: "ClaudeInterruptError",
+    message: "Claude process did not finish interrupted prompt within 25ms",
+  }))
+  expect(await failure).toBeInstanceOf(ClaudeInterruptError)
+  expect(harness.prompts).toEqual(["first"])
+  expect(harness.signals).toEqual(["SIGINT"])
+
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("keeps a managed lease usable after discarding a timed-out result", async () => {
+  const harness = createHarness()
+  const timers = createClock()
+  const scope = createScope({
+    presets: [preset(clock, timers.clock), preset(spawnProcess, harness.spawnProcess)],
+    tags: [claudeConfig(managedConfig({ timeoutMs: 10 }))],
+  })
+  const ctx = scope.createContext()
+  const leases = await ctx.resolve(claudeLeases)
+  const first = leases.prompt("shared", "first")
+  const firstEvents = collect(first.events).catch((error: unknown) => error)
+  await harness.writes(1)
+  const timedOut = expect(first.result).rejects.toThrow("Claude prompt timed out after 10ms")
+
+  await timers.advance()
+  await timedOut
+  await expect(firstEvents).resolves.toBeInstanceOf(Error)
+  expect(harness.controlInterrupts).toBe(1)
+
+  const second = leases.prompt("shared", "second")
+  const secondEvents = collect(second.events)
+  await new Promise((resolve) => setImmediate(resolve))
+  expect(harness.prompts).toEqual(["first"])
+  harness.result("late timed-out result")
+  await harness.writes(2)
+  harness.result("done")
+
+  await expect(second.result).resolves.toBe("done")
+  await expect(secondEvents).resolves.toEqual([
+    { type: "provider_status", status: "started" },
+    { type: "provider_status", status: "completed" },
+  ])
+  expect(harness.prompts).toEqual(["first", "second"])
+
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("fails queued managed prompts when an interrupted turn never emits a result", async () => {
+  const harness = createHarness()
+  const timers = createClock()
+  const controller = new AbortController()
+  const scope = createScope({
+    presets: [preset(clock, timers.clock), preset(spawnProcess, harness.spawnProcess)],
+    tags: [claudeConfig(managedConfig())],
+  })
+  const ctx = scope.createContext()
+  const leases = await ctx.resolve(claudeLeases)
+  const first = leases.prompt("shared", "first", controller.signal)
+  const firstEvents = collect(first.events).catch((error: unknown) => error)
+  await harness.writes(1)
+
+  controller.abort()
+  await expect(first.result).rejects.toMatchObject({ name: "AbortError" })
+  await expect(firstEvents).resolves.toMatchObject({ name: "AbortError" })
+  const queued = leases.prompt("shared", "queued")
+  const queuedEvents = collect(queued.events).catch((error: unknown) => error)
+  const failure = queued.result.catch((error: unknown) => error)
+  await new Promise((resolve) => setImmediate(resolve))
+  expect(harness.prompts).toEqual(["first"])
+
+  await timers.advance()
+
+  expect(await failure).toBeInstanceOf(ClaudeInterruptError)
+  await expect(queuedEvents).resolves.toBeInstanceOf(ClaudeInterruptError)
+  expect(harness.prompts).toEqual(["first"])
+  expect(harness.signals).toEqual(["SIGINT"])
+
+  await ctx.close()
+  await scope.dispose()
 })
 
 it("requires config through the graph before the process starts", async () => {

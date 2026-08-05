@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "retrievedAt": "2026-07-10",
+  "retrievedAt": "2026-08-05",
   "scenario": "account-onboarding",
   "sources": [
     {
       "id": "pumped-fn",
       "repository": "https://github.com/pumped-fn/pumped-fn",
-      "commit": "ca2a8fa3ae462129034c9f05f6630f1099955ca0",
-      "package": "@pumped-fn/lite@4.0.0",
+      "commit": "c9fd0c12da845202b4cc9b8727046a185e9a75b3",
+      "package": "@pumped-fn/lite@6.2.0",
       "license": "MIT",
       "files": [
         "docs/test-without-mocks.md",

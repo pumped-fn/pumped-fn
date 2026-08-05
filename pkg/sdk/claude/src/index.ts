@@ -36,6 +36,10 @@ export class ClaudeProcessError extends Error {
   override readonly name = "ClaudeProcessError"
 }
 
+export class ClaudeInterruptError extends Error {
+  override readonly name = "ClaudeInterruptError"
+}
+
 export class ClaudeShutdownError extends Error {
   override readonly name = "ClaudeShutdownError"
 }
@@ -110,8 +114,11 @@ export const claudeSession = resource({
     let current: {
       resolve(value: string): void
       reject(error: Error): void
+      cancel(error: Error): void
       signal?: AbortSignal
-      abort?: () => void
+      abort: () => void
+      interrupted?: Error
+      interruptTimeout?: number
       timeout?: number
     } | undefined
     let closed = false
@@ -120,15 +127,33 @@ export const claudeSession = resource({
     let stderr = ""
     let tail = Promise.resolve()
     let nextInterrupt = 0
+    let poison: ClaudeInterruptError | undefined
 
     const settle = (result: { value: string } | { error: Error }) => {
       const transaction = current
       if (!transaction) return
       current = undefined
-      if (transaction.abort) transaction.signal?.removeEventListener("abort", transaction.abort)
+      transaction.signal?.removeEventListener("abort", transaction.abort)
+      if (transaction.interruptTimeout !== undefined) clock.clear(transaction.interruptTimeout)
       if (transaction.timeout !== undefined) clock.clear(transaction.timeout)
-      if ("value" in result) transaction.resolve(result.value)
+      if (transaction.interrupted) transaction.reject(transaction.interrupted)
+      else if ("value" in result) transaction.resolve(result.value)
       else transaction.reject(result.error)
+    }
+
+    const interrupt = (transaction: NonNullable<typeof current>, error: Error) => {
+      transaction.interrupted = error
+      transaction.signal?.removeEventListener("abort", transaction.abort)
+      if (transaction.timeout !== undefined) clock.clear(transaction.timeout)
+      child.stdin.write(interruptMessage(nextInterrupt++))
+      transaction.interruptTimeout = clock.set(() => {
+        poison = new ClaudeInterruptError(`Claude process did not finish interrupted prompt within ${config.shutdownTimeoutMs}ms`)
+        closed = true
+        transaction.interrupted = poison
+        child.kill("SIGINT")
+        settle({ error: poison })
+      }, config.shutdownTimeoutMs)
+      transaction.cancel(error)
     }
 
     const fail = (error: Error) => {
@@ -198,31 +223,42 @@ export const claudeSession = resource({
     })
 
     const prompt = (value: string, signal?: AbortSignal) => {
-      const transaction = tail.then(() => new Promise<string>((resolve, reject) => {
+      if (signal?.aborted) return Promise.reject(new DOMException("Claude prompt aborted", "AbortError"))
+      const ready = tail
+      let cancel!: (error: Error) => void
+      const cancelled = new Promise<never>((_resolve, reject) => {
+        cancel = reject
+      })
+      const abort = () => {
+        const error = new DOMException("Claude prompt aborted", "AbortError")
+        const transaction = current
+        if (transaction?.abort === abort) interrupt(transaction, error)
+        else cancel(error)
+      }
+      signal?.addEventListener("abort", abort, { once: true })
+      const turn = ready.then(() => new Promise<string>((resolve, reject) => {
         if (closed || closing) {
-          reject(new ClaudeProcessError("Claude session is closed"))
+          signal?.removeEventListener("abort", abort)
+          reject(poison ?? new ClaudeProcessError("Claude session is closed"))
           return
         }
         if (signal?.aborted) {
+          signal.removeEventListener("abort", abort)
           reject(new DOMException("Claude prompt aborted", "AbortError"))
           return
         }
-        const abort = () => {
-          child.stdin.write(interruptMessage(nextInterrupt++))
-          settle({ error: new DOMException("Claude prompt aborted", "AbortError") })
-        }
-        current = { resolve, reject, signal, abort }
-        signal?.addEventListener("abort", abort, { once: true })
+        const transaction: NonNullable<typeof current> = { resolve, reject, cancel, signal, abort }
+        current = transaction
         if (config.timeoutMs !== undefined) {
-          current.timeout = clock.set(() => {
-            child.stdin.write(interruptMessage(nextInterrupt++))
-            settle({ error: new ClaudeProcessError(`Claude prompt timed out after ${config.timeoutMs}ms`) })
-          }, config.timeoutMs)
+          transaction.timeout = clock.set(
+            () => interrupt(transaction, new ClaudeProcessError(`Claude prompt timed out after ${config.timeoutMs}ms`)),
+            config.timeoutMs,
+          )
         }
         child.stdin.write(`${JSON.stringify({ type: "user", message: { role: "user", content: value } })}\n`)
       }))
-      tail = transaction.then(() => undefined, () => undefined)
-      return transaction
+      tail = turn.then(() => undefined, () => undefined)
+      return Promise.race([turn, cancelled])
     }
 
     const lifetime = { close, shutdown: undefined as Promise<void> | undefined }
@@ -326,14 +362,14 @@ export const claudeAttempt: agent.Attempt = flow({
       : leases.transient()
     const leaseId = leases.identity?.(sessionId, boundAuthority, work) ?? sessionId
     const invocation = leases.prompt(leaseId, formatModelPrompt(ctx.input), ctx.signal)
-    let completed = false
+    let reusable = false
     try {
       for await (const event of invocation.events) yield event
-      const result = parseModelResponse(await invocation.result)
-      completed = true
-      return result
+      const response = await invocation.result
+      reusable = true
+      return parseModelResponse(response)
     } finally {
-      if (!completed || !record) await leases.release(leaseId)
+      if (!reusable || !record) await leases.release(leaseId)
     }
   },
 })
@@ -568,8 +604,11 @@ function createManagedLease(
     readonly events: EventQueue<agent.ModelEvent>
     readonly resolve: (value: string) => void
     readonly reject: (error: Error) => void
+    readonly cancel: (error: Error) => void
     readonly signal?: AbortSignal
-    readonly abort?: () => void
+    readonly abort: () => void
+    interrupted?: Error
+    interruptTimeout?: number
     timeout?: number
   } | undefined
   let closed = false
@@ -577,14 +616,17 @@ function createManagedLease(
   let shutdown: Promise<void> | undefined
   let tail = Promise.resolve()
   let nextInterrupt = 0
+  let poison: ClaudeInterruptError | undefined
 
   const settle = (result: { value: string } | { error: Error }) => {
     const transaction = current
     if (!transaction) return
     current = undefined
-    if (transaction.abort) transaction.signal?.removeEventListener("abort", transaction.abort)
+    transaction.signal?.removeEventListener("abort", transaction.abort)
+    if (transaction.interruptTimeout !== undefined) deps.clock.clear(transaction.interruptTimeout)
     if (transaction.timeout !== undefined) deps.clock.clear(transaction.timeout)
-    if ("value" in result) {
+    if (transaction.interrupted) transaction.reject(transaction.interrupted)
+    else if ("value" in result) {
       transaction.events.push({ type: "provider_status", status: "completed" })
       transaction.events.end()
       transaction.resolve(result.value)
@@ -592,6 +634,22 @@ function createManagedLease(
       transaction.events.fail(result.error)
       transaction.reject(result.error)
     }
+  }
+
+  const interrupt = (transaction: NonNullable<typeof current>, error: Error) => {
+    transaction.interrupted = error
+    transaction.signal?.removeEventListener("abort", transaction.abort)
+    if (transaction.timeout !== undefined) deps.clock.clear(transaction.timeout)
+    child.stdin.write(interruptMessage(nextInterrupt++))
+    transaction.interruptTimeout = deps.clock.set(() => {
+      poison = new ClaudeInterruptError(`Claude process did not finish interrupted prompt within ${config.shutdownTimeoutMs}ms`)
+      closed = true
+      transaction.interrupted = poison
+      child.kill("SIGINT")
+      settle({ error: poison })
+    }, config.shutdownTimeoutMs)
+    transaction.events.fail(error)
+    transaction.cancel(error)
   }
 
   const awaitExit = () => new Promise<boolean>((resolve) => {
@@ -646,31 +704,47 @@ function createManagedLease(
 
   const prompt = (value: string, signal?: AbortSignal) => {
     const events = new EventQueue<agent.ModelEvent>()
-    const result = tail.then(() => new Promise<string>((resolve, reject) => {
+    if (signal?.aborted) {
+      const result = Promise.reject<string>(new DOMException("Claude prompt aborted", "AbortError"))
+      result.catch((error) => events.fail(error))
+      return { events, result }
+    }
+    const ready = tail
+    let cancel!: (error: Error) => void
+    const cancelled = new Promise<never>((_resolve, reject) => {
+      cancel = reject
+    })
+    const abort = () => {
+      const error = new DOMException("Claude prompt aborted", "AbortError")
+      const transaction = current
+      if (transaction?.abort === abort) interrupt(transaction, error)
+      else cancel(error)
+    }
+    signal?.addEventListener("abort", abort, { once: true })
+    const turn = ready.then(() => new Promise<string>((resolve, reject) => {
       if (closed || closing) {
-        reject(new ClaudeProcessError("Claude session is closed"))
+        signal?.removeEventListener("abort", abort)
+        reject(poison ?? new ClaudeProcessError("Claude session is closed"))
         return
       }
       if (signal?.aborted) {
+        signal.removeEventListener("abort", abort)
         reject(new DOMException("Claude prompt aborted", "AbortError"))
         return
       }
-      const abort = () => {
-        child.stdin.write(interruptMessage(nextInterrupt++))
-        settle({ error: new DOMException("Claude prompt aborted", "AbortError") })
-      }
-      current = { events, resolve, reject, signal, abort }
+      const transaction: NonNullable<typeof current> = { events, resolve, reject, cancel, signal, abort }
+      current = transaction
       events.push({ type: "provider_status", status: "started" })
-      signal?.addEventListener("abort", abort, { once: true })
       if (config.timeoutMs !== undefined) {
-        current.timeout = deps.clock.set(() => {
-          child.stdin.write(interruptMessage(nextInterrupt++))
-          settle({ error: new ClaudeProcessError(`Claude prompt timed out after ${config.timeoutMs}ms`) })
-        }, config.timeoutMs)
+        transaction.timeout = deps.clock.set(
+          () => interrupt(transaction, new ClaudeProcessError(`Claude prompt timed out after ${config.timeoutMs}ms`)),
+          config.timeoutMs,
+        )
       }
       child.stdin.write(`${JSON.stringify({ type: "user", message: { role: "user", content: value } })}\n`)
     }))
-    tail = result.then(() => undefined, () => undefined)
+    const result = Promise.race([turn, cancelled])
+    tail = turn.then(() => undefined, () => undefined)
     result.catch((error) => events.fail(error))
     return { events, result }
   }
