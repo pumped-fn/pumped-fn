@@ -105,7 +105,7 @@ await scope.dispose()
 `claudeAttemptBinding` when composing `agent.turn`; `provider` remains the scalar model tag. Tests
 can preset `claudeAttempt`, `claudeLeases`, or `spawnProcess` through `createScope` without changing the caller.
 
-## Current prerelease migration
+## Migration to 4.0.0
 
 | Before | Now |
 |---|---|

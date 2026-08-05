@@ -2,6 +2,19 @@
 
 Agent and session primitives built on Lite. Lite owns graph resolution, execution, streaming, lifetimes, and the `createScope` seam. The SDK supplies stable definitions and durable data contracts.
 
+## Migration to 4.0.0
+
+| Before | Now |
+|---|---|
+| `Runtime` type, `runtime` tag, tag label `workflow.runtime` | `WorkflowContext` type, `workflow` tag, tag label `workflow.context` |
+| `SuspenseSignal` | `SuspendSignal` |
+| `sandbox.ExecEvent` | `sandbox.CommandOutputEvent` |
+| `judge(options)` | pass the `Judge` object directly |
+| `formatStepKey(key)` | `formatSuspenseStepKey` from `@pumped-fn/lite-extension-suspense` |
+| `parseModelResponse` returning prose on malformed output | throws `ModelResponseParseError` |
+| `CliResult.exitCode: number \| null` | `CliResult.exitCode: 0`; failures carry `CliFailureResult` on `CliWorkerError.result` |
+| `work.branchId` required | optional; resolves from the record's current branch at admission |
+
 ## Migration to 3.0.0
 
 3.0.0 removes the `Agent` facade and the material `session()` object. Every capability is now a

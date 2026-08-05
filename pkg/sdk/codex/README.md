@@ -104,7 +104,7 @@ CLI aliases `config`, `run`, `turn`, and `provider`. They are the same graph han
 object or shared scope factory. There is no generic `engine` alias; preset the CLI `run` edge or the
 ACP `acp` resource by its explicit name.
 
-## Current prerelease migration
+## Migration to 4.0.0
 
 | Before | Now |
 |---|---|

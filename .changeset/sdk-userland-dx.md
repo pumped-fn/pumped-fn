@@ -5,7 +5,7 @@
 "@pumped-fn/sdk-pi": major
 "@pumped-fn/sdk-just-bash": major
 "@pumped-fn/sdk-test": major
-"@pumped-fn/sdk-mcp": major
+"@pumped-fn/sdk-mcp": minor
 ---
 
 Fix userland correctness defects and reduce public-surface ceremony across the SDK.

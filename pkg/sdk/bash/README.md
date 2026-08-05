@@ -110,7 +110,7 @@ await scope.dispose()
 
 There is no generic `engine` alias. Replace `interpreter`, `workspace`, `readiness`, or any named flow with `preset()` in tests. No module mock or shared scope is needed.
 
-## Current prerelease migration
+## Migration to 4.0.0
 
 | Before | Now |
 |---|---|

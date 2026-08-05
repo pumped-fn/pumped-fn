@@ -36,7 +36,7 @@ stream. Its final result is the same `ModelResponse` returned by `piTurn`; the s
 attempt. `piAttemptBinding` injects the stream through `agent.impl.attempt`. There is no generic
 `engine` alias; `models` names the collection seam that tests preset.
 
-## Current prerelease migration
+## Migration to 4.0.0
 
 | Before | Now |
 |---|---|

@@ -54,6 +54,16 @@ The existing workflow helpers remain: `kit`, `suspense`, `MemoryWorkflowLog`, `M
 
 The issue-triage example uses the same scope seam for independent tests of `agent.turn`, evidence backends, verification, publication, and queue concurrency.
 
+## Migration to 4.0.0
+
+| Before | Now |
+|---|---|
+| hand-written `SessionRecord` literal | `initialRecord(id, authority, overrides?)` |
+| full `session.createAuthority` object | `testAuthority(overrides?)` with deny-all defaults |
+| eight-field `ModelRequest` literal | `modelRequest(overrides?)` |
+| local `validation.standard({ id: "test", toJsonSchema: () => true })` | `validationStub` |
+| hand-wired session and agent tag list | `sessionKit(options?).tags` |
+
 ## Migration to 3.0.0
 
 3.0.0 tracks the `@pumped-fn/sdk` facade removal. The test helpers no longer own or cache a scope;
