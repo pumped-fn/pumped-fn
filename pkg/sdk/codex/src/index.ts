@@ -114,8 +114,9 @@ export const codexAttempt: agent.Attempt = flow({
     yield { type: "provider_status", status: "started" }
     const output = await run.exec({ input: { prompt: formatModelPrompt(ctx.input) } })
     yield { type: "content_delta", content: output }
+    const response = parseModelResponse(output)
     yield { type: "provider_status", status: "completed" }
-    return parseModelResponse(output)
+    return response
   },
 })
 
@@ -420,7 +421,8 @@ export const codexAcpAttempt: agent.Attempt = flow({
     if (boundAuthority) acp.authorities.set(sessionId, boundAuthority)
     acp.metadata.set(sessionId, metadata)
     let cancellation: Promise<void> | undefined
-    let promptStatus: "completed" | "failed" | undefined
+    let promptSettled = false
+    let invocationStatus: "completed" | "failed" | undefined
     const cancel = () => {
       cancellation ??= acp.connection.agent.notify("session/cancel", { sessionId })
       stream.fail(signal.reason ?? new DOMException("Codex ACP stream closed", "AbortError"))
@@ -431,21 +433,24 @@ export const codexAcpAttempt: agent.Attempt = flow({
       sessionId,
       prompt: [{ type: "text", text: formatModelPrompt(ctx.input) }],
     }).then(() => {
-      promptStatus = "completed"
-      stream.push({ type: "provider_status", status: "completed" })
+      promptSettled = true
       stream.end()
     }, (error) => {
-      promptStatus = "failed"
+      promptSettled = true
+      invocationStatus = "failed"
       stream.fail(error)
     })
     stream.push({ type: "provider_status", status: "started" })
     try {
       for await (const event of stream) yield event
       await prompt
-      return parseModelResponse(chunks.join(""))
+      const response = parseModelResponse(chunks.join(""))
+      invocationStatus = "completed"
+      yield { type: "provider_status", status: "completed" }
+      return response
     } finally {
       signal.removeEventListener("abort", cancel)
-      if (!promptStatus) cancel()
+      if (!promptSettled) cancel()
       const release = () => {
         if (acp.sessions.get(sessionId) === chunks) acp.sessions.delete(sessionId)
         if (acp.streams.get(sessionId) === stream) acp.streams.delete(sessionId)
@@ -459,7 +464,7 @@ export const codexAcpAttempt: agent.Attempt = flow({
       const stopped = await bounded(completion, clock, effectiveConfig.shutdownTimeoutMs)
       if (stopped) {
         release()
-        settleRemoteInvocation(runtime, remote, signal.aborted ? "cancelled" : promptStatus ?? "failed")
+        settleRemoteInvocation(runtime, remote, signal.aborted ? "cancelled" : invocationStatus ?? "failed")
       } else {
         try {
           await acp.terminate()

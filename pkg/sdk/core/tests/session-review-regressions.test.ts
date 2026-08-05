@@ -323,10 +323,10 @@ describe("session review regressions", () => {
     const events: sandbox.CommandOutputEvent[] = []
 
     for await (const event of stream) events.push(event)
-    await expect(stream.result).resolves.toEqual({ stdout: "éé", stderr: "a", exitCode: 0 })
+    await expect(stream.result).resolves.toEqual({ stdout: "éé", stderr: "a", exitCode: 0, truncated: true })
     expect(events).toEqual([
       { type: "stdout", content: "éé" },
-      { type: "stderr", content: "a" },
+      { type: "stderr", content: "a", truncated: true },
     ])
 
     await ctx.close()

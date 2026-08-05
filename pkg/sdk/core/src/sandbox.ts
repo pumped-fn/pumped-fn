@@ -3,14 +3,16 @@ import { posix } from "node:path"
 import { flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 import * as session from "./session.js"
 
-/** Defines sandbox limits enforced by the SDK. The run binding must enforce physical network access. */
+/** Defines sandbox limits. The SDK signals deadlines and caps delivered output; the run binding must observe abort signals and enforce network access. */
 export interface Policy {
   readonly roots: readonly string[]
   readonly write: boolean
   /** Declares network access; the sandbox.impl.run binding must enforce this setting. */
   readonly network: boolean
   readonly commands: readonly string[]
+  /** Aborts the run binding's signal at the deadline. A binding that ignores the signal can keep execution pending. */
   readonly timeoutMs: number
+  /** Caps delivered UTF-8 bytes. Truncated events and results carry truncated: true. */
   readonly maxOutputBytes: number
 }
 
@@ -36,11 +38,12 @@ export interface ExecResult {
   readonly stdout: string
   readonly stderr: string
   readonly exitCode: number
+  readonly truncated?: true
 }
 
 export type CommandOutputEvent =
-  | { readonly type: "stdout"; readonly content: string }
-  | { readonly type: "stderr"; readonly content: string }
+  | { readonly type: "stdout"; readonly content: string; readonly truncated?: true }
+  | { readonly type: "stderr"; readonly content: string; readonly truncated?: true }
 
 export type Read = Lite.Flow<string, ReadInput>
 export type Write = Lite.Flow<void, WriteInput>
@@ -112,39 +115,57 @@ export const exec: Run = flow({
     const timer = setTimeout(() => {
       controller.abort(new Error(`Sandbox command timed out after ${value.timeoutMs}ms`))
     }, value.timeoutMs)
-    const budget = { remaining: value.maxOutputBytes }
+    const budget = { remaining: value.maxOutputBytes, signaled: false }
+    let eventTruncated = false
     try {
       const stream = run.execStream({ input: ctx.input, signal: controller.signal })
       for await (const event of stream) {
-        const content = truncateUtf8(event.content, budget)
-        if (content) yield { ...event, content }
+        const selected = truncateUtf8(event.content, budget)
+        if (event.truncated) eventTruncated = true
+        if (selected.content || selected.truncated || event.truncated) {
+          yield {
+            ...event,
+            content: selected.content,
+            ...(selected.truncated || event.truncated ? { truncated: true } : {}),
+          }
+        }
       }
       controller.signal.throwIfAborted()
-      return truncateExecResult(await stream.result, value.maxOutputBytes)
+      return truncateExecResult(await stream.result, value.maxOutputBytes, eventTruncated || budget.signaled)
     } finally {
       clearTimeout(timer)
     }
   },
 })
 
-function truncateExecResult(result: ExecResult, maxOutputBytes: number): ExecResult {
-  const budget = { remaining: maxOutputBytes }
+function truncateExecResult(result: ExecResult, maxOutputBytes: number, eventTruncated: boolean): ExecResult {
+  const budget = { remaining: maxOutputBytes, signaled: false }
+  const stdout = truncateUtf8(result.stdout, budget)
+  const stderr = truncateUtf8(result.stderr, budget)
   return {
-    stdout: truncateUtf8(result.stdout, budget),
-    stderr: truncateUtf8(result.stderr, budget),
+    stdout: stdout.content,
+    stderr: stderr.content,
     exitCode: result.exitCode,
+    ...(eventTruncated || result.truncated || stdout.truncated || stderr.truncated ? { truncated: true } : {}),
   }
 }
 
-function truncateUtf8(content: string, budget: { remaining: number }): string {
+function truncateUtf8(
+  content: string,
+  budget: { remaining: number; signaled: boolean },
+): { content: string; truncated: boolean } {
   const encoded = new TextEncoder().encode(content)
   if (encoded.byteLength <= budget.remaining) {
     budget.remaining -= encoded.byteLength
-    return content
+    return { content, truncated: false }
   }
-  const selected = encoded.subarray(0, budget.remaining)
+  let end = budget.remaining
+  while (end > 0 && (encoded[end]! & 0b1100_0000) === 0b1000_0000) end--
+  const selected = new TextDecoder().decode(encoded.subarray(0, end))
   budget.remaining = 0
-  return new TextDecoder().decode(selected, { stream: true })
+  if (budget.signaled) return { content: selected, truncated: false }
+  budget.signaled = true
+  return { content: selected, truncated: true }
 }
 
 function assertPolicy(authority: session.Authority, value: Policy): void {

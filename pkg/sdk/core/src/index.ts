@@ -274,11 +274,15 @@ export interface CliFailureResult {
   signal: string | null
 }
 
-/** Reports a CLI worker failure and exposes its process details through result. */
+/** Reports a CLI worker failure and exposes its process details and any later cleanup failure. */
 export class CliWorkerError extends Error {
   override readonly name = "CliWorkerError"
 
-  constructor(message: string, readonly result: CliFailureResult) {
+  constructor(
+    message: string,
+    readonly result: CliFailureResult,
+    readonly cleanupError?: unknown,
+  ) {
     super(message)
   }
 }
@@ -298,7 +302,7 @@ export interface RunCliOptions {
 export async function runCli(options: RunCliOptions): Promise<CliResult> {
   const { execFile } = await import("node:child_process")
   const prepared = await prepareCli(options)
-  return new Promise<CliResult>((resolve, reject) => {
+  const execution = new Promise<CliResult>((resolve, reject) => {
     const child = execFile(prepared.command, [...prepared.args], {
       cwd: prepared.cwd,
       env: prepared.env,
@@ -326,7 +330,23 @@ export async function runCli(options: RunCliOptions): Promise<CliResult> {
     })
 
     child.stdin?.end(options.stdin)
-  }).finally(() => prepared.cleanup())
+  })
+  let result: CliResult
+  try {
+    result = await execution
+  } catch (error) {
+    try {
+      await prepared.cleanup()
+    } catch (cleanupError) {
+      if (error instanceof CliWorkerError) {
+        throw new CliWorkerError(error.message, error.result, cleanupError)
+      }
+      throw new AggregateError([error, cleanupError], "CLI worker and cleanup failed")
+    }
+    throw error
+  }
+  await prepared.cleanup()
+  return result
 }
 
 interface PreparedCli {
@@ -546,13 +566,22 @@ function readJson(output: string): unknown {
   if (!trimmed) return undefined
   const direct = parseJson(trimmed)
   if (isModelResponseRecord(direct)) return direct
-  for (let start = trimmed.indexOf("{"); start !== -1; start = trimmed.indexOf("{", start + 1)) {
+  const responses: (Record<string, unknown> & { content: string })[] = []
+  for (let start = trimmed.indexOf("{"); start !== -1;) {
     const end = jsonObjectEnd(trimmed, start)
-    if (end === undefined) continue
+    if (end === undefined) {
+      start = trimmed.indexOf("{", start + 1)
+      continue
+    }
     const value = parseJson(trimmed.slice(start, end))
-    if (isModelResponseRecord(value)) return value
+    if (isModelResponseRecord(value)) {
+      responses.push(value)
+      start = trimmed.indexOf("{", end)
+      continue
+    }
+    start = trimmed.indexOf("{", start + 1)
   }
-  return undefined
+  return responses.length === 1 ? responses[0] : undefined
 }
 
 function parseJson(value: string): unknown {

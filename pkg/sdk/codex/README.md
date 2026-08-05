@@ -75,6 +75,8 @@ await scope.dispose()
 
 ACP applies the same current-work check to `cwd`, `roots`, and granted write and
 network capabilities before starting its process or creating a session.
+ACP permission and tool entries must use stable ACP `toolCall.kind` values. Display titles are not
+permission identifiers and never grant access.
 
 Each ACP prompt maps `roots` to the ACP protocol's `additionalDirectories` field and sends
 `mcpServers: []`. Pumped-fn tool collection
@@ -111,6 +113,7 @@ ACP `acp` resource by its explicit name.
 | ACP aliases `config`, `run`, `turn`, and `provider` | CLI aliases; use `codexAcpConfig`, `codexAcpPrompt`, `codexAcpTurn`, and `codexAcp` for ACP |
 | `engine` | removed; use `acp` for the ACP process resource |
 | ACP config `additionalDirectories` | `roots` |
+| ACP permission or tool entries matching a tool title | use the tool's stable ACP `kind` value |
 
 ## Migration to 3.0.0
 
