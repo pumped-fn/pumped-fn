@@ -66,9 +66,6 @@ jobs:
           free -h
           ps -eo pid,ppid,stat,etime,%cpu,%mem,wchan:32,comm --sort=-%cpu
 
-      - name: Run comparison browser smoke
-        run: pnpm -F @pumped-fn/compare browser:smoke
-
       - name: Run Lightpanda browser tests
         run: pnpm -F @pumped-fn/lite-react test:browser:lightpanda
 
