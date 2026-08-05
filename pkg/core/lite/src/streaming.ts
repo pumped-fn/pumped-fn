@@ -56,6 +56,10 @@ export function streamResultBeforeStartError(): Error {
   return new Error("execStream()/runStream().result is unavailable before iteration begins; use exec() to drain from a context or run() from a scope.")
 }
 
+export function detachedStreamResultBeforeStartError(): Error {
+  return new Error("execDetachedStream().result is unavailable before iteration begins; start iteration before reading the result.")
+}
+
 const streamingExecSymbol = Symbol("pumped-fn.streamingExec")
 const streamingExecTargets = new WeakSet<object>()
 

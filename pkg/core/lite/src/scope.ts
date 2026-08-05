@@ -5,7 +5,7 @@ import { isFlow } from "./flow"
 import { isResource } from "./resource"
 import { isTagged, normalizeTags } from "./tag"
 import { latest, type Latest } from "./latest"
-import { assertNoReturnedStream, consumeScalarResult, isAsyncGenerator, isAsyncGeneratorFunction, isPromiseLike, markStreamingExec, registerStreamingExec, requireAsyncGenerator, streamResultBeforeStartError } from "./streaming"
+import { assertNoReturnedStream, consumeScalarResult, detachedStreamResultBeforeStartError, isAsyncGenerator, isAsyncGeneratorFunction, isPromiseLike, markStreamingExec, registerStreamingExec, requireAsyncGenerator, streamResultBeforeStartError } from "./streaming"
 export { isStreamingExec } from "./streaming"
 
 function isPlainObject(value: object): value is Record<PropertyKey, unknown> {
@@ -84,8 +84,12 @@ class ContextDataImpl implements Lite.ContextData {
   private readonly tagValues = new Map<symbol, unknown[]>()
 
   constructor(
-    private readonly parentData?: Lite.ContextData
+    private parentData?: Lite.ContextData
   ) {}
+
+  detachParent(): void {
+    this.parentData = undefined
+  }
 
   get(key: string | symbol): unknown {
     return this.map.get(key)
@@ -293,6 +297,31 @@ type ExecRuntimeOptions = {
   params: unknown[]
   tags?: Lite.TagInput
   signal?: AbortSignal
+}
+
+class StreamAbandonment {
+  readonly pending: Promise<never>
+  private reject!: (error: unknown) => void
+  private abandoned = false
+  reason: unknown
+
+  constructor() {
+    this.pending = new Promise<never>((_resolve, reject) => {
+      this.reject = reject
+    })
+    this.pending.catch(() => {})
+  }
+
+  abandon(error: unknown): void {
+    if (this.abandoned) return
+    this.abandoned = true
+    this.reason = error
+    this.reject(error)
+  }
+
+  get isAbandoned(): boolean {
+    return this.abandoned
+  }
 }
 
 function assertExecutionContextImpl(ctx: Lite.ExecutionContext): asserts ctx is ExecutionContextImpl {
@@ -2588,7 +2617,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private readonly _execName: string | undefined
   private readonly _flowName: string | undefined
   private readonly boundary: boolean
-  readonly parent: Lite.ExecutionContext | undefined
+  parent: Lite.ExecutionContext | undefined
 
   constructor(
     readonly scope: ScopeImpl,
@@ -2599,6 +2628,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       flowName?: string
       boundary?: boolean
       signal?: AbortSignal
+      detached?: boolean
     }
   ) {
     this.parent = options?.parent
@@ -2607,7 +2637,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     this._flowName = options?.flowName
     this.boundary = options?.boundary ?? true
     if (this.parent) assertExecutionContextImpl(this.parent)
-    this.baselineMode = options?.signal !== undefined || (this.parent?.baselineMode ?? false)
+    this.baselineMode = options?.detached === true || options?.signal !== undefined || (this.parent?.baselineMode ?? false)
     if (this.baselineMode) {
       this.abortController = new AbortController()
       const signals = [this.abortController.signal]
@@ -2615,7 +2645,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       if (options?.signal) signals.push(options.signal)
       this.signalOverride = signals.length === 1 ? signals[0]! : combineAbortSignals(signals)
     }
-    if (this.parent) {
+    if (this.parent && options?.detached !== true) {
       this.parent.children ??= new Set()
       this.parent.children.add(this)
       if (!this.baselineMode && this.parent.abortReason !== pendingAbort) {
@@ -2655,6 +2685,11 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   appendTagValue(key: symbol, value: unknown): void {
     this.dataImpl().appendTagValue(key, value)
+  }
+
+  detachParent(): void {
+    this._data?.detachParent()
+    this.parent = undefined
   }
 
   assertOpen(): void {
@@ -2804,6 +2839,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       get data() { return owner.data },
       exec: owner.exec.bind(owner) as Lite.ResourceContext["exec"],
       execStream: owner.execStream.bind(owner) as Lite.ResourceContext["execStream"],
+      execDetachedStream: owner.execDetachedStream.bind(owner) as Lite.ResourceContext["execDetachedStream"],
       resolve: owner.resolve.bind(owner) as Lite.ResourceContext["resolve"],
       release: owner.release.bind(owner) as Lite.ResourceContext["release"],
       controller: owner.controller.bind(owner),
@@ -2989,6 +3025,84 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     } as Lite.FlowStream<unknown, unknown>
   }
 
+  execDetachedStream<Output, Yield, Input>(options: Lite.ExecFlowOptions<Output, Input, Yield>): Lite.FlowStream<Yield, Output>
+  execDetachedStream(options: ExecFlowRuntimeOptions): Lite.FlowStream<unknown, unknown>
+  execDetachedStream(options: ExecFlowRuntimeOptions): Lite.FlowStream<unknown, unknown> {
+    this.assertOpen()
+
+    let consumed = false
+    let started = false
+    let settleResult: (value: unknown) => void
+    let failResult: (error: unknown) => void
+    const result = new Promise<unknown>((resolve, reject) => {
+      settleResult = resolve
+      failResult = reject
+    })
+    result.catch(() => {})
+    const owner = this
+
+    return {
+      get result() {
+        if (!started) throw detachedStreamResultBeforeStartError()
+        return result
+      },
+      [Symbol.asyncIterator]() {
+        if (consumed) throw new Error("execDetachedStream() results can be consumed only once.")
+        consumed = true
+        const abandonment = new StreamAbandonment()
+        const iterator = owner.iterateExecStream(
+          { ...options, tags: normalizeTags(options.tags) },
+          result,
+          settleResult!,
+          failResult!,
+          () => { started = true },
+          abandonment,
+        )
+        let active = true
+        const detached: AsyncIterator<unknown, unknown, unknown> = {
+          async next(value?: unknown) {
+            try {
+              const step = await Promise.race([iterator.next(value), abandonment.pending])
+              if (step.done) {
+                active = false
+                owner.activeIterators?.delete(detached)
+              }
+              return step
+            } catch (error) {
+              active = false
+              owner.activeIterators?.delete(detached)
+              throw error
+            }
+          },
+          async return(value?: unknown) {
+            if (!active) return { done: true, value }
+            active = false
+            owner.activeIterators?.delete(detached)
+            const error = new DOMException("Detached flow stream abandoned", "AbortError")
+            abandonment.abandon(error)
+            failResult!(error)
+            void iterator.return?.(value).catch(() => {})
+            return { done: true, value }
+          },
+          async throw(error?: unknown) {
+            if (active) {
+              active = false
+              owner.activeIterators?.delete(detached)
+              abandonment.abandon(error)
+              failResult!(error)
+              if (iterator.throw) void iterator.throw(error).catch(() => {})
+              else void iterator.return?.(undefined).catch(() => {})
+            }
+            throw error
+          },
+        }
+        owner.activeIterators ??= new Set()
+        owner.activeIterators.add(detached)
+        return detached
+      },
+    } as Lite.FlowStream<unknown, unknown>
+  }
+
   private seedTags(
     childCtx: ExecutionContextImpl,
     inputTags?: Lite.TagInput,
@@ -3018,7 +3132,11 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
   }
 
-  private createChildInvocation(options: ExecFlowRuntimeOptions): MaybePromise<{
+  private createChildInvocation(
+    options: ExecFlowRuntimeOptions,
+    detached = false,
+    abandonment?: StreamAbandonment,
+  ): MaybePromise<{
     flow: Lite.Flow<unknown, unknown, any, unknown>
     presetValue: unknown
     childCtx: ExecutionContextImpl
@@ -3028,17 +3146,19 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     const { flow, input, rawInput, name: execName, tags: execTags, blockedTags } = options
     const presetValue = this.scope.getFlowPreset(flow)
     if (presetValue !== undefined && isFlow(presetValue)) {
-      return this.createChildInvocation({ ...options, flow: presetValue })
+      return this.createChildInvocation({ ...options, flow: presetValue }, detached, abandonment)
     }
 
     const finish = (parsedInput: unknown) => {
+      if (abandonment?.isAbandoned) throw abandonment.reason
       const childCtx = new ExecutionContextImpl(this.scope, {
         parent: this,
         input: parsedInput,
         execName,
         flowName: flow.name,
         boundary: false,
-        signal: options.signal
+        signal: options.signal,
+        detached,
       })
 
       this.seedTags(childCtx, execTags, flow.tags, blockedTags)
@@ -3082,14 +3202,18 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     result: Promise<unknown>,
     settleResult: (value: unknown) => void,
     failResult: (error: unknown) => void,
-    start: () => void
+    start: () => void,
+    abandonment?: StreamAbandonment,
   ): AsyncGenerator<unknown, unknown, unknown> {
     start()
     let invocation: Awaited<ReturnType<ExecutionContextImpl["createChildInvocation"]>>
     try {
-      invocation = await this.createChildInvocation(options)
+      const created = this.createChildInvocation(options, abandonment !== undefined, abandonment)
+      invocation = abandonment
+        ? await Promise.race([created, abandonment.pending])
+        : await created
     } catch (error) {
-      failResult(error)
+      if (!abandonment?.isAbandoned) failResult(error)
       throw error
     }
 
@@ -3103,7 +3227,6 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     })
     raw.catch(() => {})
     let iterator: AsyncGenerator<unknown, unknown, unknown> | undefined
-    let abortError: Error | undefined
     let resolveSetup!: (value: IteratorReturnResult<unknown> | undefined) => void
     let rejectSetup!: (error: unknown) => void
     const setup = new Promise<IteratorReturnResult<unknown> | undefined>((resolve, reject) => {
@@ -3135,24 +3258,46 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       }
     })()
 
+    const abandon = abandonment
+      ? (error: unknown) => {
+          childCtx.abort(error)
+          childCtx.detachParent()
+          const active = iterator
+          iterator = undefined
+          failRaw!(error)
+          unregisterStreaming()
+          if (active) void active.return?.(undefined).catch(() => {})
+          void childCtx.close({ ok: false, error }).catch(() => {})
+        }
+      : undefined
+
     try {
-      const shortCircuit = await setup
+      const shortCircuit = abandonment
+        ? await Promise.race([setup, abandonment.pending])
+        : await setup
       if (shortCircuit) {
+        if (abandonment) return await Promise.race([result, abandonment.pending])
         await result
         return shortCircuit.value
       }
 
       for (;;) {
-        const step = await iterator!.next()
+        const step = abandonment
+          ? await Promise.race([iterator!.next(), abandonment.pending])
+          : await iterator!.next()
         if (step.done) {
           settleRaw!(step.value)
-          await result
+          const value = await result
           iterator = undefined
-          return step.value
+          return abandonment ? value : step.value
         }
         yield step.value
       }
     } catch (error) {
+      if (abandonment?.isAbandoned) {
+        abandon!(abandonment.reason)
+        throw abandonment.reason
+      }
       if (iterator) {
         iterator = undefined
         failRaw!(error)
@@ -3161,12 +3306,21 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       throw error
     } finally {
       if (iterator) {
-        abortError = new DOMException("Flow stream aborted", "AbortError")
-        childCtx.abort(abortError)
+        const error = abandonment?.isAbandoned
+          ? abandonment.reason
+          : new DOMException(
+              abandonment ? "Detached flow stream abandoned" : "Flow stream aborted",
+              "AbortError",
+            )
+        if (abandonment) {
+          abandon!(error)
+          return
+        }
+        childCtx.abort(error)
         try {
           await iterator.return?.(undefined)
         } catch {}
-        failRaw!(abortError)
+        failRaw!(error)
         await result.catch(() => {})
       }
     }

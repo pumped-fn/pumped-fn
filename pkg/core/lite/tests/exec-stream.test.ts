@@ -8,6 +8,20 @@ async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
   return values
 }
 
+async function promptly<T>(pending: Promise<T>, message: string): Promise<T> {
+  let timer!: ReturnType<typeof setTimeout>
+  try {
+    return await Promise.race([
+      pending,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(reject, 250, new Error(message))
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 describe("ctx.execStream()", () => {
   it("types generator flow streams", async () => {
     const read = flow({
@@ -20,13 +34,17 @@ describe("ctx.execStream()", () => {
     const scope = createScope()
     const ctx = scope.createContext()
     const stream = ctx.execStream({ flow: read, input: { id: "abc" } })
+    const detached = ctx.execDetachedStream({ flow: read, input: { id: "detached" } })
     const execResult = ctx.exec({ flow: read, input: { id: "abc" } })
 
     expectTypeOf(stream).toEqualTypeOf<Lite.FlowStream<number, { id: string }>>()
+    expectTypeOf(detached).toEqualTypeOf<Lite.FlowStream<number, { id: string }>>()
     expect(await collect(stream)).toEqual([3])
+    expect(await collect(detached)).toEqual([8])
     expectTypeOf(stream.result).toEqualTypeOf<Promise<{ id: string }>>()
     expectTypeOf(execResult).toEqualTypeOf<Promise<{ id: string }>>()
     await expect(stream.result).resolves.toEqual({ id: "abc" })
+    await expect(detached.result).resolves.toEqual({ id: "detached" })
     await expect(execResult).resolves.toEqual({ id: "abc" })
 
     await ctx.close()
@@ -176,6 +194,152 @@ describe("ctx.execStream()", () => {
     expect(starts).toBe(1)
     expect(closes[0]).toMatchObject({ ok: false, aborted: true })
     await ctx.close()
+    await scope.dispose()
+  })
+
+  it("abandons a detached child without joining its late settlement", async () => {
+    const events: string[] = []
+    const closes: Lite.CloseResult[] = []
+    const contextMarker = tag<string>({ label: "detached-marker" })
+    const late = resource({ factory: () => "late" })
+    let release!: () => void
+    let finishLate!: () => void
+    let finishCleanup!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const lateFinished = new Promise<void>((resolve) => {
+      finishLate = resolve
+    })
+    const cleanupFinished = new Promise<void>((resolve) => {
+      finishCleanup = resolve
+    })
+    const lease = resource({
+      ownership: "current",
+      factory: (ctx) => {
+        ctx.cleanup(() => {
+          events.push("release")
+          finishCleanup()
+        })
+        return "lease"
+      },
+    })
+    let signal: AbortSignal | undefined
+    let lateMarker: string | undefined
+    let lateParent: Lite.ExecutionContext | undefined
+    const read = flow({
+      deps: { lease, marker: tags.required(contextMarker) },
+      factory: async function* (ctx, { lease, marker }) {
+        signal = ctx.signal
+        const timer = setTimeout(() => events.push("timer"), 10_000)
+        ctx.onClose((result, target) => {
+          clearTimeout(target)
+          closes.push(result)
+          events.push("close")
+        }, timer)
+        try {
+          yield `${marker}:${lease}`
+          await held
+          lateMarker = ctx.data.seekTag(contextMarker)
+          lateParent = ctx.parent
+          await ctx.resolve(late)
+          yield "late"
+          return "done"
+        } finally {
+          finishLate()
+        }
+      },
+    })
+    const scope = createScope()
+    const ctx = scope.createContext({ tags: [contextMarker("inherited")] })
+    const stream = ctx.execDetachedStream({ flow: read })
+    const iterator = stream[Symbol.asyncIterator]()
+
+    expectTypeOf(stream).toEqualTypeOf<Lite.FlowStream<string, string>>()
+    expect(await iterator.next()).toEqual({ done: false, value: "inherited:lease" })
+    const pending = iterator.next()
+    await expect(promptly(ctx.close(), "parent close waited")).resolves.toBeUndefined()
+    expect(signal?.aborted).toBe(true)
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" })
+    await expect(stream.result).rejects.toMatchObject({ name: "AbortError" })
+    await expect(promptly(cleanupFinished, "cleanup waited")).resolves.toBeUndefined()
+    expect(events).toEqual(["close", "release"])
+    expect(closes).toMatchObject([{ ok: false, aborted: true }])
+    await expect(promptly(scope.dispose(), "scope disposal waited")).resolves.toBeUndefined()
+
+    release()
+    await lateFinished
+    expect(lateMarker).toBeUndefined()
+    expect(lateParent).toBeUndefined()
+    expect(events).toEqual(["close", "release"])
+  })
+
+  it("returns promptly when a detached stream consumer abandons an uncooperative generator", async () => {
+    let release!: () => void
+    let finish!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const finished = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    const read = flow({
+      factory: async function* () {
+        try {
+          yield "ready"
+          await held
+          yield "late"
+          return "done"
+        } finally {
+          finish()
+        }
+      },
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const stream = ctx.execDetachedStream({ flow: read })
+    const iterator = stream[Symbol.asyncIterator]()
+
+    expect(await iterator.next()).toEqual({ done: false, value: "ready" })
+    await expect(promptly(iterator.return!(undefined), "consumer return waited")).resolves.toEqual({ done: true, value: undefined })
+    await expect(stream.result).rejects.toMatchObject({ name: "AbortError" })
+    await expect(promptly(ctx.close(), "parent close waited")).resolves.toBeUndefined()
+    await expect(promptly(scope.dispose(), "scope disposal waited")).resolves.toBeUndefined()
+
+    release()
+    await finished
+  })
+
+  it("does not create a detached child after abandonment during async input parsing", async () => {
+    let finishParse!: () => void
+    const parsed = new Promise<void>((resolve) => {
+      finishParse = resolve
+    })
+    let factories = 0
+    const read = flow({
+      parse: async (raw: unknown) => {
+        await parsed
+        return String(raw)
+      },
+      factory: async function* () {
+        factories++
+        yield "late"
+        return "done"
+      },
+    })
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const stream = ctx.execDetachedStream({ flow: read, rawInput: "input" })
+    const iterator = stream[Symbol.asyncIterator]()
+    const pending = iterator.next()
+
+    await expect(promptly(ctx.close(), "parent close waited for parsing")).resolves.toBeUndefined()
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" })
+    await expect(stream.result).rejects.toMatchObject({ name: "AbortError" })
+    finishParse()
+    await parsed
+    await Promise.resolve()
+    expect(factories).toBe(0)
     await scope.dispose()
   })
 
