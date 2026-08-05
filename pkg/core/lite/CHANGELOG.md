@@ -1,5 +1,11 @@
 # @pumped-fn/lite
 
+## 6.3.0
+
+### Minor Changes
+
+- 60767c6: Add `ExecutionContext.execDetachedStream()` for streaming work that must release its caller when an uncooperative generator ignores cancellation. Detached streams inherit context data structurally, preserve normal completion and failure, and contain late settlement after abandonment.
+
 ## 6.2.0
 
 ### Minor Changes
