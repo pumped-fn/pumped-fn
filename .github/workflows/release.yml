@@ -115,23 +115,32 @@ jobs:
 
       - name: Verify published registry metadata
         if: steps.changesets.outputs.published == 'true'
+        timeout-minutes: 5
         env:
           PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
         run: |
           node --input-type=module <<'NODE'
-          import { spawnSync } from 'node:child_process'
+          import { execFile } from 'node:child_process'
+          import { promisify } from 'node:util'
           import { setTimeout as delay } from 'node:timers/promises'
 
+          const run = promisify(execFile)
           const packages = JSON.parse(process.env.PUBLISHED_PACKAGES)
           const waitForVersion = async ({ name, version }) => {
             const target = `${name}@${version}`
             const deadline = Date.now() + 120_000
+            let reason = 'no attempt completed'
             while (Date.now() < deadline) {
-              const result = spawnSync('npm', ['view', target, 'version', '--json'], { encoding: 'utf8' })
-              if (result.status === 0 && JSON.parse(result.stdout) === version) return
+              try {
+                const { stdout } = await run('npm', ['view', target, 'version', '--json'], { timeout: 20_000 })
+                if (JSON.parse(stdout) === version) return
+                reason = `registry reported ${stdout.trim()}`
+              } catch (error) {
+                reason = String(error.stderr || error.message).trim()
+              }
               await delay(2_000)
             }
-            throw new Error(`${target} is not visible in the npm registry`)
+            throw new Error(`${target} is not visible in the npm registry: ${reason}`)
           }
           await Promise.all(packages.map(waitForVersion))
           NODE
