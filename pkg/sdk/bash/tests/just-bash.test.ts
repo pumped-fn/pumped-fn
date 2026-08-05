@@ -10,11 +10,11 @@ import * as sandbox from "@pumped-fn/sdk/sandbox"
 import * as session from "@pumped-fn/sdk/session"
 import { expect, it } from "vitest"
 import {
-  OutputLimitError,
+  BashOutputLimitError,
   authority as bashAuthority,
   binding,
   config,
-  engine,
+  interpreter,
   read,
   readiness,
   run,
@@ -28,7 +28,7 @@ it("runs read, write, and buffered exec through named sandbox flows", async () =
   const scope = createScope({
     tags: [
       sandbox.policy(policy),
-      config.engine({ options: { files: { "/workspace/input.txt": "ready" } } }),
+      config.interpreter({ options: { files: { "/workspace/input.txt": "ready" } } }),
       config.workspace({ root: "/workspace" }),
       binding.read,
       binding.write,
@@ -38,7 +38,7 @@ it("runs read, write, and buffered exec through named sandbox flows", async () =
   const ctx = context(scope, "session-a", authority)
 
   await ctx.resolve(session.session)
-  const physical = await ctx.resolve(engine)
+  const physical = await ctx.resolve(interpreter)
   await expect(ctx.resolve(workspace)).resolves.toMatchObject({ root: "/workspace", bash: physical })
   await expect(ctx.resolve(readiness)).resolves.toEqual({
     authorityFingerprint: authority.fingerprint,
@@ -61,7 +61,7 @@ it("runs read, write, and buffered exec through named sandbox flows", async () =
     flow: sandbox.exec,
     input: { command: "printf", args: ["streamed"] },
   })
-  const events: sandbox.ExecEvent[] = []
+  const events: sandbox.CommandOutputEvent[] = []
   for await (const event of stream) events.push(event)
   expect(events).toEqual([{ type: "stdout", content: "streamed" }])
   await expect(stream.result).resolves.toEqual({ stdout: "streamed", stderr: "", exitCode: 0 })
@@ -70,16 +70,16 @@ it("runs read, write, and buffered exec through named sandbox flows", async () =
   await scope.dispose()
 })
 
-it("denies authority and policy violations before resolving the physical engine", async () => {
+it("denies authority and policy violations before resolving the physical interpreter", async () => {
   let creates = 0
   const authority = sandboxAuthority({ write: false, commands: [] })
   const scope = createScope({
     tags: [
       sandbox.policy({ ...sandboxPolicy(), write: true, commands: [] }),
-      config.engine({
+      config.interpreter({
         create: (options) => {
           creates++
-          throw new Error(`engine should not resolve: ${String(options.cwd)}`)
+          throw new Error(`interpreter should not resolve: ${String(options.cwd)}`)
         },
       }),
       config.workspace({ root: "/workspace" }),
@@ -104,7 +104,7 @@ it("enforces policy when provider flows are executed directly", async () => {
   const scope = createScope({
     tags: [
       sandbox.policy(sandboxPolicy()),
-      config.engine({ options: { files: { "/workspace/input.txt": "ready" } } }),
+      config.interpreter({ options: { files: { "/workspace/input.txt": "ready" } } }),
       config.workspace({ root: "/workspace" }),
     ],
   })
@@ -136,7 +136,7 @@ it("enforces policy when provider flows are executed directly", async () => {
     flow: run,
     input: { command: "printf", args: ["ready"] },
   })
-  const events: sandbox.ExecEvent[] = []
+  const events: sandbox.CommandOutputEvent[] = []
   for await (const event of allowed) events.push(event)
   expect(events).toEqual([{ type: "stdout", content: "ready" }])
   await expect(allowed.result).resolves.toEqual({ stdout: "ready", stderr: "", exitCode: 0 })
@@ -147,7 +147,7 @@ it("enforces policy when provider flows are executed directly", async () => {
   const readOnlyScope = createScope({
     tags: [
       sandbox.policy({ ...sandboxPolicy(), write: false }),
-      config.engine({}),
+      config.interpreter({}),
       config.workspace({ root: "/workspace" }),
     ],
   })
@@ -169,7 +169,7 @@ it("binds direct flows to the validated policy snapshot", async () => {
   const scope = createScope({
     tags: [
       sandbox.policy(policy),
-      config.engine({ options: { files: { "/outside/secret.txt": "secret" } } }),
+      config.interpreter({ options: { files: { "/outside/secret.txt": "secret" } } }),
       config.workspace({ root: "/workspace" }),
     ],
   })
@@ -216,7 +216,7 @@ it("denies symlink escapes while preserving in-root and new write paths", async 
   const scope = createScope({
     tags: [
       sandbox.policy(sandboxPolicy()),
-      config.engine({ create: () => physical }),
+      config.interpreter({ create: () => physical }),
       config.workspace({ root: "/workspace" }),
     ],
   })
@@ -259,7 +259,7 @@ it("rejects a dangling custom-filesystem symlink before write follows it", async
   const scope = createScope({
     tags: [
       sandbox.policy(sandboxPolicy()),
-      config.engine({ create: () => physical }),
+      config.interpreter({ create: () => physical }),
       config.workspace({ root: "/workspace" }),
     ],
   })
@@ -282,7 +282,7 @@ it("rejects output above the declared byte cap", async () => {
   const scope = createScope({
     tags: [
       sandbox.policy({ ...sandboxPolicy(), maxOutputBytes: 4 }),
-      config.engine({}),
+      config.interpreter({}),
       config.workspace({ root: "/workspace" }),
       binding.read,
       binding.write,
@@ -299,8 +299,8 @@ it("rejects output above the declared byte cap", async () => {
   })
   await expect(async () => {
     for await (const _event of stream) void _event
-  }).rejects.toBeInstanceOf(OutputLimitError)
-  await expect(stream.result).rejects.toBeInstanceOf(OutputLimitError)
+  }).rejects.toBeInstanceOf(BashOutputLimitError)
+  await expect(stream.result).rejects.toBeInstanceOf(BashOutputLimitError)
 
   await ctx.close({ ok: false, error: new Error("expected") })
   await scope.dispose()
@@ -316,7 +316,7 @@ it("settles cancellation in session A without closing session B", async () => {
   const scope = createScope({
     tags: [
       sandbox.policy({ ...sandboxPolicy(), commands: ["printf", "sleep"] }),
-      config.engine({ options: { sleep: () => held } }),
+      config.interpreter({ options: { sleep: () => held } }),
       config.workspace({ root: "/workspace" }),
       binding.read,
       binding.write,
@@ -327,9 +327,9 @@ it("settles cancellation in session A without closing session B", async () => {
   const sessionB = context(scope, "session-b", authority)
   await sessionA.resolve(session.session)
   await sessionB.resolve(session.session)
-  const engineA = await sessionA.resolve(engine)
-  const engineB = await sessionB.resolve(engine)
-  expect(engineA).not.toBe(engineB)
+  const interpreterA = await sessionA.resolve(interpreter)
+  const interpreterB = await sessionB.resolve(interpreter)
+  expect(interpreterA).not.toBe(interpreterB)
   await sessionA.resolve(workspace)
   await sessionB.resolve(workspace)
 

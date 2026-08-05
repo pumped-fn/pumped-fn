@@ -2,7 +2,15 @@ import { createScope } from "@pumped-fn/lite"
 import * as agent from "@pumped-fn/sdk/agent"
 import * as session from "@pumped-fn/sdk/session"
 import { expect, it } from "vitest"
-import { attemptStubConfig, sessionStoreStub } from "../src/index"
+import {
+  attemptStubConfig,
+  initialRecord,
+  modelRequest,
+  sessionKit,
+  sessionStoreStub,
+  testAuthority,
+  validationStub,
+} from "../src/index"
 
 it("streams attempt events and returns the final model response", async () => {
   const attempt = attemptStubConfig({
@@ -14,7 +22,7 @@ it("streams attempt events and returns the final model response", async () => {
   })
   const scope = createScope({ tags: attempt })
   const ctx = scope.createContext()
-  const stream = ctx.execStream({ flow: agent.invoke, input: request() })
+  const stream = ctx.execStream({ flow: agent.invoke, input: modelRequest() })
   const events: agent.ModelEvent[] = []
 
   for await (const event of stream) events.push(event)
@@ -29,9 +37,10 @@ it("streams attempt events and returns the final model response", async () => {
 })
 
 it("provides isolated session stores through explicit flow bindings", async () => {
-  const record = sessionRecord("session-a")
+  const authority = testAuthority({ tenant: "tenant-a" })
+  const record = initialRecord("session-a", authority)
   const first = sessionStoreStub([record])
-  const second = sessionStoreStub([sessionRecord("session-b")])
+  const second = sessionStoreStub([initialRecord("session-b", authority)])
   const scope = createScope({ tags: [first.config, first.binding.load, first.binding.commit] })
   const ctx = scope.createContext()
 
@@ -52,33 +61,27 @@ it("provides isolated session stores through explicit flow bindings", async () =
 })
 
 it("creates a new test-owned scope and bound session context at each use site", async () => {
-  const authority = session.createAuthority({
+  const authority = testAuthority({
     tenant: "tenant-a",
     roots: ["/workspace"],
-    permissions: [],
-    tools: [],
-    sandbox: { roots: ["/workspace"], commands: [], write: false, network: false },
+    sandbox: { roots: ["/workspace"] },
   })
-  const firstScope = createScope()
+  const firstBundle = sessionKit({
+    id: "session-a",
+    authority,
+    clock: { now: () => "2026-07-14T00:00:00.000Z" },
+  })
+  const firstScope = createScope({ tags: firstBundle.tags })
   const firstRoot = firstScope.createContext()
-  const first = firstScope.createContext({
-    parent: firstRoot,
-    tags: [
-      session.authority(authority),
-      session.record(sessionRecord("session-a", authority)),
-      session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
-    ],
+  const first = firstScope.createContext({ parent: firstRoot })
+  const secondBundle = sessionKit({
+    id: "session-b",
+    authority,
+    clock: { now: () => "2026-07-14T00:00:00.000Z" },
   })
-  const secondScope = createScope()
+  const secondScope = createScope({ tags: secondBundle.tags })
   const secondRoot = secondScope.createContext()
-  const second = secondScope.createContext({
-    parent: secondRoot,
-    tags: [
-      session.authority(authority),
-      session.record(sessionRecord("session-b", authority)),
-      session.clock({ now: () => "2026-07-14T00:00:00.000Z" }),
-    ],
-  })
+  const second = secondScope.createContext({ parent: secondRoot })
 
   await expect(first.resolve(session.session)).resolves.toMatchObject({ record: { id: "session-a" } })
   await expect(second.resolve(session.session)).resolves.toMatchObject({ record: { id: "session-b" } })
@@ -93,49 +96,92 @@ it("creates a new test-owned scope and bound session context at each use site", 
   await secondScope.dispose()
 })
 
-function request() {
-  return {
-    agentName: "test",
+it("executes agent turns with one session test bundle", async () => {
+  const bundle = sessionKit({
+    id: "turn-session",
+    role: {
+      name: "greeter",
+      version: "1",
+      instructions: "Greet the caller.",
+      maxRounds: 1,
+    },
+    respond: (request) => ({
+      events: [{ type: "content_delta", content: "hello" }],
+      result: { content: `reply:${request.messages.at(-1)?.content ?? ""}`, stop: true },
+    }),
+  })
+  const scope = createScope({ tags: bundle.tags })
+  const ctx = scope.createContext()
+  await ctx.resolve(session.session)
+
+  await expect(ctx.exec({
+    flow: session.run,
+    input: {
+      work: { id: "greeter-work", branchId: "main", role: "greeter", policy: "all" },
+      input: { prompt: "hi" },
+    },
+  })).resolves.toMatchObject({
+    role: "greeter",
+    content: "reply:hi",
+    rounds: 1,
+  })
+  await expect(ctx.exec({
+    flow: session.load,
+    input: { id: bundle.record.id },
+  })).resolves.toBe(bundle.record)
+  expect(bundle.store.records.get(bundle.record.id)).toBe(bundle.record)
+  expect(validationStub.id).toBe("test")
+
+  await ctx.close()
+  await scope.dispose()
+})
+
+it("builds minimal session, authority, and model request fixtures", () => {
+  expect(testAuthority()).toMatchObject({
+    tenant: "test",
+    roots: [],
+    permissions: [],
+    tools: [],
+    sandbox: {
+      roots: [],
+      commands: [],
+      write: false,
+      network: false,
+    },
+  })
+  const authority = testAuthority({
+    tenant: "tenant-a",
+    roots: ["/workspace"],
+    sandbox: { roots: ["/workspace"] },
+  })
+
+  expect(authority).toMatchObject({
+    tenant: "tenant-a",
+    roots: ["/workspace"],
+    permissions: [],
+    tools: [],
+    sandbox: {
+      roots: ["/workspace"],
+      commands: [],
+      write: false,
+      network: false,
+    },
+  })
+  expect(initialRecord("session-a", authority, { nextEventSequence: 4 })).toMatchObject({
+    id: "session-a",
+    status: "open",
+    authorityFingerprint: authority.fingerprint,
+    nextEventSequence: 4,
+    branches: [{ id: "main", authority }],
+  })
+  expect(modelRequest({ agentName: "reviewer", round: 2 })).toEqual({
+    agentName: "reviewer",
     instructions: "",
     messages: [],
     tools: [],
     skills: [],
     loadedSkills: [],
     subagents: [],
-    round: 0,
-  }
-}
-
-function sessionRecord(id: string, authority = session.createAuthority({
-  tenant: "tenant-a",
-  roots: [],
-  permissions: [],
-  tools: [],
-  sandbox: { roots: [], commands: [], write: false, network: false },
-})): session.SessionRecord {
-  return Object.freeze({
-    id,
-    version: 0,
-    schemaVersion: 1,
-    status: "open",
-    authorityFingerprint: authority.fingerprint,
-    authorityConstraints: authority,
-    currentBranchId: "main",
-    branches: [{
-      id: "main",
-      version: 0,
-      createdBy: "root",
-      authorityFingerprint: authority.fingerprint,
-      authority,
-      evidence: [],
-    }],
-    work: [],
-    attempts: [],
-    invocations: [],
-    artifacts: [],
-    memory: [],
-    schedules: [],
-    providerContinuations: {},
-    nextEventSequence: 0,
+    round: 2,
   })
-}
+})

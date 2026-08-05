@@ -16,41 +16,7 @@ with this table:
 | `send(message)` | `ctx.exec({ flow: session.run, input })` |
 | `new Sandbox(policy)` | `sandbox.read`, `sandbox.write`, `sandbox.exec` flows with `sandbox.impl.*` bindings |
 
-Before, the 2.x facade wired provider, tools, and session state implicitly:
-
-```ts
-const a = agent({ role, model, tools })
-const before = await a.turn({ prompt: "Triage the ticket." })
-```
-
-In 3.0.0, the application declares the complete tree and then executes the entry flow:
-
-```ts
-const scope = createScope({
-  tags: [
-    session.authority(boundAuthority),
-    session.record(loadedRecord),
-    session.clock(clock),
-    session.store.commit(commitSession),
-    validation.engine(validationEngine),
-    agent.config.role({ name: "triage", version: "1", instructions: "Triage the ticket." }),
-    agent.impl.attempt(agent.fromModel),
-    model(myScalarModel),
-    session.execution.turn({ flow: agent.turn }),
-  ],
-})
-const ctx = scope.createContext()
-await ctx.resolve(session.session)
-const after = await ctx.exec({
-  flow: session.run,
-  input: {
-    work: { id: "t-1", branchId: "main", role: "triage", policy: "all" },
-    input: { prompt: "Triage the ticket." },
-  },
-})
-await ctx.close()
-await scope.dispose()
-```
+Before, the 2.x facade wired provider, tools, and session state implicitly. In 3.0.0, the application declares those definitions and bindings in `createScope`. The minimal setup below shows the required validation and session bindings.
 
 No facade auto-collects tools or MCP servers, injects implicit dependencies, or passes `ctx`/`scope`
 into callbacks. Tool selection stays tag-driven and fails closed when a required binding is absent.
@@ -65,6 +31,17 @@ into callbacks. Tool selection stays tag-driven and fails closed when a required
 | `@pumped-fn/sdk/validation` | Configurable Standard Schema validation |
 | `@pumped-fn/sdk/sandbox` | Session-mediated read, write, and command port flows |
 
+The root entry groups these public helpers:
+
+| Export | Use |
+|---|---|
+| `workflowExtension`, `extension` | Add workflow replay and timeout behavior, then SDK remote-step behavior |
+| `step`, `workflowRun`, `workflow`, `abortSignal` | Tag steps and read the active workflow identity or cancellation signal |
+| `model`, `complete` | Bind and execute a scalar model flow |
+| `suite`, `runEval`, `summary` | Define, run, and serialize deterministic agent evaluations |
+| `inspect`, `RunLog` | Reconstruct one stored workflow run from a queryable event log |
+| `runCli`, `CliWorkerError` | Run a CLI adapter and inspect typed failure details |
+
 Import related tags as a namespace:
 
 ```ts
@@ -72,6 +49,72 @@ import * as agent from "@pumped-fn/sdk/agent"
 import * as session from "@pumped-fn/sdk/session"
 import * as validation from "@pumped-fn/sdk/validation"
 import * as sandbox from "@pumped-fn/sdk/sandbox"
+```
+
+## Minimal setup
+
+```ts
+import { createScope } from "@pumped-fn/lite"
+import * as z from "zod"
+import * as session from "@pumped-fn/sdk/session"
+import * as validation from "@pumped-fn/sdk/validation"
+
+const validationEngine = validation.standard<z.ZodType>({
+  id: "zod@4",
+  toJsonSchema: (schema) => z.toJSONSchema(schema),
+})
+
+const authority = session.createAuthority({
+  tenant: "acme",
+  roots: ["/workspace"],
+  permissions: [],
+  tools: [],
+  sandbox: {
+    roots: ["/workspace"],
+    commands: [],
+    write: false,
+    network: false,
+  },
+})
+
+const record: session.SessionRecord = {
+  id: "session-1",
+  version: 0,
+  schemaVersion: 1,
+  status: "open",
+  authorityFingerprint: authority.fingerprint,
+  authorityConstraints: authority,
+  currentBranchId: "main",
+  branches: [{
+    id: "main",
+    version: 0,
+    createdBy: "bootstrap",
+    authorityFingerprint: authority.fingerprint,
+    authority,
+    evidence: [],
+  }],
+  work: [],
+  attempts: [],
+  invocations: [],
+  artifacts: [],
+  memory: [],
+  schedules: [],
+  providerContinuations: {},
+  nextEventSequence: 1,
+}
+
+const scope = createScope({
+  tags: [
+    validation.engine(validationEngine),
+    session.authority(authority),
+    session.record(record),
+    session.clock({ now: () => new Date().toISOString() }),
+  ],
+})
+const ctx = scope.createContext()
+await ctx.resolve(session.session)
+await ctx.close()
+await scope.dispose()
 ```
 
 ## Execution model
@@ -85,6 +128,10 @@ session context -> session.run -> agent.turn
 ```
 
 `session.run`, `agent.turn`, `agent.role`, and `agent.fromModel` are module-level definitions. Composition happens through namespaced tags:
+
+Register `workflowExtension(...)` before `extension(...)` in `createScope({ extensions })`. The SDK extension reads the workflow context set by the workflow extension, so the reverse order fails on the first execution.
+
+A step `timeoutMs` rejects at the deadline and aborts the `abortSignal` tag. Step work must observe that signal to stop; JavaScript work that ignores it cannot be forcibly cancelled.
 
 | Namespace | Meaning |
 |---|---|
@@ -104,12 +151,9 @@ The full-tree activation is also the test model. A test supplies tags or presets
 The tool below can inspect a schema and explain a query. It cannot apply DDL. Both physical backend flows and their readiness fact are required dependencies of the tool flows.
 
 ```ts
-import { createScope, flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
-import { model } from "@pumped-fn/sdk"
+import { flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 import * as z from "zod"
 import * as agent from "@pumped-fn/sdk/agent"
-import * as session from "@pumped-fn/sdk/session"
-import * as validation from "@pumped-fn/sdk/validation"
 
 interface InspectInput {
   readonly schema: string
@@ -155,44 +199,13 @@ const explainQuery = flow({
   factory: (ctx, { explain }) => explain.exec({ input: ctx.input }),
 })
 
-const scope = createScope({
-  tags: [
-    session.authority(boundAuthority),
-    session.record(loadedRecord),
-    session.clock(clock),
-    session.store.commit(commitSession),
-    validation.engine(zodEngine),
-    agent.config.role({
-      name: "database-analyst",
-      version: "1",
-      instructions: "Recommend query changes. Never apply schema changes.",
-    }),
-    agent.impl.tool(inspectSchema),
-    agent.impl.tool(explainQuery),
-    agent.impl.attempt(agent.fromModel),
-    model(databaseModel),
-    session.execution.turn({ flow: agent.turn }),
-    database.ready({ serverVersion: "16" }),
-    database.inspect(inspectDatabase),
-    database.explain(explainDatabaseQuery),
-  ],
-})
-
-const ctx = scope.createContext()
-await ctx.resolve(session.session)
-await ctx.exec({
-  flow: session.run,
-  input: {
-    work: { id: "analysis-1", branchId: "main", role: "database-analyst", policy: "all" },
-    input: { prompt: "Find the slow query and recommend an index." },
-  },
-})
-await ctx.exec({ flow: session.finish })
-await ctx.close()
-await scope.dispose()
+const toolBindings = [
+  agent.impl.tool(inspectSchema),
+  agent.impl.tool(explainQuery),
+]
 ```
 
-Activation reaches `inspectSchema` and `explainQuery`, then their readiness and backend tags, before `session.run` emits `work.started` or `agent.turn` calls the model. Tests prove that an absent readiness binding produces no model or database calls.
+Add `toolBindings` to the session scope from the minimal setup, along with application-owned `database.ready`, `database.inspect`, and `database.explain` bindings. Activation reaches the selected tool and its readiness and backend tags before its factory starts. Tests prove that an absent readiness binding produces no model or database calls.
 
 ## GitHub issue triage
 
@@ -237,37 +250,46 @@ The session resource registers `deactivate()` as cleanup. Cleanup does not commi
 `agent.impl.attempt` selects the provider attempt flow. Its neutral stream contains content deltas, reasoning deltas, and provider status. `agent.fromModel` adapts the scalar root `model` tag without inventing deltas.
 
 ```ts
+import { createScope, flow, typed } from "@pumped-fn/lite"
+import { model, type Model, type ModelRequest } from "@pumped-fn/sdk"
+import * as agent from "@pumped-fn/sdk/agent"
+
+const scalarModel: Model = flow({
+  name: "model.local",
+  parse: typed<ModelRequest>(),
+  factory: () => ({ content: "Done.", stop: true }),
+})
+
 const scope = createScope({
   tags: [
-    model(myScalarModel),
+    model(scalarModel),
     agent.impl.attempt(agent.fromModel),
   ],
 })
+
+await scope.dispose()
 ```
 
 Claude, Codex, and Pi export native attempt bindings for the same tag.
 
 ## Sandboxing
 
-Sandbox policy and implementors are separate:
+Sandbox policy and implementors are separate. This creates the policy binding:
 
 ```ts
-const tags = [
-  sandbox.policy({
-    roots: ["/workspace"],
-    write: false,
-    network: false,
-    commands: ["git"],
-    timeoutMs: 30_000,
-    maxOutputBytes: 1_000_000,
-  }),
-  sandbox.impl.read(readFile),
-  sandbox.impl.write(writeFile),
-  sandbox.impl.run(runCommand),
-]
+import * as sandbox from "@pumped-fn/sdk/sandbox"
+
+const sandboxPolicy = sandbox.policy({
+  roots: ["/workspace"],
+  write: false,
+  network: false,
+  commands: ["git"],
+  timeoutMs: 30_000,
+  maxOutputBytes: 1_000_000,
+})
 ```
 
-The policy must fit the bound session authority. A missing implementation or wider policy fails before the effect.
+Add `sandboxPolicy` and application flows bound through `sandbox.impl.read`, `sandbox.impl.write`, and `sandbox.impl.run` to the session scope. The policy must fit the bound session authority. A missing implementation or wider policy fails before the effect. The SDK aborts `sandbox.exec` after `timeoutMs` and truncates its streamed and returned UTF-8 output to `maxOutputBytes`. The `sandbox.impl.run` binding must observe its execution signal to stop timed-out work and must enforce the `network` setting in its process or runtime isolation.
 
 ## Deliberate absences
 

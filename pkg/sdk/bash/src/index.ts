@@ -8,8 +8,8 @@ import { atom, flow, resource, tag, tags, typed } from "@pumped-fn/lite"
 
 export type BashOptions = ConstructorParameters<typeof Bash>[0]
 
-/** Configures creation and default options for the in-memory Bash engine. */
-export interface EngineConfig {
+/** Configures creation and default options for the in-memory Bash interpreter. */
+export interface InterpreterConfig {
   readonly create?: (options: BashOptions) => Bash
   readonly options?: BashOptions
 }
@@ -25,7 +25,7 @@ export interface SandboxAuthority {
   readonly policy: sandbox.Policy
 }
 
-/** Exposes an initialized in-memory Bash engine at its workspace root. */
+/** Exposes an initialized in-memory Bash interpreter at its workspace root. */
 export interface Workspace {
   readonly root: string
   readonly bash: Bash
@@ -37,22 +37,22 @@ export interface Readiness {
   readonly root: string
 }
 
-export class OutputLimitError extends Error {
+export class BashOutputLimitError extends Error {
   constructor(readonly limit: number) {
     super(`Sandbox output exceeds ${limit} bytes`)
-    this.name = "OutputLimitError"
+    this.name = "BashOutputLimitError"
   }
 }
 
-export class WorkspaceError extends Error {
+export class BashWorkspaceError extends Error {
   constructor(message: string) {
     super(message)
-    this.name = "WorkspaceError"
+    this.name = "BashWorkspaceError"
   }
 }
 
 export const config = {
-  engine: tag<EngineConfig>({ label: "just-bash.config.engine" }),
+  interpreter: tag<InterpreterConfig>({ label: "just-bash.config.interpreter" }),
   workspace: tag<WorkspaceConfig>({ label: "just-bash.config.workspace" }),
 }
 
@@ -87,16 +87,16 @@ export const authority = resource({
   },
 })
 
-export const engine = resource({
-  name: "just-bash.engine",
+export const interpreter = resource({
+  name: "just-bash.interpreter",
   ownership: "current",
   deps: {
     authority,
-    engine: tags.required(config.engine),
+    config: tags.required(config.interpreter),
     workspace: tags.required(config.workspace),
   },
-  factory: (_ctx, { authority, engine, workspace }) => {
-    const options = engine.options ?? {}
+  factory: (_ctx, { authority, config, workspace }) => {
+    const options = config.options ?? {}
     const executionLimits = {
       ...options.executionLimits,
       maxOutputSize: Math.min(
@@ -104,7 +104,7 @@ export const engine = resource({
         authority.policy.maxOutputBytes,
       ),
     }
-    return (engine.create ?? ((value) => new Bash(value)))({
+    return (config.create ?? ((value) => new Bash(value)))({
       ...options,
       cwd: workspace.root,
       executionLimits,
@@ -119,17 +119,17 @@ export const workspace = resource({
   ownership: "current",
   deps: {
     authority,
-    engine,
+    interpreter,
     config: tags.required(config.workspace),
     platform,
   },
-  factory: (_ctx, { authority, config, engine, platform }) => {
-    if (!config.root.startsWith("/")) throw new WorkspaceError("Sandbox workspace root must be absolute")
+  factory: (_ctx, { authority, config, interpreter, platform }) => {
+    if (!config.root.startsWith("/")) throw new BashWorkspaceError("Sandbox workspace root must be absolute")
     const root = platform.normalize(config.root)
     if (!authority.policy.roots.some((allowed) => within(root, platform.normalize(allowed)))) {
-      throw new WorkspaceError("Sandbox workspace root is outside allowed roots")
+      throw new BashWorkspaceError("Sandbox workspace root is outside allowed roots")
     }
-    return Object.freeze({ root, bash: engine })
+    return Object.freeze({ root, bash: interpreter })
   },
 })
 
@@ -185,7 +185,7 @@ export const run: sandbox.Run = flow({
     workspace,
   },
   tags: [step({ workflow: true, kind: "sandbox" })],
-  factory: async function* (ctx, { authority, clock, platform, workspace }): AsyncGenerator<sandbox.ExecEvent, sandbox.ExecResult, unknown> {
+  factory: async function* (ctx, { authority, clock, platform, workspace }): AsyncGenerator<sandbox.CommandOutputEvent, sandbox.ExecResult, unknown> {
     const policy = authority.policy
     if (!policy.commands.includes(ctx.input.command)) {
       throw new sandbox.PolicyError(`command ${JSON.stringify(ctx.input.command)} is not allowed`)
@@ -217,7 +217,7 @@ export const run: sandbox.Run = flow({
       unregister()
     }
     if (platform.byteLength(result.stdout) + platform.byteLength(result.stderr) > policy.maxOutputBytes) {
-      throw new OutputLimitError(policy.maxOutputBytes)
+      throw new BashOutputLimitError(policy.maxOutputBytes)
     }
     if (result.stdout) yield { type: "stdout", content: result.stdout }
     if (result.stderr) yield { type: "stderr", content: result.stderr }

@@ -1,5 +1,7 @@
 # @pumped-fn/sdk-just-bash
 
+> **Status: experimental.** APIs change without notice; not recommended for production yet.
+
 `just-bash` implements the session-mediated `@pumped-fn/sdk/sandbox` port. It exports named flows and resources, not a sandbox method bag.
 
 ```text
@@ -7,7 +9,7 @@ session authority -> sandbox.read/write/exec -> sandbox.impl tags
                                                 |
                          just-bash read/write/run flows
                                                 |
-                authority -> readiness -> workspace -> engine
+              authority -> readiness -> workspace -> interpreter
 ```
 
 ```ts
@@ -65,7 +67,7 @@ const scope = createScope({
       timeoutMs: 5_000,
       maxOutputBytes: 64 * 1024,
     }),
-    bash.config.engine({
+    bash.config.interpreter({
       options: {
         files: { "/workspace/README.md": "ship it" },
       },
@@ -104,9 +106,19 @@ await sessionCtx.close()
 await scope.dispose()
 ```
 
-`sandbox.exec` checks the session authority and policy before the implementation runs. Recursive entry activation reaches the selected sandbox implementation, authority, readiness, workspace, and engine before the sandbox flow starts. `just-bash.run` forwards the active `abortSignal` and enforces the timeout and UTF-8 output cap. The physical `just-bash` API returns buffered output, so this adapter yields at most one stdout event and one stderr event after the command completes. Use another `sandbox.impl.run` implementation when live command deltas or backpressure are required. Each session owns its current-owned `engine` and `workspace`, so deactivating one session does not close another.
+`sandbox.exec` checks the session authority and policy before the implementation runs. Recursive entry activation reaches the selected sandbox implementation, authority, readiness, workspace, and interpreter before the sandbox flow starts. `just-bash.run` forwards the active `abortSignal` and enforces the timeout and UTF-8 output cap. The physical `just-bash` API returns buffered output, so this adapter yields at most one stdout event and one stderr event after the command completes. Use another `sandbox.impl.run` implementation when live command deltas or backpressure are required. Each session owns its current-owned `interpreter` and `workspace`, so deactivating one session does not close another.
 
-Replace `engine`, `workspace`, `readiness`, or any named flow with `preset()` in tests. No module mock or shared scope is needed.
+There is no generic `engine` alias. Replace `interpreter`, `workspace`, `readiness`, or any named flow with `preset()` in tests. No module mock or shared scope is needed.
+
+## Current prerelease migration
+
+| Before | Now |
+|---|---|
+| `engine` | `interpreter` |
+| `config.engine` | `config.interpreter` |
+| `EngineConfig` | `InterpreterConfig` |
+| `OutputLimitError` | `BashOutputLimitError` |
+| `WorkspaceError` | `BashWorkspaceError` |
 
 ## Migration to 3.0.0
 

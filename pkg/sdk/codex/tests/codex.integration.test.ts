@@ -31,7 +31,7 @@ integration("invokes Codex through ACP", async () => {
     tags: [codexAcpConfig({
       auth: { kind: "global" },
       cwd: process.cwd(),
-      additionalDirectories: [],
+      roots: [],
       permission: "deny",
       shutdownTimeoutMs: 5_000,
     })],

@@ -8,7 +8,6 @@ import {
   model,
   parseModelResponse,
   step,
-  type CliIsolateOptions,
   type ModelRequest,
   type PromptInput,
 } from "@pumped-fn/sdk"
@@ -19,14 +18,12 @@ export type ClaudeAuth =
   | { kind: "token"; env?: string }
   | { kind: "global" }
 
-/** Configures Claude authentication, roots, isolation, permission, and process timeouts. */
+/** Configures Claude authentication, roots, and process timeouts. */
 export interface ClaudeConfig {
   auth: ClaudeAuth
   command?: string
   cwd: string
   roots: readonly string[]
-  permission: "deny"
-  isolate?: boolean | CliIsolateOptions
   shutdownTimeoutMs: number
   timeoutMs?: number
 }
@@ -45,7 +42,7 @@ export class ClaudeShutdownError extends Error {
 
 export const claudeConfig = tag<ClaudeConfig>({ label: "claude.config" })
 
-export const engine = atom({
+export const spawnProcess = atom({
   factory: () => spawn,
 })
 
@@ -88,19 +85,19 @@ export const claudeSession = resource({
     branch: tags.optional(session.current.branch),
     config: tags.required(claudeConfig),
     clock,
-    engine,
+    spawnProcess,
     environment,
     epoch: tags.optional(session.current.epoch),
     lineReader,
     runtime: tags.optional(session.current.session),
     work: tags.optional(session.current.work),
   },
-  factory: (ctx, { attempt, authority, branch, clock, config, engine, environment, epoch, lineReader, runtime, work }) => {
+  factory: (ctx, { attempt, authority, branch, clock, config, spawnProcess, environment, epoch, lineReader, runtime, work }) => {
     assertClaudeProvenance(runtime, work, attempt, branch, authority, epoch)
     const boundAuthority = bindClaudeAuthority(authority, work)
     const effectiveConfig = boundAuthority ? authorizeClaudeConfig(config, boundAuthority) : config
     const resolved = resolveConfig(effectiveConfig, environment)
-    const child = engine(resolved.command, [...resolved.args], {
+    const child = spawnProcess(resolved.command, [...resolved.args], {
       cwd: resolved.cwd,
       env: resolved.env,
       stdio: ["pipe", "pipe", "pipe"],
@@ -122,6 +119,7 @@ export const claudeSession = resource({
     let shutdownPhase: "open" | "graceful" | "force" = "open"
     let stderr = ""
     let tail = Promise.resolve()
+    let nextInterrupt = 0
 
     const settle = (result: { value: string } | { error: Error }) => {
       const transaction = current
@@ -172,7 +170,7 @@ export const claudeSession = resource({
         settle({ error: new ClaudeProcessError("Claude session closed during prompt") })
         return
       }
-      const error = new ClaudeShutdownError(`Claude process did not exit within two ${config.shutdownTimeoutMs}ms shutdown bounds`)
+      const error = new ClaudeShutdownError(`Claude process did not exit after SIGINT and SIGKILL, each with a ${config.shutdownTimeoutMs}ms shutdown bound`)
       lines.close()
       settle({ error })
       throw error
@@ -210,16 +208,14 @@ export const claudeSession = resource({
           return
         }
         const abort = () => {
-          closing = true
-          requestGraceful()
+          child.stdin.write(interruptMessage(nextInterrupt++))
           settle({ error: new DOMException("Claude prompt aborted", "AbortError") })
         }
         current = { resolve, reject, signal, abort }
         signal?.addEventListener("abort", abort, { once: true })
         if (config.timeoutMs !== undefined) {
           current.timeout = clock.set(() => {
-            closing = true
-            requestGraceful()
+            child.stdin.write(interruptMessage(nextInterrupt++))
             settle({ error: new ClaudeProcessError(`Claude prompt timed out after ${config.timeoutMs}ms`) })
           }, config.timeoutMs)
         }
@@ -257,14 +253,14 @@ export const claudeLeases = resource({
     branch: tags.optional(session.current.branch),
     config: tags.required(claudeConfig),
     clock,
-    engine,
+    spawnProcess,
     environment,
     epoch: tags.optional(session.current.epoch),
     lineReader,
     runtime: tags.optional(session.current.session),
     work: tags.optional(session.current.work),
   },
-  factory: (ctx, { attempt, authority, branch, clock, config, engine, environment, epoch, lineReader, runtime, work }): ClaudeLeaseManager => {
+  factory: (ctx, { attempt, authority, branch, clock, config, spawnProcess, environment, epoch, lineReader, runtime, work }): ClaudeLeaseManager => {
     assertClaudeProvenance(runtime, work, attempt, branch, authority, epoch)
     const boundAuthority = bindClaudeAuthority(authority, work)
     const effectiveConfig = boundAuthority ? authorizeClaudeConfig(config, boundAuthority) : config
@@ -273,7 +269,7 @@ export const claudeLeases = resource({
     const lease = (sessionId: string) => {
       const existing = leases.get(sessionId)
       if (existing) return existing
-      const created = createManagedLease(effectiveConfig, { clock, engine, environment, lineReader })
+      const created = createManagedLease(effectiveConfig, { clock, spawnProcess, environment, lineReader })
       leases.set(sessionId, created)
       return created
     }
@@ -381,10 +377,6 @@ export {
 }
 
 function resolveConfig(config: ClaudeConfig, environment: NodeJS.ProcessEnv) {
-  if (config.isolate !== undefined && config.isolate !== false) {
-    throw new ClaudeConfigError("Managed Claude sessions do not support isolated CLI state")
-  }
-  if (config.permission !== "deny") throw new ClaudeConfigError('Claude permission must be explicitly set to "deny"')
   if (!Number.isFinite(config.shutdownTimeoutMs) || config.shutdownTimeoutMs <= 0) {
     throw new ClaudeConfigError("Claude shutdownTimeoutMs must be greater than zero")
   }
@@ -535,6 +527,14 @@ function parseEvent(line: string): { type: string; result: string; is_error: boo
   return { type: "result", result: event["result"], is_error: event["is_error"] }
 }
 
+function interruptMessage(requestId: number): string {
+  return `${JSON.stringify({
+    request_id: `interrupt-${requestId}`,
+    type: "control_request",
+    request: { subtype: "interrupt" },
+  })}\n`
+}
+
 function requiredEnvironment(environment: NodeJS.ProcessEnv, name: string): string {
   const value = environment[name]
   if (!value) throw new ClaudeConfigError(`Claude token environment variable "${name}" is not set`)
@@ -548,13 +548,13 @@ function createManagedLease(
       set(fn: () => void, ms: number): number
       clear(token: number): void
     }
-    readonly engine: typeof spawn
+    readonly spawnProcess: typeof spawn
     readonly environment: NodeJS.ProcessEnv
     readonly lineReader: typeof createInterface
   },
 ) {
   const resolved = resolveConfig(config, deps.environment)
-  const child = deps.engine(resolved.command, [...resolved.args], {
+  const child = deps.spawnProcess(resolved.command, [...resolved.args], {
     cwd: resolved.cwd,
     env: resolved.env,
     stdio: ["pipe", "pipe", "pipe"],
@@ -576,6 +576,7 @@ function createManagedLease(
   let closing = false
   let shutdown: Promise<void> | undefined
   let tail = Promise.resolve()
+  let nextInterrupt = 0
 
   const settle = (result: { value: string } | { error: Error }) => {
     const transaction = current
@@ -611,7 +612,7 @@ function createManagedLease(
       }
       if (!await awaitExit()) {
         child.kill("SIGKILL")
-        if (!await awaitExit()) throw new ClaudeShutdownError(`Claude process did not exit within two ${config.shutdownTimeoutMs}ms shutdown bounds`)
+        if (!await awaitExit()) throw new ClaudeShutdownError(`Claude process did not exit after SIGINT and SIGKILL, each with a ${config.shutdownTimeoutMs}ms shutdown bound`)
       }
       lines.close()
       settle({ error: new ClaudeProcessError("Claude session closed during prompt") })
@@ -655,8 +656,7 @@ function createManagedLease(
         return
       }
       const abort = () => {
-        closing = true
-        child.kill("SIGINT")
+        child.stdin.write(interruptMessage(nextInterrupt++))
         settle({ error: new DOMException("Claude prompt aborted", "AbortError") })
       }
       current = { events, resolve, reject, signal, abort }
@@ -664,8 +664,7 @@ function createManagedLease(
       signal?.addEventListener("abort", abort, { once: true })
       if (config.timeoutMs !== undefined) {
         current.timeout = deps.clock.set(() => {
-          closing = true
-          child.kill("SIGINT")
+          child.stdin.write(interruptMessage(nextInterrupt++))
           settle({ error: new ClaudeProcessError(`Claude prompt timed out after ${config.timeoutMs}ms`) })
         }, config.timeoutMs)
       }

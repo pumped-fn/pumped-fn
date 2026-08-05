@@ -12,7 +12,7 @@ class ProbeError extends Error {
 
 const rate = atom({ factory: () => 1 })
 
-const amount = { amount: z.number() }
+const amount = { amount: z.number().describe("Amount to convert") }
 
 const convert = flow({
   name: "convert",
@@ -40,7 +40,7 @@ const boom = flow({
 
 const coerce = flow({
   name: "coerce",
-  parse: (raw) => z.object({ n: z.string().transform(Number) }).parse(raw),
+  parse: typed<{ n: number }>(),
   tags: [mcpToolMeta({ description: "Double a numeric string", inputSchema: { n: z.string().transform(Number) } })],
   factory: (ctx) => ({ doubled: ctx.input.n * 2 }),
 })
@@ -110,6 +110,20 @@ it("exposes multiple flows as MCP tools and runs them inside the resolving scope
 
   const pinged = await client.callTool({ name: "ping", arguments: { x: 3 } })
   expect(pinged.content).toEqual([{ type: "text", text: "pong:3" }])
+
+  await close()
+})
+
+it("advertises tool property types and descriptions", async () => {
+  const { client, close } = await serve([convert])
+  const listed = await client.listTools()
+
+  expect(listed.tools[0]?.inputSchema).toMatchObject({
+    type: "object",
+    properties: {
+      amount: { type: "number", description: "Amount to convert" },
+    },
+  })
 
   await close()
 })

@@ -6,86 +6,49 @@ In-memory test helpers for `@pumped-fn/sdk`. Every helper keeps `createScope` as
 config.model / modelStub ---------> scalar provider seam
 config.attempt / attemptStub -----> streaming provider seam
 sessionStoreStub ----------------> configured load and commit ports
+sessionKit ----------------------> complete agent turn tag bundle
 createScope ----------------------> explicit test-owned session seam
 ```
 
 ```ts
 import * as session from "@pumped-fn/sdk/session"
 import { createScope } from "@pumped-fn/lite"
-import {
-  attemptStubConfig,
-  sessionStoreStub,
-} from "@pumped-fn/sdk-test"
+import { sessionKit } from "@pumped-fn/sdk-test"
 
-const authority = session.createAuthority({
-  tenant: "tenant-a",
-  roots: ["/workspace"],
-  permissions: [],
-  tools: [],
-  sandbox: {
-    roots: ["/workspace"],
-    commands: [],
-    write: false,
-    network: false,
+const bundle = sessionKit({
+  id: "test-session",
+  role: {
+    name: "reviewer",
+    version: "1",
+    instructions: "Review the request.",
+    maxRounds: 1,
+  },
+  respond: {
+    events: [{ type: "content_delta", content: "ready" }],
+    result: { content: "ready", stop: true },
   },
 })
-const record: session.SessionRecord = {
-  id: "test-session",
-  version: 0,
-  schemaVersion: 1,
-  status: "open",
-  authorityFingerprint: authority.fingerprint,
-  authorityConstraints: authority,
-  currentBranchId: "main",
-  branches: [{
-    id: "main",
-    version: 0,
-    createdBy: "bootstrap",
-    authorityFingerprint: authority.fingerprint,
-    authority,
-    evidence: [],
-  }],
-  work: [],
-  attempts: [],
-  invocations: [],
-  artifacts: [],
-  memory: [],
-  schedules: [],
-  providerContinuations: {},
-  nextEventSequence: 1,
-}
-const provider = attemptStubConfig({
-  events: [{ type: "content_delta", content: "ready" }],
-  result: { content: "ready", stop: true },
-})
-const store = sessionStoreStub([record])
-const scope = createScope({
-  tags: [
-    provider,
-    store.config,
-    store.binding.load,
-    store.binding.commit,
-  ],
-})
-const root = scope.createContext()
-const owner = scope.createContext({
-  parent: root,
-  tags: [
-    session.authority(authority),
-    session.record(record),
-    session.clock({ now: () => new Date().toISOString() }),
-  ],
+const scope = createScope({ tags: bundle.tags })
+const owner = scope.createContext()
+await owner.resolve(session.session)
+
+const result = await owner.exec({
+  flow: session.run,
+  input: {
+    work: { id: "review", branchId: "main", role: "reviewer", policy: "all" },
+    input: { prompt: "Check this." },
+  },
 })
 
-await owner.resolve(session.session)
 await owner.close()
-await root.close()
 await scope.dispose()
 ```
 
-Every test creates its own scope and owner context with exactly the extensions, presets, and tags it needs. Resolve `session.session` on that owner before execution so current-owned resources share the intended session lifecycle. Close the owner, root, and scope in that order.
+Every test creates its own scope and owner context with exactly the extensions, presets, and tags it needs. `sessionKit` supplies the authority, record, clock, turn, store, attempt, role, and validation tags. Resolve `session.session` on the owner before execution, then close the owner and scope in that order.
 
-`modelStub` and `attemptStub` are stable module-level flows configured by `config.model` and `config.attempt`. `attemptStubConfig` supplies the attempt response and implementation tags together. `sessionStoreStub` owns an isolated record map and supplies its config plus named load and commit bindings. None of these helpers creates or caches a scope.
+Pass `respond` to configure `attemptStub`, or pass `attempt` to replace it with a custom flow. Every other tag value can also be replaced through the matching option. The returned `record` and `store` make state checks direct. `validationStub` is the default trivial validation engine and can also be used by tests that wire tags themselves.
+
+`initialRecord`, `testAuthority`, and `modelRequest` supply valid defaults with shallow overrides. `testAuthority` denies all sandbox access unless the test grants it. `modelStub` and `attemptStub` are stable module-level flows configured by `config.model` and `config.attempt`. `attemptStubConfig` supplies the attempt response and implementation tags together. `sessionStoreStub` owns an isolated record map and supplies its config plus named load and commit bindings. None of these helpers creates or caches a scope.
 
 The existing workflow helpers remain: `kit`, `suspense`, `MemoryWorkflowLog`, `MemorySuspenseLog`, and `localRemoteRunner`.
 

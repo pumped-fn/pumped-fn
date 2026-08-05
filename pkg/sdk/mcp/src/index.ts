@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 import { resource, tag, tags, type Lite } from "@pumped-fn/lite"
-import { z, type ZodRawShape, type ZodType } from "zod"
+import type { ZodRawShape } from "zod"
 
 /** Supplies the MCP description and Zod input shape for a tool flow. */
 export interface McpToolMeta {
@@ -41,7 +41,7 @@ export const mcpServer = resource({
         name,
         {
           description: meta.description,
-          inputSchema: validationShape(meta.inputSchema),
+          inputSchema: meta.inputSchema,
         },
         async (args) => {
           if (closing) throw new McpToolError("MCP server is closing")
@@ -64,26 +64,6 @@ export const mcpServer = resource({
     return instance
   },
 })
-
-function validationShape(shape: ZodRawShape): ZodRawShape {
-  return Object.fromEntries(
-    Object.entries(shape).map(([key, schema]) => [
-      key,
-      z.unknown().superRefine(async (value, ctx) => {
-        const result = await (schema as ZodType).safeParseAsync(value)
-        if (!result.success) {
-          for (const issue of result.error.issues) {
-            ctx.addIssue({
-              code: "custom",
-              message: issue.message,
-              path: [...issue.path],
-            })
-          }
-        }
-      }),
-    ])
-  )
-}
 
 function toolResult(output: unknown): CallToolResult {
   return { content: [{ type: "text", text: encode(output) }] }

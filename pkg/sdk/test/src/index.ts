@@ -13,6 +13,7 @@ import {
 } from "@pumped-fn/sdk"
 import * as agent from "@pumped-fn/sdk/agent"
 import * as session from "@pumped-fn/sdk/session"
+import * as validation from "@pumped-fn/sdk/validation"
 import {
   extension as suspenseExtension,
   formatSuspenseStepKey,
@@ -24,6 +25,80 @@ import {
 import { flow, tag, tags, typed, type Lite } from "@pumped-fn/lite"
 
 type MaybePromise<T> = T | Promise<T>
+
+export function initialRecord(
+  id: session.SessionId,
+  authority: session.Authority,
+  overrides: Partial<session.SessionRecord> = {},
+): session.SessionRecord {
+  return Object.freeze({
+    id,
+    version: 0,
+    schemaVersion: 1,
+    status: "open",
+    authorityFingerprint: authority.fingerprint,
+    authorityConstraints: authority,
+    currentBranchId: "main",
+    branches: [{
+      id: "main",
+      version: 0,
+      createdBy: "root",
+      authorityFingerprint: authority.fingerprint,
+      authority,
+      evidence: [],
+    }],
+    work: [],
+    attempts: [],
+    invocations: [],
+    artifacts: [],
+    memory: [],
+    schedules: [],
+    providerContinuations: {},
+    nextEventSequence: 1,
+    ...overrides,
+  })
+}
+
+export function testAuthority(
+  overrides: Omit<Partial<session.AuthorityInput>, "sandbox"> & {
+    sandbox?: Partial<session.SandboxAuthority>
+  } = {},
+): session.Authority {
+  const { sandbox, ...authority } = overrides
+  return session.createAuthority({
+    tenant: "test",
+    roots: [],
+    permissions: [],
+    tools: [],
+    ...authority,
+    sandbox: {
+      roots: [],
+      commands: [],
+      write: false,
+      network: false,
+      ...sandbox,
+    },
+  })
+}
+
+export function modelRequest(overrides: Partial<ModelRequest> = {}): ModelRequest {
+  return {
+    agentName: "test",
+    instructions: "",
+    messages: [],
+    tools: [],
+    skills: [],
+    loadedSkills: [],
+    subagents: [],
+    round: 0,
+    ...overrides,
+  }
+}
+
+export const validationStub = validation.standard({
+  id: "test",
+  toJsonSchema: () => true,
+})
 
 export const config = {
   model: tag<(request: ModelRequest) => MaybePromise<ModelResponse>>({ label: "sdk.test.config.model" }),
@@ -119,6 +194,59 @@ export function sessionStoreStub(records: readonly session.SessionRecord[] = [])
       load: session.store.load(sessionStoreLoad),
       commit: session.store.commit(sessionStoreCommit),
     },
+  }
+}
+
+export function sessionKit(
+  options: {
+    id?: session.SessionId
+    authority?: session.Authority
+    record?: session.SessionRecord
+    clock?: session.Clock
+    role?: agent.RoleConfig
+    respond?: Parameters<typeof attemptStubConfig>[0]
+    attempt?: agent.Attempt
+    turn?: Lite.AnyFlow
+    load?: session.Load
+    commit?: session.Commit
+    validation?: validation.Engine
+  } = {},
+): {
+  authority: session.Authority
+  record: session.SessionRecord
+  store: ReturnType<typeof sessionStoreStub>
+  tags: Lite.TagInput[]
+} {
+  const authority = options.authority ?? (
+    options.record === undefined
+      ? testAuthority()
+      : session.createAuthority(options.record.authorityConstraints)
+  )
+  const record = options.record ?? initialRecord(options.id ?? "test-session", authority)
+  const store = sessionStoreStub([record])
+  const request = modelRequest()
+  return {
+    authority,
+    record,
+    store,
+    tags: [
+      session.authority(authority),
+      session.record(record),
+      session.clock(options.clock ?? { now: () => "2000-01-01T00:00:00.000Z" }),
+      session.execution.turn({ flow: options.turn ?? agent.turn }),
+      store.config,
+      session.store.load(options.load ?? store.load),
+      session.store.commit(options.commit ?? store.commit),
+      options.attempt === undefined
+        ? attemptStubConfig(options.respond ?? { events: [], result: { content: "", stop: true } })
+        : agent.impl.attempt(options.attempt),
+      agent.config.role(options.role ?? {
+        name: request.agentName,
+        version: "1",
+        instructions: request.instructions,
+      }),
+      validation.engine(options.validation ?? validationStub),
+    ],
   }
 }
 

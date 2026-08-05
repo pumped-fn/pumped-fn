@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest"
 import {
   delegated,
   includes,
-  judge,
   loaded,
   runEval,
   suite,
@@ -63,8 +62,8 @@ describe("retained eval helpers", () => {
         }],
       }),
     })
-    const approved = judge({ name: "approved", evaluate: () => ({ name: "approved", passed: true, score: 1 }) })
-    const grounded = judge({ name: "grounded", evaluate: () => ({ name: "grounded", passed: true, score: 1 }) })
+    const approved = { name: "approved", evaluate: () => ({ name: "approved", passed: true, score: 1 }) }
+    const grounded = { name: "grounded", evaluate: () => ({ name: "grounded", passed: true, score: 1 }) }
     const target = suite({
       name: "database-eval",
       turn,
