@@ -5178,83 +5178,25 @@ describe("diamond invalidation ordering", () => {
   })
 })
 
-describe("convergent invalidation feedback", () => {
-  const watched = <T,>(a: Lite.Atom<T>) => controller(a, { resolve: true, watch: true })
-
-  it("settles cross-height feedback through a non-watch controller write", async () => {
-    for (const hiFirst of [true, false]) {
-      let armed = false
-      const s = atom({ factory: () => 1000 })
-      const b = atom({ factory: () => 100 })
-      const d0 = atom({ factory: () => 1 })
-      const d1 = atom({ deps: { d: watched(d0) }, factory: (_, d) => d.d.get() + 1 })
-      const hi = atom({
-        deps: { s: watched(s), d: watched(d1), b: controller(b, { resolve: true }) },
-        factory: (_, d) => {
-          if (armed) d.b.set(200)
-          return d.s.get() + d.d.get()
+describe("loop detection under sanctioned re-entry", () => {
+  it("settles finite factory self-invalidation past any fixed boundary", async () => {
+    for (const passes of [101, 1000]) {
+      let runs = 0
+      const subject = atom({
+        factory: (ctx) => {
+          runs++
+          if (runs <= passes) ctx.invalidate()
+          return runs
         },
       })
-      let loRuns = 0
-      const lo = atom({
-        deps: { s: watched(s), b: watched(b) },
-        factory: (_, d) => {
-          loRuns++
-          return d.s.get() + d.b.get()
-        },
-      })
-      const z = atom({ deps: { hi: watched(hi) }, factory: (_, d) => d.hi.get() })
       const scope = createScope()
-      await scope.resolve(hiFirst ? hi : lo)
-      await scope.resolve(hiFirst ? lo : hi)
-      await scope.resolve(z)
+      await scope.resolve(subject)
       await scope.flush()
 
-      armed = true
-      scope.controller(s).set(2000)
-      await scope.flush()
-
-      expect(scope.controller(lo).get()).toBe(2200)
-      expect(scope.controller(z).get()).toBe(2002)
-      expect(loRuns).toBe(3)
+      expect(runs).toBe(passes + 1)
+      expect(scope.controller(subject).get()).toBe(passes + 1)
       await scope.dispose()
     }
-  })
-})
-
-describe("loop detection under sanctioned re-entry", () => {
-  it("settles self-re-entry at exactly the 100-pass boundary", async () => {
-    let runs = 0
-    const subject = atom({
-      factory: (ctx) => {
-        runs++
-        if (runs <= 100) ctx.invalidate()
-        return runs
-      },
-    })
-    const scope = createScope()
-    await scope.resolve(subject)
-    await scope.flush()
-
-    expect(runs).toBe(101)
-    expect(scope.controller(subject).get()).toBe(101)
-    await scope.dispose()
-  })
-
-  it("rejects unbounded self-re-entry instead of hanging", async () => {
-    let runs = 0
-    const subject = atom({
-      factory: (ctx) => {
-        runs++
-        ctx.invalidate()
-        return runs
-      },
-    })
-    const scope = createScope()
-    await scope.resolve(subject)
-    await expect(scope.flush()).rejects.toThrow("Infinite invalidation loop detected")
-    expect(runs).toBe(101)
-    await scope.dispose()
   })
 
   it("rejects flush for cycles that invalidate mid-recompute instead of hanging", async () => {

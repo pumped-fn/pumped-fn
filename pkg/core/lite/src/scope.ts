@@ -29,7 +29,6 @@ export function shallowEqual(a: unknown, b: unknown): boolean {
 
 const controllerReadHooks: Array<(ctrl: Lite.Controller<unknown>) => void> = []
 const complete = Promise.resolve()
-const invalidationPassLimit = 100
 const noExtensions: Lite.Extension[] = []
 const noTags: Lite.Tagged<any>[] = []
 
@@ -593,7 +592,7 @@ class ScopeImpl implements Lite.Scope {
   private invalidationQueue?: { atom: Lite.Atom<unknown>; height: number }[]
   private invalidationQueued?: Set<Lite.Atom<unknown>>
   private invalidationIndex = 0
-  private invalidationChain: Map<Lite.Atom<unknown>, number> | null = null
+  private invalidationChain: Set<Lite.Atom<unknown>> | null = null
   private chainPromise: Promise<void> | null = null
   private chainError: unknown = null
   private initialized = false
@@ -1192,8 +1191,10 @@ class ScopeImpl implements Lite.Scope {
   private handlePostResolve<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): void {
     if (entry.pendingInvalidate) {
       entry.pendingInvalidate = false
+      this.invalidationChain?.delete(atom)
       this.scheduleInvalidation(atom)
     } else if (entry.pendingSet) {
+      this.invalidationChain?.delete(atom)
       this.scheduleInvalidation(atom)
     }
   }
@@ -1201,8 +1202,10 @@ class ScopeImpl implements Lite.Scope {
   private handlePostResolveError<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): void {
     if (entry.pendingInvalidate) {
       entry.pendingInvalidate = false
+      this.invalidationChain?.delete(atom)
       this.scheduleInvalidation(atom)
     } else if (entry.pendingSet?.hasValue) {
+      this.invalidationChain?.delete(atom)
       this.scheduleInvalidation(atom)
     } else {
       entry.pendingSet = undefined
@@ -2301,17 +2304,16 @@ class ScopeImpl implements Lite.Scope {
       return
     }
 
-    const chain = this.invalidationChain ??= new Map()
-    const passes = chain.get(atom) ?? 0
-    if (passes >= invalidationPassLimit) {
-      const chainAtoms = Array.from(chain.keys())
+    if (!this.invalidationChain) this.invalidationChain = new Set()
+    if (this.invalidationChain.has(atom)) {
+      const chainAtoms = Array.from(this.invalidationChain)
       chainAtoms.push(atom)
       const path = chainAtoms
         .map(a => a.factory?.name || "<anonymous>")
         .join(" → ")
       throw new Error(`Infinite invalidation loop detected: ${path}`)
     }
-    chain.set(atom, passes + 1)
+    this.invalidationChain.add(atom)
     return this.doInvalidateAsync(atom, entry, previousValue)
   }
 
