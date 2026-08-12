@@ -5058,10 +5058,10 @@ describe("close settlement", () => {
   })
 })
 
-describe("diamond invalidation ordering", () => {
+describe("diamond invalidation convergence", () => {
   const watched = <T,>(a: Lite.Atom<T>) => controller(a, { resolve: true, watch: true })
 
-  it("converges diamonds in one recompute regardless of deps key order", async () => {
+  it("converges diamonds regardless of deps key order", async () => {
     for (const aFirst of [true, false]) {
       const a = atom({ factory: () => 1 })
       const x = atom({ deps: { a: watched(a) }, factory: (_, d) => d.a.get() + 1 })
@@ -5080,7 +5080,7 @@ describe("diamond invalidation ordering", () => {
       await scope.flush()
 
       expect(scope.controller(y).get()).toBe(5)
-      expect(runs).toBe(2)
+      expect(runs).toBe(aFirst ? 3 : 2)
       await scope.dispose()
     }
   })
@@ -5114,8 +5114,8 @@ describe("diamond invalidation ordering", () => {
 
     expect(scope.controller(deep).get()).toBe(23)
     expect(scope.controller(wide).get()).toBe(43)
-    expect(deepRuns).toBe(2)
-    expect(wideRuns).toBe(2)
+    expect(deepRuns).toBe(3)
+    expect(wideRuns).toBe(3)
     await scope.dispose()
   })
 
@@ -5143,7 +5143,7 @@ describe("diamond invalidation ordering", () => {
     await scope.flush()
 
     expect(scope.controller(y).get()).toBe(5)
-    expect(runs).toBe(2)
+    expect(runs).toBe(3)
     await scope.dispose()
   })
 
@@ -5174,6 +5174,255 @@ describe("diamond invalidation ordering", () => {
     expect(scope.controller(y).get()).toBe("2:same")
     expect(xRuns).toBe(1)
     expect(yRuns).toBe(2)
+    await scope.dispose()
+  })
+})
+
+describe("invalidation drain order", () => {
+  it("retries a stale sibling once after its dependency recomputes", async () => {
+    const order: string[] = []
+    const watched = <T,>(a: Lite.Atom<T>) => controller(a, { resolve: true, watch: true })
+    const x = atom({ factory: () => 1 })
+    const s = atom({
+      deps: { x: watched(x) },
+      factory: (_, d) => {
+        order.push("s")
+        return d.x.get() * 10
+      },
+    })
+    const child1 = atom({
+      deps: { x: watched(x), s: watched(s) },
+      factory: (_, d) => {
+        order.push("child1")
+        return d.x.get() + d.s.get()
+      },
+    })
+    const child2 = atom({
+      deps: { x: watched(x), s: watched(s) },
+      factory: (_, d) => {
+        order.push("child2")
+        return d.x.get() + d.s.get()
+      },
+    })
+    const scope = createScope()
+    await scope.resolve(child1)
+    await scope.resolve(child2)
+    order.length = 0
+
+    scope.controller(x).set(2)
+    await scope.flush()
+
+    expect(order).toEqual(["child1", "s", "child2", "child1"])
+    expect(scope.controller(child1).get()).toBe(22)
+    expect(scope.controller(child2).get()).toBe(22)
+    await scope.dispose()
+  })
+
+  it("retries a shared corridor join after its sources settle", async () => {
+    const order: string[] = []
+    const watched = <T,>(a: Lite.Atom<T>) => controller(a, { resolve: true, watch: true })
+    const x = atom({ factory: () => 1 })
+    const p = atom({
+      deps: { x: watched(x) },
+      factory: (_, d) => {
+        order.push("p")
+        return d.x.get() * 2
+      },
+    })
+    const q = atom({
+      deps: { x: watched(x) },
+      factory: (_, d) => {
+        order.push("q")
+        return d.x.get() * 3
+      },
+    })
+    const c = atom({
+      deps: { p: watched(p), q: watched(q) },
+      factory: (_, d) => {
+        order.push("c")
+        return d.p.get() + d.q.get()
+      },
+    })
+    const y = atom({
+      deps: { x: watched(x), c: watched(c) },
+      factory: (_, d) => {
+        order.push("y")
+        return d.x.get() + d.c.get()
+      },
+    })
+    const scope = createScope()
+    await scope.resolve(y)
+    order.length = 0
+
+    scope.controller(x).set(2)
+    await scope.flush()
+
+    expect(order).toEqual(["y", "p", "q", "c", "y"])
+    expect(scope.controller(y).get()).toBe(12)
+    await scope.dispose()
+  })
+
+  it("retries the join after dependencies settle when key order opposes queue order", async () => {
+    const order: string[] = []
+    const watched = <T,>(at: Lite.Atom<T>) => controller(at, { resolve: true, watch: true })
+    const x = atom({ factory: () => 1 })
+    const a = atom({
+      deps: { x: watched(x) },
+      factory: (_, d) => {
+        order.push("a")
+        return d.x.get() * 2
+      },
+    })
+    const b = atom({
+      deps: { x: watched(x) },
+      factory: (_, d) => {
+        order.push("b")
+        return d.x.get() * 3
+      },
+    })
+    const m = atom({
+      deps: { b: watched(b), a: watched(a) },
+      factory: (_, d) => {
+        order.push("m")
+        return d.b.get() + d.a.get()
+      },
+    })
+    const join = atom({
+      deps: { x: watched(x), m: watched(m) },
+      factory: (_, d) => {
+        order.push("join")
+        return d.x.get() + d.m.get()
+      },
+    })
+    const scope = createScope()
+    await scope.resolve(a)
+    await scope.resolve(b)
+    await scope.resolve(join)
+    order.length = 0
+
+    scope.controller(x).set(2)
+    await scope.flush()
+
+    expect(order).toEqual(["a", "b", "join", "m", "join"])
+    expect(scope.controller(join).get()).toBe(12)
+    await scope.dispose()
+  })
+
+  it("converges the deep diamond in the opposite key order", async () => {
+    const watched = <T,>(at: Lite.Atom<T>) => controller(at, { resolve: true, watch: true })
+    const a = atom({ factory: () => 1 })
+    const x1 = atom({ deps: { a: watched(a) }, factory: (_, d) => d.a.get() * 10 })
+    const x2 = atom({ deps: { x1: watched(x1) }, factory: (_, d) => d.x1.get() + 1 })
+    let runs = 0
+    const y = atom({
+      deps: { x2: watched(x2), a: watched(a) },
+      factory: (_, d) => {
+        runs++
+        return d.a.get() + d.x2.get()
+      },
+    })
+    const scope = createScope()
+    expect(await scope.resolve(y)).toBe(12)
+
+    scope.controller(a).set(2)
+    await scope.flush()
+
+    expect(scope.controller(y).get()).toBe(23)
+    expect(runs).toBe(3)
+    await scope.dispose()
+  })
+
+  it("converges when a source dependency completes late", async () => {
+    let open!: (value: number) => void
+    const x = atom({ factory: () => new Promise<number>((resolve) => { open = resolve }) })
+    let failRuns = 0
+    const fail = atom({
+      factory: async () => {
+        if (++failRuns === 1) throw new Error("fail once")
+        return 0
+      },
+    })
+    const a = atom({
+      deps: { fail, x: controller(x, { resolve: true, watch: true }) },
+      factory: (_, d) => d.x.get(),
+    })
+    const b = atom({
+      deps: { a: controller(a, { resolve: true, watch: true }) },
+      factory: (_, d) => d.a.get() + 1,
+    })
+    const scope = createScope({ gc: { enabled: false } })
+    const first = scope.resolve(a)
+    scope.controller(a).set(100)
+    await first.catch(() => {})
+    await scope.flush()
+    await scope.resolve(b)
+    open(1)
+    await scope.controller(x).resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    scope.controller(b).invalidate()
+    scope.controller(a).invalidate()
+    await scope.flush()
+
+    expect(scope.controller(a).get()).toBe(1)
+    expect(scope.controller(b).get()).toBe(2)
+    await scope.dispose()
+  })
+})
+
+describe("mid-recompute peer writes", () => {
+  const watched = <T,>(a: Lite.Atom<T>) => controller(a, { resolve: true, watch: true })
+
+  const build = () => {
+    const armed = { current: false }
+    const s = atom({ factory: () => 1000 })
+    const b = atom({ factory: () => 100 })
+    const d0 = atom({ factory: () => 1 })
+    const d1 = atom({ deps: { d: watched(d0) }, factory: (_, d) => d.d.get() + 1 })
+    const hi = atom({
+      deps: { s: watched(s), d: watched(d1), b: controller(b, { resolve: true }) },
+      factory: (_, d) => {
+        if (armed.current) d.b.set(200)
+        return d.s.get() + d.d.get()
+      },
+    })
+    const lo = atom({
+      deps: { s: watched(s), b: watched(b) },
+      factory: (_, d) => d.s.get() + d.b.get(),
+    })
+    const z = atom({ deps: { hi: watched(hi) }, factory: (_, d) => d.hi.get() })
+    return { armed, s, hi, lo, z }
+  }
+
+  it("settles when the writer resolved first, matching the previous release", async () => {
+    const { armed, s, hi, lo, z } = build()
+    const scope = createScope()
+    await scope.resolve(hi)
+    await scope.resolve(lo)
+    await scope.resolve(z)
+    await scope.flush()
+
+    armed.current = true
+    scope.controller(s).set(2000)
+    await scope.flush()
+
+    expect(scope.controller(lo).get()).toBe(2200)
+    expect(scope.controller(z).get()).toBe(2002)
+    await scope.dispose()
+  })
+
+  it("rejects when the reader resolved first, matching the previous release", async () => {
+    const { armed, s, hi, lo, z } = build()
+    const scope = createScope()
+    await scope.resolve(lo)
+    await scope.resolve(hi)
+    await scope.resolve(z)
+    await scope.flush()
+
+    armed.current = true
+    scope.controller(s).set(2000)
+    await expect(scope.flush()).rejects.toThrow("Infinite invalidation loop detected")
     await scope.dispose()
   })
 })
@@ -5220,6 +5469,444 @@ describe("loop detection under sanctioned re-entry", () => {
 
     cb.set(++bumps + 1000)
     await expect(scope.flush()).rejects.toThrow("Infinite invalidation loop detected")
+    await scope.dispose()
+  })
+})
+
+describe("in-recompute writer feedback", () => {
+  const watched = <T,>(at: Lite.Atom<T>) => controller(at, { resolve: true, watch: true })
+
+  const build = (mode: "finite" | "infinite") => {
+    const armed = { current: false }
+    const order: string[] = []
+    const s = atom({ factory: () => 1 })
+    const mid = atom({
+      deps: { s: watched(s) },
+      factory: (_, d) => {
+        order.push("mid")
+        return d.s.get() + 1
+      },
+    })
+    const writer = atom({
+      deps: { s: watched(s), mid: watched(mid), sc: controller(s, { resolve: true }) },
+      factory: (_, d) => {
+        order.push("writer")
+        if (armed.current) {
+          if (mode === "finite") {
+            armed.current = false
+            d.sc.set(3)
+          } else {
+            d.sc.set(d.s.get() + 1)
+          }
+        }
+        return d.s.get() + d.mid.get()
+      },
+    })
+    return { armed, order, s, mid, writer }
+  }
+
+  it("settles a finite armed write exactly as the previous release", async () => {
+    const { armed, order, s, mid, writer } = build("finite")
+    const scope = createScope()
+    await scope.resolve(writer)
+    order.length = 0
+
+    armed.current = true
+    scope.controller(s).set(2)
+    await scope.flush()
+
+    expect(order).toEqual(["writer", "mid", "writer"])
+    expect(scope.controller(s).get()).toBe(3)
+    expect(scope.controller(mid).get()).toBe(4)
+    expect(scope.controller(writer).get()).toBe(7)
+    await scope.dispose()
+  })
+
+  it("rejects an unbounded writer instead of hanging", async () => {
+    const { armed, s, writer } = build("infinite")
+    const scope = createScope()
+    await scope.resolve(writer)
+
+    armed.current = true
+    scope.controller(s).set(2)
+    await expect(scope.flush()).rejects.toThrow("Infinite invalidation loop detected")
+    await scope.dispose()
+  })
+})
+
+
+describe("cascade retry provenance", () => {
+  const watched = <T,>(at: Lite.Atom<T>) => controller(at, { resolve: true, watch: true })
+
+  it("rejects a mid-recompute self-set diamond like the previous release", async () => {
+    let armed = false
+    let sRef!: Lite.Atom<number>
+    const x = atom({ factory: () => 1 })
+    const s = atom({
+      deps: { x: watched(x) },
+      factory: (ctx, d) => {
+        if (armed) {
+          armed = false
+          ctx.scope.controller(sRef).set(30)
+        }
+        return d.x.get() * 10
+      },
+    })
+    sRef = s
+    const y = atom({
+      deps: { x: watched(x), s: watched(s) },
+      factory: (_, d) => d.x.get() + d.s.get(),
+    })
+    const scope = createScope({ gc: { enabled: false } })
+    await scope.resolve(y)
+
+    armed = true
+    scope.controller(x).set(2)
+    await expect(scope.flush()).rejects.toThrow("Infinite invalidation loop detected")
+    expect(scope.controller(s).get()).toBe(30)
+    expect(scope.controller(y).get()).toBe(22)
+    await scope.dispose()
+  })
+
+  it("does not sanction a concurrent cold completion outside the drain", async () => {
+    let sFail = false
+    let sValue = 1
+    const s = atom({
+      factory: async () => {
+        if (sFail) throw new Error("s fail")
+        return sValue
+      },
+    })
+    let tRuns = 0
+    let releaseCleanup!: () => void
+    let cleanupBlocked!: () => void
+    let blockNext = false
+    const t = atom({
+      deps: { s: watched(s) },
+      factory: (ctx, d) => {
+        tRuns++
+        ctx.cleanup(() => {
+          if (!blockNext) return
+          blockNext = false
+          return new Promise<void>((resolve) => {
+            releaseCleanup = resolve
+            cleanupBlocked()
+          })
+        })
+        return d.s.get()
+      },
+    })
+    const scope = createScope({ gc: { enabled: false } })
+    await scope.resolve(t)
+
+    sFail = true
+    scope.controller(s).invalidate()
+    await scope.flush().catch(() => {})
+
+    sFail = false
+    sValue = 2
+    blockNext = true
+    const blocked = new Promise<void>((resolve) => {
+      cleanupBlocked = resolve
+    })
+    scope.controller(t).invalidate()
+    const flush = scope.flush()
+    await blocked
+
+    expect(await scope.resolve(s)).toBe(2)
+    await Promise.resolve()
+    releaseCleanup()
+
+    await expect(flush).rejects.toThrow("Infinite invalidation loop detected")
+    expect(tRuns).toBe(2)
+    expect(scope.controller(t).get()).toBe(2)
+    await scope.dispose()
+  })
+})
+
+describe("cascade retry termination", () => {
+  const watched = <T,>(at: Lite.Atom<T>) => controller(at, { resolve: true, watch: true })
+
+  it("rejects a pending-set cycle instead of hanging", async () => {
+    let armed = false
+    let sourceRuns = 0
+    let sourceRef!: Lite.Controller<number>
+    const source = atom({
+      factory: () => {
+        sourceRuns++
+        if (armed) sourceRef.set(100 + sourceRuns)
+        return sourceRuns
+      },
+    })
+    const writer = atom({
+      deps: { source: watched(source) },
+      factory: (_, d) => {
+        if (armed) sourceRef.invalidate()
+        return d.source.get()
+      },
+    })
+    const scope = createScope({ gc: { enabled: false } })
+    sourceRef = scope.controller(source)
+    await scope.resolve(writer)
+
+    armed = true
+    sourceRef.invalidate()
+    await expect(scope.flush()).rejects.toThrow("Infinite invalidation loop detected")
+    await scope.dispose()
+  })
+
+  it("retries a watcher re-dirtied by a clean recompute after a direct invalidate", async () => {
+    let armed = false
+    let sRuns = 0
+    const events: string[] = []
+    const s = atom({
+      factory: () => {
+        if (armed) events.push("s")
+        return ++sRuns
+      },
+    })
+    let t!: Lite.Atom<number>
+    const u = atom({
+      factory: (ctx) => {
+        if (armed) {
+          events.push("u")
+          ctx.scope.controller(t).invalidate()
+        }
+        return 0
+      },
+    })
+    t = atom({
+      deps: { s: watched(s) },
+      factory: (_, d) => {
+        if (armed) events.push("t")
+        return d.s.get()
+      },
+    })
+    const scope = createScope({ gc: { enabled: false } })
+    await scope.resolve(t)
+    await scope.resolve(u)
+    await scope.flush()
+
+    armed = true
+    scope.controller(t).invalidate()
+    scope.controller(u).invalidate()
+    scope.controller(s).invalidate()
+    await scope.flush()
+
+    expect(events).toEqual(["t", "u", "s", "t"])
+    expect(scope.controller(t).get()).toBe(2)
+    await scope.dispose()
+  })
+})
+
+describe("pure watch convergence", () => {
+  const watched = <T,>(at: Lite.Atom<T>) => controller(at, { resolve: true, watch: true })
+
+  it("converges a repeated-source overlapping diamond", async () => {
+    const x = atom({ factory: () => 1 })
+    const p = atom({ deps: { x: watched(x) }, factory: (_, d) => d.x.get() * 10 })
+    const s = atom({ deps: { x: watched(x), p: watched(p) }, factory: (_, d) => d.x.get() + d.p.get() })
+    const y = atom({ deps: { x: watched(x), s: watched(s) }, factory: (_, d) => d.x.get() + d.s.get() })
+    const scope = createScope({ gc: { enabled: false } })
+    await scope.resolve(y)
+
+    scope.controller(x).set(2)
+    await scope.flush()
+
+    expect(scope.controller(p).get()).toBe(20)
+    expect(scope.controller(s).get()).toBe(22)
+    expect(scope.controller(y).get()).toBe(24)
+    await scope.dispose()
+  })
+
+  it("converges a multi-branch join whose causes merge while queued", async () => {
+    const r = atom({ factory: () => 1 })
+    const p = atom({ deps: { r: watched(r) }, factory: (_, d) => d.r.get() * 10 })
+    const a = atom({ deps: { r: watched(r), p: watched(p) }, factory: (_, d) => d.r.get() + d.p.get() })
+    const q = atom({ deps: { r: watched(r) }, factory: (_, d) => d.r.get() * 100 })
+    const b = atom({ deps: { q: watched(q) }, factory: (_, d) => d.q.get() + 1 })
+    const y = atom({
+      deps: { r: watched(r), a: watched(a), b: watched(b) },
+      factory: (_, d) => d.r.get() + d.a.get() + d.b.get(),
+    })
+    const scope = createScope({ gc: { enabled: false } })
+    await scope.resolve(y)
+
+    scope.controller(r).set(2)
+    await scope.flush()
+
+    expect(scope.controller(a).get()).toBe(22)
+    expect(scope.controller(b).get()).toBe(201)
+    expect(scope.controller(y).get()).toBe(225)
+    await scope.dispose()
+  })
+
+  it("converges nested diamonds in the adverse outer-first order", async () => {
+    const x = atom({ factory: () => 1 })
+    let stage = atom({ deps: { x: watched(x) }, factory: (_, d) => d.x.get() * 10 })
+    for (let i = 1; i <= 3; i++) {
+      const previous = stage
+      stage = atom({
+        deps: { x: watched(x), previous: watched(previous) },
+        factory: (_, d) => d.x.get() + d.previous.get(),
+      })
+    }
+    const scope = createScope({ gc: { enabled: false } })
+    await scope.resolve(stage)
+
+    scope.controller(x).set(2)
+    await scope.flush()
+
+    expect(scope.controller(stage).get()).toBe(26)
+    await scope.dispose()
+  })
+})
+
+describe("tainted recompute provenance", () => {
+  const watched = <T,>(at: Lite.Atom<T>) => controller(at, { resolve: true, watch: true })
+
+  it("rejects self-re-entry writer feedback instead of hanging", async () => {
+    let armed = false
+    let sourceRuns = 0
+    let sourceRef!: Lite.Controller<number>
+    const source = atom({
+      factory: (ctx) => {
+        sourceRuns++
+        if (armed) ctx.invalidate()
+        return sourceRuns
+      },
+    })
+    const writer = atom({
+      deps: { source: watched(source) },
+      factory: (_, d) => {
+        if (armed) sourceRef.invalidate()
+        return d.source.get()
+      },
+    })
+    const scope = createScope({ gc: { enabled: false } })
+    sourceRef = scope.controller(source)
+    await scope.resolve(writer)
+
+    armed = true
+    sourceRef.invalidate()
+    await expect(scope.flush()).rejects.toThrow("Infinite invalidation loop detected")
+    await scope.dispose()
+  })
+
+  it("rejects listener-driven re-entry writer feedback instead of hanging", async () => {
+    let armed = false
+    let sourceRuns = 0
+    const source = atom({ factory: () => ++sourceRuns })
+    let sourceRef!: Lite.Controller<number>
+    const writer = atom({
+      deps: { source: watched(source) },
+      factory: (_, d) => {
+        if (armed) sourceRef.invalidate()
+        return d.source.get()
+      },
+    })
+    const scope = createScope({ gc: { enabled: false } })
+    sourceRef = scope.controller(source)
+    scope.on("resolving", source, () => {
+      if (armed) sourceRef.invalidate()
+    })
+    await scope.resolve(writer)
+
+    armed = true
+    sourceRef.invalidate()
+    await expect(scope.flush()).rejects.toThrow("Infinite invalidation loop detected")
+    await scope.dispose()
+  })
+})
+
+describe("mutations during an unrelated in-flight recompute", () => {
+  const watched = <T,>(at: Lite.Atom<T>) => controller(at, { resolve: true, watch: true })
+
+  it("converges without overlap and conservatively rejects with overlap", async () => {
+    for (const overlap of [false, true]) {
+      let armed = false
+      let open!: () => void
+      let startedResolve!: () => void
+      const started = new Promise<void>((resolve) => { startedResolve = resolve })
+      const gate = new Promise<void>((resolve) => { open = resolve })
+      const blocker = atom({
+        factory: async () => {
+          if (armed) {
+            startedResolve()
+            await gate
+          }
+          return 0
+        },
+      })
+      const b = atom({ factory: () => 1 })
+      const x = atom({ deps: { b: watched(b) }, factory: (_, d) => d.b.get() * 10 })
+      let runs = 0
+      const y = atom({
+        deps: { b: watched(b), x: watched(x) },
+        factory: (_, d) => {
+          runs++
+          return d.b.get() + d.x.get()
+        },
+      })
+      const scope = createScope({ gc: { enabled: false } })
+      await scope.resolve(blocker)
+      await scope.resolve(b)
+      await scope.resolve(y)
+
+      let flushing: Promise<void> | undefined
+      if (overlap) {
+        armed = true
+        scope.controller(blocker).invalidate()
+        flushing = scope.flush()
+        await started
+      }
+      scope.controller(b).set(2)
+      if (overlap) open()
+
+      if (overlap) {
+        await expect(flushing!).rejects.toThrow("Infinite invalidation loop detected")
+        expect(scope.controller(y).get()).toBe(12)
+      } else {
+        await scope.flush()
+        expect(runs).toBe(3)
+        expect(scope.controller(y).get()).toBe(22)
+      }
+      expect(scope.controller(x).get()).toBe(20)
+      await scope.dispose()
+    }
+  })
+})
+
+describe("same-turn batched mutations", () => {
+  it("converges two independent adverse-order diamonds set in one turn", async () => {
+    const watched = <T,>(at: Lite.Atom<T>) => controller(at, { resolve: true, watch: true })
+    const make = () => {
+      const root = atom({ factory: () => 1 })
+      const mid = atom({ deps: { root: watched(root) }, factory: (_, d) => d.root.get() * 10 })
+      let runs = 0
+      const join = atom({
+        deps: { root: watched(root), mid: watched(mid) },
+        factory: (_, d) => {
+          runs++
+          return d.root.get() + d.mid.get()
+        },
+      })
+      return { root, join, getRuns: () => runs }
+    }
+    const first = make()
+    const second = make()
+    const scope = createScope({ gc: { enabled: false } })
+    await scope.resolve(first.join)
+    await scope.resolve(second.join)
+
+    scope.controller(first.root).set(2)
+    scope.controller(second.root).set(2)
+    await scope.flush()
+
+    expect(scope.controller(first.join).get()).toBe(22)
+    expect(scope.controller(second.join).get()).toBe(22)
+    expect(first.getRuns()).toBe(3)
+    expect(second.getRuns()).toBe(3)
     await scope.dispose()
   })
 })

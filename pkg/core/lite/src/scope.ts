@@ -196,12 +196,11 @@ interface AtomEntry<T> {
   resolvedListener?: Listener
   resolvedListeners?: Set<Listener>
   allListeners?: Set<Listener>
-  pendingInvalidate: boolean
+  pendingInvalidate: 0 | 1 | 2
   pendingSet?: PendingSet<T>
   data?: ContextDataImpl
   dependents?: Set<Lite.Atom<unknown>>
   watchers?: Set<WatchEdge>
-  watchHeight: number
   valueListeners?: Set<Listener>
   valueReady?: boolean
   notifiedValue?: T
@@ -217,10 +216,9 @@ class AtomEntryImpl<T> implements AtomEntry<T> {
   hasValue = false
   error: Error | undefined = undefined
   generation: AtomGeneration<T>
-  pendingInvalidate = false
+  pendingInvalidate: 0 | 1 | 2 = 0
   pendingSet: PendingSet<T> | undefined = undefined
   data: ContextDataImpl | undefined = undefined
-  watchHeight = 0
   gcPending = false
   gcQueued = false
   gcScheduled: ReturnType<typeof setTimeout> | null = null
@@ -376,14 +374,21 @@ function throwListenerErrors(errors: unknown[]): void {
   throw new AggregateError(errors, "Listener notification failed")
 }
 
+let notifyingListeners = 0
+
 function notifyListener(listener: Listener | undefined, errors?: unknown[]): void {
   if (!listener) return
+  notifyingListeners++
   try {
     listener()
   } catch (error) {
-    if (!errors) throw error
+    if (!errors) {
+      notifyingListeners--
+      throw error
+    }
     errors.push(error)
   }
+  notifyingListeners--
 }
 
 function notifyListeners(listeners: Set<Listener> | undefined, errors?: unknown[]): void {
@@ -394,6 +399,7 @@ function notifyListeners(listeners: Set<Listener> | undefined, errors?: unknown[
   }
   const failures = errors ?? []
   const snapshot = [...listeners]
+  notifyingListeners++
   for (let i = 0; i < snapshot.length; i++) {
     try {
       snapshot[i]!()
@@ -401,6 +407,7 @@ function notifyListeners(listeners: Set<Listener> | undefined, errors?: unknown[
       failures.push(error)
     }
   }
+  notifyingListeners--
   if (!errors) throwListenerErrors(failures)
 }
 
@@ -589,9 +596,13 @@ class ScopeImpl implements Lite.Scope {
   private releasing?: Map<Lite.Atom<unknown>, ReleaseFlight>
   private presets?: Map<Lite.Atom<unknown> | Lite.Flow<unknown, unknown, any, unknown> | Lite.Resource<unknown>, unknown>
   private stateListeners?: Map<AtomState, Map<Lite.Atom<unknown>, Set<Listener>>>
-  private invalidationQueue?: { atom: Lite.Atom<unknown>; height: number }[]
+  private invalidationQueue?: Lite.Atom<unknown>[]
   private invalidationQueued?: Set<Lite.Atom<unknown>>
   private invalidationIndex = 0
+  private drainTarget: Lite.Atom<unknown> | null = null
+  private drainStarted = false
+  private drainTainted = false
+  private invalidationTainted: Set<Lite.Atom<unknown>> | null = null
   private invalidationChain: Set<Lite.Atom<unknown>> | null = null
   private chainPromise: Promise<void> | null = null
   private chainError: unknown = null
@@ -608,26 +619,28 @@ class ScopeImpl implements Lite.Scope {
   readonly execExts: Lite.Extension[]
   readonly ready: Promise<void>
 
-  private scheduleInvalidation<T>(atom: Lite.Atom<T>, entry?: AtomEntry<T>): void {
+  private taintContext(): boolean {
+    return this.drainStarted || notifyingListeners > 0
+  }
+
+  private scheduleInvalidation<T>(atom: Lite.Atom<T>, entry?: AtomEntry<T>, tainted = false): void {
     if (!entry) {
       entry = this.cache.get(atom) as AtomEntry<T> | undefined
       if (!entry || entry.state === "idle") return
     }
 
     if (entry.state === "resolving") {
-      entry.pendingInvalidate = true
+      const level = tainted ? 2 : 1
+      if (level > entry.pendingInvalidate) entry.pendingInvalidate = level
       return
     }
 
     const queued = this.invalidationQueued ??= new Set()
     if (!queued.has(atom)) {
       queued.add(atom)
-      const queue = this.invalidationQueue ??= []
-      const height = entry.watchHeight
-      let i = queue.length
-      while (i > this.invalidationIndex && queue[i - 1]!.height > height) i--
-      queue.splice(i, 0, { atom, height })
+      ;(this.invalidationQueue ??= []).push(atom)
     }
+    if (tainted) (this.invalidationTainted ??= new Set()).add(atom)
 
     if (!this.chainPromise) {
       this.chainError = null
@@ -640,9 +653,10 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private async processInvalidationChain(): Promise<void> {
+    this.drainStarted = true
     try {
       while (this.invalidationQueue && this.invalidationIndex < this.invalidationQueue.length && !this.disposed) {
-        const atom = this.invalidationQueue[this.invalidationIndex++]!.atom
+        const atom = this.invalidationQueue[this.invalidationIndex++]!
         this.invalidationQueued!.delete(atom)
         const result = this.doInvalidateSequential(atom)
         if (result) await result
@@ -651,8 +665,10 @@ class ScopeImpl implements Lite.Scope {
       this.invalidationQueue = undefined
       this.invalidationQueued = undefined
       this.invalidationIndex = 0
+      this.invalidationTainted = null
       this.invalidationChain = null
       this.chainPromise = null
+      this.drainStarted = false
     }
   }
 
@@ -878,20 +894,24 @@ class ScopeImpl implements Lite.Scope {
     }
   }
 
-  private notifyEntry(entry: AtomEntry<unknown>, event: 'resolving' | 'resolved', errors?: unknown[]): void {
+  private notifyEntry(entry: AtomEntry<unknown>, event: 'resolving' | 'resolved', errors?: unknown[], cascade = false): void {
     const listeners = event === 'resolving' ? entry.resolvingListeners : entry.resolvedListeners
     if (!errors && !entry.watchers?.size && !entry.valueListeners?.size && !entry.allListeners?.size) {
-      if (event === 'resolved') entry.resolvedListener?.()
+      if (event === 'resolved') notifyListener(entry.resolvedListener)
       notifyListeners(listeners)
       return
     }
     const failures = errors ?? []
+    const tainted = !cascade && (this.drainStarted || notifyingListeners > 0)
     if (event === 'resolved' && entry.watchers?.size) {
       for (const edge of entry.watchers) {
         try {
           const previous = edge.previous
           edge.previous = entry.value
-          if (!edge.eq(previous, entry.value)) this.scheduleInvalidation(edge.target)
+          if (!edge.eq(previous, entry.value)) {
+            if (cascade) this.invalidationChain?.delete(edge.target)
+            this.scheduleInvalidation(edge.target, undefined, tainted)
+          }
         } catch (error) {
           failures.push(error)
         }
@@ -1094,7 +1114,7 @@ class ScopeImpl implements Lite.Scope {
 
     const ctx: Lite.ResolveContext = {
       cleanup: (fn, ...params) => (generation.cleanups ??= []).push({ fn, params }),
-      invalidate: () => { this.scheduleInvalidation(atom) },
+      invalidate: () => { this.scheduleInvalidation(atom, undefined, this.taintContext()) },
       release: () => this.releaseGeneration(atom, entry, generation),
       scope: this,
       get data() {
@@ -1137,7 +1157,7 @@ class ScopeImpl implements Lite.Scope {
           entry.error = undefined
           entry.resolvedPromise = Promise.resolve(resolved)
           this.emitStateChange('resolved', atom, listenerErrors)
-          this.notifyEntry(entry as AtomEntry<unknown>, 'resolved', listenerErrors)
+          this.notifyEntry(entry as AtomEntry<unknown>, 'resolved', listenerErrors, atom === this.drainTarget && !this.drainTainted)
           this.handlePostResolve(atom, entry)
           throwListenerErrors(listenerErrors)
           return resolved
@@ -1168,7 +1188,7 @@ class ScopeImpl implements Lite.Scope {
     entry.error = undefined
     entry.resolvedPromise = Promise.resolve(value as T)
     this.emitStateChange('resolved', atom, listenerErrors)
-    this.notifyEntry(entry as AtomEntry<unknown>, 'resolved', listenerErrors)
+    this.notifyEntry(entry as AtomEntry<unknown>, 'resolved', listenerErrors, atom === this.drainTarget && !this.drainTainted)
     this.handlePostResolve(atom, entry)
     this.finishGeneration(atom, entry, generation)
 
@@ -1190,23 +1210,25 @@ class ScopeImpl implements Lite.Scope {
 
   private handlePostResolve<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): void {
     if (entry.pendingInvalidate) {
-      entry.pendingInvalidate = false
+      const tainted = entry.pendingInvalidate === 2
+      entry.pendingInvalidate = 0
       this.invalidationChain?.delete(atom)
-      this.scheduleInvalidation(atom)
+      this.scheduleInvalidation(atom, undefined, tainted)
     } else if (entry.pendingSet) {
       this.invalidationChain?.delete(atom)
-      this.scheduleInvalidation(atom)
+      this.scheduleInvalidation(atom, undefined, true)
     }
   }
 
   private handlePostResolveError<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): void {
     if (entry.pendingInvalidate) {
-      entry.pendingInvalidate = false
+      const tainted = entry.pendingInvalidate === 2
+      entry.pendingInvalidate = 0
       this.invalidationChain?.delete(atom)
-      this.scheduleInvalidation(atom)
+      this.scheduleInvalidation(atom, undefined, tainted)
     } else if (entry.pendingSet?.hasValue) {
       this.invalidationChain?.delete(atom)
-      this.scheduleInvalidation(atom)
+      this.scheduleInvalidation(atom, undefined, true)
     } else {
       entry.pendingSet = undefined
     }
@@ -1291,7 +1313,7 @@ class ScopeImpl implements Lite.Scope {
     const ctx: Lite.ResolveContext = {
       cleanup: (fn, ...params) => (generation.cleanups ??= []).push({ fn, params }),
       invalidate: () => {
-        this.scheduleInvalidation(atom)
+        this.scheduleInvalidation(atom, undefined, this.taintContext())
       },
       release: () => this.releaseGeneration(atom, entry, generation),
       scope: this,
@@ -1328,7 +1350,7 @@ class ScopeImpl implements Lite.Scope {
       entry.error = undefined
       entry.resolvedPromise = Promise.resolve(value)
       this.emitStateChange('resolved', atom, listenerErrors)
-      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved', listenerErrors)
+      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved', listenerErrors, atom === this.drainTarget && !this.drainTainted)
       this.handlePostResolve(atom, entry)
       throwListenerErrors(listenerErrors)
 
@@ -1757,12 +1779,8 @@ class ScopeImpl implements Lite.Scope {
     }
     const watchers = entry.watchers ??= new Set()
     watchers.add(edge)
-    const dependent = this.getEntry(dependentAtom)
-    if (dependent) {
-      const height = entry.watchHeight + 1
-      if (height > dependent.watchHeight) dependent.watchHeight = height
-      ;(dependent.generation.cleanups ??= []).push({ fn: () => { watchers.delete(edge) }, params: [] })
-    }
+    const generation = this.getEntry(dependentAtom)?.generation
+    if (generation) (generation.cleanups ??= []).push({ fn: () => { watchers.delete(edge) }, params: [] })
   }
 
   private wireResourceWatch(
@@ -2209,11 +2227,12 @@ class ScopeImpl implements Lite.Scope {
     if (entry.state === 'idle') return
 
     if (entry.state === 'resolving') {
-      entry.pendingInvalidate = true
+      const level = this.taintContext() ? 2 : 1
+      if (level > entry.pendingInvalidate) entry.pendingInvalidate = level
       return
     }
 
-    this.scheduleInvalidation(atom)
+    this.scheduleInvalidation(atom, undefined, this.taintContext())
   }
 
   scheduleSet<T>(atom: Lite.Atom<T>, value: T, cachedEntry?: AtomEntry<T>): void {
@@ -2234,10 +2253,10 @@ class ScopeImpl implements Lite.Scope {
     entry.state = 'resolved'
     entry.hasValue = true
     entry.error = undefined
-    entry.pendingInvalidate = false
+    entry.pendingInvalidate = 0
     entry.resolvedPromise = undefined
     if (!this.stateListeners && !entry.watchers?.size && !entry.allListeners?.size && !entry.valueListeners?.size) {
-      entry.resolvedListener?.()
+      notifyListener(entry.resolvedListener)
       notifyListeners(entry.resolvedListeners)
       return
     }
@@ -2269,10 +2288,10 @@ class ScopeImpl implements Lite.Scope {
     entry.state = 'resolved'
     entry.hasValue = true
     entry.error = undefined
-    entry.pendingInvalidate = false
+    entry.pendingInvalidate = 0
     entry.resolvedPromise = undefined
     if (!this.stateListeners && !entry.watchers?.size && !entry.allListeners?.size && !entry.valueListeners?.size) {
-      entry.resolvedListener?.()
+      notifyListener(entry.resolvedListener)
       notifyListeners(entry.resolvedListeners)
       return
     }
@@ -2281,6 +2300,7 @@ class ScopeImpl implements Lite.Scope {
   }
 
   private doInvalidateSequential<T>(atom: Lite.Atom<T>): void | Promise<void> {
+    const tainted = this.invalidationTainted?.delete(atom) === true
     const entry = this.cache.get(atom) as AtomEntry<T> | undefined
     if (!entry) return
 
@@ -2296,11 +2316,18 @@ class ScopeImpl implements Lite.Scope {
       entry.state = 'resolved'
       entry.hasValue = true
       entry.error = undefined
-      entry.pendingInvalidate = false
+      entry.pendingInvalidate = 0
       entry.resolvedPromise = undefined
       if (!this.stateListeners && !entry.watchers?.size && !entry.resolvedListener && !entry.resolvedListeners?.size && !entry.allListeners?.size && !entry.valueListeners?.size) return
-      if (this.stateListeners) this.emitStateChange('resolved', atom)
-      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
+      this.drainTarget = atom
+      this.drainTainted = true
+      try {
+        if (this.stateListeners) this.emitStateChange('resolved', atom)
+        this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
+      } finally {
+        this.drainTarget = null
+        this.drainTainted = false
+      }
       return
     }
 
@@ -2314,34 +2341,41 @@ class ScopeImpl implements Lite.Scope {
       throw new Error(`Infinite invalidation loop detected: ${path}`)
     }
     this.invalidationChain.add(atom)
-    return this.doInvalidateAsync(atom, entry, previousValue)
+    return this.doInvalidateAsync(atom, entry, previousValue, tainted)
   }
 
-  private async doInvalidateAsync<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, previousValue: T | undefined): Promise<void> {
-    if (this.streamHubs?.has(atom as Lite.Atom<unknown>)) await this.stopStreamHubForAtom(atom as Lite.Atom<unknown>)
-
-    const { generation, cleanups } = this.replaceGeneration(entry)
-    if (cleanups?.length) await runCleanupsSafe(cleanups)
-
-    if (this.cache.get(atom) !== entry || entry.generation !== generation) {
-      await this.resolve(atom)
-      return
-    }
-
-    const listenerErrors: unknown[] = []
-    entry.state = "resolving"
-    entry.value = previousValue
-    entry.error = undefined
-    entry.pendingInvalidate = false
-    this.emitStateChange("resolving", atom, listenerErrors)
-    this.notifyEntry(entry as AtomEntry<unknown>, "resolving", listenerErrors)
-
+  private async doInvalidateAsync<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, previousValue: T | undefined, tainted: boolean): Promise<void> {
+    this.drainTarget = atom
+    this.drainTainted = tainted
     try {
-      await this.resolve(atom)
-    } catch (e) {
-      if (!entry.pendingSet && !entry.pendingInvalidate) throw e
+      if (this.streamHubs?.has(atom as Lite.Atom<unknown>)) await this.stopStreamHubForAtom(atom as Lite.Atom<unknown>)
+
+      const { generation, cleanups } = this.replaceGeneration(entry)
+      if (cleanups?.length) await runCleanupsSafe(cleanups)
+
+      if (this.cache.get(atom) !== entry || entry.generation !== generation) {
+        await this.resolve(atom)
+        return
+      }
+
+      const listenerErrors: unknown[] = []
+      entry.state = "resolving"
+      entry.value = previousValue
+      entry.error = undefined
+      entry.pendingInvalidate = 0
+      this.emitStateChange("resolving", atom, listenerErrors)
+      this.notifyEntry(entry as AtomEntry<unknown>, "resolving", listenerErrors)
+
+      try {
+        await this.resolve(atom)
+      } catch (e) {
+        if (!entry.pendingSet && !entry.pendingInvalidate) throw e
+      }
+      throwListenerErrors(listenerErrors)
+    } finally {
+      this.drainTarget = null
+      this.drainTainted = false
     }
-    throwListenerErrors(listenerErrors)
   }
 
   private releaseGeneration<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, generation: AtomGeneration<T>): Promise<void> {
@@ -2427,6 +2461,7 @@ class ScopeImpl implements Lite.Scope {
     this.invalidationQueue = undefined
     this.invalidationQueued = undefined
     this.invalidationIndex = 0
+    this.invalidationTainted = null
     this.invalidationChain = null
     this.chainPromise = null
 
