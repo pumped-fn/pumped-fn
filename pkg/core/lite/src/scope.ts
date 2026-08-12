@@ -29,6 +29,7 @@ export function shallowEqual(a: unknown, b: unknown): boolean {
 
 const controllerReadHooks: Array<(ctrl: Lite.Controller<unknown>) => void> = []
 const complete = Promise.resolve()
+const invalidationPassLimit = 25
 const noExtensions: Lite.Extension[] = []
 const noTags: Lite.Tagged<any>[] = []
 
@@ -201,6 +202,7 @@ interface AtomEntry<T> {
   data?: ContextDataImpl
   dependents?: Set<Lite.Atom<unknown>>
   watchers?: Set<WatchEdge>
+  watchHeight: number
   valueListeners?: Set<Listener>
   valueReady?: boolean
   notifiedValue?: T
@@ -219,6 +221,7 @@ class AtomEntryImpl<T> implements AtomEntry<T> {
   pendingInvalidate = false
   pendingSet: PendingSet<T> | undefined = undefined
   data: ContextDataImpl | undefined = undefined
+  watchHeight = 0
   gcPending = false
   gcQueued = false
   gcScheduled: ReturnType<typeof setTimeout> | null = null
@@ -587,10 +590,10 @@ class ScopeImpl implements Lite.Scope {
   private releasing?: Map<Lite.Atom<unknown>, ReleaseFlight>
   private presets?: Map<Lite.Atom<unknown> | Lite.Flow<unknown, unknown, any, unknown> | Lite.Resource<unknown>, unknown>
   private stateListeners?: Map<AtomState, Map<Lite.Atom<unknown>, Set<Listener>>>
-  private invalidationQueue?: Lite.Atom<unknown>[]
+  private invalidationQueue?: { atom: Lite.Atom<unknown>; height: number }[]
   private invalidationQueued?: Set<Lite.Atom<unknown>>
   private invalidationIndex = 0
-  private invalidationChain: Set<Lite.Atom<unknown>> | null = null
+  private invalidationChain: Map<Lite.Atom<unknown>, number> | null = null
   private chainPromise: Promise<void> | null = null
   private chainError: unknown = null
   private initialized = false
@@ -620,7 +623,11 @@ class ScopeImpl implements Lite.Scope {
     const queued = this.invalidationQueued ??= new Set()
     if (!queued.has(atom)) {
       queued.add(atom)
-      ;(this.invalidationQueue ??= []).push(atom)
+      const queue = this.invalidationQueue ??= []
+      const height = entry.watchHeight
+      let i = queue.length
+      while (i > this.invalidationIndex && queue[i - 1]!.height > height) i--
+      queue.splice(i, 0, { atom, height })
     }
 
     if (!this.chainPromise) {
@@ -636,7 +643,7 @@ class ScopeImpl implements Lite.Scope {
   private async processInvalidationChain(): Promise<void> {
     try {
       while (this.invalidationQueue && this.invalidationIndex < this.invalidationQueue.length && !this.disposed) {
-        const atom = this.invalidationQueue[this.invalidationIndex++]!
+        const atom = this.invalidationQueue[this.invalidationIndex++]!.atom
         this.invalidationQueued!.delete(atom)
         const result = this.doInvalidateSequential(atom)
         if (result) await result
@@ -1185,10 +1192,8 @@ class ScopeImpl implements Lite.Scope {
   private handlePostResolve<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): void {
     if (entry.pendingInvalidate) {
       entry.pendingInvalidate = false
-      this.invalidationChain?.delete(atom)
       this.scheduleInvalidation(atom)
     } else if (entry.pendingSet) {
-      this.invalidationChain?.delete(atom)
       this.scheduleInvalidation(atom)
     }
   }
@@ -1196,10 +1201,8 @@ class ScopeImpl implements Lite.Scope {
   private handlePostResolveError<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): void {
     if (entry.pendingInvalidate) {
       entry.pendingInvalidate = false
-      this.invalidationChain?.delete(atom)
       this.scheduleInvalidation(atom)
     } else if (entry.pendingSet?.hasValue) {
-      this.invalidationChain?.delete(atom)
       this.scheduleInvalidation(atom)
     } else {
       entry.pendingSet = undefined
@@ -1751,8 +1754,12 @@ class ScopeImpl implements Lite.Scope {
     }
     const watchers = entry.watchers ??= new Set()
     watchers.add(edge)
-    const generation = this.getEntry(dependentAtom)?.generation
-    if (generation) (generation.cleanups ??= []).push({ fn: () => { watchers.delete(edge) }, params: [] })
+    const dependent = this.getEntry(dependentAtom)
+    if (dependent) {
+      const height = entry.watchHeight + 1
+      if (height > dependent.watchHeight) dependent.watchHeight = height
+      ;(dependent.generation.cleanups ??= []).push({ fn: () => { watchers.delete(edge) }, params: [] })
+    }
   }
 
   private wireResourceWatch(
@@ -2294,16 +2301,17 @@ class ScopeImpl implements Lite.Scope {
       return
     }
 
-    if (!this.invalidationChain) this.invalidationChain = new Set()
-    if (this.invalidationChain.has(atom)) {
-      const chainAtoms = Array.from(this.invalidationChain)
+    const chain = this.invalidationChain ??= new Map()
+    const passes = chain.get(atom) ?? 0
+    if (passes >= invalidationPassLimit) {
+      const chainAtoms = Array.from(chain.keys())
       chainAtoms.push(atom)
       const path = chainAtoms
         .map(a => a.factory?.name || "<anonymous>")
         .join(" → ")
       throw new Error(`Infinite invalidation loop detected: ${path}`)
     }
-    this.invalidationChain.add(atom)
+    chain.set(atom, passes + 1)
     return this.doInvalidateAsync(atom, entry, previousValue)
   }
 

@@ -5057,3 +5057,193 @@ describe("close settlement", () => {
     await scope.dispose()
   })
 })
+
+describe("diamond invalidation ordering", () => {
+  const watched = <T,>(a: Lite.Atom<T>) => controller(a, { resolve: true, watch: true })
+
+  it("converges diamonds in one recompute regardless of deps key order", async () => {
+    for (const aFirst of [true, false]) {
+      const a = atom({ factory: () => 1 })
+      const x = atom({ deps: { a: watched(a) }, factory: (_, d) => d.a.get() + 1 })
+      let runs = 0
+      const y = atom({
+        deps: aFirst ? { a: watched(a), x: watched(x) } : { x: watched(x), a: watched(a) },
+        factory: (_, d) => {
+          runs++
+          return d.a.get() + d.x.get()
+        },
+      })
+      const scope = createScope()
+      expect(await scope.resolve(y)).toBe(3)
+
+      scope.controller(a).set(2)
+      await scope.flush()
+
+      expect(scope.controller(y).get()).toBe(5)
+      expect(runs).toBe(2)
+      await scope.dispose()
+    }
+  })
+
+  it("converges deep and wide diamonds without spurious loop errors", async () => {
+    const a = atom({ factory: () => 1 })
+    const x1 = atom({ deps: { a: watched(a) }, factory: (_, d) => d.a.get() * 10 })
+    const x2 = atom({ deps: { x1: watched(x1) }, factory: (_, d) => d.x1.get() + 1 })
+    let deepRuns = 0
+    const deep = atom({
+      deps: { a: watched(a), x2: watched(x2) },
+      factory: (_, d) => {
+        deepRuns++
+        return d.a.get() + d.x2.get()
+      },
+    })
+    let wideRuns = 0
+    const wide = atom({
+      deps: { a: watched(a), x1: watched(x1), x2: watched(x2) },
+      factory: (_, d) => {
+        wideRuns++
+        return d.a.get() + d.x1.get() + d.x2.get()
+      },
+    })
+    const scope = createScope()
+    expect(await scope.resolve(deep)).toBe(12)
+    expect(await scope.resolve(wide)).toBe(22)
+
+    scope.controller(a).set(2)
+    await scope.flush()
+
+    expect(scope.controller(deep).get()).toBe(23)
+    expect(scope.controller(wide).get()).toBe(43)
+    expect(deepRuns).toBe(2)
+    expect(wideRuns).toBe(2)
+    await scope.dispose()
+  })
+
+  it("converges diamonds with an async middle branch", async () => {
+    const a = atom({ factory: () => 1 })
+    const x = atom({
+      deps: { a: watched(a) },
+      factory: async (_, d) => {
+        await new Promise((resolve) => setTimeout(resolve, 1))
+        return d.a.get() + 1
+      },
+    })
+    let runs = 0
+    const y = atom({
+      deps: { a: watched(a), x: watched(x) },
+      factory: (_, d) => {
+        runs++
+        return d.a.get() + d.x.get()
+      },
+    })
+    const scope = createScope()
+    expect(await scope.resolve(y)).toBe(3)
+
+    scope.controller(a).set(2)
+    await scope.flush()
+
+    expect(scope.controller(y).get()).toBe(5)
+    expect(runs).toBe(2)
+    await scope.dispose()
+  })
+
+  it("keeps eq suppression on one branch from double-running the join", async () => {
+    const a = atom({ factory: () => ({ n: 1, tag: "same" }) })
+    let xRuns = 0
+    const x = atom({
+      deps: { a: controller(a, { resolve: true, watch: true, eq: (p, q) => p.tag === q.tag }) },
+      factory: (_, d) => {
+        xRuns++
+        return d.a.get().tag
+      },
+    })
+    let yRuns = 0
+    const y = atom({
+      deps: { a: watched(a), x: watched(x) },
+      factory: (_, d) => {
+        yRuns++
+        return `${d.a.get().n}:${d.x.get()}`
+      },
+    })
+    const scope = createScope()
+    expect(await scope.resolve(y)).toBe("1:same")
+
+    scope.controller(a).set({ n: 2, tag: "same" })
+    await scope.flush()
+
+    expect(scope.controller(y).get()).toBe("2:same")
+    expect(xRuns).toBe(1)
+    expect(yRuns).toBe(2)
+    await scope.dispose()
+  })
+})
+
+describe("convergent invalidation feedback", () => {
+  const watched = <T,>(a: Lite.Atom<T>) => controller(a, { resolve: true, watch: true })
+
+  it("settles cross-height feedback through a non-watch controller write", async () => {
+    for (const hiFirst of [true, false]) {
+      let armed = false
+      const s = atom({ factory: () => 1000 })
+      const b = atom({ factory: () => 100 })
+      const d0 = atom({ factory: () => 1 })
+      const d1 = atom({ deps: { d: watched(d0) }, factory: (_, d) => d.d.get() + 1 })
+      const hi = atom({
+        deps: { s: watched(s), d: watched(d1), b: controller(b, { resolve: true }) },
+        factory: (_, d) => {
+          if (armed) d.b.set(200)
+          return d.s.get() + d.d.get()
+        },
+      })
+      let loRuns = 0
+      const lo = atom({
+        deps: { s: watched(s), b: watched(b) },
+        factory: (_, d) => {
+          loRuns++
+          return d.s.get() + d.b.get()
+        },
+      })
+      const z = atom({ deps: { hi: watched(hi) }, factory: (_, d) => d.hi.get() })
+      const scope = createScope()
+      await scope.resolve(hiFirst ? hi : lo)
+      await scope.resolve(hiFirst ? lo : hi)
+      await scope.resolve(z)
+      await scope.flush()
+
+      armed = true
+      scope.controller(s).set(2000)
+      await scope.flush()
+
+      expect(scope.controller(lo).get()).toBe(2200)
+      expect(scope.controller(z).get()).toBe(2002)
+      expect(loRuns).toBe(3)
+      await scope.dispose()
+    }
+  })
+})
+
+describe("loop detection under sanctioned re-entry", () => {
+  it("rejects flush for cycles that invalidate mid-recompute instead of hanging", async () => {
+    const b = atom({ factory: () => 0 })
+    const a = atom({
+      deps: { b: controller(b, { resolve: true, watch: true }) },
+      factory: (_, d) => d.b.get(),
+    })
+    const scope = createScope()
+    await scope.resolve(a)
+    const ca = scope.controller(a)
+    const cb = scope.controller(b)
+
+    let bumps = 0
+    ca.on("resolved", () => cb.set(++bumps + 1000))
+    let resolving = 0
+    scope.on("resolving", a, () => {
+      resolving++
+      if (resolving % 2 === 1) ca.invalidate()
+    })
+
+    cb.set(++bumps + 1000)
+    await expect(scope.flush()).rejects.toThrow("Infinite invalidation loop detected")
+    await scope.dispose()
+  })
+})
