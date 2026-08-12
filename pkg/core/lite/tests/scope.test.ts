@@ -5223,6 +5223,40 @@ describe("convergent invalidation feedback", () => {
 })
 
 describe("loop detection under sanctioned re-entry", () => {
+  it("settles self-re-entry at exactly the 100-pass boundary", async () => {
+    let runs = 0
+    const subject = atom({
+      factory: (ctx) => {
+        runs++
+        if (runs <= 100) ctx.invalidate()
+        return runs
+      },
+    })
+    const scope = createScope()
+    await scope.resolve(subject)
+    await scope.flush()
+
+    expect(runs).toBe(101)
+    expect(scope.controller(subject).get()).toBe(101)
+    await scope.dispose()
+  })
+
+  it("rejects unbounded self-re-entry instead of hanging", async () => {
+    let runs = 0
+    const subject = atom({
+      factory: (ctx) => {
+        runs++
+        ctx.invalidate()
+        return runs
+      },
+    })
+    const scope = createScope()
+    await scope.resolve(subject)
+    await expect(scope.flush()).rejects.toThrow("Infinite invalidation loop detected")
+    expect(runs).toBe(101)
+    await scope.dispose()
+  })
+
   it("rejects flush for cycles that invalidate mid-recompute instead of hanging", async () => {
     const b = atom({ factory: () => 0 })
     const a = atom({

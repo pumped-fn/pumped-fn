@@ -29,7 +29,7 @@ export function shallowEqual(a: unknown, b: unknown): boolean {
 
 const controllerReadHooks: Array<(ctrl: Lite.Controller<unknown>) => void> = []
 const complete = Promise.resolve()
-const invalidationPassLimit = 25
+const invalidationPassLimit = 100
 const noExtensions: Lite.Extension[] = []
 const noTags: Lite.Tagged<any>[] = []
 
