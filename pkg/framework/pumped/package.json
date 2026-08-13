@@ -82,7 +82,6 @@
   "devDependencies": {
     "acorn": "catalog:",
     "@hono/node-server": "catalog:",
-    "@types/estree": "catalog:",
     "@pumped-fn/sdk": "workspace:*",
     "@pumped-fn/sdk-test": "workspace:*",
     "@pumped-fn/lite": "workspace:*",
@@ -91,6 +90,7 @@
     "hono": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "typescript-api": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   },

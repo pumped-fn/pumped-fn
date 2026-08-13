@@ -4,7 +4,7 @@
 
 Fix three defects that only surface when the framework is consumed from outside this repository.
 
-**`pumped dev` no longer answers discovered `GET` routes with 404.** The plugin registers its request handler as a Vite *post* middleware, so Vite's own html-fallback and 404 middlewares answered every `GET` before pumped saw it. `POST` routes were unaffected, which hid the split: the same app served `GET /list` correctly from `dist/server.mjs` and returned `404 Not Found` under `pumped dev`. The plugin's `config()` hook now defaults `appType` to `"custom"`. An application that sets `appType` itself keeps its own value, so this is a new default rather than an override.
+**`pumped dev` no longer answers discovered `GET` routes with 404.** The plugin registers its request handler as a Vite *post* middleware, so Vite's own html-fallback and 404 middlewares answered every `GET` before pumped saw it. `POST` routes were unaffected, which hid the split: the same app served `GET /list` correctly from `dist/server.mjs` and returned `404 Not Found` under `pumped dev`. Pumped now uses Vite's `"custom"` app type because it owns the request pipeline and has no HTML fallback. If an application explicitly sets another app type, Pumped warns with the ignored value before using `"custom"`.
 
 **`analyze()` accepts an entry flow that declares `faults`.** `ManifestEntry.flow` was declared `Lite.Flow<any, any>`, which leaves the fault and yield type parameters at their `never` defaults, so passing a flow built with `faults: typed<F>()` — the pattern the README recommends — failed to typecheck. It is now `Lite.Flow<any, any, any, any>`. Generated manifests are emitted JavaScript and were never affected; this only bit hand-written `analyze()` calls and tests.
 

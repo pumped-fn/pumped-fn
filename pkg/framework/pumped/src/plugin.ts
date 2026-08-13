@@ -68,8 +68,13 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
     name: "pumped-fn",
 
     config(userConfig) {
+      if (userConfig.appType !== undefined && userConfig.appType !== "custom") {
+        this.warn(
+          `pumped overrides Vite appType "${userConfig.appType}" with "custom" because pumped owns the request pipeline`
+        )
+      }
       return {
-        appType: userConfig.appType ?? ("custom" as const),
+        appType: "custom",
         ssr: {
           external: [
             "@pumped-fn/pumped",
