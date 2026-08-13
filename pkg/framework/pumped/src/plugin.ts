@@ -31,27 +31,27 @@ export function manifestId(target: BuildTarget): string {
 }
 
 export const ENTRY_SERVER_SOURCE = `
-import { pumped } from "@pumped-fn/pumped"
+import { createAppScope, createServer, runJobs, runWorkflows } from "@pumped-fn/pumped/runtime"
 import { hono } from "@pumped-fn/lite-hono"
 import { serve } from "@hono/node-server"
 import { app as manifestApp, entries, identity } from ${JSON.stringify(MANIFEST_SERVER_ID)}
 
 const manifest = { identity, app: manifestApp, entries }
 const lite = hono.adapter()
-const scope = pumped.createAppScope(manifest, [lite])
-const { app: honoApp } = pumped.createServer(manifest, { scope, lite })
-const jobs = pumped.runJobs(manifest, undefined, scope)
-pumped.runWorkflows(manifest, undefined, scope)
+const scope = createAppScope(manifest, [lite])
+const { app: honoApp } = createServer(manifest, { scope, lite })
+const jobs = runJobs(manifest, undefined, scope)
+runWorkflows(manifest, undefined, scope)
 await jobs.ready
 const port = Number(process.env.PORT ?? 3000)
 serve({ fetch: honoApp.fetch, port })
 `
 
 export const ENTRY_CLI_SOURCE = `
-import { pumped } from "@pumped-fn/pumped"
+import { runCli } from "@pumped-fn/pumped/runtime"
 import { app as manifestApp, entries, identity } from ${JSON.stringify(MANIFEST_CLI_ID)}
 
-await pumped.runCli({ identity, app: manifestApp, entries }, process.argv.slice(2))
+await runCli({ identity, app: manifestApp, entries }, process.argv.slice(2))
 `
 
 export function pumped(options: PumpedOptions = {}): Plugin[] {
@@ -67,11 +67,13 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
   const appPlugin: Plugin = {
     name: "pumped-fn",
 
-    config() {
+    config(userConfig) {
       return {
+        appType: userConfig.appType ?? ("custom" as const),
         ssr: {
           external: [
             "@pumped-fn/pumped",
+            "@pumped-fn/pumped/runtime",
             "@pumped-fn/lite",
             "@pumped-fn/lite-hono",
             "@pumped-fn/lite-extension-scheduler",

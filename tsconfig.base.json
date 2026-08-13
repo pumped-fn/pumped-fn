@@ -75,6 +75,9 @@
       "@pumped-fn/pumped": [
         "./pkg/framework/pumped/src/index.ts"
       ],
+      "@pumped-fn/pumped/runtime": [
+        "./pkg/framework/pumped/src/runtime.ts"
+      ],
       "@pumped-fn/sdk": [
         "./pkg/sdk/core/src/index.ts"
       ],
