@@ -786,7 +786,7 @@ importers:
         version: 7.0.2
       typescript-api:
         specifier: 'catalog:'
-        version: 6.0.3
+        version: typescript@6.0.3
       vite:
         specifier: 'catalog:'
         version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
