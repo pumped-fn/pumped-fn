@@ -21,6 +21,7 @@ export function normalizeTagInput(input: TagInput | undefined): Lite.Tagged<any>
   return normalized
 }
 
+/** Application-wide wiring used to create scopes and map runtime failures. */
 export interface AppConfig {
   presets?: Lite.Preset<any, any>[]
   tags?: TagInput
@@ -47,6 +48,7 @@ export function normalizeApp(app?: AppConfig): NormalizedAppConfig {
   }
 }
 
+/** Agent metadata carried from discovery into a generated runtime manifest. */
 export interface ManifestAgentMeta {
   name: string
   description?: string
@@ -55,6 +57,7 @@ export interface ManifestAgentMeta {
   subagents: readonly string[]
 }
 
+/** A discovered server, CLI, job, workflow, or agent module available to a runtime runner. */
 export interface ManifestEntry {
   kind: EntryKind
   name: string
@@ -72,6 +75,7 @@ export interface ManifestIdentity {
   hash: string
 }
 
+/** The generated application description passed to Pumped's runtime runners. */
 export interface Manifest {
   identity?: ManifestIdentity
   app: AppConfig | undefined

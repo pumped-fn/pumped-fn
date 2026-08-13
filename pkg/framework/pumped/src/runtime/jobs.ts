@@ -3,10 +3,12 @@ import { backend as schedulerBackend } from "@pumped-fn/lite-extension-scheduler
 import { createAppScope, defaultSchedulerBackend } from "./app-scope"
 import type { Manifest, ManifestEntry } from "./manifest"
 
+/** Hooks for observing job runner setup without replacing scheduler behavior. */
 export interface JobsIo {
   onDefaultBackend?(): void
 }
 
+/** Controls job registration readiness and shutdown for a running application. */
 export interface JobsRunner {
   ready: Promise<void>
   stop(): Promise<void>

@@ -35,6 +35,7 @@ async function readJsonBody(req: { text(): Promise<string> }): Promise<unknown> 
   }
 }
 
+/** A scope and Hono adapter shared by the HTTP server and other runtime runners. */
 export interface SharedScope {
   scope: Lite.Scope
   lite: hono.Adapter

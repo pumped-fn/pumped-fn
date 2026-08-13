@@ -11,6 +11,7 @@ function resolveCommand(entry: ManifestEntry): { name: string; description: stri
   }
 }
 
+/** Output sinks supplied by callers that embed or test the generated CLI. */
 export interface CliIo {
   out(line: string): void
   err(line: string): void
