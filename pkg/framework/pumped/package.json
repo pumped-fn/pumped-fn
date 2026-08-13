@@ -40,6 +40,16 @@
         "types": "./dist/meta.d.cts",
         "default": "./dist/meta.cjs"
       }
+    },
+    "./runtime": {
+      "import": {
+        "types": "./dist/runtime.d.mts",
+        "default": "./dist/runtime.mjs"
+      },
+      "require": {
+        "types": "./dist/runtime.d.cts",
+        "default": "./dist/runtime.cjs"
+      }
     }
   },
   "files": [
@@ -72,7 +82,6 @@
   "devDependencies": {
     "acorn": "catalog:",
     "@hono/node-server": "catalog:",
-    "@types/estree": "catalog:",
     "@pumped-fn/sdk": "workspace:*",
     "@pumped-fn/sdk-test": "workspace:*",
     "@pumped-fn/lite": "workspace:*",
@@ -81,6 +90,7 @@
     "hono": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "typescript-api": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   },

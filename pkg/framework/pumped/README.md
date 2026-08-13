@@ -64,15 +64,20 @@ workflows against **one** shared scope. Stateful atoms are therefore the same in
 they're read from an HTTP handler, a cron tick, or a workflow run in the same process:
 
 ```ts
-import { pumped } from "@pumped-fn/pumped"
+import { createAppScope, createServer, runJobs, runWorkflows } from "@pumped-fn/pumped/runtime"
 import { hono } from "@pumped-fn/lite-hono"
 
 const lite = hono.adapter()
-const scope = pumped.createAppScope(manifest, [lite])
-const { app } = pumped.createServer(manifest, { scope, lite })
-pumped.runJobs(manifest, undefined, scope)
-pumped.runWorkflows(manifest, undefined, scope)
+const scope = createAppScope(manifest, [lite])
+const { app } = createServer(manifest, { scope, lite })
+runJobs(manifest, undefined, scope)
+runWorkflows(manifest, undefined, scope)
 ```
+
+Import these from `@pumped-fn/pumped/runtime`, not the package index. The index also exports
+`plugin` and `discover`, which reach `vite`; the runtime entry reaches only `@pumped-fn/lite`,
+`@pumped-fn/lite-hono`, `@pumped-fn/lite-extension-scheduler`, `hono`, and `cac`, so a deployment
+does not need the build toolchain installed. The generated server and CLI entries use it.
 
 `pumped.createAppScope(manifest, extraExtensions?)` derives a scope's `extensions`/`tags`/`presets`
 from `manifest.app` (the `src/app.ts` config), merged with any `extraExtensions` the caller needs
@@ -237,9 +242,17 @@ compile error instead of a silent `undefined` status.
 ## Quick start
 
 Framework operations are available through the `pumped` namespace, its `p` alias, and direct named
-exports. The lightweight `@pumped-fn/pumped/app` entry re-exports the exact Lite authoring handles,
-and `@pumped-fn/pumped/meta` exposes Pumped route and command metadata without loading the Node
-framework.
+exports. Four entries, smallest first:
+
+| Entry | Use it for | Reaches `vite` |
+| --- | --- | --- |
+| `@pumped-fn/pumped/meta` | `route`/`command` metadata on an edge file | no |
+| `@pumped-fn/pumped/app` | the exact Lite authoring handles, plus `app()` | no |
+| `@pumped-fn/pumped/runtime` | serving a built app: `createServer`, `createAppScope`, `runCli`, `runJobs`, `runWorkflows` | no |
+| `@pumped-fn/pumped` | everything, including `plugin`, `discover`, and `analyze` | yes |
+
+Reach for the package index in build tooling and graph inspection. Production entries should import
+from `@pumped-fn/pumped/runtime` so a deployment never needs Vite installed.
 
 The runnable [Pumped tour](../../../examples/pumped-tour/README.md) is the smallest complete example.
 

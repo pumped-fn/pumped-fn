@@ -128,4 +128,27 @@ describe("analyze", () => {
 
     expect(report.unknowns).toContainEqual({ from: "flow:target", reason: "preset-factory" })
   })
+
+  it("accepts an entry flow that declares typed faults", () => {
+    const store = atom({ factory: () => ({ read: (id: string) => id }) })
+    const readItem = flow({
+      name: "readItem",
+      parse: typed<{ id: string }>(),
+      faults: typed<{ kind: "not-found"; id: string }>(),
+      deps: { store },
+      factory: (context, { store }) =>
+        context.input.id === ""
+          ? context.fail({ kind: "not-found", id: context.input.id })
+          : store.read(context.input.id),
+    })
+    const report = analyze({
+      app: app(),
+      entries: [{ kind: "server", name: "read-item", file: "src/server/read-item.ts", flow: readItem }],
+    })
+
+    const flowId = report.idOf(readItem)
+
+    expect(flowId).toBe("flow:read-item")
+    expect(report.edges).toContainEqual({ from: flowId, to: "atom:store", kind: "depends-on", key: "store" })
+  })
 })

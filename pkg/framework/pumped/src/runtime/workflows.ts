@@ -4,10 +4,12 @@ import { workflowRun } from "../tags"
 import { createAppScope } from "./app-scope"
 import { normalizeApp, type Manifest, type ManifestEntry } from "./manifest"
 
+/** Receives workflow failures after the application has had a chance to map them. */
 export interface WorkflowsIo {
   onError(entry: ManifestEntry, error: unknown, mapped?: { status: number; body: unknown }): void
 }
 
+/** Waits for startup workflow runs and releases their owned scope on shutdown. */
 export interface WorkflowsRunner {
   stop(): Promise<void>
 }
