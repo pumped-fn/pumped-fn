@@ -20,6 +20,7 @@ export type RuleId =
   | "pumped/no-module-mocks"
   | "pumped/no-module-state"
   | "pumped/no-naked-globals"
+  | "pumped/no-preset-outside-test"
   | "pumped/no-render-outside-browser-test"
   | "pumped/no-react-local-state"
   | "pumped/no-react-manual-execution-context"
@@ -149,6 +150,7 @@ type Imports = {
   liteNamespaceImportEnds: Map<string, number>
   liteReactNamespaces: Set<string>
   mockFns: Set<string>
+  preset: Set<string>
   nodeBuiltins: Map<string, string>
   reactNamespaces: Set<string>
   render: Set<string>
@@ -341,6 +343,7 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
     liteReactNamespaces: new Set(),
     mockFns: new Set(),
     nodeBuiltins: new Map(),
+    preset: new Set(),
     reactNamespaces: new Set(),
     render: new Set(),
     stepLocals: new Set(),
@@ -397,6 +400,9 @@ function collectImports(sourceFile: ts.SourceFile): Imports {
       }
       if (moduleName === "@pumped-fn/lite" && imported === "flow") {
         imports.flow.add(local)
+      }
+      if (moduleName === "@pumped-fn/lite" && imported === "preset") {
+        imports.preset.add(local)
       }
       if ((moduleName === "@pumped-fn/lite" || moduleName === "@pumped-fn/lite-react") && creatorNames.has(imported)) {
         imports.creators.add(local)
@@ -2630,6 +2636,23 @@ function addAstDiagnostics(source: string, filePath: string, diagnostics: Diagno
           "pumped/no-module-mocks",
           node.expression,
           "Use scope presets at the test seam instead of module mocks or spies.",
+        )
+      }
+
+      if (
+        !isTestPath(filePath)
+        && (
+          (ts.isIdentifier(node.expression) && imports.preset.has(node.expression.text))
+          || isNamespaceCall(node.expression, imports.liteNamespaces, "preset")
+        )
+      ) {
+        pushNodeDiagnostic(
+          diagnostics,
+          sourceFile,
+          filePath,
+          "pumped/no-preset-outside-test",
+          node.expression,
+          "preset() is the test seam; production composition supplies implementations through tags, not presets.",
         )
       }
 

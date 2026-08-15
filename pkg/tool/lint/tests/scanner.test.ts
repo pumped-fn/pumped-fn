@@ -172,6 +172,27 @@ describe("lite lint scanner", () => {
     ])
   })
 
+  it("flags preset outside test paths and allows it inside them", () => {
+    const source = `
+      import { atom, createScope, preset } from "@pumped-fn/lite"
+
+      const store = atom({ factory: () => "real" })
+      export const scope = createScope({ presets: [preset(store, "wired")] })
+    `
+    expect(ids(source, "src/main.ts")).toContain("pumped/no-preset-outside-test")
+    expect(ids(source, "tests/store.test.ts")).not.toContain("pumped/no-preset-outside-test")
+    expect(ids(source, "src/store.spec.ts")).not.toContain("pumped/no-preset-outside-test")
+  })
+
+  it("flags a namespaced lite preset call outside tests", () => {
+    expect(ids(`
+      import * as lite from "@pumped-fn/lite"
+
+      const store = lite.atom({ factory: () => "real" })
+      export const scope = lite.createScope({ presets: [lite.preset(store, "wired")] })
+    `, "src/main.ts")).toContain("pumped/no-preset-outside-test")
+  })
+
   it("finds shared scope factories in tests", () => {
     expect(ids(`
       import { createScope } from "@pumped-fn/lite"
