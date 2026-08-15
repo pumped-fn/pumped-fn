@@ -1687,6 +1687,7 @@ class ScopeImpl implements Lite.Scope {
             throw error
           }
         })
+        ready.catch(() => {})
         let consumed = false
         const consume = () => {
           if (consumed) throw new Error("Prepared flow invocations can be consumed only once")

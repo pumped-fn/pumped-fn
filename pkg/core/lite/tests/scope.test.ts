@@ -3040,6 +3040,30 @@ describe("ExecutionContext", () => {
       await ctx.close()
       await scope.dispose()
     })
+
+    it("keeps an abandoned failing prepare from leaking an unhandled rejection", async () => {
+      const bad = atom({
+        factory: () => {
+          throw new Error("dep boom")
+        },
+      })
+      const step = flow({ name: "step", deps: { bad }, factory: () => "ran" })
+      const submit = flow({
+        name: "submit",
+        deps: { step: controller(step) },
+        factory: (_ctx, { step }) => {
+          step.prepare()
+          return "abandoned"
+        },
+      })
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      expect(await ctx.exec({ flow: submit })).toBe("abandoned")
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await ctx.close()
+      await scope.dispose()
+    })
   })
 
   describe("ctx.data (ContextData with Tag support)", () => {
