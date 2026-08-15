@@ -374,6 +374,26 @@ describe("observable extension", () => {
     ])
   })
 
+  it("closes per-context sinks at context close without traced work", async () => {
+    const calls: string[] = []
+    const lifecycle: Observable.Sink = {
+      name: "lifecycle",
+      emit() {},
+      flush() {
+        calls.push("flush")
+      },
+      close() {
+        calls.push("close")
+      },
+    }
+    const scope = createScope({ extensions: [observable.extension()] })
+    const ctx = scope.createContext({ tags: observable.runtime({ sinks: [lifecycle] }) })
+
+    await ctx.close()
+    expect(calls).toEqual(["flush", "close"])
+    await scope.dispose()
+  })
+
   it("flushes and closes context runtime sinks only when the owner context closes", async () => {
     const calls: string[] = []
     const sink: Observable.Sink = {

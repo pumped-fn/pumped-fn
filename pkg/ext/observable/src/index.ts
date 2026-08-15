@@ -87,6 +87,9 @@ function extension(options?: Observable.Options): Lite.Extension {
 
   return {
     name: options?.name ?? "observable",
+    initContext: (ctx) => {
+      if (ctx.data.getTag(runtime) !== undefined) contextRuntime(owners, ctx)
+    },
     wrapResolve: async (run, event) => {
       const current = event.kind === "resource"
         ? contextRuntime(owners, event.ctx)

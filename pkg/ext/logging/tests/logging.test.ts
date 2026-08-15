@@ -84,6 +84,26 @@ describe("logging extension", () => {
     expect(snapshot).toHaveLength(2)
   })
 
+  it("flushes and closes per-context sinks at context close without logger or traced flows", async () => {
+    const calls: string[] = []
+    const lifecycle: Logging.Sink = {
+      name: "lifecycle",
+      write() {},
+      flush() {
+        calls.push("flush")
+      },
+      close() {
+        calls.push("close")
+      },
+    }
+    const scope = createScope({ extensions: [logging.extension()] })
+    const ctx = scope.createContext({ tags: logging.runtime({ sinks: [lifecycle] }) })
+
+    await ctx.close()
+    expect(calls).toEqual(["flush", "close"])
+    await scope.dispose()
+  })
+
   it("logs flow start, success, and error from runtime tag policy", async () => {
     const sink = logging.memory()
     const ok = flow({
