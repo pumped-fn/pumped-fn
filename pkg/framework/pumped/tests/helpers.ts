@@ -1,5 +1,5 @@
 import type { Lite } from "@pumped-fn/lite"
-import type { EntryKind } from "../src/discover"
+import { entry } from "../src/entry"
 import type { AppConfig, Manifest, ManifestEntry } from "../src/runtime/manifest"
 
 /**
@@ -7,22 +7,20 @@ import type { AppConfig, Manifest, ManifestEntry } from "../src/runtime/manifest
  * never discovered from disk -- it names "not discovery, a hand-built test
  * entry" the same way every hand-written manifest literal in this test suite
  * already did.
- *
- * Replaces:
- * ```typescript
- * const entry: ManifestEntry = { kind: "jobs", name: "nightly-sweep", file: "virtual", flow: sweep }
- * ```
  */
-export function entry(kind: EntryKind, name: string, flow: Lite.Flow<any, any>): ManifestEntry {
-  return { kind, name, file: "virtual", flow }
+export function manifestEntry(
+  name: string,
+  flow: Lite.Flow<any, any, any, any>,
+  tags: Lite.TagInput,
+  options?: { attributes?: Lite.AttributeInput; file?: string }
+): ManifestEntry {
+  return {
+    name,
+    file: options?.file ?? "virtual",
+    entry: entry({ flow, tags, ...(options?.attributes === undefined ? {} : { attributes: options.attributes }) }),
+  }
 }
 
-/**
- * Replaces:
- * ```typescript
- * const manifest: Manifest = { app: undefined, entries: [entry] }
- * ```
- */
 export function manifest(app: AppConfig | undefined, ...entries: ManifestEntry[]): Manifest {
   return { app, entries }
 }

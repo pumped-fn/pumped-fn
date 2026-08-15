@@ -1,8 +1,8 @@
 # Pumped tour
 
-This is the smallest app that exercises Pumped as a real convention compiler. One shared flow is
-discovered as an HTTP route and a CLI command. A named app changes its region tag without changing
-the flow. Tests use the same public handle through the scope seam.
+This is the smallest app that exercises Pumped as a real convention compiler. One entry carries a
+`route` tag and a `command` tag, so one shared flow serves HTTP and the CLI. A named app changes
+its region tag without changing the flow. Tests use the same public handles through the scope seam.
 
 ## Run it
 
@@ -42,48 +42,51 @@ pnpm -F @pumped-fn/pumped-tour cli:east greet --json '{"name":"Ada"}'
 
 Its output ends with `from east`.
 
-Inspect the east manifest without starting the app:
+Verify and inspect the east manifest without starting the app:
 
 ```bash
+pnpm -F @pumped-fn/pumped-tour check
 pnpm -F @pumped-fn/pumped-tour graph:east
 ```
 
-The JSON identity says `east` and `server`, followed by the static graph and explicit unknowns.
+`check` exits 1 on statically provable defects — an entry no host mounts, duplicate mount points,
+or a required tag some mounted host can never supply. `graph` prints the identity, the static
+graph, explicit unknowns, and those failures.
 
 ## Canonical Shape
 
 ```text
 src/
-  app.ts                 default composition
-  apps/east.ts           derived composition
+  app.ts                 default composition: app({ tags: [region("default")] })
+  apps/east.ts           derived composition: app(base, { tags: [region("east")] })
   domain/greet.ts        shared tag, capability atom, and flow
-  server/greet.ts        HTTP root and route metadata
-  cli/greet.ts           CLI root and command metadata
+  entries/greet.ts       entry({ flow: greet, tags: [route(...), command(...)] })
 tests/greet.test.ts      direct scope-seam test
 ```
 
-The domain flow imports only `@pumped-fn/pumped/app`. That entry is the exact lightweight Lite
-authoring surface. Transport roots re-export the same flow handle and add metadata from
-`@pumped-fn/pumped/meta`. They do not wrap or copy the flow.
+Domain code imports Lite primitives from `@pumped-fn/lite`; entry and app files import `entry`,
+the mount tags, and `app` from `@pumped-fn/pumped`. One name has one home. The entry holds the
+flow by reference; it does not wrap or copy it, so a `preset()` targeting the flow reaches through.
 
 `src/app.ts` supplies the default region tag. `src/apps/east.ts` derives from it and puts the east
 value first. The test replaces the directory atom with `preset()` and needs no module mock.
 
-The same test passes an assembled manifest to `analyze()`. It proves the two roots share one flow
-node, the flow declares its directory and region edges, and opaque factory work stays visible under
-`unknowns`.
+The same test passes an assembled manifest to `analyze()`. It proves the entry's flow declares its
+directory and region edges, opaque factory work stays visible under `unknowns`, and both mounted
+hosts can satisfy every required tag, so `failures` is empty.
 
-The production compiler emits `dist/server.mjs` with server roots and `dist/cli.mjs` with CLI roots.
-Named apps use their own directory, such as `dist/apps/east/`, so builds cannot mix app selections.
-Each artifact embeds its app, target, and manifest hash with project-relative source names. No
-artifact contains the other target's exclusive roots or an absolute checkout path.
+The production compiler emits `dist/server.mjs` from `route` entries and `dist/cli.mjs` from
+`command` entries; this entry carries both tags, so it lands in both. Named apps use their own
+directory, such as `dist/apps/east/`, so builds cannot mix app selections. Each artifact embeds its
+app, target, and manifest hash with project-relative source names. The CLI artifact contains no
+HTTP server, no scheduler, and no build toolchain.
 
 ## Package boundary verdict
 
-This example gives `@pumped-fn/pumped` one clear job that Lite does not own: compile file conventions
-into runnable target manifests and own their HTTP, CLI, job, workflow, and development lifecycle.
-The `/app` entry is intentionally only a lightweight authoring bridge.
+This example gives `@pumped-fn/pumped` one clear job that Lite does not own: compile file
+conventions into runnable target manifests and mount them on HTTP, CLI, cron, and workflow hosts
+with one lifecycle. Disposing the scope stops everything the hosts started.
 
 The verdict is to keep the package experimental. It removes two hand-written composition roots and
-their build wiring, emits isolated and identified production artifacts, and inspects the generated
-graph without starting the app. The compiler earns a boundary. `app()` alone would not earn one.
+their build wiring, emits isolated and identified production artifacts, and proves mount and tag
+contracts before anything runs. The compiler earns a boundary. `app()` alone would not earn one.

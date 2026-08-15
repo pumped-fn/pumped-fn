@@ -1,4 +1,5 @@
-import { app, tag, type Lite } from "../src/app"
+import { tag, type Lite } from "@pumped-fn/lite"
+import { app } from "../src/app"
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
   ? true
