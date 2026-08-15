@@ -4,7 +4,9 @@ Structured lifecycle events for `@pumped-fn/lite`.
 
 The extension is static composition. Runtime backend choice is a tag. Install
 `observable.extension()` once in `createScope({ extensions })`, then pass sinks and policy with
-`observable.runtime(...)` at the scope, request context, or flow execution boundary.
+`observable.runtime(...)` at the scope, request context, or flow execution boundary. Root execution
+contexts emit `context` events from creation to their close outcome, so every span traced inside a
+context nests under one umbrella span; `only` excludes them like any other kind.
 
 ## Migration to 1.0.0
 
@@ -46,7 +48,7 @@ await ctx.close()
 | Option | Role |
 | --- | --- |
 | `sinks` | Event destinations. A backend package should adapt to this interface. |
-| `only` | Optional target filter: `atom`, `resource`, `flow`, or `function`. |
+| `only` | Optional target filter: `atom`, `resource`, `flow`, `function`, or `context`. |
 | `input` / `output` | Opt-in payload capture. Defaults stay private. |
 | `redact` | Payload mapper used when capture is enabled. |
 | `filter` | Final event filter. |

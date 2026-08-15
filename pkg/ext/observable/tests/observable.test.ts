@@ -46,8 +46,11 @@ describe("observable extension", () => {
           sinks: [sink],
           input: true,
           output: true,
-          now: clock([10, 16]),
-          id: () => "flow-1",
+          now: clock([10, 12, 16, 20]),
+          id: (() => {
+            const ids = ["ctx-1", "flow-1"]
+            return () => ids.shift() ?? "extra"
+          })(),
           redact: () => "[redacted]",
         }),
       ],
@@ -61,33 +64,51 @@ describe("observable extension", () => {
     expect(output).toEqual({ value: "token" })
     expect(sink.events()).toEqual([
       {
+        id: "ctx-1",
+        phase: "start",
+        kind: "context",
+        name: "context",
+        at: 10,
+      },
+      {
         id: "flow-1",
+        parentId: "ctx-1",
         phase: "start",
         kind: "flow",
         name: "run",
-        at: 10,
+        at: 12,
         input: "[redacted]",
       },
       {
         id: "flow-1",
+        parentId: "ctx-1",
         phase: "success",
         kind: "flow",
         name: "run",
         at: 16,
-        startedAt: 10,
-        durationMs: 6,
+        startedAt: 12,
+        durationMs: 4,
         output: "[redacted]",
       },
+      {
+        id: "ctx-1",
+        phase: "success",
+        kind: "context",
+        name: "context",
+        at: 20,
+        startedAt: 10,
+        durationMs: 10,
+      },
     ])
-    expect(observed).toHaveLength(2)
-    expect(sink.size()).toBe(2)
+    expect(observed).toHaveLength(4)
+    expect(sink.size()).toBe(4)
     const snapshot = sink.events()
-    expect(snapshot).toHaveLength(2)
+    expect(snapshot).toHaveLength(4)
     unsubscribe()
     sink.clear()
     sink.close?.()
     expect(sink.events()).toEqual([])
-    expect(snapshot).toHaveLength(2)
+    expect(snapshot).toHaveLength(4)
     expect(sink.size()).toBe(0)
   })
 
@@ -167,12 +188,14 @@ describe("observable extension", () => {
       ["atom", "value", "success"],
       ["atom", "<anonymous>", "start"],
       ["atom", "<anonymous>", "success"],
+      ["context", "context", "start"],
       ["flow", "load", "start"],
       ["resource", "tx", "start"],
       ["resource", "tx", "success"],
       ["function", "helper", "start"],
       ["function", "helper", "success"],
       ["flow", "load", "success"],
+      ["context", "context", "success"],
     ])
   })
 
@@ -212,14 +235,18 @@ describe("observable extension", () => {
     await ctx.close({ ok: false, error: "boom" })
     await scope.dispose()
 
-    expect(sink.events().at(-1)).toMatchObject({
-      id: "error-1",
+    expect(sink.events().find((event) => event.kind === "flow" && event.phase === "error")).toMatchObject({
       phase: "error",
       kind: "flow",
       name: "fail",
       error: { message: "boom" },
     })
-    expect(captured).toHaveLength(3)
+    expect(sink.events().at(-1)).toMatchObject({
+      phase: "error",
+      kind: "context",
+      error: { message: "boom" },
+    })
+    expect(captured).toHaveLength(5)
 
     const strict = createScope({
       extensions: [observable.extension()],
@@ -231,7 +258,20 @@ describe("observable extension", () => {
       ],
     })
     await strict.ready
-    const strictCtx = strict.createContext()
+    expect(() => strict.createContext()).toThrow("sink failed")
+
+    const filtered = createScope({
+      extensions: [observable.extension()],
+      tags: [
+        observable.runtime({
+          sinks: [bad],
+          failure: "throw",
+          only: ["flow"],
+        }),
+      ],
+    })
+    await filtered.ready
+    const strictCtx = filtered.createContext()
     await expect(strictCtx.exec({ flow: flow({ name: "strict", factory: () => "ok" }) })).rejects.toThrow("sink failed")
   })
 
@@ -292,7 +332,7 @@ describe("observable extension", () => {
     await expect(ctx.exec({ flow: fail, input: "raw" })).rejects.toThrow("default")
     await ctx.close({ ok: false, error: new Error("default") })
 
-    expect(sink.events()[0]?.input).toBe("raw")
+    expect(sink.events().find((event) => event.kind === "flow")?.input).toBe("raw")
     expect(sink.events().at(-1)?.error).toMatchObject({
       name: "Error",
       message: "default",
@@ -367,11 +407,69 @@ describe("observable extension", () => {
 
     expect(root.events()).toEqual([])
     expect(local.events().map((event) => [event.kind, event.name, event.phase])).toEqual([
+      ["context", "context", "start"],
       ["flow", "run", "start"],
       ["resource", "<anonymous>", "start"],
       ["resource", "<anonymous>", "success"],
       ["flow", "run", "success"],
+      ["context", "context", "success"],
     ])
+  })
+
+  it("emits a context span for root contexts that parents traced work", async () => {
+    const sink = observable.memory()
+    let n = 0
+    const work = flow({ name: "work", factory: () => "done" })
+    const scope = createScope({
+      extensions: [observable.extension()],
+      tags: [observable.runtime({ sinks: [sink], now: clock([1, 2, 3, 4]), id: () => `id-${++n}` })],
+    })
+    await scope.ready
+
+    const ctx = scope.createContext()
+    await ctx.exec({ flow: work })
+    await ctx.close()
+
+    const events = sink.events()
+    const contextStarts = events.filter((event) => event.kind === "context" && event.phase === "start")
+    const flowStart = events.find((event) => event.kind === "flow" && event.phase === "start")
+    const contextEnd = events.find((event) => event.kind === "context" && event.phase === "success")
+    expect(contextStarts).toHaveLength(1)
+    expect(flowStart?.parentId).toBe(contextStarts[0]!.id)
+    expect(contextEnd?.id).toBe(contextStarts[0]!.id)
+    expect(contextEnd?.durationMs).toBe(3)
+    await scope.dispose()
+  })
+
+  it("emits a context error event with the close outcome", async () => {
+    const sink = observable.memory()
+    const scope = createScope({
+      extensions: [observable.extension()],
+      tags: [observable.runtime({ sinks: [sink] })],
+    })
+    await scope.ready
+
+    const ctx = scope.createContext()
+    await ctx.close({ ok: false, error: new Error("request failed") })
+
+    const terminal = sink.events().find((event) => event.kind === "context" && event.phase === "error")
+    expect(terminal?.error?.message).toBe("request failed")
+    await scope.dispose()
+  })
+
+  it("omits context events when the only filter excludes them", async () => {
+    const sink = observable.memory()
+    const scope = createScope({
+      extensions: [observable.extension()],
+      tags: [observable.runtime({ sinks: [sink], only: ["flow"] })],
+    })
+    await scope.ready
+
+    const ctx = scope.createContext()
+    await ctx.close()
+
+    expect(sink.events().filter((event) => event.kind === "context")).toHaveLength(0)
+    await scope.dispose()
   })
 
   it("closes per-context sinks at context close without traced work", async () => {
@@ -487,11 +585,13 @@ describe("parent linking", () => {
     await ctx.exec({ flow: outer })
 
     const starts = sink.events().filter((event) => event.phase === "start")
+    const contextStart = starts.find((event) => event.kind === "context")
     const outerStart = starts.find((event) => event.name === "outer")
     const innerStart = starts.find((event) => event.name === "inner")
+    expect(contextStart).toBeDefined()
     expect(outerStart).toBeDefined()
     expect(innerStart).toBeDefined()
-    expect(outerStart!.parentId).toBeUndefined()
+    expect(outerStart!.parentId).toBe(contextStart!.id)
     expect(innerStart!.parentId).toBe(outerStart!.id)
 
     await scope.dispose()
