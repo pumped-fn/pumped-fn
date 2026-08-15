@@ -541,8 +541,12 @@ spies, or test-only branches.
 ## Extensions
 
 Extensions wrap atom/resource resolution and flow/function execution for logging, metrics, auth checks,
-trace spans, transactions, and runtime tag injection. Extension hooks see the same seams as tests and
-composition roots. See [Observability](../../../docs/observability.md).
+trace spans, transactions, and runtime tag injection. `initContext`/`disposeContext` observe every
+execution context — scope-created roots, per-exec children, and prepared lifetimes — so session- or
+span-shaped state needs no first exec to attach. `initContext` is synchronous; `disposeContext`
+receives the close outcome after user `onClose` cleanups and before context-owned resource teardown.
+Extension hooks see the same seams as tests and composition roots. See
+[Observability](../../../docs/observability.md).
 
 ## API Summary
 

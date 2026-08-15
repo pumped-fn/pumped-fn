@@ -16,6 +16,7 @@ execution context
         |
         v
 extensions
+  initContext/disposeContext observe context lifetimes
   wrapResolve + wrapExec observe graph edges
 ```
 
@@ -69,7 +70,7 @@ await scope.dispose()
 
 The composition root creates the scope and supplies the tenant tag. The flow declares the HTTP client, tenant, and transaction resource in `deps`, so the execution context can resolve them before the factory runs. The resource is owned by the current execution context, so its cleanup runs when that context closes.
 
-Extensions sit outside the business function. They can wrap dependency resolution and execution without changing the flow body.
+Extensions sit outside the business function. They can observe each execution context's creation and close outcome and wrap dependency resolution and execution without changing the flow body.
 
 > **Note:** Missing required tag deps fail during dependency resolution before the unit factory runs. The current source does not validate every required tag at `createScope()` construction.
 

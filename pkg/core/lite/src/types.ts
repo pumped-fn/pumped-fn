@@ -581,6 +581,24 @@ export namespace Lite {
     readonly name: string
     init?(scope: Scope): MaybePromise<void>
     /**
+     * Observes every execution-context creation: scope-created roots,
+     * per-exec children, prepared-flow lifetimes, and detached streams.
+     * Runs after context tags are seeded, before any user code receives
+     * the context. Must be synchronous — a returned promise fails the
+     * creation. If it throws, the error reaches the creator and the
+     * context closes with it, notifying extensions already attached;
+     * that closing settles inside the owning lifetime (the parent
+     * context's close, or scope disposal for scope-created roots).
+     */
+    initContext?(ctx: ExecutionContext): void
+    /**
+     * Observes the context's close outcome. Runs after user `onClose`
+     * cleanups (LIFO) and before context-owned resource teardown, so it
+     * sees the requested outcome, not resource-teardown failures. Skipped
+     * when this extension's own `initContext` threw for the context.
+     */
+    disposeContext?(ctx: ExecutionContext, result: CloseResult): MaybePromise<void>
+    /**
      * Wraps dependency resolution. Dispatch by `event.kind`:
      *
      * - `"atom"` — `event.scope`, `event.ctx`, `event.target: Atom`. Cached in scope.

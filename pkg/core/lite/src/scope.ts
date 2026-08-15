@@ -617,7 +617,9 @@ class ScopeImpl implements Lite.Scope {
   readonly tags: Lite.Tagged<any>[]
   readonly resolveExts: Lite.Extension[]
   readonly execExts: Lite.Extension[]
+  readonly contextExts: Lite.Extension[]
   readonly ready: Promise<void>
+  private pendingContextCloses?: Set<Promise<void>>
 
   private taintContext(): boolean {
     return this.drainStarted || notifyingListeners > 0
@@ -678,9 +680,11 @@ class ScopeImpl implements Lite.Scope {
     if (this.extensions.length) {
       this.resolveExts = this.extensions.filter(e => e.wrapResolve)
       this.execExts = this.extensions.filter(e => e.wrapExec)
+      this.contextExts = this.extensions.filter(e => e.initContext || e.disposeContext)
     } else {
       this.resolveExts = noExtensions
       this.execExts = noExtensions
+      this.contextExts = noExtensions
     }
 
     for (const p of options?.presets ?? []) {
@@ -715,6 +719,37 @@ class ScopeImpl implements Lite.Scope {
 
   executionContextCloseReason(): DOMException {
     return this.closeReason ??= new DOMException("Execution context closed", "AbortError")
+  }
+
+  attachContextExtensions(ctx: ExecutionContextImpl): void {
+    for (let i = 0; i < this.contextExts.length; i++) {
+      const ext = this.contextExts[i]!
+      const unregister = ext.disposeContext ? ctx.onClose(runDisposeContext, ext, ctx) : undefined
+      if (!ext.initContext) continue
+      try {
+        const returned: unknown = ext.initContext(ctx)
+        if (isPromiseLike(returned)) {
+          void Promise.resolve(returned).catch(() => {})
+          throw new Error(`Extension "${ext.name}" initContext must be synchronous`)
+        }
+      } catch (error) {
+        unregister?.()
+        const closing = ctx.close({ ok: false, error })
+        closing.catch(() => {})
+        if (ctx.parent) {
+          assertExecutionContextImpl(ctx.parent)
+          ctx.parent.trackDescendant(closing)
+        } else {
+          const pending = this.pendingContextCloses ??= new Set()
+          pending.add(closing)
+          closing.then(
+            () => pending.delete(closing),
+            () => pending.delete(closing)
+          )
+        }
+        throw error
+      }
+    }
   }
 
   private createGeneration<T>(): AtomGeneration<T> {
@@ -1630,12 +1665,13 @@ class ScopeImpl implements Lite.Scope {
           execName: ctx.name,
           signal: preparedOptions.signal,
         })
-        const unregister = ctx.onClose((result, prepared) => prepared.close(result), preparedCtx)
         if (preparedOptions.tags) {
           for (let i = 0; i < preparedOptions.tags.length; i++) {
             preparedCtx.appendTagValue(preparedOptions.tags[i]!.key, preparedOptions.tags[i]!.value)
           }
         }
+        this.attachContextExtensions(preparedCtx)
+        const unregister = ctx.onClose((result, prepared) => prepared.close(result), preparedCtx)
         const ready = Promise.resolve().then(async () => {
           try {
             await this.activateFlowTree(
@@ -2455,31 +2491,42 @@ class ScopeImpl implements Lite.Scope {
     }
 
     this.disposed = true
-    if (this.streamHubs?.size) await this.releaseStreamHubs()
-    this.emitDispose()
+    try {
+      if (this.streamHubs?.size) await this.releaseStreamHubs()
+      this.emitDispose()
 
-    this.invalidationQueue = undefined
-    this.invalidationQueued = undefined
-    this.invalidationIndex = 0
-    this.invalidationTainted = null
-    this.invalidationChain = null
-    this.chainPromise = null
+      this.invalidationQueue = undefined
+      this.invalidationQueued = undefined
+      this.invalidationIndex = 0
+      this.invalidationTainted = null
+      this.invalidationChain = null
+      this.chainPromise = null
 
-    for (const ext of this.extensions) {
-      if (ext.dispose) {
-        await ext.dispose(this)
+      if (this.pendingContextCloses?.size) {
+        await Promise.allSettled([...this.pendingContextCloses])
+      }
+
+      for (const ext of this.extensions) {
+        if (ext.dispose) {
+          await ext.dispose(this)
+        }
+      }
+
+      for (const entry of this.cache.values()) {
+        this.cancelGCTimer(entry)
+      }
+
+      const atoms = Array.from(this.cache.keys())
+      for (const atom of atoms) {
+        await this.release(atom as Lite.Atom<unknown>)
+      }
+      if (this.releasing) await Promise.all([...this.releasing.values()].map(({ promise }) => promise))
+    } finally {
+      await Promise.resolve()
+      while (this.pendingContextCloses?.size) {
+        await Promise.allSettled([...this.pendingContextCloses])
       }
     }
-
-    for (const entry of this.cache.values()) {
-      this.cancelGCTimer(entry)
-    }
-
-    const atoms = Array.from(this.cache.keys())
-    for (const atom of atoms) {
-      await this.release(atom as Lite.Atom<unknown>)
-    }
-    if (this.releasing) await Promise.all([...this.releasing.values()].map(({ promise }) => promise))
   }
 
   async flush(): Promise<void> {
@@ -2621,8 +2668,17 @@ class ScopeImpl implements Lite.Scope {
       }
     }
 
+    this.attachContextExtensions(ctx)
     return ctx
   }
+}
+
+function runDisposeContext(
+  result: Lite.CloseResult,
+  ext: Lite.Extension,
+  ctx: Lite.ExecutionContext
+): MaybePromise<void> {
+  return ext.disposeContext!(ctx, result)
 }
 
 function assertCreateContextOptions(options: unknown): asserts options is Lite.CreateContextOptions | undefined {
@@ -2980,6 +3036,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         })
 
         this.seedTags(childCtx, options.tags)
+        this.scope.attachContextExtensions(childCtx)
 
         try {
           const result = this.scope.execExts.length === 0
@@ -3207,6 +3264,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       })
 
       this.seedTags(childCtx, execTags, flow.tags, blockedTags)
+      this.scope.attachContextExtensions(childCtx)
 
       return {
         flow,
@@ -3534,7 +3592,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     }
   }
 
-  private trackDescendant<T>(pending: Promise<T>): Promise<T> {
+  trackDescendant<T>(pending: Promise<T>): Promise<T> {
     this.descendants ??= new Set()
     this.descendants.add(pending)
     pending.then(
