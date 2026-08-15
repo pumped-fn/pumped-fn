@@ -42,7 +42,7 @@ await ctx.close()
 await scope.dispose()
 ```
 
-The observable extension sees atom and resource resolution, plus flow and function execution. The OTel sink turns those lifecycle events into spans, links child spans through `parentId`, records errors, sets status, and ends spans on terminal events.
+The observable extension sees atom and resource resolution, flow and function execution, and each root execution context from creation to its close outcome. The OTel sink turns those lifecycle events into spans, links child spans through `parentId` — execution spans nest under their root context span — records errors, sets status, and ends spans on terminal events.
 
 For a foreign SDK call, name the edge with `ctx.exec`.
 

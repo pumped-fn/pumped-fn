@@ -109,6 +109,10 @@ function extension(options?: Logging.Options): Lite.Extension {
     init(scope) {
       root = normalize(rootRuntime(scope))
     },
+    initContext(ctx) {
+      const value = ctx.data.getTag(runtime)
+      if (value !== undefined) registerContextClose(ctx, value, normalize(value))
+    },
     wrapExec: async (run, target, ctx) => {
       const value = ctx.data.seekTag(runtime)
       const current = normalize(value)

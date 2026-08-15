@@ -99,7 +99,7 @@ The core package has zero runtime dependencies and ~15 kB min+gzip.
 
 ## Mental model
 
-A `scope` is the composition and test boundary. `scope.run` and `scope.runStream` own one temporary execution context. `scope.run({ name, fn, params })` declares a named one-off operation without a reusable flow handle; add `deps` only when it has graph dependencies. Use `createContext` with `exec` or `execStream` when several turns or flows share one lifetime. `atom` values live in the scope. `resource` values are owned by an execution context. `tag` values carry request facts and role choices. `preset` replaces an edge for tests or alternate roots. `extension` wraps resolution and execution.
+A `scope` is the composition and test boundary. `scope.run` and `scope.runStream` own one temporary execution context. `scope.run({ name, fn, params })` declares a named one-off operation without a reusable flow handle; add `deps` only when it has graph dependencies. Use `createContext` with `exec` or `execStream` when several turns or flows share one lifetime. `atom` values live in the scope. `resource` values are owned by an execution context. `tag` values carry request facts and role choices. `preset` replaces an edge for tests or alternate roots. `extension` wraps resolution and execution and observes execution-context lifetimes.
 
 SDK applications use stable `session.run`, `agent.turn`, `agent.role`, and `agent.fromModel` definitions. Composition selects configuration and implementations through namespaced tags such as `agent.config.*`, `agent.impl.*`, and `session.execution.*`. Tool, skill, and subagent flows remain ordinary declared graph edges.
 

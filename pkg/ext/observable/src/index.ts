@@ -2,7 +2,7 @@ import { tag, FlowFault, type Lite } from "@pumped-fn/lite"
 
 export namespace Observable {
   export type Phase = "start" | "success" | "error"
-  export type Kind = "atom" | "resource" | "flow" | "function"
+  export type Kind = "atom" | "resource" | "flow" | "function" | "context"
   export type Failure = "isolate" | "throw"
 
   export interface ErrorInfo {
@@ -84,9 +84,45 @@ const runtime = tag<Observable.Runtime>({
 
 function extension(options?: Observable.Options): Lite.Extension {
   const owners = new WeakMap<Lite.ExecutionContext, Set<Observable.Runtime>>()
+  const rootSpans = new WeakMap<Lite.ExecutionContext, { id: string; startedAt: number; current: ActiveRuntime }>()
 
   return {
     name: options?.name ?? "observable",
+    initContext: (ctx) => {
+      if (ctx.data.getTag(runtime) !== undefined) contextRuntime(owners, ctx)
+      if (ctx.parent) return
+      const current = normalize(ctx.data.seekTag(runtime))
+      if (current.sinks.length === 0 || skipped(current, "context")) return
+      const id = current.id()
+      const startedAt = current.now()
+      rootSpans.set(ctx, { id, startedAt, current })
+      ctx.data.set(spanKey, id)
+      emit(current, {
+        id,
+        phase: "start",
+        kind: "context",
+        name: ctx.name ?? "context",
+        at: startedAt,
+      })
+    },
+    disposeContext: (ctx, result) => {
+      const span = rootSpans.get(ctx)
+      if (!span) return
+      rootSpans.delete(ctx)
+      const at = span.current.now()
+      const base = {
+        id: span.id,
+        phase: "success" as Observable.Phase,
+        kind: "context" as const,
+        name: ctx.name ?? "context",
+        at,
+        startedAt: span.startedAt,
+        durationMs: at - span.startedAt,
+      }
+      emit(span.current, result.ok
+        ? base
+        : { ...base, phase: "error", error: span.current.mapError(result.error) })
+    },
     wrapResolve: async (run, event) => {
       const current = event.kind === "resource"
         ? contextRuntime(owners, event.ctx)

@@ -1770,6 +1770,454 @@ describe("ExecutionContext", () => {
     })
   })
 
+  describe("context lifecycle extensions", () => {
+    it("notifies creation and close of scope-created contexts with seeded tags", async () => {
+      const marker = tag<string>({ label: "lifecycle-marker" })
+      const events: string[] = []
+      let created: Lite.ExecutionContext | undefined
+      let outcome: Lite.CloseResult | undefined
+      const ext = {
+        name: "context-observer",
+        initContext: (ctx) => {
+          created = ctx
+          events.push(`init:${ctx.data.seekTag(marker)}`)
+        },
+        disposeContext: (ctx, result) => {
+          outcome = result
+          events.push(`dispose:${ctx.data.seekTag(marker)}`)
+        },
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [ext] })
+      const ctx = scope.createContext({ tags: [marker("root")] })
+
+      expect(created).toBe(ctx)
+      expect(events).toEqual(["init:root"])
+
+      await ctx.close()
+      expect(events).toEqual(["init:root", "dispose:root"])
+      expect(outcome).toEqual({ ok: true })
+      await scope.dispose()
+    })
+
+    it("notifies per-exec child contexts and nests dispose order across extensions", async () => {
+      const events: string[] = []
+      const observer = (name: string): Lite.Extension => ({
+        name,
+        initContext: (ctx) => {
+          events.push(`${name}:init:${ctx.name ?? "root"}`)
+        },
+        disposeContext: (ctx) => {
+          events.push(`${name}:dispose:${ctx.name ?? "root"}`)
+        },
+      })
+      const child = flow({ name: "child", factory: () => "done" })
+      const scope = createScope({ extensions: [observer("a"), observer("b")] })
+
+      expect(await scope.run({ flow: child })).toBe("done")
+      expect(events).toEqual([
+        "a:init:root",
+        "b:init:root",
+        "a:init:child",
+        "b:init:child",
+        "b:dispose:child",
+        "a:dispose:child",
+        "b:dispose:root",
+        "a:dispose:root",
+      ])
+      await scope.dispose()
+    })
+
+    it("passes failure outcomes to disposeContext without requiring initContext", async () => {
+      const outcomes: Lite.CloseResult[] = []
+      const ext = {
+        name: "failure-observer",
+        disposeContext: (_ctx, result) => {
+          outcomes.push(result)
+        },
+      } satisfies Lite.Extension
+      const failing = flow({
+        name: "failing",
+        factory: () => {
+          throw new Error("exec failed")
+        },
+      })
+      const scope = createScope({ extensions: [ext] })
+      const ctx = scope.createContext()
+
+      await expect(ctx.exec({ flow: failing })).rejects.toThrow("exec failed")
+      expect(outcomes).toHaveLength(1)
+      expect(outcomes[0]).toMatchObject({ ok: false, error: new Error("exec failed") })
+
+      await ctx.close()
+      expect(outcomes[1]).toEqual({ ok: true })
+      await scope.dispose()
+    })
+
+    it("awaits async disposeContext after user onClose cleanups", async () => {
+      const events: string[] = []
+      const ext = {
+        name: "async-dispose",
+        disposeContext: async () => {
+          await Promise.resolve()
+          events.push("extension")
+        },
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [ext] })
+      const ctx = scope.createContext()
+      ctx.onClose(() => {
+        events.push("user")
+      })
+
+      await ctx.close()
+      expect(events).toEqual(["user", "extension"])
+      await scope.dispose()
+    })
+
+    it("closes the context and notifies attached extensions when initContext throws", async () => {
+      const events: string[] = []
+      const observer = {
+        name: "first",
+        initContext: () => {
+          events.push("first:init")
+        },
+        disposeContext: (_ctx, result) => {
+          events.push(`first:dispose:${result.ok}`)
+        },
+      } satisfies Lite.Extension
+      const failing = {
+        name: "second",
+        initContext: () => {
+          throw new Error("init failed")
+        },
+        disposeContext: () => {
+          events.push("second:dispose")
+        },
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [observer, failing] })
+
+      expect(() => scope.createContext()).toThrow("init failed")
+      await Promise.resolve()
+      expect(events).toEqual(["first:init", "first:dispose:false"])
+      await scope.dispose()
+    })
+
+    it("closes exec child contexts when initContext throws mid-chain", async () => {
+      const events: string[] = []
+      const observer = {
+        name: "observer",
+        initContext: (ctx) => {
+          events.push(`init:${ctx.parent ? "child" : "root"}`)
+        },
+        disposeContext: (ctx) => {
+          events.push(`dispose:${ctx.parent ? "child" : "root"}`)
+        },
+      } satisfies Lite.Extension
+      const failing = {
+        name: "failing",
+        initContext: (ctx) => {
+          if (ctx.parent) throw new Error("child init failed")
+        },
+      } satisfies Lite.Extension
+      const child = flow({ name: "child", factory: () => "unreachable" })
+      const scope = createScope({ extensions: [observer, failing] })
+
+      await expect(scope.run({ flow: child })).rejects.toThrow("child init failed")
+      expect(events).toEqual(["init:root", "init:child", "dispose:child", "dispose:root"])
+      await scope.dispose()
+    })
+
+    it("joins async rollback disposal into the parent close before exec rejection settles", async () => {
+      const events: string[] = []
+      const slow = {
+        name: "slow",
+        initContext: (ctx) => {
+          events.push(`init:${ctx.parent ? "child" : "root"}`)
+        },
+        disposeContext: async (ctx) => {
+          const label = ctx.parent ? "child" : "root"
+          events.push(`dispose:${label}:start`)
+          await new Promise((resolve) => setTimeout(resolve, 5))
+          events.push(`dispose:${label}:end`)
+        },
+      } satisfies Lite.Extension
+      const failing = {
+        name: "failing",
+        initContext: (ctx) => {
+          if (ctx.parent) throw new Error("child init failed")
+        },
+      } satisfies Lite.Extension
+      const child = flow({ name: "child", factory: () => "unreachable" })
+      const scope = createScope({ extensions: [slow, failing] })
+
+      await expect(scope.run({ flow: child })).rejects.toThrow("child init failed")
+      expect(events).toEqual([
+        "init:root",
+        "init:child",
+        "dispose:child:start",
+        "dispose:child:end",
+        "dispose:root:start",
+        "dispose:root:end",
+      ])
+      await scope.dispose()
+    })
+
+    it("joins root rollback disposal into scope disposal before extension dispose", async () => {
+      const events: string[] = []
+      const slow = {
+        name: "slow",
+        disposeContext: async () => {
+          events.push("context:start")
+          await new Promise((resolve) => setTimeout(resolve, 5))
+          events.push("context:end")
+        },
+        dispose: () => {
+          events.push("scope")
+        },
+      } satisfies Lite.Extension
+      const failing = {
+        name: "failing",
+        initContext: () => {
+          throw new Error("root init failed")
+        },
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [slow, failing] })
+
+      expect(() => scope.createContext()).toThrow("root init failed")
+      await scope.dispose()
+      expect(events).toEqual(["context:start", "context:end", "scope"])
+    })
+
+    it("rolls back a failed prepared context with exactly one disposal", async () => {
+      const marker = tag<string>({ label: "prepared-marker" })
+      let disposals = 0
+      const observer = {
+        name: "observer",
+        disposeContext: (ctx) => {
+          if (ctx.data.getTag(marker) === "prepared") disposals++
+        },
+      } satisfies Lite.Extension
+      const failing = {
+        name: "failing",
+        initContext: (ctx) => {
+          if (ctx.data.getTag(marker) === "prepared") throw new Error("prepared init failed")
+        },
+      } satisfies Lite.Extension
+      const step = flow({ name: "step", factory: () => "ran" })
+      const submit = flow({
+        name: "submit",
+        deps: { step: controller(step, { tags: [marker("prepared")] }) },
+        factory: (_ctx, { step }) => {
+          expect(() => step.prepare()).toThrow("prepared init failed")
+          return "handled"
+        },
+      })
+      const scope = createScope({ extensions: [observer, failing] })
+      const ctx = scope.createContext()
+
+      expect(await ctx.exec({ flow: submit })).toBe("handled")
+      await ctx.close()
+      expect(disposals).toBe(1)
+      await scope.dispose()
+    })
+
+    it("rejects asynchronous initContext and swallows its late rejection", async () => {
+      const ext = {
+        name: "async-init",
+        async initContext() {
+          throw new Error("late rejection")
+        },
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [ext] })
+
+      expect(() => scope.createContext()).toThrow('Extension "async-init" initContext must be synchronous')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await scope.dispose()
+    })
+
+    it("settles a re-entrant scope disposal only after rollback disposal finishes", async () => {
+      const events: string[] = []
+      let disposal: Promise<void> | undefined
+      const slow = {
+        name: "slow",
+        disposeContext: async () => {
+          events.push("context:start")
+          await new Promise((resolve) => setTimeout(resolve, 5))
+          events.push("context:end")
+        },
+      } satisfies Lite.Extension
+      const sabotage = {
+        name: "sabotage",
+        initContext: (ctx) => {
+          disposal = ctx.scope.dispose()
+          throw new Error("init failed")
+        },
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [slow, sabotage] })
+
+      expect(() => scope.createContext()).toThrow("init failed")
+      await disposal
+      expect(events).toEqual(["context:start", "context:end"])
+    })
+
+    it("drains rollback disposal before a rejected scope disposal settles", async () => {
+      const events: string[] = []
+      let disposal: Promise<void> | undefined
+      const slow = {
+        name: "slow",
+        disposeContext: async () => {
+          events.push("context:start")
+          await new Promise((resolve) => setTimeout(resolve, 5))
+          events.push("context:end")
+        },
+        dispose: () => {
+          throw new Error("scope dispose failed")
+        },
+      } satisfies Lite.Extension
+      const sabotage = {
+        name: "sabotage",
+        initContext: (ctx) => {
+          disposal = ctx.scope.dispose()
+          throw new Error("init failed")
+        },
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [slow, sabotage] })
+
+      expect(() => scope.createContext()).toThrow("init failed")
+      await expect(disposal).rejects.toThrow("scope dispose failed")
+      expect(events).toEqual(["context:start", "context:end"])
+    })
+
+    it("fires disposeContext exactly once across repeated close calls", async () => {
+      let count = 0
+      const ext = {
+        name: "once",
+        disposeContext: () => {
+          count++
+        },
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [ext] })
+      const ctx = scope.createContext()
+
+      await Promise.all([ctx.close(), ctx.close()])
+      await ctx.close()
+      expect(count).toBe(1)
+      await scope.dispose()
+    })
+
+    it("runs disposeContext before context-owned resource teardown", async () => {
+      const events: string[] = []
+      const tracked = resource({
+        factory: (ctx) => {
+          ctx.cleanup(() => {
+            events.push("resource")
+          })
+          return "ready"
+        },
+      })
+      const ext = {
+        name: "order",
+        disposeContext: () => {
+          events.push("dispose")
+        },
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [ext] })
+      const ctx = scope.createContext()
+
+      expect(await ctx.resolve(tracked)).toBe("ready")
+      await ctx.close()
+      expect(events).toEqual(["dispose", "resource"])
+      await scope.dispose()
+    })
+
+    it("notifies inline function child contexts", async () => {
+      const events: string[] = []
+      const ext = {
+        name: "inline-observer",
+        initContext: (ctx) => {
+          events.push(`init:${ctx.name ?? "root"}`)
+        },
+        disposeContext: (ctx) => {
+          events.push(`dispose:${ctx.name ?? "root"}`)
+        },
+      } satisfies Lite.Extension
+      const scope = createScope({ extensions: [ext] })
+      const ctx = scope.createContext()
+
+      expect(await ctx.exec({ name: "inline-step", params: [2], fn: (value: number) => value * 2 })).toBe(4)
+      await ctx.close()
+      expect(events).toEqual(["init:root", "init:inline-step", "dispose:inline-step", "dispose:root"])
+      await scope.dispose()
+    })
+
+    it("passes aborted outcomes to disposeContext when a stream is abandoned", async () => {
+      const outcomes: Lite.CloseResult[] = []
+      const ext = {
+        name: "abort-observer",
+        disposeContext: (_ctx, result) => {
+          outcomes.push(result)
+        },
+      } satisfies Lite.Extension
+      const ticker = flow({
+        name: "ticker",
+        factory: async function* () {
+          yield 1
+          yield 2
+          return "done"
+        },
+      })
+      const scope = createScope({ extensions: [ext] })
+
+      for await (const value of scope.runStream({ flow: ticker })) {
+        expect(value).toBe(1)
+        break
+      }
+      expect(outcomes.length).toBeGreaterThan(0)
+      expect(outcomes.every((outcome) => outcome.ok === false)).toBe(true)
+      expect(outcomes.some((outcome) => !outcome.ok && outcome.aborted === true)).toBe(true)
+      await scope.dispose()
+    })
+
+    it("notifies prepared flow contexts through their isolated lifetime", async () => {
+      const events: string[] = []
+      const ext = {
+        name: "prepared-observer",
+        initContext: (ctx) => {
+          events.push(`init:${ctx.name ?? "anon"}`)
+        },
+        disposeContext: (ctx) => {
+          events.push(`dispose:${ctx.name ?? "anon"}`)
+        },
+      } satisfies Lite.Extension
+      const step = flow({ name: "step", factory: () => "ran" })
+      const submit = flow({
+        name: "submit",
+        deps: { step: controller(step, { name: "step-run" }) },
+        factory: async (_ctx, { step }) => {
+          const prepared = step.prepare()
+          await prepared.ready
+          return prepared.exec()
+        },
+      })
+      const scope = createScope({ extensions: [ext] })
+      const ctx = scope.createContext()
+
+      expect(await ctx.exec({ flow: submit, name: "submit-step" })).toBe("ran")
+      expect(events).toEqual([
+        "init:anon",
+        "init:submit-step",
+        "init:submit-step",
+        "init:step-run",
+        "dispose:step-run",
+        "dispose:submit-step",
+        "dispose:submit-step",
+      ])
+
+      await ctx.close()
+      expect(events).toContain("dispose:anon")
+      await scope.dispose()
+    })
+  })
+
   describe("ctx.exec() inline operations", () => {
     it("executes an inline operation with explicit params and no dependency map", async () => {
       const scope = createScope()
@@ -2589,6 +3037,30 @@ describe("ExecutionContext", () => {
       })
       expect(events).toEqual(["root>submit-step:root", "submit-step>normalize-step:child"])
 
+      await ctx.close()
+      await scope.dispose()
+    })
+
+    it("keeps an abandoned failing prepare from leaking an unhandled rejection", async () => {
+      const bad = atom({
+        factory: () => {
+          throw new Error("dep boom")
+        },
+      })
+      const step = flow({ name: "step", deps: { bad }, factory: () => "ran" })
+      const submit = flow({
+        name: "submit",
+        deps: { step: controller(step) },
+        factory: (_ctx, { step }) => {
+          step.prepare()
+          return "abandoned"
+        },
+      })
+      const scope = createScope()
+      const ctx = scope.createContext()
+
+      expect(await ctx.exec({ flow: submit })).toBe("abandoned")
+      await new Promise((resolve) => setTimeout(resolve, 0))
       await ctx.close()
       await scope.dispose()
     })

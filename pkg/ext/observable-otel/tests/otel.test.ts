@@ -71,6 +71,7 @@ describe("otel sink", () => {
       parse: typed<{ id: string }>(),
       factory: (ctx) => ({ accepted: ctx.input.id }),
     })
+    let n = 0
     const scope = createScope({
       extensions: [observable.extension()],
       tags: [
@@ -78,38 +79,67 @@ describe("otel sink", () => {
           sinks: [sink],
           input: true,
           output: true,
-          now: clock([10, 16]),
-          id: () => "exec-1",
+          now: clock([10, 12, 16, 20]),
+          id: () => `exec-${++n}`,
         }),
       ],
     })
 
-    await scope.createContext().exec({ flow: run, input: { id: "order-1" } })
+    const ctx = scope.createContext()
+    await ctx.exec({ flow: run, input: { id: "order-1" } })
+    await ctx.close()
 
     expect(sink.name).toBe("otel-test")
     expect(sink.pending()).toBe(0)
-    expect(recorded.spans).toHaveLength(1)
+    expect(recorded.spans).toHaveLength(2)
     expect(recorded.spans[0]).toEqual({
-      name: "flow:checkout",
+      name: "context:context",
       startTime: 10,
       initial: {
         "pumped.id": "exec-1",
-        "pumped.kind": "flow",
+        "pumped.kind": "context",
         "pumped.phase": "start",
-        "pumped.name": "checkout",
+        "pumped.name": "context",
         "pumped.at": 10,
-        "pumped.input": "{\"id\":\"order-1\"}",
         "app.phase": "start",
       },
       attributes: [
         {
           "pumped.id": "exec-1",
+          "pumped.kind": "context",
+          "pumped.phase": "success",
+          "pumped.name": "context",
+          "pumped.at": 20,
+          "pumped.started_at": 10,
+          "pumped.duration_ms": 10,
+          "app.phase": "success",
+        },
+      ],
+      statuses: [{ code: SpanStatusCode.OK }],
+      exceptions: [],
+      ends: [20],
+    })
+    expect(recorded.spans[1]).toEqual({
+      name: "flow:checkout",
+      startTime: 12,
+      initial: {
+        "pumped.id": "exec-2",
+        "pumped.kind": "flow",
+        "pumped.phase": "start",
+        "pumped.name": "checkout",
+        "pumped.at": 12,
+        "pumped.input": "{\"id\":\"order-1\"}",
+        "app.phase": "start",
+      },
+      attributes: [
+        {
+          "pumped.id": "exec-2",
           "pumped.kind": "flow",
           "pumped.phase": "success",
           "pumped.name": "checkout",
           "pumped.at": 16,
-          "pumped.started_at": 10,
-          "pumped.duration_ms": 6,
+          "pumped.started_at": 12,
+          "pumped.duration_ms": 4,
           "pumped.output": "{\"accepted\":\"order-1\"}",
           "app.phase": "success",
         },
@@ -228,9 +258,10 @@ describe("otel sink", () => {
 
     await scope.createContext().exec({ flow: outer })
 
-    expect(recorded.spans.map((s) => s.name)).toEqual(["outer", "inner"])
+    expect(recorded.spans.map((s) => s.name)).toEqual(["context", "outer", "inner"])
     expect(recorded.contexts[0]).toBeUndefined()
     expect(recorded.contexts[1]).toBeDefined()
+    expect(recorded.contexts[2]).toBeDefined()
 
     await scope.dispose()
   })
