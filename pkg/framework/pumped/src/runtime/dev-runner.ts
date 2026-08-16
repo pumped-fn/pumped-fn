@@ -7,8 +7,9 @@ export interface DevRunner<T> {
 export function createDevRunner<T>(load: () => Promise<T>, dispose: (value: T) => Promise<void>): DevRunner<T> {
   let pending: Promise<T> | undefined
   let current: T | undefined
+  let chain: Promise<void> = Promise.resolve()
 
-  async function rebuild(): Promise<T> {
+  async function step(): Promise<T> {
     const previous = current
     const value = await load()
     current = value
@@ -17,11 +18,18 @@ export function createDevRunner<T>(load: () => Promise<T>, dispose: (value: T) =
   }
 
   function get(): Promise<T> {
-    pending ??= rebuild().catch((error) => {
-      pending = undefined
+    if (pending) return pending
+    const attempt = chain.then(step)
+    chain = attempt.then(
+      () => undefined,
+      () => undefined
+    )
+    const guarded: Promise<T> = attempt.catch((error) => {
+      if (pending === guarded) pending = undefined
       throw error
     })
-    return pending
+    pending = guarded
+    return guarded
   }
 
   function invalidate() {
@@ -29,6 +37,7 @@ export function createDevRunner<T>(load: () => Promise<T>, dispose: (value: T) =
   }
 
   async function disposeCurrent() {
+    await chain.catch(() => undefined)
     if (current === undefined) return
     const value = current
     current = undefined

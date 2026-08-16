@@ -1,11 +1,10 @@
 # Why is AsyncLocalStorage `getStore()` undefined, and what should I use instead?
 
-Use an explicit `ExecutionContext`. Middleware creates it, seeds request tags, stores it in the framework context, and closes it after the request.
+Use an explicit `ExecutionContext`. The handler runs the flow through the scope with request tags; `scope.run` owns one context per request and closes it.
 
 ```ts
 import { Hono } from "hono"
 import { createScope, flow, tag, tags } from "@pumped-fn/lite"
-import { hono } from "@pumped-fn/lite-hono"
 
 const requestId = tag<string>({ label: "request.id" })
 
@@ -14,23 +13,16 @@ const readRequest = flow({
   factory: (_ctx, { requestId }) => requestId,
 })
 
-type BaseEnv = { Variables: { user: string } }
-type AppEnv = hono.Env<BaseEnv>
-
-const lite = hono.adapter()
-const app = new Hono<AppEnv>()
-
-const scope = createScope({ extensions: [lite] })
-
-app.use(
-  "*",
-  lite.middleware<BaseEnv>({
-    tags: (request) => [requestId(request.headers.get("x-request-id") ?? "missing")],
-  })
-)
+const app = new Hono()
+const scope = createScope()
 
 app.get("/id", async (context) =>
-  context.json({ id: await context.var.lite.exec({ flow: readRequest }) })
+  context.json({
+    id: await scope.run({
+      flow: readRequest,
+      tags: [requestId(context.req.header("x-request-id") ?? "missing")],
+    }),
+  })
 )
 
 export async function closeApp(): Promise<void> {

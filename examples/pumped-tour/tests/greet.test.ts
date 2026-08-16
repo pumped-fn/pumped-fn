@@ -1,8 +1,9 @@
-import { createScope, preset } from "@pumped-fn/pumped/app"
+import { createScope, preset } from "@pumped-fn/lite"
 import { analyze } from "@pumped-fn/pumped"
 import { describe, expect, it } from "vitest"
 import east from "../src/apps/east"
 import { directory, greet, region } from "../src/domain/greet"
+import greeting from "../src/entries/greet"
 
 describe("pumped tour", () => {
   it("composes the east app over the default app", () => {
@@ -22,13 +23,10 @@ describe("pumped tour", () => {
     await scope.dispose()
   })
 
-  it("shows the declared graph without running a factory", () => {
+  it("shows the declared graph without running a factory, and proves both hosts mount the one entry", () => {
     const report = analyze({
       app: east,
-      entries: [
-        { kind: "server", name: "greet", file: "src/server/greet.ts", flow: greet },
-        { kind: "cli", name: "greet", file: "src/cli/greet.ts", flow: greet },
-      ],
+      entries: [{ name: "greet", file: "src/entries/greet.ts", entry: greeting }],
     })
 
     expect(report.idOf(greet)).toBe("flow:greet")
@@ -40,5 +38,6 @@ describe("pumped tour", () => {
       key: "directory",
     })
     expect(report.unknowns).toContainEqual({ from: "flow:greet", reason: "factory-body" })
+    expect(report.failures).toEqual([])
   })
 })

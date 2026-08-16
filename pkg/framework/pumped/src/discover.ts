@@ -1,11 +1,8 @@
 import { readdirSync, existsSync } from "node:fs"
 import { extname, join, resolve } from "node:path"
 
-export type EntryKind = "server" | "cli" | "jobs" | "agents" | "workflows"
-
-/** Identifies a discovered application entry by kind, name, and source file. */
-export interface EntryDescriptor {
-  kind: EntryKind
+/** Identifies a discovered entry module by name and source file. */
+export interface EntryFile {
   name: string
   file: string
 }
@@ -17,12 +14,12 @@ export interface AppDescriptor {
 }
 
 export interface DiscoveryResult {
-  entries: EntryDescriptor[]
+  entries: EntryFile[]
   appFile: string | undefined
   apps: AppDescriptor[]
 }
 
-const KINDS: EntryKind[] = ["server", "cli", "jobs", "agents", "workflows"]
+const LEGACY_KINDS = ["server", "cli", "jobs", "agents", "workflows"]
 
 function toKebabCase(name: string): string {
   return name
@@ -41,15 +38,21 @@ function listEntryFiles(dir: string): string[] {
 
 export function discover(sourceDir: string): DiscoveryResult {
   const root = resolve(sourceDir)
-  const entries: EntryDescriptor[] = []
+  const entriesDir = join(root, "entries")
 
-  for (const kind of KINDS) {
-    const kindDir = join(root, kind)
-    for (const fileName of listEntryFiles(kindDir)) {
-      const name = toKebabCase(fileName.replace(extname(fileName), ""))
-      entries.push({ kind, name, file: join(kindDir, fileName) })
-    }
+  const legacy = LEGACY_KINDS.filter((kind) => existsSync(join(root, kind)))
+  if (legacy.length > 0) {
+    throw new Error(
+      `found legacy entry directories (${legacy.map((kind) => `src/${kind}`).join(", ")}); ` +
+        `pumped discovers only src/entries — move each entry there and default-export entry({ flow, tags }), ` +
+        `then delete or rename the old directories`
+    )
   }
+
+  const entries: EntryFile[] = listEntryFiles(entriesDir).map((fileName) => ({
+    name: toKebabCase(fileName.replace(extname(fileName), "")),
+    file: join(entriesDir, fileName),
+  }))
 
   const appFile = ["app.ts", "app.tsx", "app.js", "app.mjs"]
     .map((name) => join(root, name))

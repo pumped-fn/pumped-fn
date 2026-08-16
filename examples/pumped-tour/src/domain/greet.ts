@@ -1,4 +1,4 @@
-import { atom, flow, tag, tags, typed } from "@pumped-fn/pumped/app"
+import { atom, flow, tag, tags, typed } from "@pumped-fn/lite"
 
 export interface Directory {
   displayName(name: string): string
@@ -18,7 +18,7 @@ export const greet = flow({
     directory,
     region: tags.required(region),
   },
-  factory: (context, deps) => ({
-    message: `Hello, ${deps.directory.displayName(context.input.name)} from ${deps.region}`,
+  factory: (context, { directory, region }) => ({
+    message: `Hello, ${directory.displayName(context.input.name)} from ${region}`,
   }),
 })

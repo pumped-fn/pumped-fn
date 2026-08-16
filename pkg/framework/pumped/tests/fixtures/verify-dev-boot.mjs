@@ -1,43 +1,53 @@
+import { spawn } from "node:child_process"
 import { resolve } from "node:path"
-import { createServer, isRunnableDevEnvironment } from "vite"
-import { pumped } from "@pumped-fn/pumped"
 
 const root = resolve(import.meta.dirname, "schedule-dev")
-const server = await createServer({
-  configFile: false,
-  root,
-  logLevel: "silent",
-  plugins: [pumped.plugin()],
-})
+const bin = resolve(import.meta.dirname, "../../dist/cli.mjs")
+const child = spawn(process.execPath, [bin, "dev"], { cwd: root, stdio: ["ignore", "pipe", "pipe"] })
+
+let output = ""
+function fail(message) {
+  child.kill("SIGTERM")
+  process.stderr.write(`${message}\n---\n${output}\n`)
+  process.exit(1)
+}
 
 try {
-  const ssrEnvironment = server.environments.ssr
-  if (!isRunnableDevEnvironment(ssrEnvironment)) throw new Error("ssr environment is not runnable")
+  const port = await new Promise((resolvePort, rejectPort) => {
+    const timer = setTimeout(() => rejectPort(new Error("dev server did not print a URL within 30s")), 30_000)
+    const onData = (chunk) => {
+      output += chunk
+      const match = output.match(/(?:localhost|127\.0\.0\.1):(\d+)/)
+      if (match) {
+        clearTimeout(timer)
+        resolvePort(Number(match[1]))
+      }
+    }
+    child.stdout.on("data", onData)
+    child.stderr.on("data", onData)
+    child.on("exit", (code) => {
+      clearTimeout(timer)
+      rejectPort(new Error(`dev server exited early with code ${code}`))
+    })
+  })
 
-  const { createScope, isAtom } = await ssrEnvironment.runner.import("@pumped-fn/lite")
-  const { scheduler } = await ssrEnvironment.runner.import("@pumped-fn/lite-extension-scheduler")
-
-  const manifest = await ssrEnvironment.runner.import("virtual:pumped/manifest/server")
-  const entry = manifest.entries.find((candidate) => candidate.kind === "jobs")
-  if (!entry) throw new Error("expected a jobs entry to be discovered")
-
-  if (!isAtom(entry.schedule)) {
-    throw new Error("jobs entry did not default-export a schedule() atom across the module runner boundary")
+  let body
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/ping`)
+      if (response.status === 200) {
+        body = await response.json()
+        break
+      }
+    } catch {}
+    await new Promise((wake) => setTimeout(wake, 200))
   }
 
-  const scope = createScope({ tags: [scheduler.backend(scheduler.inProcess())] })
-  const registration = await scope.resolve(entry.schedule)
-  const next = registration.next()
-  if (!(next instanceof Date)) {
-    throw new Error(`schedule atom did not resolve a valid cron registration across the module runner boundary, got: ${JSON.stringify(next)}`)
-  }
-  await scope.dispose()
+  if (body?.pong !== true) fail(`GET /ping never answered { pong: true }`)
 
+  child.kill("SIGTERM")
   process.stdout.write("OK\n")
-  await server.close()
   process.exit(0)
 } catch (error) {
-  await server.close()
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
-  process.exit(1)
+  fail(error instanceof Error ? error.message : String(error))
 }

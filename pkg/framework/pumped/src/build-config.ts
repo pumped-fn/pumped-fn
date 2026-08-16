@@ -1,14 +1,43 @@
-import type { EntryDescriptor, EntryKind } from "./discover"
+import type { Lite } from "@pumped-fn/lite"
+import { entrySpec } from "./entry"
+import { appPick, enabled, mounts } from "./hosts/host"
+import type { Manifest } from "./runtime/manifest"
+import { command, route, schedule, workflow } from "./tags"
 
 export type BuildTarget = "server" | "cli"
+export type HostName = "http" | "cron" | "workflow" | "cli"
 
-const TARGET_KINDS: Record<BuildTarget, ReadonlySet<EntryKind>> = {
-  server: new Set(["server", "agents", "jobs", "workflows"]),
-  cli: new Set(["cli", "agents"]),
+/** Entries and hosts one build target needs, computed from entry tags. */
+export interface TargetPlan {
+  files: string[]
+  hosts: HostName[]
 }
 
-export function selectTargetEntries(entries: EntryDescriptor[], target: BuildTarget): EntryDescriptor[] {
-  return entries.filter((entry) => TARGET_KINDS[target].has(entry.kind))
+const TARGET_SELECTORS: Record<BuildTarget, readonly { host: HostName; selector: Lite.Tag<any, false> }[]> = {
+  server: [
+    { host: "http", selector: route },
+    { host: "cron", selector: schedule },
+    { host: "workflow", selector: workflow },
+  ],
+  cli: [{ host: "cli", selector: command }],
+}
+
+export function planTarget(manifest: Manifest, target: BuildTarget): TargetPlan {
+  const pick = appPick(manifest.app)
+  const files: string[] = []
+  const hosts = new Set<HostName>()
+  for (const item of manifest.entries) {
+    const spec = entrySpec(item.entry)
+    if (!enabled(spec.attributes, pick)) continue
+    let included = false
+    for (const { host, selector } of TARGET_SELECTORS[target]) {
+      if (mounts(spec.tags, selector, pick).length === 0) continue
+      hosts.add(host)
+      included = true
+    }
+    if (included) files.push(item.file)
+  }
+  return { files, hosts: [...hosts] }
 }
 
 export function buildConfig(target: BuildTarget, app?: string) {
@@ -31,7 +60,7 @@ export function buildConfig(target: BuildTarget, app?: string) {
 }
 
 /**
- * Builds the manifest alone so `pumped graph` can read its identity. Declares no SSR
+ * Builds the manifest alone so `pumped graph` and the build census can read it. Declares no SSR
  * externalization of its own, so the module closure behind the embedded content hash matches the
  * production build byte for byte.
  */

@@ -37,12 +37,11 @@ The route owns the request context. It seeds request facts as tags, runs one flo
 
 > **Note:** Express and Nest examples are not covered here yet. This page shows a plain handler and Hono.
 
-If you are using Hono, put the adapter on the scope and let middleware create the context for each request.
+If you are using Hono, run the flow through the scope with request tags; `scope.run` owns one context per request.
 
 ```ts
 import { Hono } from "hono"
 import { createScope, flow, tag, tags } from "@pumped-fn/lite"
-import { hono } from "@pumped-fn/lite-hono"
 
 const requestId = tag<string>({ label: "request.id" })
 
@@ -51,23 +50,16 @@ const readRequest = flow({
   factory: (_ctx, { requestId }) => requestId,
 })
 
-type BaseEnv = { Variables: { user: string } }
-type AppEnv = hono.Env<BaseEnv>
-
-const lite = hono.adapter()
-const app = new Hono<AppEnv>()
-
-const scope = createScope({ extensions: [lite] })
-
-app.use(
-  "*",
-  lite.middleware<BaseEnv>({
-    tags: (request) => [requestId(request.headers.get("x-request-id") ?? "missing")],
-  })
-)
+const app = new Hono()
+const scope = createScope()
 
 app.get("/id", async (context) =>
-  context.json({ id: await context.var.lite.exec({ flow: readRequest }) })
+  context.json({
+    id: await scope.run({
+      flow: readRequest,
+      tags: [requestId(context.req.header("x-request-id") ?? "missing")],
+    }),
+  })
 )
 
 export async function closeApp(): Promise<void> {

@@ -1,13 +1,15 @@
 import { createHash } from "node:crypto"
 import { relative } from "node:path"
-import type { EntryDescriptor } from "./discover"
+import { flowSymbol } from "@pumped-fn/lite"
+import type { EntryFile } from "./discover"
+import { entryBrandKey } from "./entry"
 import type { ManifestIdentity } from "./runtime/manifest"
 
 /** Stable project inputs used to identify a generated target manifest. */
 export interface ManifestGenerationOptions {
   root: string
   app: string
-  target: "server" | "cli"
+  target: "app" | "server" | "cli"
 }
 
 /** Generated manifest module source plus the identity embedded in it. */
@@ -20,17 +22,31 @@ function entryVar(index: number): string {
   return `e${index}`
 }
 
-function logicalFile(root: string, file: string): string {
+export function logicalFile(root: string, file: string): string {
   return relative(root, file).replaceAll("\\", "/")
 }
 
+const ASSERT_ENTRY_HELPER = [
+  `const ENTRY = Symbol.for(${JSON.stringify(entryBrandKey)})`,
+  `const FLOW = Symbol.for(${JSON.stringify(Symbol.keyFor(flowSymbol))})`,
+  "function assertEntry(value, name, file) {",
+  "  if (value === undefined) {",
+  '    throw new Error(`entry "${name}" in ${file} has no default export`)',
+  "  }",
+  '  if (typeof value === "object" && value !== null && ENTRY in value) return value',
+  '  if (typeof value === "object" && value !== null && FLOW in value) {',
+  '    throw new Error(`entry "${name}" in ${file} default-exports a bare flow; wrap it in entry({ flow, tags })`)',
+  "  }",
+  '  throw new Error(`entry "${name}" in ${file} must default-export entry({ flow, tags })`)',
+  "}",
+].join("\n")
+
 export function generateManifest(
-  entries: EntryDescriptor[],
+  entries: EntryFile[],
   appFile: string | undefined,
   options: ManifestGenerationOptions
 ): GeneratedManifestSource {
   const describedEntries = entries.map((entry) => ({
-    kind: entry.kind,
     name: entry.name,
     file: logicalFile(options.root, entry.file),
   }))
@@ -38,9 +54,9 @@ export function generateManifest(
     app: options.app,
     target: options.target,
     appFile: appFile ? logicalFile(options.root, appFile) : null,
-    entries: [...describedEntries].sort((left, right) => (
-      `${left.kind}:${left.name}:${left.file}`.localeCompare(`${right.kind}:${right.name}:${right.file}`)
-    )),
+    entries: [...describedEntries].sort((left, right) =>
+      `${left.name}:${left.file}`.localeCompare(`${right.name}:${right.file}`)
+    ),
   }
   const identity: ManifestIdentity = {
     app: options.app,
@@ -49,38 +65,24 @@ export function generateManifest(
   }
   const entryImports = entries.map((entry, index) => `import * as ns${index} from ${JSON.stringify(entry.file)}`)
   const appImport = appFile ? `import app from ${JSON.stringify(appFile)}` : `const app = undefined`
-  const needsAgentHelper = entries.some((entry) => entry.kind === "agents")
-  const helperImport = needsAgentHelper ? `import { normalizeAgentEntry } from "@pumped-fn/pumped"` : undefined
 
   const entryGuards = entries.map((entry, index) => {
-    const guard = `entryDefault(ns${index}, ${JSON.stringify(entry.name)}, ${JSON.stringify(logicalFile(options.root, entry.file))})`
+    const guard = `assertEntry(ns${index}.default, ${JSON.stringify(entry.name)}, ${JSON.stringify(logicalFile(options.root, entry.file))})`
     return `const ${entryVar(index)} = ${guard}`
   })
 
   const entryLiterals = entries
-    .map((entry, index) => {
-      const base = `kind: ${JSON.stringify(entry.kind)}, name: ${JSON.stringify(entry.name)}, file: ${JSON.stringify(logicalFile(options.root, entry.file))}`
-      if (entry.kind === "agents") return `  { ${base}, ...normalizeAgentEntry(${entryVar(index)}) }`
-      if (entry.kind === "jobs") return `  { ${base}, schedule: ${entryVar(index)} }`
-      return `  { ${base}, flow: ${entryVar(index)}, meta: ns${index}.meta }`
-    })
+    .map(
+      (entry, index) =>
+        `  { name: ${JSON.stringify(entry.name)}, file: ${JSON.stringify(logicalFile(options.root, entry.file))}, entry: ${entryVar(index)} }`
+    )
     .join(",\n")
-
-  const entryDefaultHelper = [
-    "function entryDefault(ns, name, file) {",
-    "  if (ns.default === undefined) {",
-    '    throw new Error(`entry "${name}" in ${file} has no default export`)',
-    "  }",
-    "  return ns.default",
-    "}",
-  ].join("\n")
 
   const source = [
     ...entryImports,
-    ...(helperImport ? [helperImport] : []),
     appImport,
     "",
-    entryDefaultHelper,
+    ASSERT_ENTRY_HELPER,
     "",
     ...(entryGuards.length > 0 ? [...entryGuards, ""] : []),
     `export const identity = ${JSON.stringify(identity)}`,

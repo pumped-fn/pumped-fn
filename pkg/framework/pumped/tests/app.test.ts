@@ -1,20 +1,6 @@
-import * as lite from "@pumped-fn/lite"
-import type { Lite } from "@pumped-fn/lite"
+import { atom, attribute, createScope, isAttributed, preset, tag, type Lite } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
-import {
-  app,
-  atom,
-  controller,
-  flow,
-  preset,
-  resource,
-  tag,
-  tags,
-  typed,
-} from "../src/app"
-import { createAppScope, p, pumped } from "../src/index"
-import { route as metaRoute } from "../src/meta"
-import { route as rootRoute } from "../src/tags"
+import { app } from "../src/app"
 
 describe("app", () => {
   it("keeps a single app config intact without sharing the caller reference", () => {
@@ -24,8 +10,6 @@ describe("app", () => {
     expect(single).toEqual(config)
     expect(single).not.toBe(config)
     expect(app()).toEqual({})
-    expect(pumped.app).toBe(app)
-    expect(p.app).toBe(app)
   })
 
   it("rejects cyclic tags while composing apps", () => {
@@ -37,53 +21,42 @@ describe("app", () => {
     )
   })
 
-  it("composes tags, presets, extensions, context, and error mapping", async () => {
+  it("composes tags and attributes derived-first and presets and extensions base-first", async () => {
     const region = tag<string>({ label: "region" })
+    const capability = attribute<string>({ label: "app.test.capability" })
     const store = atom({ factory: () => "production" })
-    const baseContext = tag<string>({ label: "context.base" })
-    const addedContext = tag<string>({ label: "context.added" })
     const base = app({
       tags: region("base"),
       presets: [preset(store, "base")],
       extensions: [{ name: "base" }],
-      context: () => baseContext("base"),
-      mapError: () => ({ status: 500, body: "base" }),
+      attributes: { include: [capability("base")] },
     })
     const composed = app(base, {
       tags: [[region("east")]],
       presets: [preset(store, "east")],
       extensions: [{ name: "east" }],
-      context: () => [[addedContext("east")]],
-      mapError: (error) => error === "east" ? { status: 409, body: "east" } : undefined,
+      attributes: { include: [capability("east")], exclude: [capability("legacy")] },
     })
 
     expect(region.get(composed.tags ?? [])).toBe("east")
     expect(region.collect(composed.tags ?? [])).toEqual(["east", "base"])
+    const values = (rules: readonly unknown[] | undefined) =>
+      (rules ?? []).filter(isAttributed).map((rule) => rule.value)
+    expect(values(composed.attributes?.include as readonly unknown[])).toEqual(["east", "base"])
+    expect(values(composed.attributes?.exclude as readonly unknown[])).toEqual(["legacy"])
     expect(composed.presets?.map((value) => value.value)).toEqual(["base", "east"])
     expect(composed.extensions?.map((extension) => extension.name)).toEqual(["base", "east"])
-    expect(composed.context?.()).toEqual([addedContext("east"), baseContext("base")])
-    expect(composed.mapError?.("east")).toEqual({ status: 409, body: "east" })
-    expect(composed.mapError?.("other")).toEqual({ status: 500, body: "base" })
 
-    const scope = createAppScope({ app: composed, entries: [] })
+    const scope = createScope(composed)
     expect(await scope.resolve(store)).toBe("east")
     await scope.dispose()
   })
-})
 
-describe("Lite re-exports", () => {
-  it("exports the exact Lite authoring handles", () => {
-    expect(atom).toBe(lite.atom)
-    expect(controller).toBe(lite.controller)
-    expect(flow).toBe(lite.flow)
-    expect(preset).toBe(lite.preset)
-    expect(resource).toBe(lite.resource)
-    expect(tag).toBe(lite.tag)
-    expect(tags).toBe(lite.tags)
-    expect(typed).toBe(lite.typed)
-  })
+  it("creates a plain scope from an undefined app", async () => {
+    const scope = createScope({})
+    const value = atom({ factory: () => 41 })
 
-  it("keeps metadata handle identity across the lightweight entry", () => {
-    expect(metaRoute).toBe(rootRoute)
+    expect(await scope.resolve(value)).toBe(41)
+    await scope.dispose()
   })
 })

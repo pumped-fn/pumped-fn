@@ -51,9 +51,6 @@
       "@pumped-fn/lite-hmr": [
         "./pkg/ext/hmr/src/index.ts"
       ],
-      "@pumped-fn/lite-hono": [
-        "./pkg/framework/hono/src/index.ts"
-      ],
       "@pumped-fn/lite-lint": [
         "./pkg/tool/lint/src/index.ts"
       ],
@@ -74,9 +71,6 @@
       ],
       "@pumped-fn/pumped": [
         "./pkg/framework/pumped/src/index.ts"
-      ],
-      "@pumped-fn/pumped/runtime": [
-        "./pkg/framework/pumped/src/runtime.ts"
       ],
       "@pumped-fn/sdk": [
         "./pkg/sdk/core/src/index.ts"

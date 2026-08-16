@@ -7,18 +7,17 @@ import { discover, selectAppFile } from "../src/discover"
 const fixtureDir = resolve(__dirname, "fixtures/basic/src")
 
 describe("discover", () => {
-  it("scans server, cli, and jobs entries flat, ignoring nested support modules", () => {
+  it("scans src/entries flat, ignoring nested support modules", () => {
     const { entries, appFile, apps } = discover(fixtureDir)
 
-    expect(entries).toEqual(
-      expect.arrayContaining([
-        { kind: "server", name: "book-space", file: resolve(fixtureDir, "server/book-space.ts") },
-        { kind: "server", name: "list-lots", file: resolve(fixtureDir, "server/list-lots.ts") },
-        { kind: "cli", name: "report", file: resolve(fixtureDir, "cli/report.ts") },
-        { kind: "jobs", name: "nightly-sweep", file: resolve(fixtureDir, "jobs/nightly-sweep.ts") },
-      ])
-    )
-    expect(entries).toHaveLength(4)
+    expect(entries).toEqual([
+      { name: "book-space", file: resolve(fixtureDir, "entries/book-space.ts") },
+      { name: "greet", file: resolve(fixtureDir, "entries/greet.ts") },
+      { name: "list-lots", file: resolve(fixtureDir, "entries/list-lots.ts") },
+      { name: "nightly-sweep", file: resolve(fixtureDir, "entries/nightly-sweep.ts") },
+      { name: "preview", file: resolve(fixtureDir, "entries/preview.ts") },
+      { name: "report", file: resolve(fixtureDir, "entries/report.ts") },
+    ])
     expect(appFile).toBe(resolve(fixtureDir, "app.ts"))
     expect(apps).toEqual([
       { name: "east", file: resolve(fixtureDir, "apps/east.ts") },
@@ -28,6 +27,27 @@ describe("discover", () => {
   it("returns undefined appFile and no entries when nothing exists", () => {
     const result = discover(resolve(__dirname, "fixtures/empty"))
     expect(result).toEqual({ entries: [], appFile: undefined, apps: [] })
+  })
+
+  it("rejects a legacy layout loudly instead of discovering nothing", () => {
+    const legacy = mkdtempSync(join(tmpdir(), "pumped-legacy-"))
+    mkdirSync(join(legacy, "server"))
+    mkdirSync(join(legacy, "jobs"))
+    writeFileSync(join(legacy, "server/greet.ts"), "export default {}\n")
+
+    expect(() => discover(legacy)).toThrow(
+      "found legacy entry directories (src/server, src/jobs); pumped discovers only src/entries"
+    )
+  })
+
+  it("rejects a partial migration instead of silently dropping legacy entries", () => {
+    const partial = mkdtempSync(join(tmpdir(), "pumped-partial-"))
+    mkdirSync(join(partial, "entries"))
+    mkdirSync(join(partial, "server"))
+    writeFileSync(join(partial, "entries/new-thing.ts"), "export default {}\n")
+    writeFileSync(join(partial, "server/greet.ts"), "export default {}\n")
+
+    expect(() => discover(partial)).toThrow("found legacy entry directories (src/server)")
   })
 
   it("selects the default or a named app", () => {

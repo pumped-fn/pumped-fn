@@ -1,9 +1,48 @@
+import { flow } from "@pumped-fn/lite"
 import { describe, expect, it } from "vitest"
-import type { EntryDescriptor, EntryKind } from "../src/discover"
-import { buildConfig, manifestConfig, selectTargetEntries } from "../src/build-config"
+import { buildConfig, manifestConfig, planTarget } from "../src/build-config"
+import { entry } from "../src/entry"
+import type { Manifest, ManifestEntry } from "../src/runtime/manifest"
+import { command, route, schedule, workflow } from "../src/tags"
 
-const kinds: EntryKind[] = ["server", "cli", "jobs", "agents", "workflows"]
-const entries: EntryDescriptor[] = kinds.map((kind) => ({ kind, name: kind, file: `/src/${kind}/entry.ts` }))
+const noop = flow({ factory: () => undefined })
+
+function planEntry(name: string, tags: Parameters<typeof entry>[0]["tags"]): ManifestEntry {
+  return { name, file: `src/entries/${name}.ts`, entry: entry({ flow: noop, tags }) }
+}
+
+const planned: Manifest = {
+  app: undefined,
+  entries: [
+    planEntry("web-only", [route({ method: "GET", path: "/web" })]),
+    planEntry("cli-only", [command({ name: "cli-only" })]),
+    planEntry("sweep", [schedule({ cron: "0 2 * * *" })]),
+    planEntry("warm", [workflow({})]),
+    planEntry("dual", [route({ method: "POST", path: "/dual" }), command({ name: "dual" })]),
+  ],
+}
+
+describe("planTarget", () => {
+  it("selects server entries and hosts from tags", () => {
+    expect(planTarget(planned, "server")).toEqual({
+      files: ["src/entries/web-only.ts", "src/entries/sweep.ts", "src/entries/warm.ts", "src/entries/dual.ts"],
+      hosts: ["http", "cron", "workflow"],
+    })
+  })
+
+  it("selects cli entries and hosts from tags", () => {
+    expect(planTarget(planned, "cli")).toEqual({
+      files: ["src/entries/cli-only.ts", "src/entries/dual.ts"],
+      hosts: ["cli"],
+    })
+  })
+
+  it("omits hosts no entry needs", () => {
+    const webOnly: Manifest = { app: undefined, entries: [planEntry("web", [route({ method: "GET", path: "/w" })])] }
+
+    expect(planTarget(webOnly, "server")).toEqual({ files: ["src/entries/web.ts"], hosts: ["http"] })
+  })
+})
 
 describe("buildConfig", () => {
   it("builds an SSR config against the virtual server entry", () => {
@@ -27,23 +66,8 @@ describe("buildConfig", () => {
     expect(buildConfig("cli", "east/preview").build.outDir).toBe("dist/apps/east%2Fpreview")
   })
 
-  it("leaves SSR externalization to the project on both the production and manifest paths", () => {
+  it("leaves SSR externalization to the plugin on both the production and manifest paths", () => {
     expect(buildConfig("server")).not.toHaveProperty("ssr")
-    expect(manifestConfig("virtual:pumped/manifest/server", "dist")).not.toHaveProperty("ssr")
-  })
-})
-
-describe("selectTargetEntries", () => {
-  it("selects only server runtime roots", () => {
-    expect(selectTargetEntries(entries, "server").map((entry) => entry.kind)).toEqual([
-      "server",
-      "jobs",
-      "agents",
-      "workflows",
-    ])
-  })
-
-  it("selects only CLI runtime roots", () => {
-    expect(selectTargetEntries(entries, "cli").map((entry) => entry.kind)).toEqual(["cli", "agents"])
+    expect(manifestConfig("virtual:pumped/manifest/app", "dist")).not.toHaveProperty("ssr")
   })
 })

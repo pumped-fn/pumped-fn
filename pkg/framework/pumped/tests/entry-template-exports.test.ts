@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import * as lite from "@pumped-fn/lite"
 import ts from "typescript-api"
 import { describe, expect, it } from "vitest"
-import { ENTRY_CLI_SOURCE, ENTRY_SERVER_SOURCE } from "../src/plugin"
-import * as packageRuntime from "../src/runtime"
+import { entryCliSource, entryServerSource } from "../src/plugin"
+import * as packageIndex from "../src/index"
 
 const srcDir = resolve(dirname(fileURLToPath(import.meta.url)), "../src")
 
@@ -27,7 +28,7 @@ function namedImportsFrom(source: string, moduleSpecifier: string): string[] {
   })
 }
 
-function moduleSpecifiers(source: string, fileName: string): string[] {
+function moduleSpecifiers(source: string, fileName: string, includeDynamic: boolean): string[] {
   const specifiers: string[] = []
   const append = (node: ts.Node): void => {
     if (
@@ -36,7 +37,7 @@ function moduleSpecifiers(source: string, fileName: string): string[] {
       ts.isStringLiteralLike(node.moduleSpecifier)
     ) {
       specifiers.push(node.moduleSpecifier.text)
-    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+    } else if (includeDynamic && ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
       const [argument] = node.arguments
       if (argument !== undefined && ts.isStringLiteralLike(argument)) specifiers.push(argument.text)
     }
@@ -52,7 +53,11 @@ function moduleFile(specifier: string, fromFile: string): string | undefined {
   return [`${base}.ts`, `${base}/index.ts`].find(existsSync)
 }
 
-function reachableBareSpecifiers(entryFile: string, sources: ReadonlyMap<string, string> = new Map()): Set<string> {
+function reachableBareSpecifiers(
+  entryFile: string,
+  includeDynamic: boolean,
+  sources: ReadonlyMap<string, string> = new Map()
+): Set<string> {
   const bare = new Set<string>()
   const seen = new Set<string>()
   const queue = [entryFile]
@@ -62,7 +67,7 @@ function reachableBareSpecifiers(entryFile: string, sources: ReadonlyMap<string,
     if (seen.has(file)) continue
     seen.add(file)
 
-    for (const specifier of moduleSpecifiers(sources.get(file) ?? readFileSync(file, "utf8"), file)) {
+    for (const specifier of moduleSpecifiers(sources.get(file) ?? readFileSync(file, "utf8"), file, includeDynamic)) {
       const local = moduleFile(specifier, file)
       if (local === undefined) bare.add(specifier)
       else queue.push(local)
@@ -73,58 +78,79 @@ function reachableBareSpecifiers(entryFile: string, sources: ReadonlyMap<string,
 }
 
 describe("generated entry templates reference real package exports", () => {
-  const runtimeExports = new Set(Object.keys(packageRuntime))
+  const indexExports = new Set(Object.keys(packageIndex))
+  const liteExports = new Set(Object.keys(lite))
 
-  it("entry-server imports only exports that exist on the runtime entry", () => {
-    const imports = namedImportsFrom(ENTRY_SERVER_SOURCE, "@pumped-fn/pumped/runtime")
+  it("entry-server imports only exports that exist on the package index and on Lite, per host census", () => {
+    for (const hosts of [["http", "cron", "workflow"], ["http"], ["cron"], []] as const) {
+      const source = entryServerSource([...hosts])
 
-    expect(imports.length).toBeGreaterThan(0)
-    for (const name of imports) expect(runtimeExports.has(name)).toBe(true)
+      for (const name of namedImportsFrom(source, "@pumped-fn/pumped")) expect(indexExports.has(name)).toBe(true)
+      const fromLite = namedImportsFrom(source, "@pumped-fn/lite")
+      expect(fromLite.length).toBeGreaterThan(0)
+      for (const name of fromLite) expect(liteExports.has(name)).toBe(true)
+    }
   })
 
-  it("entry-cli imports only exports that exist on the runtime entry", () => {
-    const imports = namedImportsFrom(ENTRY_CLI_SOURCE, "@pumped-fn/pumped/runtime")
+  it("entry-server omits hosts the census does not need", () => {
+    const source = entryServerSource(["http"])
 
-    expect(imports.length).toBeGreaterThan(0)
-    for (const name of imports) expect(runtimeExports.has(name)).toBe(true)
+    expect(source).toContain("httpHost")
+    expect(source).not.toContain("cronHost")
+    expect(source).not.toContain("workflowHost")
   })
 
-  it("neither generated entry imports the vite-carrying package index", () => {
-    expect(namedImportsFrom(ENTRY_SERVER_SOURCE, "@pumped-fn/pumped")).toEqual([])
-    expect(namedImportsFrom(ENTRY_CLI_SOURCE, "@pumped-fn/pumped")).toEqual([])
+  it("entry-cli imports only exports that exist on the package index and on Lite", () => {
+    const source = entryCliSource()
+
+    const fromPumped = namedImportsFrom(source, "@pumped-fn/pumped")
+    expect(fromPumped.length).toBeGreaterThan(0)
+    for (const name of fromPumped) expect(indexExports.has(name)).toBe(true)
+    for (const name of namedImportsFrom(source, "@pumped-fn/lite")) expect(liteExports.has(name)).toBe(true)
   })
 })
 
-describe("the runtime entry keeps build-time dependencies out of production", () => {
-  it("reads static imports, re-exports, bare imports, and dynamic imports", () => {
-    expect(
-      moduleSpecifiers(
-        `
+describe("the package index keeps transports and the toolchain out of eager evaluation", () => {
+  it("reads static imports and re-exports, optionally including dynamic imports", () => {
+    const source = `
 import "bare"
 import value from './default'
 export { value } from "./named"
 export * from './all'
 void import("./dynamic")
-`,
-        "fixture.ts"
-      )
-    ).toEqual(["bare", "./default", "./named", "./all", "./dynamic"])
+`
+    expect(moduleSpecifiers(source, "fixture.ts", true)).toEqual(["bare", "./default", "./named", "./all", "./dynamic"])
+    expect(moduleSpecifiers(source, "fixture.ts", false)).toEqual(["bare", "./default", "./named", "./all"])
   })
 
-  it("never reaches vite", () => {
-    expect(reachableBareSpecifiers(resolve(srcDir, "runtime.ts"))).not.toContain("vite")
+  it("never statically reaches vite, hono, cac, or the scheduler from the index", () => {
+    const bare = reachableBareSpecifiers(resolve(srcDir, "index.ts"), false)
+
+    expect(bare).toContain("@pumped-fn/lite")
+    for (const heavy of ["vite", "hono", "@hono/node-server", "cac", "@pumped-fn/lite-extension-scheduler", "croner"]) {
+      expect(bare).not.toContain(heavy)
+    }
+  })
+
+  it("reaches the transports only through dynamic imports inside hosts", () => {
+    const withDynamic = reachableBareSpecifiers(resolve(srcDir, "index.ts"), true)
+
+    expect(withDynamic).toContain("hono")
+    expect(withDynamic).toContain("@hono/node-server")
+    expect(withDynamic).toContain("@pumped-fn/lite-extension-scheduler")
+    expect(withDynamic).not.toContain("vite")
   })
 
   it("detects vite through a single-quoted re-export", () => {
-    const entryFile = resolve(srcDir, "runtime.ts")
+    const entryFile = resolve(srcDir, "index.ts")
     const sources = new Map([
       [entryFile, `${readFileSync(entryFile, "utf8")}\nexport { pumped } from './plugin'\n`],
     ])
 
-    expect(reachableBareSpecifiers(entryFile, sources)).toContain("vite")
+    expect(reachableBareSpecifiers(entryFile, false, sources)).toContain("vite")
   })
 
-  it("still proves the check works by finding vite from the package index", () => {
-    expect(reachableBareSpecifiers(resolve(srcDir, "index.ts"))).toContain("vite")
+  it("still proves the check works by finding vite from the bin", () => {
+    expect(reachableBareSpecifiers(resolve(srcDir, "cli.ts"), false)).toContain("vite")
   })
 })

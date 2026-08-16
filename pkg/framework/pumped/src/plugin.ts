@@ -1,22 +1,24 @@
 import { createHash } from "node:crypto"
 import { isAbsolute, relative } from "node:path"
+import { fileURLToPath } from "node:url"
 import { pumpedHmr } from "@pumped-fn/lite-hmr"
 import { getRequestListener } from "@hono/node-server"
 import { isRunnableDevEnvironment, type Plugin, type RunnableDevEnvironment } from "vite"
 import type { Lite } from "@pumped-fn/lite"
 import { discover, selectAppFile } from "./discover"
 import { generateManifest } from "./codegen"
-import { selectTargetEntries, type BuildTarget } from "./build-config"
+import type { BuildTarget, HostName, TargetPlan } from "./build-config"
 import { createDevRunner } from "./runtime/dev-runner"
 import type { Manifest } from "./runtime/manifest"
-import type { JobsRunner } from "./runtime/jobs"
-import type { WorkflowsRunner } from "./runtime/workflows"
 
 export interface PumpedOptions {
   dir?: string
   app?: string
+  plan?: TargetPlan & { target: BuildTarget }
 }
 
+const MANIFEST_APP_ID = "virtual:pumped/manifest/app"
+const RESOLVED_MANIFEST_APP_ID = "\0pumped:manifest/app"
 const MANIFEST_SERVER_ID = "virtual:pumped/manifest/server"
 const RESOLVED_MANIFEST_SERVER_ID = "\0pumped:manifest/server"
 const MANIFEST_CLI_ID = "virtual:pumped/manifest/cli"
@@ -26,37 +28,70 @@ const RESOLVED_ENTRY_SERVER_ID = "\0pumped:entry-server"
 const ENTRY_CLI_ID = "virtual:pumped/entry-cli"
 const RESOLVED_ENTRY_CLI_ID = "\0pumped:entry-cli"
 
-export function manifestId(target: BuildTarget): string {
+const frameworkRoot = fileURLToPath(new URL("..", import.meta.url)).replaceAll("\\", "/")
+
+export function manifestId(target: "app" | BuildTarget): string {
+  if (target === "app") return MANIFEST_APP_ID
   return target === "server" ? MANIFEST_SERVER_ID : MANIFEST_CLI_ID
 }
 
-export const ENTRY_SERVER_SOURCE = `
-import { createAppScope, createServer, runJobs, runWorkflows } from "@pumped-fn/pumped/runtime"
-import { hono } from "@pumped-fn/lite-hono"
-import { serve } from "@hono/node-server"
-import { app as manifestApp, entries, identity } from ${JSON.stringify(MANIFEST_SERVER_ID)}
+export function entryServerSource(hosts: readonly HostName[]): string {
+  const serverHosts = (["http", "cron", "workflow"] as const).filter((host) => hosts.includes(host))
+  const hostImports = serverHosts.map((host) => `${host}Host`)
+  const backgroundHosts = serverHosts.filter((host) => host !== "http")
+  return [
+    `import { createScope } from "@pumped-fn/lite"`,
+    ...(hostImports.length > 0 ? [`import { ${hostImports.join(", ")} } from "@pumped-fn/pumped"`] : []),
+    `import { app, entries, identity } from ${JSON.stringify(MANIFEST_SERVER_ID)}`,
+    "",
+    "const manifest = { identity, app, entries }",
+    "const scope = createScope(app ?? {})",
+    ...(serverHosts.includes("http")
+      ? [
+          'const parsedPort = Number.parseInt(process.env.PORT ?? "", 10)',
+          "const port = Number.isNaN(parsedPort) ? 3000 : parsedPort",
+        ]
+      : []),
+    "const runtimes = [",
+    ...backgroundHosts.map((host) => `  ${host}Host.start({ scope, manifest }),`),
+    "]",
+    "await Promise.all(runtimes.map((runtime) => runtime.ready))",
+    ...(serverHosts.includes("http") ? ["await httpHost.start({ scope, manifest, port }).ready"] : []),
+    "let closing = false",
+    "const shutdown = () => {",
+    "  if (closing) return",
+    "  closing = true",
+    "  scope.dispose().catch((error) => {",
+    "    console.error(error)",
+    "    process.exitCode = 1",
+    "  })",
+    "}",
+    'process.once("SIGINT", shutdown)',
+    'process.once("SIGTERM", shutdown)',
+    "",
+  ].join("\n")
+}
 
-const manifest = { identity, app: manifestApp, entries }
-const lite = hono.adapter()
-const scope = createAppScope(manifest, [lite])
-const { app: honoApp } = createServer(manifest, { scope, lite })
-const jobs = runJobs(manifest, undefined, scope)
-runWorkflows(manifest, undefined, scope)
-await jobs.ready
-const port = Number(process.env.PORT ?? 3000)
-serve({ fetch: honoApp.fetch, port })
-`
-
-export const ENTRY_CLI_SOURCE = `
-import { runCli } from "@pumped-fn/pumped/runtime"
-import { app as manifestApp, entries, identity } from ${JSON.stringify(MANIFEST_CLI_ID)}
-
-await runCli({ identity, app: manifestApp, entries }, process.argv.slice(2))
-`
+export function entryCliSource(): string {
+  return [
+    `import { createScope } from "@pumped-fn/lite"`,
+    `import { cliHost } from "@pumped-fn/pumped"`,
+    `import { app, entries, identity } from ${JSON.stringify(MANIFEST_CLI_ID)}`,
+    "",
+    "const manifest = { identity, app, entries }",
+    "const scope = createScope(app ?? {})",
+    "const runtime = cliHost.start({ scope, manifest, argv: process.argv.slice(2) })",
+    "const code = await runtime.code",
+    "await scope.dispose()",
+    "process.exitCode = code",
+    "",
+  ].join("\n")
+}
 
 export function pumped(options: PumpedOptions = {}): Plugin[] {
   const dir = options.dir ?? "src"
   const selectedApp = options.app ?? process.env["PUMPED_APP"]
+  const plan = options.plan
   let root = process.cwd()
   let generatedManifest: { id: string; hash: string } | undefined
 
@@ -64,10 +99,14 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
     return `${root}/${dir}`
   }
 
+  function logicalFile(file: string): string {
+    return relative(root, file).replaceAll("\\", "/")
+  }
+
   const appPlugin: Plugin = {
     name: "pumped-fn",
 
-    config(userConfig) {
+    config(userConfig, env) {
       if (userConfig.appType !== undefined && userConfig.appType !== "custom") {
         this.warn(
           `pumped overrides Vite appType "${userConfig.appType}" with "custom" because pumped owns the request pipeline`
@@ -75,15 +114,19 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
       }
       return {
         appType: "custom",
-        ssr: {
-          external: [
-            "@pumped-fn/pumped",
-            "@pumped-fn/pumped/runtime",
-            "@pumped-fn/lite",
-            "@pumped-fn/lite-hono",
-            "@pumped-fn/lite-extension-scheduler",
-          ],
-        },
+        ssr:
+          env.command === "build" && plan !== undefined
+            ? {
+                external: ["@pumped-fn/lite", "hono", "@hono/node-server", "@pumped-fn/lite-extension-scheduler"],
+                noExternal: [/^@pumped-fn\/pumped(\/|$)/],
+              }
+            : {
+                external: [
+                  "@pumped-fn/pumped",
+                  "@pumped-fn/lite",
+                  "@pumped-fn/lite-extension-scheduler",
+                ],
+              },
       }
     },
 
@@ -92,6 +135,7 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
     },
 
     resolveId(id) {
+      if (id === MANIFEST_APP_ID) return RESOLVED_MANIFEST_APP_ID
       if (id === MANIFEST_SERVER_ID) return RESOLVED_MANIFEST_SERVER_ID
       if (id === MANIFEST_CLI_ID) return RESOLVED_MANIFEST_CLI_ID
       if (id === ENTRY_SERVER_ID) return RESOLVED_ENTRY_SERVER_ID
@@ -100,19 +144,25 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
     },
 
     load(id) {
-      if (id === RESOLVED_MANIFEST_SERVER_ID || id === RESOLVED_MANIFEST_CLI_ID) {
+      if (id === RESOLVED_MANIFEST_APP_ID || id === RESOLVED_MANIFEST_SERVER_ID || id === RESOLVED_MANIFEST_CLI_ID) {
         const discovery = discover(sourceDir())
-        const target = id === RESOLVED_MANIFEST_SERVER_ID ? "server" : "cli"
-        const { source, identity } = generateManifest(
-          selectTargetEntries(discovery.entries, target),
-          selectAppFile(discovery, selectedApp),
-          { root, app: selectedApp ?? "default", target }
-        )
+        const target = id === RESOLVED_MANIFEST_APP_ID ? "app" : id === RESOLVED_MANIFEST_SERVER_ID ? "server" : "cli"
+        const entries =
+          target === "app" || plan === undefined || plan.target !== target
+            ? discovery.entries
+            : discovery.entries.filter((entry) => plan.files.includes(logicalFile(entry.file)))
+        const { source, identity } = generateManifest(entries, selectAppFile(discovery, selectedApp), {
+          root,
+          app: selectedApp ?? "default",
+          target,
+        })
         generatedManifest = { id, hash: identity.hash }
         return source
       }
-      if (id === RESOLVED_ENTRY_SERVER_ID) return ENTRY_SERVER_SOURCE
-      if (id === RESOLVED_ENTRY_CLI_ID) return ENTRY_CLI_SOURCE
+      if (id === RESOLVED_ENTRY_SERVER_ID) {
+        return entryServerSource(plan?.target === "server" ? plan.hosts : ["http", "cron", "workflow"])
+      }
+      if (id === RESOLVED_ENTRY_CLI_ID) return entryCliSource()
       return undefined
     },
 
@@ -126,6 +176,9 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
       const visit = (id: string): void => {
         if (visited.has(id)) return
         visited.add(id)
+        const normalizedId = id.replaceAll("\\", "/")
+        if (normalizedId.includes("/node_modules/")) return
+        if (normalizedId.startsWith(frameworkRoot) && !normalizedId.startsWith(`${normalizedRoot}/`)) return
         const module = this.getModuleInfo(id)
         if (!module) return
         if (isAbsolute(id)) absoluteIds.push(id)
@@ -158,10 +211,8 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
 
     configureServer(server) {
       interface DevApp {
-        fetch: (request: Request) => Promise<Response> | Response
+        fetch: (request: Request) => Promise<Response>
         scope: Lite.Scope
-        jobs: JobsRunner
-        workflows: WorkflowsRunner
       }
 
       if (!isRunnableDevEnvironment(server.environments.ssr)) {
@@ -170,42 +221,62 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
       const ssrEnvironment = server.environments.ssr as RunnableDevEnvironment
 
       async function loadDevApp(): Promise<DevApp> {
-        const manifest = (await ssrEnvironment.runner.import(MANIFEST_SERVER_ID)) as Manifest
-        const { createServer } = await import("./runtime/serve")
-        const { runJobs } = await import("./runtime/jobs")
-        const { runWorkflows } = await import("./runtime/workflows")
-        const { createAppScope } = await import("./runtime/app-scope")
-        const { hono } = await import("@pumped-fn/lite-hono")
+        const manifest = (await ssrEnvironment.runner.import(MANIFEST_APP_ID)) as Manifest
+        const { createScope } = await import("@pumped-fn/lite")
+        const { analyze } = await import("./analyze")
+        const { selectEntries } = await import("./hosts/host")
+        const { httpHost } = await import("./hosts/http")
+        const { cronHost } = await import("./hosts/cron")
+        const { workflowHost } = await import("./hosts/workflow")
 
-        const lite = hono.adapter()
-        const scope = createAppScope(manifest, [lite])
-        const { app } = createServer(manifest, { scope, lite })
-        const jobs = runJobs(manifest, undefined, scope)
-        const workflows = runWorkflows(manifest, undefined, scope)
+        for (const failure of analyze(manifest).failures) {
+          server.config.logger.error(`pumped check: ${failure.message}`)
+        }
 
+        const scope = createScope(manifest.app ?? {})
         try {
-          await jobs.ready
+          const waits: Promise<void>[] = []
+          let fetch: DevApp["fetch"] = async () =>
+            new Response(JSON.stringify({ error: "no route entries in this app" }), {
+              status: 404,
+              headers: { "content-type": "application/json" },
+            })
+          if (selectEntries(manifest, httpHost.selector).length > 0) {
+            const http = httpHost.start({ scope, manifest })
+            waits.push(http.ready)
+            fetch = http.fetch
+          }
+          if (selectEntries(manifest, cronHost.selector).length > 0) {
+            waits.push(cronHost.start({ scope, manifest }).ready)
+          }
+          if (selectEntries(manifest, workflowHost.selector).length > 0) {
+            waits.push(workflowHost.start({ scope, manifest }).ready)
+          }
+          await Promise.all(waits)
+          return { fetch, scope }
         } catch (error) {
-          await Promise.allSettled([jobs.stop(), workflows.stop()])
           await scope.dispose()
           throw error
         }
-
-        return { fetch: app.fetch, scope, jobs, workflows }
       }
 
       async function disposeDevApp(devApp: DevApp): Promise<void> {
-        await devApp.jobs.stop()
-        await devApp.workflows.stop()
         await devApp.scope.dispose()
       }
 
       const runner = createDevRunner(loadDevApp, disposeDevApp)
 
+      function reportDevError(error: unknown) {
+        server.config.logger.error(error instanceof Error ? (error.stack ?? error.message) : String(error), {
+          error: error instanceof Error ? error : undefined,
+        })
+      }
+
       function invalidate() {
-        const manifestModule = ssrEnvironment.moduleGraph.getModuleById(RESOLVED_MANIFEST_SERVER_ID)
+        const manifestModule = ssrEnvironment.moduleGraph.getModuleById(RESOLVED_MANIFEST_APP_ID)
         if (manifestModule) ssrEnvironment.moduleGraph.invalidateModule(manifestModule)
         runner.invalidate()
+        runner.get().catch(reportDevError)
       }
 
       server.watcher.add(sourceDir())
@@ -213,20 +284,28 @@ export function pumped(options: PumpedOptions = {}): Plugin[] {
       server.watcher.on("unlink", invalidate)
       server.watcher.on("change", invalidate)
 
-      runner.get().catch((error) => {
-        server.config.logger.error(error instanceof Error ? (error.stack ?? error.message) : String(error), {
-          error: error instanceof Error ? error : undefined,
-        })
-      })
+      runner.get().catch(reportDevError)
 
       server.httpServer?.on("close", () => {
         void runner.disposeCurrent()
       })
 
+      const listener = getRequestListener(async (request) => {
+        const devApp = await runner.get()
+        return devApp.fetch(request)
+      })
+
       return () => {
         server.middlewares.use(async (request, response) => {
-          const devApp = await runner.get()
-          getRequestListener(devApp.fetch)(request, response)
+          try {
+            await listener(request, response)
+          } catch (error) {
+            reportDevError(error)
+            if (!response.headersSent) response.writeHead(500, { "content-type": "application/json" })
+            if (!response.writableEnded) {
+              response.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }))
+            }
+          }
         })
       }
     },

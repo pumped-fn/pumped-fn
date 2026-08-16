@@ -1,4 +1,4 @@
-import { app } from "@pumped-fn/pumped/app"
+import { app } from "@pumped-fn/pumped"
 import base from "../app"
 import { region } from "../domain/greet"
 

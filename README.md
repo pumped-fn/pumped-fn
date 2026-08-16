@@ -175,7 +175,6 @@ Read the checklist: [How to review pumped-fn code](docs/code-review-guide.md).
 | `pkg/ext/suspense` | `@pumped-fn/lite-extension-suspense` | [README](pkg/ext/suspense/README.md) |
 | `pkg/ext/sync` | `@pumped-fn/lite-extension-sync` | [README](pkg/ext/sync/README.md) |
 | `pkg/ext/sync-nats` | `@pumped-fn/lite-extension-sync-nats` | [README](pkg/ext/sync-nats/README.md) |
-| `pkg/framework/hono` | `@pumped-fn/lite-hono` | [README](pkg/framework/hono/README.md) |
 | `pkg/framework/pumped` | `@pumped-fn/pumped` | [README](pkg/framework/pumped/README.md) |
 | `pkg/framework/tanstack-start` | `@pumped-fn/lite-tanstack-start` | [README](pkg/framework/tanstack-start/README.md) |
 | `pkg/react/json` | `@pumped-fn/lite-react-json-render` | [README](pkg/react/json/README.md) |

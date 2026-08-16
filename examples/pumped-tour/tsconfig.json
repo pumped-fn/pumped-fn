@@ -11,12 +11,6 @@
       ],
       "@pumped-fn/pumped": [
         "../../pkg/framework/pumped/src/index.ts"
-      ],
-      "@pumped-fn/pumped/app": [
-        "../../pkg/framework/pumped/src/app.ts"
-      ],
-      "@pumped-fn/pumped/meta": [
-        "../../pkg/framework/pumped/src/meta.ts"
       ]
     }
   },
