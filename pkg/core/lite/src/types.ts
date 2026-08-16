@@ -8,6 +8,8 @@ export const controllerSymbol: unique symbol = Symbol.for("@pumped-fn/lite/contr
 export const tagExecutorSymbol: unique symbol = Symbol.for("@pumped-fn/lite/tag-executor")
 export const typedSymbol: unique symbol = Symbol.for("@pumped-fn/lite/typed")
 export const resourceSymbol: unique symbol = Symbol.for("@pumped-fn/lite/resource")
+export const attributeSymbol: unique symbol = Symbol.for("@pumped-fn/lite/attribute")
+export const attributedSymbol: unique symbol = Symbol.for("@pumped-fn/lite/attributed")
 
 export class ParseError extends Error {
   override readonly name = "ParseError"
@@ -446,7 +448,7 @@ export namespace Lite {
     readonly hasDefault: HasDefault
     readonly parse?: (raw: unknown) => T
     eq(a: T, b: T): boolean
-    (value: T): Tagged<T>
+    (value: T, options?: TaggedOptions): Tagged<T>
     same(a: Tagged<any>, b: Tagged<any>): boolean
     get(source: TagSource): T
     find(source: TagSource): HasDefault extends true ? T : T | undefined
@@ -459,6 +461,51 @@ export namespace Lite {
     readonly key: symbol
     readonly value: T
     readonly tag: Tag<T, boolean>
+    readonly attributes?: readonly Attributed<any>[]
+  }
+
+  /**
+   * Declaration-layer membership key: discriminates carriers of the same tag.
+   * Attributes never enter a scope or an execution context. A carrier's bindings
+   * of one attribute form its membership set, read with `has` and `collect`.
+   * `select` marks whether application picking polices facts of this attribute
+   * (default true); consumer-owned attributes declare `select: false`.
+   */
+  export interface Attribute<T> {
+    readonly [attributeSymbol]: true
+    readonly key: symbol
+    readonly label: string
+    readonly select: boolean
+    eq(a: T, b: T): boolean
+    (value: T): Attributed<T>
+    has(source: AttributeSource, value: T): boolean
+    collect(source: AttributeSource): T[]
+  }
+
+  /** Presence-only attribute for markers; never participates in application picking. */
+  export interface Flag {
+    readonly [attributeSymbol]: true
+    readonly key: symbol
+    readonly label: string
+    readonly select: false
+    (): Attributed<true>
+    has(source: AttributeSource): boolean
+  }
+
+  export interface Attributed<T> {
+    readonly [attributedSymbol]: true
+    readonly key: symbol
+    readonly value: T
+    readonly attribute: Attribute<T>
+  }
+
+  export type AttributeInput = Attributed<any> | readonly AttributeInput[]
+
+  export type AttributeSource = AttributeInput | { attributes?: AttributeInput }
+
+  /** Creation options for one tagged value; the value itself stays untouched. */
+  export interface TaggedOptions {
+    attributes?: AttributeInput
   }
 
   export type TagInput = Tagged<any> | readonly TagInput[]

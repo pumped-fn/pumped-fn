@@ -1,7 +1,9 @@
+import { normalizeAttributes } from "./attribute"
 import { tagSymbol, taggedSymbol, tagExecutorSymbol, ParseError, type Lite } from "./types"
 
 export interface TagOptions<T, HasDefault extends boolean> {
   label: string
+  attributes?: Lite.AttributeInput
   default?: HasDefault extends true ? T : never
   parse?: (raw: unknown) => T
   eq?: (a: T, b: T) => boolean
@@ -125,20 +127,24 @@ function getAtomsForTag(tag: Lite.Tag<unknown, boolean>): Lite.Atom<unknown>[] {
  */
 export function tag<T>(options: {
   label: string
+  attributes?: Lite.AttributeInput
   eq?: (a: T, b: T) => boolean
 }): Lite.Tag<T, false>
 export function tag<T>(options: {
   label: string
+  attributes?: Lite.AttributeInput
   default: T
   eq?: (a: T, b: T) => boolean
 }): Lite.Tag<T, true>
 export function tag<T>(options: {
   label: string
+  attributes?: Lite.AttributeInput
   parse: (raw: unknown) => T
   eq?: (a: T, b: T) => boolean
 }): Lite.Tag<T, false>
 export function tag<T>(options: {
   label: string
+  attributes?: Lite.AttributeInput
   parse: (raw: unknown) => T
   default: T
   eq?: (a: T, b: T) => boolean
@@ -149,10 +155,17 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
   const defaultValue = hasDefault ? options.default : undefined
   const parse = options.parse
   const eq = options.eq ?? Object.is
+  const declared = normalizeAttributes(options.attributes)
 
   let tagInstance: Lite.Tag<T, boolean>
 
-  function createTagged(value: T): Lite.Tagged<T> {
+  function createTagged(value: T, taggedOptions?: Lite.TaggedOptions): Lite.Tagged<T> {
+    let bound = declared
+    if (taggedOptions?.attributes !== undefined) {
+      const overrides = normalizeAttributes(taggedOptions.attributes)
+      const overriddenKeys = new Set(overrides.map((attributed) => attributed.key))
+      bound = [...overrides, ...declared.filter((attributed) => !overriddenKeys.has(attributed.key))]
+    }
     let validatedValue = value
     if (parse) {
       try {
@@ -164,6 +177,15 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
           options.label,
           err
         )
+      }
+    }
+    if (bound.length > 0) {
+      return {
+        [taggedSymbol]: true,
+        key,
+        value: validatedValue,
+        tag: tagInstance,
+        attributes: bound,
       }
     }
     return {
