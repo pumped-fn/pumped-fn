@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/pumped",
-  "version": "0.3.2",
+  "version": "1.0.0",
   "private": false,
   "description": "Convention-driven scope compiler: declare entries with tags, assemble a scope, mount them on HTTP, CLI, cron, and workflow hosts",
   "type": "module",
