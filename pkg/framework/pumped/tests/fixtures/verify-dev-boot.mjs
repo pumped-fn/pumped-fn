@@ -3,7 +3,11 @@ import { resolve } from "node:path"
 
 const root = resolve(import.meta.dirname, "schedule-dev")
 const bin = resolve(import.meta.dirname, "../../dist/cli.mjs")
-const child = spawn(process.execPath, [bin, "dev"], { cwd: root, stdio: ["ignore", "pipe", "pipe"] })
+const child = spawn(process.execPath, [bin, "dev"], {
+  cwd: root,
+  stdio: ["ignore", "pipe", "pipe"],
+  env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" },
+})
 
 let output = ""
 function fail(message) {
@@ -17,7 +21,8 @@ try {
     const timer = setTimeout(() => rejectPort(new Error("dev server did not print a URL within 30s")), 30_000)
     const onData = (chunk) => {
       output += chunk
-      const match = output.match(/(?:localhost|127\.0\.0\.1):(\d+)/)
+      const plain = output.replaceAll(/\u001b\[[0-9;]*m/g, "")
+      const match = plain.match(/(?:localhost|127\.0\.0\.1):(\d+)/)
       if (match) {
         clearTimeout(timer)
         resolvePort(Number(match[1]))
