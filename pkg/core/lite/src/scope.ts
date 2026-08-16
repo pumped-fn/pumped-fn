@@ -374,32 +374,34 @@ function throwListenerErrors(errors: unknown[]): void {
   throw new AggregateError(errors, "Listener notification failed")
 }
 
-let notifyingListeners = 0
+interface NotifyDepth {
+  count: number
+}
 
-function notifyListener(listener: Listener | undefined, errors?: unknown[]): void {
+function notifyListener(depth: NotifyDepth, listener: Listener | undefined, errors?: unknown[]): void {
   if (!listener) return
-  notifyingListeners++
+  depth.count++
   try {
     listener()
   } catch (error) {
     if (!errors) {
-      notifyingListeners--
+      depth.count--
       throw error
     }
     errors.push(error)
   }
-  notifyingListeners--
+  depth.count--
 }
 
-function notifyListeners(listeners: Set<Listener> | undefined, errors?: unknown[]): void {
+function notifyListeners(depth: NotifyDepth, listeners: Set<Listener> | undefined, errors?: unknown[]): void {
   if (!listeners?.size) return
   if (listeners.size === 1) {
-    notifyListener(listeners.values().next().value, errors)
+    notifyListener(depth, listeners.values().next().value, errors)
     return
   }
   const failures = errors ?? []
   const snapshot = [...listeners]
-  notifyingListeners++
+  depth.count++
   for (let i = 0; i < snapshot.length; i++) {
     try {
       snapshot[i]!()
@@ -407,7 +409,7 @@ function notifyListeners(listeners: Set<Listener> | undefined, errors?: unknown[
       failures.push(error)
     }
   }
-  notifyingListeners--
+  depth.count--
   if (!errors) throwListenerErrors(failures)
 }
 
@@ -421,7 +423,8 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
   constructor(
     private ctrl: Lite.Controller<T>,
     private selector: (value: T) => S,
-    private eq: (prev: S, next: S) => boolean
+    private eq: (prev: S, next: S) => boolean,
+    private notifyDepth: NotifyDepth
   ) {
     if (ctrl.state !== 'resolved') {
       throw new Error("Cannot select from unresolved atom")
@@ -455,7 +458,7 @@ class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
         const nextValue = this.selector(this.sourceValue)
         if (!this.eq(this.currentValue, nextValue)) {
           this.currentValue = nextValue
-          notifyListeners(this.listeners)
+          notifyListeners(this.notifyDepth, this.listeners)
         }
       })
     }
@@ -600,6 +603,7 @@ class ScopeImpl implements Lite.Scope {
   private invalidationQueued?: Set<Lite.Atom<unknown>>
   private invalidationIndex = 0
   private drainTarget: Lite.Atom<unknown> | null = null
+  readonly notifyDepth: NotifyDepth = { count: 0 }
   private drainStarted = false
   private drainTainted = false
   private invalidationTainted: Set<Lite.Atom<unknown>> | null = null
@@ -622,7 +626,7 @@ class ScopeImpl implements Lite.Scope {
   private pendingContextCloses?: Set<Promise<void>>
 
   private taintContext(): boolean {
-    return this.drainStarted || notifyingListeners > 0
+    return this.drainStarted || this.notifyDepth.count > 0
   }
 
   private scheduleInvalidation<T>(atom: Lite.Atom<T>, entry?: AtomEntry<T>, tainted = false): void {
@@ -932,12 +936,12 @@ class ScopeImpl implements Lite.Scope {
   private notifyEntry(entry: AtomEntry<unknown>, event: 'resolving' | 'resolved', errors?: unknown[], cascade = false): void {
     const listeners = event === 'resolving' ? entry.resolvingListeners : entry.resolvedListeners
     if (!errors && !entry.watchers?.size && !entry.valueListeners?.size && !entry.allListeners?.size) {
-      if (event === 'resolved') notifyListener(entry.resolvedListener)
-      notifyListeners(listeners)
+      if (event === 'resolved') notifyListener(this.notifyDepth, entry.resolvedListener)
+      notifyListeners(this.notifyDepth, listeners)
       return
     }
     const failures = errors ?? []
-    const tainted = !cascade && (this.drainStarted || notifyingListeners > 0)
+    const tainted = !cascade && (this.drainStarted || this.notifyDepth.count > 0)
     if (event === 'resolved' && entry.watchers?.size) {
       for (const edge of entry.watchers) {
         try {
@@ -956,27 +960,27 @@ class ScopeImpl implements Lite.Scope {
       if (!entry.valueReady || !Object.is(entry.notifiedValue, entry.value)) {
         entry.valueReady = true
         entry.notifiedValue = entry.value
-        notifyListeners(entry.valueListeners, failures)
+        notifyListeners(this.notifyDepth, entry.valueListeners, failures)
       }
     }
-    if (event === 'resolved') notifyListener(entry.resolvedListener, failures)
-    notifyListeners(listeners, failures)
-    notifyListeners(entry.allListeners, failures)
+    if (event === 'resolved') notifyListener(this.notifyDepth, entry.resolvedListener, failures)
+    notifyListeners(this.notifyDepth, listeners, failures)
+    notifyListeners(this.notifyDepth, entry.allListeners, failures)
     if (!errors) throwListenerErrors(failures)
   }
 
   private notifyEntryAll(entry: AtomEntry<unknown>, errors?: unknown[]): void {
     const failures = errors ?? []
     entry.valueReady = false
-    notifyListeners(entry.valueListeners, failures)
-    notifyListeners(entry.allListeners, failures)
+    notifyListeners(this.notifyDepth, entry.valueListeners, failures)
+    notifyListeners(this.notifyDepth, entry.allListeners, failures)
     if (!errors) throwListenerErrors(failures)
   }
 
   private emitStateChange(state: AtomState, atom: Lite.Atom<unknown>, errors?: unknown[]): void {
     const stateMap = this.stateListeners?.get(state)
     if (!stateMap) return
-    notifyListeners(stateMap.get(atom), errors)
+    notifyListeners(this.notifyDepth, stateMap.get(atom), errors)
   }
 
   on<Args extends unknown[]>(
@@ -1909,7 +1913,7 @@ class ScopeImpl implements Lite.Scope {
   ): Lite.SelectHandle<S> {
     const ctrl = this.controller(atom)
     const eq = options?.eq ?? Object.is
-    return new SelectHandleImpl(ctrl, selector, eq)
+    return new SelectHandleImpl(ctrl, selector, eq, this.notifyDepth)
   }
 
   changes<T>(atom: Lite.Atom<T>): AsyncIterable<T>
@@ -2293,8 +2297,8 @@ class ScopeImpl implements Lite.Scope {
     entry.pendingInvalidate = 0
     entry.resolvedPromise = undefined
     if (!this.stateListeners && !entry.watchers?.size && !entry.allListeners?.size && !entry.valueListeners?.size) {
-      notifyListener(entry.resolvedListener)
-      notifyListeners(entry.resolvedListeners)
+      notifyListener(this.notifyDepth, entry.resolvedListener)
+      notifyListeners(this.notifyDepth, entry.resolvedListeners)
       return
     }
     if (this.stateListeners) this.emitStateChange('resolved', atom)
@@ -2328,8 +2332,8 @@ class ScopeImpl implements Lite.Scope {
     entry.pendingInvalidate = 0
     entry.resolvedPromise = undefined
     if (!this.stateListeners && !entry.watchers?.size && !entry.allListeners?.size && !entry.valueListeners?.size) {
-      notifyListener(entry.resolvedListener)
-      notifyListeners(entry.resolvedListeners)
+      notifyListener(this.notifyDepth, entry.resolvedListener)
+      notifyListeners(this.notifyDepth, entry.resolvedListeners)
       return
     }
     if (this.stateListeners) this.emitStateChange('resolved', atom)
@@ -2915,8 +2919,8 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   emitResourceState(resource: Lite.Resource<unknown>, state: AtomState): void {
     const listeners = this.resourceListeners?.get(resource)
     if (!listeners) return
-    notifyListeners(listeners[state])
-    notifyListeners(listeners.all)
+    notifyListeners(this.scope.notifyDepth, listeners[state])
+    notifyListeners(this.scope.notifyDepth, listeners.all)
   }
 
   runResourceFactory<T>(
