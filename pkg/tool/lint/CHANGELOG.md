@@ -1,5 +1,15 @@
 # @pumped-fn/lite-lint
 
+## 1.4.0
+
+### Minor Changes
+
+- 3c80d40: New rule `pumped/no-preset-outside-test` (error by default): flags `preset(...)` calls in
+  files outside test paths (`tests/`, `*.test.*`, `*.spec.*`), including namespaced
+  `lite.preset(...)` calls. Preset is the test seam; production composition supplies
+  implementations through tags. Markdown snippets are untouched — the rule runs only on
+  source files.
+
 ## 1.3.2
 
 ### Patch Changes
