@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-logging",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": false,
   "description": "Execution-scoped logging extension for @pumped-fn/lite with tag-injected sinks",
   "type": "module",

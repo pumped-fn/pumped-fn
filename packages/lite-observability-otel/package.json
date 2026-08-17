@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-observability-otel",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": false,
   "description": "OpenTelemetry sink adapter for @pumped-fn/lite-observability",
   "type": "module",
