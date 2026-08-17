@@ -123,10 +123,12 @@ jobs:
       - name: Check for changeset
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_REF: ${{ github.head_ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           TITLE_SKIP_PATTERN='^(chore|docs|ci)(\([^)]+\))?!?:([[:space:]]|$)'
-          if [[ "$PR_TITLE" =~ $TITLE_SKIP_PATTERN ]] || \
+          if [[ "$HEAD_REF" == "changeset-release/main" ]] || \
+             [[ "$PR_TITLE" =~ $TITLE_SKIP_PATTERN ]] || \
              [[ "$PR_TITLE" == *"[skip-changeset]"* ]]; then
             echo "Skipping changeset check for this PR type"
             exit 0
@@ -163,6 +165,7 @@ jobs:
       - name: Check public and inline execution contracts
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           CHECKOUT_HEAD="$(git rev-parse HEAD)"
           CHANGED_FILES="$RUNNER_TEMP/public-contract-changed-files.json"
@@ -171,7 +174,11 @@ jobs:
           pnpm examples:test
           pnpm examples:check
           pnpm contract:test
-          pnpm contract:check -- --base "$BASE_SHA" --changed-files "$CHANGED_FILES" --pr-json "$GITHUB_EVENT_PATH" --expect-head "$CHECKOUT_HEAD"
+          if [[ "$HEAD_REF" == "changeset-release/main" ]]; then
+            echo "Skipping the new-changeset contract check for the generated release PR"
+          else
+            pnpm contract:check -- --base "$BASE_SHA" --changed-files "$CHANGED_FILES" --pr-json "$GITHUB_EVENT_PATH" --expect-head "$CHECKOUT_HEAD"
+          fi
           pnpm inline-exec:test
           pnpm inline-exec:check -- --expect-head "$CHECKOUT_HEAD"
 

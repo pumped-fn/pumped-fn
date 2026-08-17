@@ -350,7 +350,9 @@ const changesetOrder = [
   "pnpm release-policy:test",
   "pnpm release-policy:check -- --base \"$BASE_SHA\"",
   "- name: Check for changeset",
+  "HEAD_REF: ${{ github.head_ref }}",
   "TITLE_SKIP_PATTERN='^(chore|docs|ci)(\\([^)]+\\))?!?:([[:space:]]|$)'",
+  '[[ "$HEAD_REF" == "changeset-release/main" ]]',
   '[[ "$PR_TITLE" =~ $TITLE_SKIP_PATTERN ]]',
   "exit 0",
   "pnpm changeset status --since=\"$BASE_SHA\"",
@@ -370,6 +372,7 @@ const contractOrder = [
   "CHECKOUT_HEAD=\"$(git rev-parse HEAD)\"",
   "git diff --name-only \"$BASE_SHA...$CHECKOUT_HEAD\"",
   "pnpm contract:test",
+  '[[ "$HEAD_REF" == "changeset-release/main" ]]',
   "pnpm contract:check -- --base \"$BASE_SHA\" --changed-files \"$CHANGED_FILES\" --pr-json \"$GITHUB_EVENT_PATH\" --expect-head \"$CHECKOUT_HEAD\"",
   "pnpm inline-exec:test",
   "pnpm inline-exec:check -- --expect-head \"$CHECKOUT_HEAD\"",
@@ -380,8 +383,9 @@ if (
   || contractOrder.some((index, position) => position > 0 && index <= contractOrder[position - 1])
   || !contractJob.includes("if: github.event_name == 'pull_request'")
   || !contractJob.includes("BASE_SHA: ${{ github.event.pull_request.base.sha }}")
+  || !contractJob.includes("HEAD_REF: ${{ github.head_ref }}")
 ) {
-  fail("workflow_contract_gate_order", "Contract CI must bind changed files, the PR event snapshot, and both contract checks to the exact checkout head")
+  fail("workflow_contract_gate_order", "Contract CI must bind changed files, the PR event snapshot, release-branch handling, and both contract checks to the exact checkout head")
 }
 
 const changedPackagesJob = workflowJob("changed-packages")
