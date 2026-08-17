@@ -33,41 +33,9 @@ export async function handleUser(request: Request): Promise<Response> {
 }
 ```
 
-The route owns the request context. It seeds request facts as tags, runs one flow, and closes the context in `finally`.
-
-> **Note:** Express and Nest examples are not covered here yet. This page shows a plain handler and Hono.
-
-If you are using Hono, run the flow through the scope with request tags; `scope.run` owns one context per request.
-
-```ts
-import { Hono } from "hono"
-import { createScope, flow, tag, tags } from "@pumped-fn/lite"
-
-const requestId = tag<string>({ label: "request.id" })
-
-const readRequest = flow({
-  deps: { requestId: tags.required(requestId) },
-  factory: (_ctx, { requestId }) => requestId,
-})
-
-const app = new Hono()
-const scope = createScope()
-
-app.get("/id", async (context) =>
-  context.json({
-    id: await scope.run({
-      flow: readRequest,
-      tags: [requestId(context.req.header("x-request-id") ?? "missing")],
-    }),
-  })
-)
-
-export async function closeApp(): Promise<void> {
-  await scope.dispose()
-}
-```
-
-The adapter keeps the app scope in the extension, writes the request execution context to `context.var`, and closes it after request handling. Application scope construction still belongs to your composition root.
+The route owns the request context. It seeds request facts as tags, runs one flow, and closes the
+context in `finally`. The server only needs to call this plain handler. Lite does not need a
+server-specific adapter.
 
 ## Move One Leaf
 
@@ -143,18 +111,17 @@ Then repeat with the next leaf dependency. The route boundary does not have to m
 
 Create scopes, root contexts, route mounts, job mounts, and disposal at composition roots. Keep feature units declared in the graph, or keep helpers pure and call them from declared graph units.
 
-Avoid shared scope factories, global registries, framework-shaped copies of Lite primitives, public helpers that accept `scope`, and hidden framework request reads inside units. Those shapes make the seam harder to test and harder to replace one route at a time.
+Avoid shared scope factories, global registries, server-shaped copies of Lite primitives, public
+helpers that accept `scope`, and hidden request reads inside units. Those shapes make the seam harder
+to test and harder to replace one route at a time.
 
 ## Source
 
-- [Framework package rules](../pkg/framework/README.md)
-- [Hono adapter](../pkg/framework/hono/src/index.ts)
-- [Hono adapter tests](../pkg/framework/hono/tests/hono.test.ts)
-- [Lite README boundary rules](../pkg/core/lite/README.md)
-- [Preset API](../pkg/core/lite/src/preset.ts)
-- [Scope implementation](../pkg/core/lite/src/scope.ts)
+- [Lite boundary rules](../packages/lite/README.md#boundary-ownership)
+- [Preset API](../packages/lite/src/preset.ts)
+- [Scope implementation](../packages/lite/src/scope.ts)
 
 ## Next
 
-- [Request context without AsyncLocalStorage](request-context-without-als.md)
+- [Request context without ambient storage](request-context-without-als.md)
 - [Test without mocking modules](test-without-mocks.md)

@@ -216,18 +216,18 @@ export function extractRows(
 }
 
 const moduleFiles = {
-  "@pumped-fn/lite": process.env.PUMPED_PERF_LITE_DIST ?? resolve(repoRoot, "pkg/core/lite/dist/index.mjs"),
+  "@pumped-fn/lite": process.env.PUMPED_PERF_LITE_DIST ?? resolve(repoRoot, "packages/lite/dist/index.mjs"),
   "@pumped-fn/lite-react": process.env.PUMPED_PERF_LITE_REACT_DIST ?? resolve(
     repoRoot,
-    "pkg/react/lite-react/dist/index.mjs"
+    "packages/lite-react/dist/index.mjs"
   ),
 };
 
 const packageFiles = {
-  "@pumped-fn/lite": process.env.PUMPED_PERF_LITE_PACKAGE ?? resolve(repoRoot, "pkg/core/lite/package.json"),
+  "@pumped-fn/lite": process.env.PUMPED_PERF_LITE_PACKAGE ?? resolve(repoRoot, "packages/lite/package.json"),
   "@pumped-fn/lite-react": process.env.PUMPED_PERF_LITE_REACT_PACKAGE ?? resolve(
     repoRoot,
-    "pkg/react/lite-react/package.json"
+    "packages/lite-react/package.json"
   ),
 };
 

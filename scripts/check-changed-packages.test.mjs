@@ -28,8 +28,8 @@ const fixture = ({ move = false, retire = false } = {}) => {
   const base = execFileSync("git", ["rev-parse", "HEAD"], { cwd: directory, encoding: "utf8" }).trim();
 
   if (move) {
-    mkdirSync(join(directory, "pkg/ext"), { recursive: true });
-    renameSync(join(directory, "pkg/core/demo"), join(directory, "pkg/ext/demo"));
+    mkdirSync(join(directory, "packages"), { recursive: true });
+    renameSync(join(directory, "pkg/core/demo"), join(directory, "packages/demo"));
   } else {
     rmSync(join(directory, "pkg/core/demo"), { recursive: true });
   }
@@ -62,7 +62,7 @@ describe("changed package identity", () => {
   it("treats a public package path move as the same package", () => {
     const result = run({ move: true });
     assert.equal(result.status, 0);
-    assert.match(result.stdout, /Rebuilding @fixture\/demo from pkg\/ext\/demo/u);
+    assert.match(result.stdout, /Rebuilding @fixture\/demo from packages\/demo/u);
     assert.doesNotMatch(result.stdout, /Retired public package/u);
   });
 

@@ -1,8 +1,8 @@
 # TypeScript DI without decorators: why use pumped-fn instead of a container?
 
-Use pumped-fn when the container question is really a testability question. The goal is not "no decorators" by itself; the goal is one graph seam where hidden IO, async setup, substitutions, and request facts become visible.
-
-Run the [source-locked account-onboarding comparison](../playground/compare/README.md) to execute pumped-fn, Awilix, Inversify, and plain TypeScript against the same black-box contract in Node and an editable browser sandbox.
+Use pumped-fn when the container question is really a testability question. The goal is not "no
+decorators" by itself. The goal is one graph seam where hidden IO, async setup, substitutions, and
+request facts become visible.
 
 ## 1. Footguns
 
@@ -166,9 +166,9 @@ tsyringe documents injection tokens and providers in its container API: [tsyring
 
 ## Source
 
-- [Core exports](../pkg/core/lite/src/index.ts)
-- [Dependency classification](../pkg/core/lite/src/deps-graph.ts)
-- [Role tag tests](../pkg/core/lite/tests/role-tags.test.ts)
+- [Lite exports](../packages/lite/src/index.ts)
+- [Dependency classification](../packages/lite/src/deps-graph.ts)
+- [Role tag tests](../packages/lite/tests/role-tags.test.ts)
 - [tsyringe README](https://github.com/microsoft/tsyringe#api)
 - [InversifyJS getting started](https://inversify.io/docs/introduction/getting-started/)
 - [InversifyJS binding fundamentals](https://inversify.io/docs/fundamentals/binding/)

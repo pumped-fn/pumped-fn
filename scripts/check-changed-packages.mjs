@@ -17,7 +17,7 @@ const files = changedFiles(base);
 const packageDirs = [
   ...new Set(
     files
-      .map((file) => file.match(/^pkg\/[^/]+\/[^/]+\//)?.[0])
+      .map((file) => file.match(/^(?:packages\/[^/]+|pkg\/[^/]+\/[^/]+)\//)?.[0])
       .filter((value) => value !== undefined)
       .map((value) => value.slice(0, -1)),
   ),
@@ -102,23 +102,20 @@ function packageAt(path) {
 }
 
 function currentPackageInventory() {
-  return readdirSync(join(root, "pkg"), { withFileTypes: true })
+  if (!existsSync(join(root, "packages"))) return [];
+  return readdirSync(join(root, "packages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .flatMap((lane) =>
-      readdirSync(join(root, "pkg", lane.name), { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => packageAt(`pkg/${lane.name}/${entry.name}`))
-    )
+    .map((entry) => packageAt(`packages/${entry.name}`))
     .filter((pkg) => pkg !== undefined && pkg.private !== true);
 }
 
 function basePackageInventory() {
-  return execFileSync("git", ["ls-tree", "-r", "--name-only", base, "--", "pkg"], {
+  return execFileSync("git", ["ls-tree", "-r", "--name-only", base, "--", "packages", "pkg"], {
     cwd: root,
     encoding: "utf8",
   })
     .split("\n")
-    .filter((path) => /^pkg\/[^/]+\/[^/]+\/package\.json$/u.test(path))
+    .filter((path) => /^(?:packages\/[^/]+|pkg\/[^/]+\/[^/]+)\/package\.json$/u.test(path))
     .map((file) => {
       const pkg = JSON.parse(execFileSync("git", ["show", `${base}:${file}`], { cwd: root, encoding: "utf8" }));
       return { ...pkg, path: dirname(file) };

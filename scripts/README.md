@@ -10,14 +10,16 @@
 | --- | --- |
 | `act.mjs` | Repository wrapper for local GitHub Actions dry-runs with `act`. |
 | `check-changed-packages.mjs` | CI helper that rebuilds changed public workspace packages and dry-runs unpublished versions. |
-| `check-example-alignment.mjs` | Check example, guidance, package-map, dependency-policy, and script-surface drift. |
+| `check-changed-packages.test.mjs` | Deterministic fixtures for flat-package moves and explicit retirement evidence. |
+| `check-repository-alignment.mjs` | Check flat package inventory, dependency policy, root cleanup, public lint wiring, script surface, and workflow provenance. |
+| `check-repository-alignment.test.mjs` | Deterministic fixtures for repository shape, public lint wiring, and workflow provenance. |
 | `check-inline-exec-contract.mjs` | Check inline `scope.run` and `ctx.exec` call sites for explicit names, parameters, inspectable callbacks, and graph dependencies when used. |
 | `check-inline-exec-contract.test.mjs` | Deterministic positive and negative fixtures for the inline execution contract checker. |
-| `check-packed-lite.mjs` | Pack Lite and Lite React, then verify docs, ESM, CJS, TS7 NodeNext, and Bundler consumers. |
+| `check-packed-lite.mjs` | Pack all seven public packages, then verify docs, licenses, runtime/API/CLI behavior, NodeNext, and Bundler consumers. |
 | `check-published-types.mjs` | Validate every public package root export with strict NodeNext ESM/CJS and Bundler consumers. |
 | `check-public-contract.mjs` | Check package metadata, migration evidence, public interface TSDoc, README fences, changesets, and PR provenance. |
 | `check-release-policy.mjs` | Check Changeset bump size, corrected early versions, internal peer alignment, and the repository release policy. |
-| `check-release-policy.test.mjs` | Deterministic release-policy fixtures for core majors, pre-1 graduation, early version correction, stable minors, widening, and stale peers. |
+| `check-release-policy.test.mjs` | Deterministic release-policy fixtures for core majors, pre-1 graduation, early version correction, stable majors, widening, and stale peers. |
 | `check-public-contract.test.mjs` | Deterministic positive and negative fixtures for the public contract checker. |
 | `get-release-title.sh` | Release workflow helper for Changesets PR titles. |
 

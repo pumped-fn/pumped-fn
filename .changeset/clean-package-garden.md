@@ -1,0 +1,33 @@
+---
+"@pumped-fn/lite": minor
+"@pumped-fn/lite-lint": patch
+"@pumped-fn/lite-react": patch
+"@pumped-fn/lite-logging": major
+"@pumped-fn/lite-logging-pino": major
+"@pumped-fn/lite-observability": major
+"@pumped-fn/lite-observability-otel": major
+---
+
+Start the short-name logging and observability package lines, publish the flat package metadata, and expose immutable root tags through `scope.tags` for extension authors.
+
+Retires: "@pumped-fn/codemod"
+Retires: "@pumped-fn/lite-extension-logging"
+Retires: "@pumped-fn/lite-extension-logging-pino"
+Retires: "@pumped-fn/lite-extension-observable"
+Retires: "@pumped-fn/lite-extension-observable-otel"
+Retires: "@pumped-fn/lite-extension-suspense"
+Retires: "@pumped-fn/lite-extension-sync"
+Retires: "@pumped-fn/lite-extension-sync-nats"
+Retires: "@pumped-fn/lite-hmr"
+Retires: "@pumped-fn/lite-react-json-render"
+Retires: "@pumped-fn/lite-render-core"
+Retires: "@pumped-fn/lite-render-react"
+Retires: "@pumped-fn/lite-tanstack-start"
+Retires: "@pumped-fn/pumped"
+Retires: "@pumped-fn/sdk"
+Retires: "@pumped-fn/sdk-claude"
+Retires: "@pumped-fn/sdk-codex"
+Retires: "@pumped-fn/sdk-just-bash"
+Retires: "@pumped-fn/sdk-mcp"
+Retires: "@pumped-fn/sdk-pi"
+Retires: "@pumped-fn/sdk-test"

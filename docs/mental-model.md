@@ -89,11 +89,11 @@ Raw ambient IO belongs in transport atoms or composition-root adapters. Feature 
 ## Source
 
 - [Core README mental model](../README.md)
-- [Dependency graph classification](../pkg/core/lite/src/deps-graph.ts)
-- [Tag dependencies](../pkg/core/lite/src/tag.ts)
-- [Resources](../pkg/core/lite/src/resource.ts)
-- [Scope implementation](../pkg/core/lite/src/scope.ts)
-- [Lite patterns](../pkg/core/lite/PATTERNS.md)
+- [Dependency graph classification](../packages/lite/src/deps-graph.ts)
+- [Tag dependencies](../packages/lite/src/tag.ts)
+- [Resources](../packages/lite/src/resource.ts)
+- [Scope implementation](../packages/lite/src/scope.ts)
+- [Lite patterns](../packages/lite/PATTERNS.md)
 
 ## Next
 

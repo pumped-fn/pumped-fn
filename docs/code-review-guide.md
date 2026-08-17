@@ -62,19 +62,39 @@ That is the review move: find the uncontrolled edge, then ask where the graph sh
 | Module-level DB/client singleton used by a flow | Unsubstitutable edge | Wrap the client in an atom and preset that atom in tests |
 | Exported shared scope or helper that accepts `scope` | Service-locator shape | Create scopes at composition roots and run flows through contexts |
 | Child flow called through hidden same-file `ctx.exec({ flow })` | Invisible graph edge | Put child flow in `deps`, usually with `controller(child)` |
-| Awaited foreign call on a dep without named `ctx.exec({ name, params, fn })` or a workflow step tag | Unattributed effect | Give the call a named execution edge |
+| Awaited client call without named `ctx.exec({ name, deps, params, fn })` | Unattributed effect | Give the call a named execution edge |
 
-For foreign SDK calls, prefer an adapter atom plus `ctx.exec({ name, params, fn, tags })`, adding `deps` only for graph dependencies. That gives tracing and workflow tags a named edge instead of an anonymous promise while keeping dependencies and runtime inputs explicit.
+For an outside client call, prefer an adapter atom plus a named inline execution. Graph handles go in
+`deps`. Runtime values go in `params`.
+
+```ts
+import { atom, flow, typed } from "@pumped-fn/lite"
+
+const notifier = atom({
+  factory: () => ({ send: async (message: string) => `sent:${message}` }),
+})
+
+const notify = flow({
+  parse: typed<{ message: string }>(),
+  factory: (ctx) => ctx.exec({
+    name: "notifier.send",
+    deps: { notifier },
+    params: [ctx.input.message],
+    fn: ({ notifier }, message) => notifier.send(message),
+  }),
+})
+```
+
+This gives logging and tracing a named edge instead of an anonymous promise.
 
 > **Note:** This guide does not replace `@pumped-fn/lite-lint`. Use the scanner too; it exposes diagnostics through `scanPaths` and `scanText`.
 
 ## Source
 
-- [Lite patterns](../pkg/core/lite/PATTERNS.md)
-- [Lite README testing boundary](../pkg/core/lite/README.md)
-- [Lint rule list](../pkg/tool/lint/README.md)
-- [Lint implementation](../pkg/tool/lint/src/index.ts)
-- [Invoice triage flow edges](../examples/invoice-triage/src/flows.ts)
+- [Lite patterns](../packages/lite/PATTERNS.md)
+- [Lite testing boundary](../packages/lite/README.md#boundary-ownership)
+- [Lint rule list](../packages/lite-lint/README.md#rules)
+- [Lint implementation](../packages/lite-lint/src/index.ts)
 
 ## Next
 

@@ -29,23 +29,30 @@ const fromRoot = (path) => normalize(relative(root, path));
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 const sortBy = (items, key) => items.sort((left, right) => key(left).localeCompare(key(right)));
 
-const packageDirectories = readdirSync(join(root, "pkg"), { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
-  .flatMap((lane) =>
-    readdirSync(join(root, "pkg", lane.name), { withFileTypes: true })
+const packageDirectories = [
+  ...(existsSync(join(root, "packages"))
+    ? readdirSync(join(root, "packages"), { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
-      .map((entry) => join(root, "pkg", lane.name, entry.name)),
-  )
+      .map((entry) => join(root, "packages", entry.name))
+    : []),
+  ...(existsSync(join(root, "pkg"))
+    ? readdirSync(join(root, "pkg"), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .flatMap((lane) => readdirSync(join(root, "pkg", lane.name), { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => join(root, "pkg", lane.name, entry.name)))
+    : []),
+]
   .filter((directory) => existsSync(join(directory, "package.json")))
   .map((directory) => ({ directory, manifest: readJson(join(directory, "package.json")) }))
   .filter(({ manifest }) => manifest.private !== true);
 const packagesByName = new Map(packageDirectories.map((entry) => [entry.manifest.name, entry]));
-const packageManifestsAt = (ref) => execFileSync("git", ["ls-tree", "-r", "--name-only", ref, "--", "pkg"], {
+const packageManifestsAt = (ref) => execFileSync("git", ["ls-tree", "-r", "--name-only", ref, "--", "packages", "pkg"], {
   cwd: root,
   encoding: "utf8",
 })
   .split("\n")
-  .filter((path) => /^pkg\/[^/]+\/[^/]+\/package\.json$/u.test(path))
+  .filter((path) => /^(?:packages\/[^/]+|pkg\/[^/]+\/[^/]+)\/package\.json$/u.test(path))
   .map((path) => ({
     manifest: JSON.parse(execFileSync("git", ["show", `${ref}:${path}`], { cwd: root, encoding: "utf8" })),
     path,
@@ -205,7 +212,7 @@ const changedFiles = changedFilesPath
       .filter(Boolean);
 const packagesByPath = new Map(packageDirectories.map((entry) => [fromRoot(entry.directory), entry]));
 const changedPackages = [...new Set(changedFiles.flatMap((path) => {
-  const match = normalize(path).match(/^(pkg\/[^/]+\/[^/]+)\/(?:src\/|package\.json$)/u);
+  const match = normalize(path).match(/^((?:packages\/[^/]+|pkg\/[^/]+\/[^/]+))\/(?:src\/|package\.json$)/u);
   return match && packagesByPath.has(match[1]) ? [match[1]] : [];
 }))].sort();
 const changedWithoutChangeset = changedPackages.flatMap((path) => {
@@ -238,7 +245,7 @@ const collectMarkdown = (path) => {
 const guidancePaths = [...new Set([
   join(root, "README.md"),
   join(root, "scripts", "README.md"),
-  ...["docs", "examples", "skills", "pkg"].flatMap((path) => collectMarkdown(join(root, path))),
+  ...["docs", "packages"].flatMap((path) => collectMarkdown(join(root, path))),
 ].filter(existsSync))];
 
 const propertyName = (member) => {
