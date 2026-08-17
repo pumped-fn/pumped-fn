@@ -293,6 +293,20 @@ describe("ExecutionContext tags", () => {
     await scope.dispose()
   })
 
+  it("allows unopened tag storage during close cleanup and finalizes it afterward", async () => {
+    const marker = tag<string>({ label: "context-tags-lazy-close-cleanup" })
+    const scope = createScope()
+    const ctx = scope.createContext()
+
+    ctx.onClose(() => ctx.tags.set(marker("closing")))
+
+    await ctx.close()
+
+    expect(ctx.tags.get(marker)).toBe("closing")
+    expect(() => ctx.tags.set(marker("closed"))).toThrow("ExecutionContext is closed")
+    await scope.dispose()
+  })
+
   it("surfaces watcher failures from compatibility tag mutations after committing", async () => {
     const marker = tag<string>({ label: "context-tags-compat-failure" })
     const scope = createScope()

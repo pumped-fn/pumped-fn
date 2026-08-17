@@ -3032,6 +3032,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private signalOverride: AbortSignal | undefined
   private closePromise: Promise<void> | undefined
   private closed = false
+  private storeFinalized = false
   private readonly _input: unknown
   private _store: ContextStore | undefined
   private _data: ContextDataImpl | undefined
@@ -3108,7 +3109,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     if (!this._store) {
       if (this.parent) assertExecutionContextImpl(this.parent)
       this._store = new ContextStore(this.parent?.storeImpl())
-      if (this.closed) this._store.finalize()
+      if (this.storeFinalized) this._store.finalize()
     }
     return this._store
   }
@@ -3862,7 +3863,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         assertExecutionContextImpl(this.parent)
         this.parent.children?.delete(this)
       }
-      this._store?.finalize()
+      this.finalizeStore()
       return Promise.resolve()
     }
     const closing = (
@@ -3882,7 +3883,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         assertExecutionContextImpl(this.parent)
         this.parent.children?.delete(this)
       }
-      this._store?.finalize()
+      this.finalizeStore()
     })
     this.closePromise.then(
       () => { this.closePromise = undefined },
@@ -3910,6 +3911,11 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       assertExecutionContextImpl(this.parent)
       this.parent.children?.delete(this)
     }
+    this.finalizeStore()
+  }
+
+  private finalizeStore(): void {
+    this.storeFinalized = true
     this._store?.finalize()
   }
 
