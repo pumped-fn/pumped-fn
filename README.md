@@ -12,7 +12,7 @@ createScope({ presets, tags, extensions })
   ├─ run / runStream -> owned execution context ──────────┐
   │    ├─ ctx.data -> raw scratch data                    │
   │    ├─ ctx.tags -> exact watched tag families          │
-  │    └─ flow or named inline { deps, fn, params }        │
+  │    └─ flow or named inline { deps, fn, params }       │
   └─ createContext -> exec / execStream ──────────────────┴─ session.run -> agent.turn
                                                                   ├─ role + selected capability flows
                                                                   └─ provider + backend adapters

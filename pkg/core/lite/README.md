@@ -379,8 +379,10 @@ Watchers belong to one exact tag family in one context. `{ initial: true }` deli
 family synchronously during registration. A batch notifies each changed family once with its final values;
 reentrant writes queue until the active notification finishes. All listeners run before listener failures
 are rethrown. Each listener gets its own family snapshot. The listeners present when a delivery starts run
-once even if another listener removes them. An unbounded reentrant write loop throws instead of hanging.
-Closing the context drops its watchers after close cleanup settles.
+once even if another listener removes them. Each call owns its own subscription. An unbounded reentrant
+write loop throws instead of hanging; delivery stops there, so watchers may not have observed the committed
+values. A failed initial delivery rolls the registration back. Closing the context drops its watchers after
+close cleanup settles.
 
 ```ts
 import { createScope, tag } from "@pumped-fn/lite"

@@ -255,7 +255,41 @@ describe("ExecutionContext tags", () => {
 
     ctx.tags.watch(marker, (values) => ctx.tags.set(marker(values[0]! + 1)))
 
-    expect(() => ctx.tags.set(marker(0))).toThrow("Infinite context tag notification loop detected")
+    expect(() => ctx.tags.set(marker(0))).toThrow("Context tag notification did not settle")
+
+    await ctx.close()
+    await scope.dispose()
+  })
+
+  it("stops a reentrant loop that grows its own watcher set", async () => {
+    const marker = tag<number>({ label: "context-tags-infinite-fanout" })
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const grow = (): ((values: readonly number[]) => void) => (values) => {
+      ctx.tags.watch(marker, grow())
+      ctx.tags.set(marker(values[0]! + 1))
+    }
+
+    ctx.tags.watch(marker, grow())
+
+    expect(() => ctx.tags.set(marker(0))).toThrow("Context tag notification did not settle")
+
+    await scope.dispose()
+  })
+
+  it("gives each watch call its own subscription for a shared listener", async () => {
+    const marker = tag<number>({ label: "context-tags-shared-listener" })
+    const scope = createScope()
+    const ctx = scope.createContext()
+    const seen: number[][] = []
+    const listener = (values: readonly number[]) => seen.push([...values])
+
+    const stopFirst = ctx.tags.watch(marker, listener)
+    ctx.tags.watch(marker, listener)
+    stopFirst()
+    ctx.tags.set(marker(1))
+
+    expect(seen).toEqual([[1]])
 
     await ctx.close()
     await scope.dispose()

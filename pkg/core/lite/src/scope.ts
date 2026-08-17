@@ -88,6 +88,7 @@ interface ContextTagFamily {
 type ContextTagListener = (values: readonly any[]) => void
 
 const maxContextTagNotificationRounds = 1000
+const maxContextTagNotifications = 1_000_000
 
 class ContextStore {
   private readonly raw = new Map<string | symbol, unknown>()
@@ -233,9 +234,10 @@ class ContextStore {
       listeners = new Set()
       watchers.set(tag.key, listeners)
     }
-    listeners.add(listener as ContextTagListener)
+    const registered: ContextTagListener = (values) => listener(values)
+    listeners.add(registered)
     const stop = () => {
-      listeners!.delete(listener as ContextTagListener)
+      listeners!.delete(registered)
       if (watchers.get(tag.key) === listeners && listeners!.size === 0) watchers.delete(tag.key)
     }
     if (options?.initial) {
@@ -346,11 +348,12 @@ class ContextStore {
     }
     this.notifying = true
     let rounds = 0
+    let notifications = 0
     try {
       while (this.pending.size > 0) {
-        if (++rounds > maxContextTagNotificationRounds) {
+        if (++rounds > maxContextTagNotificationRounds || notifications > maxContextTagNotifications) {
           this.pending.clear()
-          failures.push(new Error("Infinite context tag notification loop detected"))
+          failures.push(new Error("Context tag notification did not settle"))
           break
         }
         const pending = [...this.pending.values()]
@@ -362,6 +365,7 @@ class ContextStore {
           const values = this.getMany(tag)
           for (const listener of [...listeners]) {
             if (this.finalized) break
+            notifications++
             try {
               listener(values.slice())
             } catch (error) {

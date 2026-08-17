@@ -198,6 +198,7 @@ export namespace Lite {
     /**
      * Replace every local family present in the input, preserving family value order.
      * @throws After committing when a watcher fails, or when reentrant writes do not settle.
+     * A write that does not settle stops delivery, so watchers may not observe the committed values.
      */
     set(input: TagInput): void
     /** Get the first local value without applying the tag default. */
@@ -217,7 +218,12 @@ export namespace Lite {
     delete<T, H extends boolean>(tag: Tag<T, H>): boolean
     /**
      * Watch one local tag family. Each listener receives its own value snapshot. Listeners
-     * present when delivery starts run once, even when another listener removes them.
+     * present when delivery starts run once, even when another listener removes them. Each call
+     * owns its own subscription, so the same function may be watched more than once.
+     *
+     * @throws When the context is closed, or when initial delivery fails. A failed initial
+     * delivery rolls the registration back, including when the failure comes from another
+     * watcher reached by the initial listener's own writes.
      */
     watch<T>(
       tag: Tag<T, boolean>,
@@ -241,7 +247,11 @@ export namespace Lite {
     has(key: string | symbol): boolean
     /** Delete value by key, returns true if existed */
     delete(key: string | symbol): boolean
-    /** Remove all stored values */
+    /**
+     * Remove all stored values.
+     *
+     * @throws After committing when a watcher of a removed tag family fails.
+     */
     clear(): void
     /**
      * Look up value by key, traversing parent chain if not found locally.
