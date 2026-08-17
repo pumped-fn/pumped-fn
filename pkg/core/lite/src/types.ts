@@ -188,8 +188,38 @@ export namespace Lite {
 
   export type ResourceOwnership = "boundary" | "current"
 
+  export interface ContextTagWatchOptions {
+    /** Emit the current local family synchronously while registering. */
+    initial?: boolean
+  }
+
+  /** Typed tag-family storage owned by one execution context. */
+  export interface ContextTags {
+    /** Replace every local family present in the input, preserving family value order. */
+    set(input: TagInput): void
+    /** Get the first local value without applying the tag default. */
+    get<T>(tag: Tag<T, boolean>): T | undefined
+    /** Get a copy of all local values without applying the tag default. */
+    getMany<T>(tag: Tag<T, boolean>): readonly T[]
+    /** Get the first value from the nearest context without applying the tag default. */
+    seek<T>(tag: Tag<T, boolean>): T | undefined
+    /** Get copies of all values from the current context through its parents. */
+    seekMany<T>(tag: Tag<T, boolean>): readonly T[]
+    /** Check whether the local context stores the tag family. */
+    has<T, H extends boolean>(tag: Tag<T, H>): boolean
+    /** Delete the local tag family, returning true when it existed. */
+    delete<T, H extends boolean>(tag: Tag<T, H>): boolean
+    /** Watch one local tag family. */
+    watch<T>(
+      tag: Tag<T, boolean>,
+      listener: (values: readonly T[]) => void,
+      options?: ContextTagWatchOptions,
+    ): () => void
+  }
+
   /**
-   * Unified context data storage with both raw Map operations and Tag-based DX.
+   * Context-local raw data storage. Tag helpers remain as compatibility shims;
+   * execution contexts should use `ctx.tags`.
    */
   export interface ContextData {
     /** Get value by key */
@@ -210,6 +240,8 @@ export namespace Lite {
     /**
      * Look up tag value, traversing parent chain if not found locally.
      * Returns first match or undefined (ignores tag defaults).
+     *
+     * @deprecated Use `ctx.tags.seek(tag)` on execution contexts.
      */
     seekTag<T>(tag: Tag<T, boolean>): T | undefined
     /**
@@ -217,27 +249,49 @@ export namespace Lite {
      */
     seekHas(key: string | symbol): boolean
 
-    /** Get value by tag, returns undefined if not stored */
+    /**
+     * Get value by tag, returns undefined if not stored.
+     *
+     * @deprecated Use `ctx.tags.get(tag)` on execution contexts.
+     */
     getTag<T>(tag: Tag<T, boolean>): T | undefined
-    /** Set value by tag */
+    /**
+     * Set value by tag.
+     *
+     * @deprecated Use `ctx.tags.set(tag(value))` on execution contexts.
+     */
     setTag<T>(tag: Tag<T, boolean>, value: T): void
-    /** Check if tag has stored value */
+    /**
+     * Check if tag has stored value.
+     *
+     * @deprecated Use `ctx.tags.has(tag)` on execution contexts.
+     */
     hasTag<T, H extends boolean>(tag: Tag<T, H>): boolean
-    /** Delete value by tag, returns true if existed */
+    /**
+     * Delete value by tag, returns true if existed.
+     *
+     * @deprecated Use `ctx.tags.delete(tag)` on execution contexts.
+     */
     deleteTag<T, H extends boolean>(tag: Tag<T, H>): boolean
     /**
      * Get existing value or initialize with tag's default.
      * Stores and returns the value.
+     *
+     * @deprecated Use `ctx.tags.has(tag)` with `ctx.tags.set(tag(value))` on execution contexts.
      */
     getOrSetTag<T>(tag: Tag<T, true>): T
     /**
      * Get existing value or initialize with provided value.
      * Stores and returns the value.
+     *
+     * @deprecated Use `ctx.tags.has(tag)` with `ctx.tags.set(tag(value))` on execution contexts.
      */
     getOrSetTag<T>(tag: Tag<T, true>, value: T): T
     /**
      * Get existing value or initialize with provided value.
      * Required for tags without defaults.
+     *
+     * @deprecated Use `ctx.tags.has(tag)` with `ctx.tags.set(tag(value))` on execution contexts.
      */
     getOrSetTag<T>(tag: Tag<T, false>, value: T): T
   }
@@ -269,6 +323,7 @@ export namespace Lite {
     readonly parent: ExecutionContext | undefined
     readonly signal: AbortSignal
     readonly data: ContextData
+    readonly tags: ContextTags
     resolve<T>(target: Atom<T>): Promise<T>
     resolve<T>(target: Resource<T>): Promise<T>
     release<T>(resource: Resource<T>): Promise<void>

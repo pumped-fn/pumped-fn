@@ -348,6 +348,58 @@ await ctx.close()
 await scope.dispose()
 ```
 
+Execution contexts expose raw scratch data through `ctx.data` and typed tag families through `ctx.tags`.
+`get` and `getMany` read only the current context. `seek` and `seekMany` continue through parents, with
+the current context first. These storage reads never apply tag defaults; defaults remain part of
+`tags.required()` and `tags.optional()` dependency resolution.
+
+`ctx.tags.set(input)` accepts the same single, list, or nested-list `TagInput` as other tag boundaries.
+It groups the input by family, preserves value order, and atomically replaces every touched local family.
+Families absent from the input stay unchanged. `getMany` and `seekMany` return copies.
+
+```ts
+import { createScope, tag } from "@pumped-fn/lite"
+
+const channel = tag<string>({ label: "channel" })
+const tenant = tag<string>({ label: "tenant" })
+const scope = createScope()
+const ctx = scope.createContext({ tags: tenant("acme") })
+
+ctx.tags.set([channel("email"), channel("sms")])
+
+if (ctx.tags.get(channel) !== "email") throw new Error("unexpected channel")
+if (ctx.tags.getMany(channel).join(",") !== "email,sms") throw new Error("unexpected channels")
+if (ctx.tags.seek(tenant) !== "acme") throw new Error("unexpected tenant")
+
+await ctx.close()
+await scope.dispose()
+```
+
+Watchers belong to one exact tag family in one context. `{ initial: true }` delivers the current local
+family synchronously during registration. A batch notifies each changed family once with its final values;
+reentrant writes queue until the active notification finishes. All listeners run before listener failures
+are rethrown. Closing the context drops its watchers after close cleanup settles.
+
+```ts
+import { createScope, tag } from "@pumped-fn/lite"
+
+const channel = tag<string>({ label: "channel" })
+const scope = createScope()
+const ctx = scope.createContext({ tags: channel("email") })
+const events: string[][] = []
+const stop = ctx.tags.watch(channel, (values) => events.push([...values]), { initial: true })
+
+ctx.tags.set([channel("push"), channel("email")])
+stop()
+
+await ctx.close()
+await scope.dispose()
+```
+
+Extensions that persist context state should watch only explicitly configured tag handles. Stable storage
+IDs and codecs belong to the extension; runtime tag symbols and labels are not durable identities. Raw
+`ctx.data` is not watchable. The tag helpers on `ctx.data` remain compatibility shims for this release.
+
 ## Reactivity
 
 Atoms are cached values by default. Reactivity is opt-in through controllers and select handles.
@@ -558,6 +610,7 @@ Extension hooks see the same seams as tests and composition roots. See
 | `resource(config)` | Define execution-context-owned state or lifecycle |
 | `tag(config)` | Define typed ambient values and optional value equality |
 | `tags.required/optional/all` | Request tags as dependencies |
+| `ctx.tags` | Read, replace, delete, and watch local typed tag families |
 | `preset(target, value)` | Replace an atom, flow, or resource in one scope |
 | `controller(target, options?)` | Request an atom/resource controller dependency, or preconfigure flow-handle defaults |
 | `scope.controller(atom)` | Observe and control atom state from the boundary |

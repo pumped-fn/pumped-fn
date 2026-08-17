@@ -6,7 +6,6 @@ export default defineConfig({
     alias: [
       { find: "@pumped-fn/lite", replacement: fileURLToPath(new URL("../../pkg/core/lite/src/index.ts", import.meta.url)) },
       { find: "@pumped-fn/lite-extension-logging", replacement: fileURLToPath(new URL("../../pkg/ext/logging/src/index.ts", import.meta.url)) },
-      { find: "@pumped-fn/lite-extension-scheduler", replacement: fileURLToPath(new URL("../../pkg/ext/scheduler/src/index.ts", import.meta.url)) },
       { find: "@pumped-fn/sdk/agent", replacement: fileURLToPath(new URL("../../pkg/sdk/core/src/agent.ts", import.meta.url)) },
       { find: "@pumped-fn/sdk/session", replacement: fileURLToPath(new URL("../../pkg/sdk/core/src/session.ts", import.meta.url)) },
       { find: "@pumped-fn/sdk/sandbox", replacement: fileURLToPath(new URL("../../pkg/sdk/core/src/sandbox.ts", import.meta.url)) },

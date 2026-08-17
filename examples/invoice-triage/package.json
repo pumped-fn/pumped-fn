@@ -18,7 +18,7 @@
     "@pumped-fn/lite-extension-logging": "workspace:*",
     "@pumped-fn/lite-extension-observable": "workspace:*",
     "@pumped-fn/lite-extension-observable-otel": "workspace:*",
-    "@pumped-fn/lite-extension-scheduler": "workspace:*",
+    "@pumped-fn/lite-extension-scheduler": "catalog:",
     "@pumped-fn/sdk": "workspace:*",
     "cac": "catalog:",
     "drizzle-orm": "catalog:",

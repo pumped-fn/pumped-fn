@@ -23,7 +23,6 @@ Each page starts with code you can read as the main idea, then explains the part
 - Required tag deps fail during dependency resolution, before the unit factory runs — not at `createScope()` construction.
 - Suspense durable replay rejects streaming flows today.
 - Size: zero runtime dependencies, ~12 kB min+gzip. No performance benchmarks are published.
-- Scheduler NATS is lock-guarded scheduling, not an unconditional single-run guarantee; lease expiry can become at-least-once.
 - `pkg/render/*` and `pkg/sdk/claude` are experimental and not covered here.
 
 ## Source
@@ -32,7 +31,6 @@ Each page starts with code you can read as the main idea, then explains the part
 - [Lite flow faults](../pkg/core/lite/src/flow.ts)
 - [Lite scope](../pkg/core/lite/src/scope.ts)
 - [Suspense extension](../pkg/ext/suspense/src/index.ts)
-- [Scheduler NATS README](../pkg/ext/scheduler-nats/README.md)
 
 ## Next
 

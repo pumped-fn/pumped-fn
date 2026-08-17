@@ -21,7 +21,7 @@
   "dependencies": {
     "@hono/node-server": "catalog:",
     "@pumped-fn/lite": "workspace:*",
-    "@pumped-fn/lite-extension-scheduler": "workspace:*",
+    "@pumped-fn/lite-extension-scheduler": "catalog:",
     "@pumped-fn/pumped": "workspace:*",
     "hono": "catalog:"
   },
