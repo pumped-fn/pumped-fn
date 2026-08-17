@@ -28,13 +28,20 @@ const rank = { patch: 1, minor: 2, major: 3 }
 const policy = readJson(join(root, ".changeset", "release-policy.json"))
 const majorReleasePackages = new Set(policy.majorReleasePackages)
 
-const packageDirectories = readdirSync(join(root, "pkg"), { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
-  .flatMap((lane) =>
-    readdirSync(join(root, "pkg", lane.name), { withFileTypes: true })
+const packageDirectories = [
+  ...(existsSync(join(root, "packages"))
+    ? readdirSync(join(root, "packages"), { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
-      .map((entry) => join(root, "pkg", lane.name, entry.name)),
-  )
+      .map((entry) => join(root, "packages", entry.name))
+    : []),
+  ...(existsSync(join(root, "pkg"))
+    ? readdirSync(join(root, "pkg"), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .flatMap((lane) => readdirSync(join(root, "pkg", lane.name), { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => join(root, "pkg", lane.name, entry.name)))
+    : []),
+]
   .filter((directory) => existsSync(join(directory, "package.json")))
   .map((directory) => ({
     directory,
@@ -101,9 +108,9 @@ for (const change of changesets) {
   if (!current || rank[change.bump] > rank[current.bump]) bumps.set(change.package, change)
 }
 
-const packageManifestsAt = (ref) => runGit(["ls-tree", "-r", "--name-only", ref, "--", "pkg"])
+const packageManifestsAt = (ref) => runGit(["ls-tree", "-r", "--name-only", ref, "--", "packages", "pkg"])
   .split("\n")
-  .filter((path) => /^pkg\/[^/]+\/[^/]+\/package\.json$/u.test(path))
+  .filter((path) => /^(?:packages\/[^/]+|pkg\/[^/]+\/[^/]+)\/package\.json$/u.test(path))
   .map((path) => ({ path, manifest: JSON.parse(runGit(["show", `${ref}:${path}`])) }))
   .filter(({ manifest }) => manifest.private !== true)
 const basePackageDirectories = packageManifestsAt(base)

@@ -1,8 +1,8 @@
 # Should I use pumped-fn instead of Effect for DI and typed errors?
 
-Use pumped-fn when the adoption unit should stay a normal TypeScript function behind one scope. Use Effect when you want the Effect program model, typed effect combinators, services, layers, and fibers as the center of the app.
-
-Run the [source-locked account-onboarding comparison](../playground/compare/README.md) to execute both approaches against the same black-box contract in Node and an editable browser sandbox.
+Use pumped-fn when the adoption unit should stay a normal TypeScript function behind one scope. Use
+Effect when you want the Effect program model, typed effect combinators, services, layers, and fibers
+as the center of the app.
 
 ## 1. Footguns
 
@@ -161,9 +161,9 @@ Pick pumped-fn when the target is smaller: make side effects visible as graph ed
 
 ## Source
 
-- [Flow implementation](../pkg/core/lite/src/flow.ts)
-- [Flow fault tests](../pkg/core/lite/tests/flow-fault.test.ts)
-- [Scope execution](../pkg/core/lite/src/scope.ts)
+- [Flow implementation](../packages/lite/src/flow.ts)
+- [Flow fault tests](../packages/lite/tests/flow-fault.test.ts)
+- [Scope execution](../packages/lite/src/scope.ts)
 - [Effect type](https://effect.website/docs/getting-started/the-effect-type/)
 - [Effect services](https://effect.website/docs/requirements-management/services/)
 - [Effect fibers](https://effect.website/docs/concurrency/fibers/)

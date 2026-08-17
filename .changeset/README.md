@@ -9,6 +9,6 @@ Repository release sizing lives in `release-policy.json` and is enforced by
 
 - Intentional core contract breaks may use a configured major.
 - A breaking compatibility change graduates a pre-1.0 package to 1.0.
-- A stable adapter uses a minor for a new core-major compatibility line.
+- A stable package uses a major for a breaking compatibility line.
 - A package that only widens compatibility uses a patch.
-- The SDK packages are linked in `config.json` and stay version-aligned.
+- Packages release independently. Internal peer ranges must cover every release in the plan.

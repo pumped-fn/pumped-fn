@@ -1,7 +1,0 @@
-{"type":"trace_ref","name":"terminal_performance_comparison","ref":"artifacts/terminal-performance-comparison-6a436169.json","hash":"sha256:cca075dcec8d956237e7fa27ed0c02b008ba5a2c3a19cd8d5f622d70ef254073"}
-{"type":"trace_ref","name":"sunset_evidence","ref":"sha256:fc57bf02308816197d4573c0bcfa97c3e27da7f6bc8115b6cf5edf76e5c72a02"}
-{"type":"trace_ref","name":"performance_followup","ref":"https://github.com/pumped-fn/pumped-fn/issues/348"}
-{"type":"trace_ref","name":"sol_xhigh_review","ref":"workers/PKR-SOL-XHIGH-TERMINAL-REVIEW/progress.jsonl"}
-{"type":"trace_ref","name":"objective_read","ref":"ledger.jsonl#seq=121 record_hash=a12b0791ff92622f1ee736f03ff9f56f8177de8f0425a5cb2775a711849483e2"}
-{"type":"trace_ref","name":"performance_wall_read","ref":"ledger.jsonl#seq=112 record_hash=27ab63a44106bbea11a9de231112d83757bd1d730e74821499783fbb8f7631bb"}
-{"type":"trace_ref","name":"sunset_checkpoint","ref":"workers/DKR-SUNSET-HANDOFF/progress.jsonl#seq=4 record_hash=aec793576d42d041af844cddcea006e350538876df37f784faa685c50603c011"}

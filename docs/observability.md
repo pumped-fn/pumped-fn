@@ -4,8 +4,8 @@ Install the extension at the scope and pass the sink through runtime tags. Your 
 
 ```ts
 import { createScope, flow, typed } from "@pumped-fn/lite"
-import { observable } from "@pumped-fn/lite-extension-observable"
-import { otel, type Otel } from "@pumped-fn/lite-extension-observable-otel"
+import { observability } from "@pumped-fn/lite-observability"
+import { otel, type Otel } from "@pumped-fn/lite-observability-otel"
 
 function recorder(): Otel.Tracer {
   return {
@@ -32,8 +32,8 @@ const checkout = flow({
 })
 
 const scope = createScope({
-  extensions: [observable.extension()],
-  tags: observable.runtime({ sinks: [otel.sink({ tracer: recorder() })] }),
+  extensions: [observability.extension()],
+  tags: observability.runtime({ sinks: [otel.sink({ tracer: recorder() })] }),
 })
 
 const ctx = scope.createContext()
@@ -42,33 +42,42 @@ await ctx.close()
 await scope.dispose()
 ```
 
-The observable extension sees atom and resource resolution, flow and function execution, and each root execution context from creation to its close outcome. The OTel sink turns those lifecycle events into spans, links child spans through `parentId` — execution spans nest under their root context span — records errors, sets status, and ends spans on terminal events.
+The observability extension sees atom and resource resolution, flow and function execution, and each
+root execution context from creation to its close outcome. The OpenTelemetry sink turns those events
+into spans. Child spans link through `parentId`, errors set failure status, and terminal events end
+their spans.
 
-For a foreign SDK call, name the edge with `ctx.exec`.
+Name an outside client call with inline execution so the trace has a useful edge.
 
 ```ts
-import { step } from "@pumped-fn/sdk"
+import { atom, flow, typed } from "@pumped-fn/lite"
 
-await ctx.exec({
-  name: "notifier.send",
-  deps: { notifier },
-  params: [message],
-  fn: ({ notifier }, content) => notifier.send(content),
-  tags: step({ workflow: true, kind: "email" }),
+const notifier = atom({
+  factory: () => ({ send: async (message: string) => `sent:${message}` }),
+})
+
+const notify = flow({
+  name: "notify",
+  parse: typed<{ message: string }>(),
+  factory: (ctx) => ctx.exec({
+    name: "notifier.send",
+    deps: { notifier },
+    params: [ctx.input.message],
+    fn: ({ notifier }, message) => notifier.send(message),
+  }),
 })
 ```
 
-The `step` tag comes from `@pumped-fn/sdk`. In the invoice example, this shape gives intake, store, model, review, and reminder work named span edges after `observable.extension()` is added at scope creation.
-
+Inputs and outputs are private by default. Turn capture on only after adding a `redact` policy for the
+data your application handles.
 
 ## Source
 
-- [Extension types](../pkg/core/lite/src/types.ts)
-- [Scope extension setup](../pkg/core/lite/src/scope.ts)
-- [Observable extension](../pkg/ext/observable/src/index.ts)
-- [OTel sink](../pkg/ext/observable-otel/src/index.ts)
-- [OTel tests](../pkg/ext/observable-otel/tests/otel.test.ts)
-- [Invoice triage span test](../examples/invoice-triage/tests/invoice-triage.test.ts)
+- [Extension types](../packages/lite/src/types.ts)
+- [Scope extension setup](../packages/lite/src/scope.ts)
+- [Observability extension](../packages/lite-observability/src/index.ts)
+- [OpenTelemetry sink](../packages/lite-observability-otel/src/index.ts)
+- [OpenTelemetry tests](../packages/lite-observability-otel/tests/otel.test.ts)
 
 ## Next
 

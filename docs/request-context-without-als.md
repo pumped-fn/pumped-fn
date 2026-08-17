@@ -1,9 +1,9 @@
 # Why is AsyncLocalStorage `getStore()` undefined, and what should I use instead?
 
-Use an explicit `ExecutionContext`. The handler runs the flow through the scope with request tags; `scope.run` owns one context per request and closes it.
+Use an explicit Lite execution context. The transport boundary reads request facts and supplies them
+as tags. Product code declares the tags it needs.
 
 ```ts
-import { Hono } from "hono"
 import { createScope, flow, tag, tags } from "@pumped-fn/lite"
 
 const requestId = tag<string>({ label: "request.id" })
@@ -13,47 +13,62 @@ const readRequest = flow({
   factory: (_ctx, { requestId }) => requestId,
 })
 
-const app = new Hono()
 const scope = createScope()
 
-app.get("/id", async (context) =>
-  context.json({
-    id: await scope.run({
-      flow: readRequest,
-      tags: [requestId(context.req.header("x-request-id") ?? "missing")],
-    }),
+export async function handle(request: Request): Promise<Response> {
+  const id = await scope.run({
+    flow: readRequest,
+    tags: requestId(request.headers.get("x-request-id") ?? "missing"),
   })
-)
+
+  return Response.json({ id })
+}
 
 export async function closeApp(): Promise<void> {
   await scope.dispose()
 }
 ```
 
-The request state is not discovered from ambient storage inside product code. It is declared as a tag dependency and supplied by the request boundary.
+There is no hidden request lookup in `readRequest`. A missing required tag fails during dependency
+resolution, before the flow factory runs.
 
-The same flow can run in a test with the same API.
+The same flow runs in a test through the same API.
 
 ```ts
-const scope = createScope()
-const ctx = scope.createContext({ tags: requestId("test-request") })
-const id = await ctx.exec({ flow: readRequest })
-await ctx.close()
-await scope.dispose()
+const testScope = createScope()
+
+const id = await testScope.run({
+  flow: readRequest,
+  tags: requestId("test-request"),
+})
 
 if (id !== "test-request") throw new Error("unexpected request id")
+await testScope.dispose()
 ```
 
-The public execution context carries `input`, `scope`, `parent`, `data`, `resolve`, `release`, `controller`, `exec`, `execStream`, `changes`, close hooks, and failure helpers. Context data supports raw keys and tag methods, including parent-chain tag lookup. `scope.createContext({ tags, parent })` seeds context tags and then scope tags.
+Use `scope.createContext({ tags })` when several operations must share request resources, tags, or
+cancellation.
 
-> **Note:** AsyncLocalStorage internals are not covered here. The supported control surface is explicit execution contexts plus declared tag deps.
+```ts
+const ctx = scope.createContext({ tags: requestId("request-42") })
+
+try {
+  const first = await ctx.exec({ flow: readRequest })
+  const second = await ctx.exec({ flow: readRequest })
+  console.log(first, second)
+} finally {
+  await ctx.close()
+}
+```
+
+The boundary owns the context and closes it. Feature code receives request facts through declared
+dependencies, not through an ambient store.
 
 ## Source
 
-- [ExecutionContext types](../pkg/core/lite/src/types.ts)
-- [Context tag lookup](../pkg/core/lite/src/scope.ts)
-- [Hono adapter](../pkg/framework/hono/src/index.ts)
-- [Hono adapter tests](../pkg/framework/hono/tests/hono.test.ts)
+- [Execution context types](../packages/lite/src/types.ts)
+- [Context tag lookup](../packages/lite/src/scope.ts)
+- [Tag dependencies](../packages/lite/src/tag.ts)
 
 ## Next
 

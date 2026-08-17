@@ -1,0 +1,4064 @@
+import { controllerSymbol, ParseError, FlowFault, type Lite, type MaybePromise, type AtomState } from "./types"
+import { isAtom, isControllerDep } from "./atom"
+import { classifyDeps, type DepsGraph } from "./deps-graph"
+import { isFlow } from "./flow"
+import { isResource } from "./resource"
+import { isTagged, normalizeTags } from "./tag"
+import { latest, type Latest } from "./latest"
+import { assertNoReturnedStream, consumeScalarResult, detachedStreamResultBeforeStartError, isAsyncGenerator, isAsyncGeneratorFunction, isPromiseLike, markStreamingExec, registerStreamingExec, requireAsyncGenerator, streamResultBeforeStartError } from "./streaming"
+export { isStreamingExec } from "./streaming"
+
+function isPlainObject(value: object): value is Record<PropertyKey, unknown> {
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+
+export function shallowEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false
+  if (!isPlainObject(a) || !isPlainObject(b)) return false
+  const keysA = Reflect.ownKeys(a).filter((key) => Object.prototype.propertyIsEnumerable.call(a, key))
+  if (keysA.length !== Reflect.ownKeys(b).filter((key) => Object.prototype.propertyIsEnumerable.call(b, key)).length) return false
+  for (const key of keysA) {
+    if (!Object.hasOwn(b as Record<PropertyKey, unknown>, key)) return false
+    if (!Object.is((a as Record<PropertyKey, unknown>)[key], (b as Record<PropertyKey, unknown>)[key])) return false
+  }
+  return true
+}
+
+const controllerReadHooks: Array<(ctrl: Lite.Controller<unknown>) => void> = []
+const complete = Promise.resolve()
+const noExtensions: Lite.Extension[] = []
+const noTags: readonly Lite.Tagged<any>[] = Object.freeze([])
+
+interface Cleanup {
+  fn: (...args: any[]) => MaybePromise<void>
+  params: unknown[]
+}
+
+interface CloseCleanup {
+  fn: (result: Lite.CloseResult, ...args: any[]) => MaybePromise<void>
+  params: unknown[]
+}
+
+type Listener = () => void
+
+interface Update<T> {
+  fn: (value: T) => T
+}
+
+interface PendingSet<T> {
+  hasValue: boolean
+  value?: T
+  updates: Update<T>[]
+}
+
+interface WatchEdge {
+  target: Lite.Atom<unknown>
+  previous: unknown
+  eq: (previous: any, next: any) => boolean
+}
+
+function runCleanup(cleanup: Cleanup): MaybePromise<void> {
+  return cleanup.fn(...cleanup.params)
+}
+
+function bindListener(fn: (...args: any[]) => void, params: unknown[]): Listener {
+  return params.length === 0 ? fn : () => fn(...params)
+}
+
+async function runCleanupsSafe(cleanups: Cleanup[]): Promise<void> {
+  for (let i = cleanups.length - 1; i >= 0; i--) {
+    try {
+      const result = runCleanup(cleanups[i]!)
+      if (result != null && typeof (result as any).then === 'function') await result
+    } catch {}
+  }
+}
+
+type ListenerEvent = 'resolving' | 'resolved' | '*'
+
+interface ContextTagFamily {
+  tag: Lite.Tag<any, boolean>
+  first: any
+  rest?: any[]
+}
+
+type ContextTagListener = (values: readonly any[]) => void
+
+const maxContextTagNotificationRounds = 1000
+const maxContextTagNotifications = 1_000_000
+
+class ContextStore {
+  private readonly raw = new Map<string | symbol, unknown>()
+  private readonly families = new Map<symbol, ContextTagFamily>()
+  private watchers?: Map<symbol, Set<ContextTagListener>>
+  private pending?: Map<symbol, Lite.Tag<any, boolean>>
+  private notifying = false
+  private finalized = false
+
+  constructor(private parent?: ContextStore) {}
+
+  detachParent(): void {
+    this.parent = undefined
+  }
+
+  finalize(): void {
+    this.finalized = true
+    this.watchers?.clear()
+    this.pending?.clear()
+  }
+
+  getRaw(key: string | symbol): unknown {
+    if (this.raw.has(key)) return this.raw.get(key)
+    return typeof key === "symbol" ? this.families.get(key)?.first : undefined
+  }
+
+  setRaw(key: string | symbol, value: unknown): void {
+    if (typeof key === "symbol") {
+      const family = this.families.get(key)
+      if (family) {
+        this.replaceFamilies([{ tag: family.tag, values: [value] }])
+        return
+      }
+    }
+    this.raw.set(key, value)
+  }
+
+  hasRaw(key: string | symbol): boolean {
+    return this.raw.has(key) || (typeof key === "symbol" && this.families.has(key))
+  }
+
+  deleteRaw(key: string | symbol): boolean {
+    if (typeof key === "symbol") {
+      const family = this.families.get(key)
+      if (family) {
+        this.families.delete(key)
+        this.queue(family.tag)
+        this.flush()
+        return true
+      }
+    }
+    return this.raw.delete(key)
+  }
+
+  clearRaw(): void {
+    const changed = this.watchers?.size
+      ? [...this.families.values()].filter((family) => this.watchers?.get(family.tag.key)?.size)
+      : []
+    this.raw.clear()
+    this.families.clear()
+    for (let i = 0; i < changed.length; i++) this.queue(changed[i]!.tag)
+    this.flush()
+  }
+
+  seekRaw(key: string | symbol): unknown {
+    if (this.hasRaw(key)) return this.getRaw(key)
+    return this.parent?.seekRaw(key)
+  }
+
+  seekHasRaw(key: string | symbol): boolean {
+    return this.hasRaw(key) || (this.parent?.seekHasRaw(key) ?? false)
+  }
+
+  append(tagged: Lite.Tagged<any>): void {
+    this.raw.delete(tagged.key)
+    const family = this.families.get(tagged.key)
+    if (!family) {
+      this.families.set(tagged.key, { tag: tagged.tag, first: tagged.value })
+      return
+    }
+    if (family.rest) family.rest.push(tagged.value)
+    else family.rest = [tagged.value]
+  }
+
+  set(input: Lite.TagInput): void {
+    if (this.finalized) throw new Error("ExecutionContext is closed")
+    const taggedValues = normalizeTags(input)!
+    const grouped = new Map<symbol, { tag: Lite.Tag<any, boolean>; values: any[] }>()
+    for (let i = 0; i < taggedValues.length; i++) {
+      const tagged = taggedValues[i]!
+      const family = grouped.get(tagged.key)
+      if (family) family.values.push(tagged.value)
+      else grouped.set(tagged.key, { tag: tagged.tag, values: [tagged.value] })
+    }
+    this.replaceFamilies([...grouped.values()])
+  }
+
+  get<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    return this.families.get(tag.key)?.first as T | undefined
+  }
+
+  getMany<T>(tag: Lite.Tag<T, boolean>): readonly T[] {
+    return this.familyValues(this.families.get(tag.key)) as T[]
+  }
+
+  seek<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    const family = this.families.get(tag.key)
+    if (family) return family.first as T
+    return this.parent?.seek(tag)
+  }
+
+  seekMany<T>(tag: Lite.Tag<T, boolean>): readonly T[] {
+    const local = this.familyValues(this.families.get(tag.key)) as T[]
+    const inherited = this.parent?.seekMany(tag) ?? []
+    if (local.length === 0) return inherited
+    if (inherited.length === 0) return local
+    return [...local, ...inherited]
+  }
+
+  has<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.families.has(tag.key)
+  }
+
+  delete<T, H extends boolean>(tag: Lite.Tag<T, H>, enforceOpen = true): boolean {
+    if (enforceOpen && this.finalized) throw new Error("ExecutionContext is closed")
+    const family = this.families.get(tag.key)
+    if (!family) return false
+    this.families.delete(tag.key)
+    this.queue(family.tag)
+    this.flush()
+    return true
+  }
+
+  watch<T>(
+    tag: Lite.Tag<T, boolean>,
+    listener: (values: readonly T[]) => void,
+    options?: Lite.ContextTagWatchOptions,
+  ): () => void {
+    if (this.finalized) throw new Error("ExecutionContext is closed")
+    const watchers = this.watchers ??= new Map()
+    let listeners = watchers.get(tag.key)
+    if (!listeners) {
+      listeners = new Set()
+      watchers.set(tag.key, listeners)
+    }
+    const registered: ContextTagListener = (values) => listener(values)
+    listeners.add(registered)
+    const stop = () => {
+      listeners!.delete(registered)
+      if (watchers.get(tag.key) === listeners && listeners!.size === 0) watchers.delete(tag.key)
+    }
+    if (options?.initial) {
+      try {
+        const failures: unknown[] = []
+        const root = !this.notifying
+        if (root) this.notifying = true
+        try {
+          listener(this.getMany(tag))
+        } catch (error) {
+          stop()
+          failures.push(error)
+        }
+        if (root) {
+          this.notifying = false
+          this.flush(failures)
+        } else if (failures.length > 0) {
+          throw failures[0]
+        }
+      } catch (error) {
+        stop()
+        throw error
+      }
+    }
+    return stop
+  }
+
+  getTagCompat<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    const family = this.families.get(tag.key)
+    return (family ? family.first : this.raw.get(tag.key)) as T | undefined
+  }
+
+  setTagCompat<T>(tag: Lite.Tag<T, boolean>, value: T): void {
+    this.replaceFamilies([{ tag, values: [value] }])
+  }
+
+  hasTagCompat<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.families.has(tag.key) || this.raw.has(tag.key)
+  }
+
+  deleteTagCompat<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.delete(tag, false) || this.raw.delete(tag.key)
+  }
+
+  seekTagCompat<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    if (this.hasTagCompat(tag)) return this.getTagCompat(tag)
+    return this.parent?.seekTagCompat(tag)
+  }
+
+  collectTagCompat<T>(tag: Lite.Tag<T, boolean>): T[] {
+    const family = this.families.get(tag.key)
+    if (family) return this.familyValues(family) as T[]
+    return (this.raw.has(tag.key) ? [this.raw.get(tag.key)] : []) as T[]
+  }
+
+  private replaceFamilies(replacements: Array<{ tag: Lite.Tag<any, boolean>; values: any[] }>): void {
+    const changed: Lite.Tag<any, boolean>[] = []
+    for (let i = 0; i < replacements.length; i++) {
+      const replacement = replacements[i]!
+      if (this.watchers?.get(replacement.tag.key)?.size && !this.sameFamily(
+        replacement.tag,
+        this.families.get(replacement.tag.key),
+        replacement.values,
+      )) {
+        changed.push(replacement.tag)
+      }
+    }
+    for (let i = 0; i < replacements.length; i++) {
+      const { tag, values } = replacements[i]!
+      this.raw.delete(tag.key)
+      this.families.set(tag.key, values.length === 1
+        ? { tag, first: values[0] }
+        : { tag, first: values[0], rest: values.slice(1) })
+    }
+    for (let i = 0; i < changed.length; i++) this.queue(changed[i]!)
+    this.flush()
+  }
+
+  private sameFamily(
+    tag: Lite.Tag<any, boolean>,
+    family: ContextTagFamily | undefined,
+    values: any[],
+  ): boolean {
+    if (!family) return false
+    const length = 1 + (family.rest?.length ?? 0)
+    if (length !== values.length || !tag.eq(family.first, values[0])) return false
+    for (let i = 1; i < values.length; i++) {
+      if (!tag.eq(family.rest![i - 1], values[i])) return false
+    }
+    return true
+  }
+
+  private familyValues(family: ContextTagFamily | undefined): any[] {
+    if (!family) return []
+    return family.rest ? [family.first, ...family.rest] : [family.first]
+  }
+
+  private queue(tag: Lite.Tag<any, boolean>): void {
+    if (!this.watchers?.get(tag.key)?.size) return
+    ;(this.pending ??= new Map()).set(tag.key, tag)
+  }
+
+  private flush(failures: unknown[] = []): void {
+    if (this.notifying) return
+    if (!this.pending?.size) {
+      this.throwListenerFailures(failures)
+      return
+    }
+    this.notifying = true
+    let rounds = 0
+    let notifications = 0
+    try {
+      while (this.pending.size > 0) {
+        if (++rounds > maxContextTagNotificationRounds || notifications > maxContextTagNotifications) {
+          this.pending.clear()
+          failures.push(new Error("Context tag notification did not settle"))
+          break
+        }
+        const pending = [...this.pending.values()]
+        this.pending.clear()
+        for (let i = 0; i < pending.length; i++) {
+          const tag = pending[i]!
+          const listeners = this.watchers?.get(tag.key)
+          if (!listeners?.size) continue
+          const values = this.getMany(tag)
+          for (const listener of [...listeners]) {
+            if (this.finalized) break
+            notifications++
+            try {
+              listener(values.slice())
+            } catch (error) {
+              failures.push(error)
+            }
+          }
+        }
+      }
+    } finally {
+      this.notifying = false
+    }
+    this.throwListenerFailures(failures)
+  }
+
+  private throwListenerFailures(failures: unknown[]): void {
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1) throw new AggregateError(failures, "Context tag listener notification failed")
+  }
+}
+
+class ContextTagsImpl implements Lite.ContextTags {
+  constructor(private readonly store: ContextStore) {}
+
+  set(input: Lite.TagInput): void {
+    this.store.set(input)
+  }
+
+  get<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    return this.store.get(tag)
+  }
+
+  getMany<T>(tag: Lite.Tag<T, boolean>): readonly T[] {
+    return this.store.getMany(tag)
+  }
+
+  seek<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    return this.store.seek(tag)
+  }
+
+  seekMany<T>(tag: Lite.Tag<T, boolean>): readonly T[] {
+    return this.store.seekMany(tag)
+  }
+
+  has<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.store.has(tag)
+  }
+
+  delete<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.store.delete(tag)
+  }
+
+  watch<T>(
+    tag: Lite.Tag<T, boolean>,
+    listener: (values: readonly T[]) => void,
+    options?: Lite.ContextTagWatchOptions,
+  ): () => void {
+    return this.store.watch(tag, listener, options)
+  }
+}
+
+class ContextDataImpl implements Lite.ContextData {
+  constructor(private readonly store = new ContextStore()) {}
+
+  get(key: string | symbol): unknown {
+    return this.store.getRaw(key)
+  }
+
+  set(key: string | symbol, value: unknown): void {
+    this.store.setRaw(key, value)
+  }
+
+  appendTagValue(tagged: Lite.Tagged<any>): void {
+    this.store.append(tagged)
+  }
+
+  collectTag<T>(tag: Lite.Tag<T, boolean>): T[] {
+    return this.store.collectTagCompat(tag)
+  }
+
+  has(key: string | symbol): boolean {
+    return this.store.hasRaw(key)
+  }
+
+  delete(key: string | symbol): boolean {
+    return this.store.deleteRaw(key)
+  }
+
+  clear(): void {
+    this.store.clearRaw()
+  }
+
+  seek(key: string | symbol): unknown {
+    return this.store.seekRaw(key)
+  }
+
+  seekHas(key: string | symbol): boolean {
+    return this.store.seekHasRaw(key)
+  }
+
+  getTag<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    return this.store.getTagCompat(tag)
+  }
+
+  setTag<T>(tag: Lite.Tag<T, boolean>, value: T): void {
+    this.store.setTagCompat(tag, value)
+  }
+
+  hasTag<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.store.hasTagCompat(tag)
+  }
+
+  deleteTag<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.store.deleteTagCompat(tag)
+  }
+
+  seekTag<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    return this.store.seekTagCompat(tag)
+  }
+
+  getOrSetTag<T>(tag: Lite.Tag<T, true>): T
+  getOrSetTag<T>(tag: Lite.Tag<T, true>, value: T): T
+  getOrSetTag<T>(tag: Lite.Tag<T, false>, value: T): T
+  getOrSetTag<T>(tag: Lite.Tag<T, boolean>, value?: T): T {
+    if (this.store.hasTagCompat(tag)) return this.store.getTagCompat(tag) as T
+    const storedValue = value !== undefined ? value : (tag.defaultValue as T)
+    this.store.setTagCompat(tag, storedValue)
+    return storedValue
+  }
+}
+
+interface AtomGeneration<T> {
+  cleanups?: Cleanup[]
+  pending?: Promise<T>
+  releaseRequested: boolean
+  resolving: boolean
+  started: boolean
+}
+
+interface AtomEntry<T> {
+  state: AtomState
+  value?: T
+  hasValue: boolean
+  error?: Error
+  generation: AtomGeneration<T>
+  resolvingListeners?: Set<Listener>
+  resolvedListener?: Listener
+  resolvedListeners?: Set<Listener>
+  allListeners?: Set<Listener>
+  pendingInvalidate: 0 | 1 | 2
+  pendingSet?: PendingSet<T>
+  data?: ContextDataImpl
+  dependents?: Set<Lite.Atom<unknown>>
+  watchers?: Set<WatchEdge>
+  valueListeners?: Set<Listener>
+  valueReady?: boolean
+  notifiedValue?: T
+  gcPending: boolean
+  gcQueued: boolean
+  gcScheduled: ReturnType<typeof setTimeout> | null
+  resolvedPromise?: Promise<T>
+}
+
+class AtomEntryImpl<T> implements AtomEntry<T> {
+  state: AtomState = "idle"
+  value: T | undefined = undefined
+  hasValue = false
+  error: Error | undefined = undefined
+  generation: AtomGeneration<T>
+  pendingInvalidate: 0 | 1 | 2 = 0
+  pendingSet: PendingSet<T> | undefined = undefined
+  data: ContextDataImpl | undefined = undefined
+  gcPending = false
+  gcQueued = false
+  gcScheduled: ReturnType<typeof setTimeout> | null = null
+  resolvedPromise: Promise<T> | undefined = undefined
+
+  constructor(generation: AtomGeneration<T>) {
+    this.generation = generation
+  }
+}
+
+interface ReleaseFlight {
+  entry: object
+  generation: object
+  promise: Promise<void>
+}
+
+interface ResourceEntry<T> {
+  state: AtomState
+  value?: T
+  hasValue: boolean
+  error?: Error
+  cleanups: Cleanup[]
+  promise?: Promise<T>
+}
+
+interface ResourceListeners {
+  idle: Set<Listener>
+  resolving: Set<Listener>
+  resolved: Set<Listener>
+  failed: Set<Listener>
+  all: Set<Listener>
+}
+
+type ResourceDependencyConsumer = {
+  ownerCtx: ExecutionContextImpl
+  resource: Lite.Resource<unknown>
+  entry: ResourceEntry<unknown>
+}
+
+type StreamSource<T> = AsyncIterable<T> | AsyncIterator<T>
+
+const pendingAbort = Symbol()
+
+type StreamHub<T> = {
+  atom: Lite.Atom<StreamSource<T>>
+  views: Set<Latest<T>>
+  unsubs: (() => void)[]
+  version: number
+  iterator?: AsyncIterator<T>
+  source?: StreamSource<T>
+}
+
+type ExecFlowRuntimeOptions = {
+  flow: Lite.Flow<unknown, any, any, unknown>
+  input?: unknown
+  rawInput?: unknown
+  name?: string
+  tags?: Lite.TagInput
+  signal?: AbortSignal
+  blockedTags?: Lite.Tagged<any>[]
+}
+
+type ExecDepsRuntimeOptions = {
+  name: string
+  deps: Record<string, Lite.ExecutionDependency>
+  fn: (deps: Record<string, unknown>, ...params: any[]) => unknown
+  params: unknown[]
+  tags?: Lite.TagInput
+  signal?: AbortSignal
+}
+
+type ExecRuntimeOptions = {
+  name: string
+  deps?: undefined
+  fn: (...params: any[]) => unknown
+  params: unknown[]
+  tags?: Lite.TagInput
+  signal?: AbortSignal
+}
+
+class StreamAbandonment {
+  readonly pending: Promise<never>
+  private reject!: (error: unknown) => void
+  private abandoned = false
+  reason: unknown
+
+  constructor() {
+    this.pending = new Promise<never>((_resolve, reject) => {
+      this.reject = reject
+    })
+    this.pending.catch(() => {})
+  }
+
+  abandon(error: unknown): void {
+    if (this.abandoned) return
+    this.abandoned = true
+    this.reason = error
+    this.reject(error)
+  }
+
+  get isAbandoned(): boolean {
+    return this.abandoned
+  }
+}
+
+function assertExecutionContextImpl(ctx: Lite.ExecutionContext): asserts ctx is ExecutionContextImpl {
+  if (!(ctx instanceof ExecutionContextImpl)) {
+    throw new Error("Resource deps require an ExecutionContext")
+  }
+}
+
+function isAtomControllerDep(dep: Lite.ControllerDep<unknown>): dep is Lite.AtomControllerDep<unknown> {
+  return dep.atom !== undefined
+}
+
+function isAsyncFactory(fn: Function): boolean {
+  return fn.constructor.name === "AsyncFunction"
+}
+
+function getAsyncIterator<T>(source: StreamSource<T>): AsyncIterator<T> {
+  const iterate = (source as AsyncIterable<T>)[Symbol.asyncIterator]
+  return iterate ? iterate.call(source) : source as AsyncIterator<T>
+}
+
+function combineAbortSignals(signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController()
+  const abort = (event: Event) => {
+    for (let i = 0; i < signals.length; i++) signals[i]!.removeEventListener("abort", abort)
+    controller.abort((event.target as AbortSignal).reason)
+  }
+  for (let i = 0; i < signals.length; i++) {
+    if (signals[i]!.aborted) {
+      controller.abort(signals[i]!.reason)
+      return controller.signal
+    }
+    signals[i]!.addEventListener("abort", abort, { once: true })
+  }
+  return controller.signal
+}
+
+function applyUpdates<T>(value: T, updates: Update<T>[]): T {
+  let current = value
+  for (let i = 0; i < updates.length; i++) {
+    const update = updates[i]!
+    current = update.fn(current)
+  }
+  return current
+}
+
+function throwListenerErrors(errors: unknown[]): void {
+  if (errors.length === 0) return
+  if (errors.length === 1) throw errors[0]
+  throw new AggregateError(errors, "Listener notification failed")
+}
+
+interface NotifyDepth {
+  count: number
+}
+
+function notifyListener(depth: NotifyDepth, listener: Listener | undefined, errors?: unknown[]): void {
+  if (!listener) return
+  depth.count++
+  try {
+    listener()
+  } catch (error) {
+    if (!errors) {
+      depth.count--
+      throw error
+    }
+    errors.push(error)
+  }
+  depth.count--
+}
+
+function notifyListeners(depth: NotifyDepth, listeners: Set<Listener> | undefined, errors?: unknown[]): void {
+  if (!listeners?.size) return
+  if (listeners.size === 1) {
+    notifyListener(depth, listeners.values().next().value, errors)
+    return
+  }
+  const failures = errors ?? []
+  const snapshot = [...listeners]
+  depth.count++
+  for (let i = 0; i < snapshot.length; i++) {
+    try {
+      snapshot[i]!()
+    } catch (error) {
+      failures.push(error)
+    }
+  }
+  depth.count--
+  if (!errors) throwListenerErrors(failures)
+}
+
+class SelectHandleImpl<T, S> implements Lite.SelectHandle<S> {
+  private listeners = new Set<Listener>()
+  private sourceValue: T
+  private currentValue: S
+  private ctrlUnsub: (() => void) | null = null
+  private frozen = false
+
+  constructor(
+    private ctrl: Lite.Controller<T>,
+    private selector: (value: T) => S,
+    private eq: (prev: S, next: S) => boolean,
+    private notifyDepth: NotifyDepth
+  ) {
+    if (ctrl.state !== 'resolved') {
+      throw new Error("Cannot select from unresolved atom")
+    }
+
+    this.sourceValue = ctrl.get()
+    this.currentValue = selector(this.sourceValue)
+  }
+
+  private refreshFromSource(): void {
+    const source = this.ctrl.get()
+    if (Object.is(source, this.sourceValue)) return
+    this.sourceValue = source
+    const nextValue = this.selector(source)
+    if (!this.eq(this.currentValue, nextValue)) {
+      this.currentValue = nextValue
+    }
+  }
+
+  get(): S {
+    if (!this.ctrlUnsub && !this.frozen) this.refreshFromSource()
+    return this.currentValue
+  }
+
+  subscribe<Args extends unknown[]>(listener: (...args: Args) => void, ...params: Args): () => void {
+    if (!this.ctrlUnsub) {
+      this.refreshFromSource()
+      this.frozen = false
+      this.ctrlUnsub = this.ctrl.on('resolved', () => {
+        this.sourceValue = this.ctrl.get()
+        const nextValue = this.selector(this.sourceValue)
+        if (!this.eq(this.currentValue, nextValue)) {
+          this.currentValue = nextValue
+          notifyListeners(this.notifyDepth, this.listeners)
+        }
+      })
+    }
+    const registered = bindListener(listener, params)
+    this.listeners.add(registered)
+
+    return () => {
+      this.listeners.delete(registered)
+      if (this.listeners.size === 0) {
+        this.cleanup()
+      }
+    }
+  }
+
+  dispose(): void {
+    this.listeners.clear()
+    this.cleanup()
+  }
+
+  private cleanup(): void {
+    this.ctrlUnsub?.()
+    this.ctrlUnsub = null
+    this.frozen = true
+  }
+}
+
+class ControllerImpl<T> implements Lite.Controller<T> {
+  readonly [controllerSymbol] = true
+  _entryCache: AtomEntry<T> | null = null
+
+  constructor(
+    private atom: Lite.Atom<T>,
+    private scope: ScopeImpl
+  ) {}
+
+  private resolveEntry(): AtomEntry<T> | undefined {
+    const cached = this._entryCache
+    if (cached) return cached
+    const fresh = this.scope.getEntry(this.atom) as AtomEntry<T> | undefined
+    if (fresh) this._entryCache = fresh
+    return fresh
+  }
+
+  _invalidateEntryCache(): void {
+    this._entryCache = null
+  }
+
+  get state(): AtomState {
+    const e = this._entryCache ?? this.resolveEntry()
+    return e?.state ?? 'idle'
+  }
+
+  get value(): T {
+    return this.get()
+  }
+
+  get(): T {
+    const cached = this._entryCache
+    if (!controllerReadHooks.length && cached?.hasValue) return cached.value as T
+    for (let i = controllerReadHooks.length - 1; i >= 0; i--) {
+      controllerReadHooks[i]!(this)
+    }
+    const entry = this.resolveEntry()
+    if (!entry || entry.state === 'idle') throw new Error("Atom not resolved")
+    if (entry.state === 'failed') throw entry.error!
+    if (entry.hasValue) return entry.value as T
+    throw new Error("Atom not resolved")
+  }
+
+  async resolve(): Promise<T> {
+    return this.scope.resolve(this.atom)
+  }
+
+  async release(): Promise<void> {
+    return this.scope.release(this.atom)
+  }
+
+  invalidate(): void {
+    this.scope.invalidate(this.atom)
+  }
+
+  set(value: T): void {
+    this.scope.scheduleSet(this.atom, value, this._entryCache ?? undefined)
+  }
+
+  update(fn: (prev: T) => T): void {
+    this.scope.scheduleUpdate(this.atom, fn, this._entryCache ?? undefined)
+  }
+
+  on<Args extends unknown[]>(event: ListenerEvent, listener: (...args: Args) => void, ...params: Args): () => void {
+    return this.scope.addListener(this.atom, event, listener, params)
+  }
+
+  _(listener: Listener): () => void {
+    return this.scope.addValueListener(this.atom, listener)
+  }
+}
+
+class ResourceControllerImpl<T> implements Lite.ResourceController<T> {
+  constructor(
+    private resource: Lite.Resource<T>,
+    private ctx: ExecutionContextImpl
+  ) {}
+
+  get state(): AtomState {
+    const found = this.ctx.findResourceEntry(this.resource)
+    return found?.entry.state ?? "idle"
+  }
+
+  get(): T {
+    const found = this.ctx.findResourceEntry(this.resource)
+    const entry = found?.entry
+    if (!entry || entry.state === "idle") throw new Error("Resource not resolved")
+    if (entry.state === "failed") throw entry.error!
+    if (entry.hasValue) return entry.value as T
+    throw new Error("Resource not resolved")
+  }
+
+  resolve(): Promise<T> {
+    return this.ctx.resolve(this.resource)
+  }
+
+  release(): Promise<void> {
+    return this.ctx.release(this.resource)
+  }
+
+  on<Args extends unknown[]>(
+    event: Lite.ResourceControllerEvent,
+    listener: (...args: Args) => void,
+    ...params: Args
+  ): () => void {
+    return this.ctx.addResourceListener(this.resource, event, listener, params)
+  }
+}
+
+class ScopeImpl implements Lite.Scope {
+  private cache = new Map<Lite.Atom<unknown>, AtomEntry<unknown>>()
+  private releasing?: Map<Lite.Atom<unknown>, ReleaseFlight>
+  private presets?: Map<Lite.Atom<unknown> | Lite.Flow<unknown, unknown, any, unknown> | Lite.Resource<unknown>, unknown>
+  private stateListeners?: Map<AtomState, Map<Lite.Atom<unknown>, Set<Listener>>>
+  private invalidationQueue?: Lite.Atom<unknown>[]
+  private invalidationQueued?: Set<Lite.Atom<unknown>>
+  private invalidationIndex = 0
+  private drainTarget: Lite.Atom<unknown> | null = null
+  readonly notifyDepth: NotifyDepth = { count: 0 }
+  private drainStarted = false
+  private drainTainted = false
+  private invalidationTainted: Set<Lite.Atom<unknown>> | null = null
+  private invalidationChain: Set<Lite.Atom<unknown>> | null = null
+  private chainPromise: Promise<void> | null = null
+  private chainError: unknown = null
+  private initialized = false
+  private disposed = false
+  private disposeListeners?: Set<Listener>
+  private controllers = new Map<Lite.Atom<unknown>, ControllerImpl<unknown>>()
+  private streamHubs?: Map<Lite.Atom<unknown>, StreamHub<unknown>>
+  private closeReason: DOMException | undefined
+  private gcOptions: Required<Lite.GCOptions>
+  readonly extensions: Lite.Extension[]
+  readonly tags: readonly Lite.Tagged<any>[]
+  readonly resolveExts: Lite.Extension[]
+  readonly execExts: Lite.Extension[]
+  readonly contextExts: Lite.Extension[]
+  readonly ready: Promise<void>
+  private pendingContextCloses?: Set<Promise<void>>
+
+  private taintContext(): boolean {
+    return this.drainStarted || this.notifyDepth.count > 0
+  }
+
+  private scheduleInvalidation<T>(atom: Lite.Atom<T>, entry?: AtomEntry<T>, tainted = false): void {
+    if (!entry) {
+      entry = this.cache.get(atom) as AtomEntry<T> | undefined
+      if (!entry || entry.state === "idle") return
+    }
+
+    if (entry.state === "resolving") {
+      const level = tainted ? 2 : 1
+      if (level > entry.pendingInvalidate) entry.pendingInvalidate = level
+      return
+    }
+
+    const queued = this.invalidationQueued ??= new Set()
+    if (!queued.has(atom)) {
+      queued.add(atom)
+      ;(this.invalidationQueue ??= []).push(atom)
+    }
+    if (tainted) (this.invalidationTainted ??= new Set()).add(atom)
+
+    if (!this.chainPromise) {
+      this.chainError = null
+      this.chainPromise = Promise.resolve().then(() =>
+        this.processInvalidationChain().catch(error => {
+          this.chainError = error
+        })
+      )
+    }
+  }
+
+  private async processInvalidationChain(): Promise<void> {
+    this.drainStarted = true
+    try {
+      while (this.invalidationQueue && this.invalidationIndex < this.invalidationQueue.length && !this.disposed) {
+        const atom = this.invalidationQueue[this.invalidationIndex++]!
+        this.invalidationQueued!.delete(atom)
+        const result = this.doInvalidateSequential(atom)
+        if (result) await result
+      }
+    } finally {
+      this.invalidationQueue = undefined
+      this.invalidationQueued = undefined
+      this.invalidationIndex = 0
+      this.invalidationTainted = null
+      this.invalidationChain = null
+      this.chainPromise = null
+      this.drainStarted = false
+    }
+  }
+
+  constructor(options?: Lite.ScopeOptions) {
+    this.extensions = options?.extensions ?? noExtensions
+    const normalizedTags = normalizeTags(options?.tags)
+    this.tags = normalizedTags ? Object.freeze(normalizedTags) : noTags
+    if (this.extensions.length) {
+      this.resolveExts = this.extensions.filter(e => e.wrapResolve)
+      this.execExts = this.extensions.filter(e => e.wrapExec)
+      this.contextExts = this.extensions.filter(e => e.initContext || e.disposeContext)
+    } else {
+      this.resolveExts = noExtensions
+      this.execExts = noExtensions
+      this.contextExts = noExtensions
+    }
+
+    for (const p of options?.presets ?? []) {
+      ;(this.presets ??= new Map()).set(p.target, p.value)
+    }
+
+    this.gcOptions = {
+      enabled: options?.gc?.enabled ?? true,
+      graceMs: options?.gc?.graceMs ?? 3000,
+    }
+
+    if (this.extensions.some(extension => extension.init)) {
+      this.ready = this.init()
+    } else {
+      this.initialized = true
+      this.ready = complete
+    }
+  }
+
+  private async init(): Promise<void> {
+    for (const ext of this.extensions) {
+      if (ext.init) {
+        await ext.init(this)
+      }
+    }
+    this.initialized = true
+  }
+
+  getEntry<T>(atom: Lite.Atom<T>): AtomEntry<T> | undefined {
+    return this.cache.get(atom) as AtomEntry<T> | undefined
+  }
+
+  executionContextCloseReason(): DOMException {
+    return this.closeReason ??= new DOMException("Execution context closed", "AbortError")
+  }
+
+  attachContextExtensions(ctx: ExecutionContextImpl): void {
+    for (let i = 0; i < this.contextExts.length; i++) {
+      const ext = this.contextExts[i]!
+      const unregister = ext.disposeContext ? ctx.onClose(runDisposeContext, ext, ctx) : undefined
+      if (!ext.initContext) continue
+      try {
+        const returned: unknown = ext.initContext(ctx)
+        if (isPromiseLike(returned)) {
+          void Promise.resolve(returned).catch(() => {})
+          throw new Error(`Extension "${ext.name}" initContext must be synchronous`)
+        }
+      } catch (error) {
+        unregister?.()
+        const closing = ctx.close({ ok: false, error })
+        closing.catch(() => {})
+        if (ctx.parent) {
+          assertExecutionContextImpl(ctx.parent)
+          ctx.parent.trackDescendant(closing)
+        } else {
+          const pending = this.pendingContextCloses ??= new Set()
+          pending.add(closing)
+          closing.then(
+            () => pending.delete(closing),
+            () => pending.delete(closing)
+          )
+        }
+        throw error
+      }
+    }
+  }
+
+  private createGeneration<T>(): AtomGeneration<T> {
+    return {
+      releaseRequested: false,
+      resolving: false,
+      started: false,
+    }
+  }
+
+  private beginGeneration<T>(entry: AtomEntry<T>): { generation: AtomGeneration<T>, cleanups: Cleanup[] | undefined } {
+    let generation = entry.generation
+    let cleanups: Cleanup[] | undefined
+    if (generation.started) {
+      cleanups = generation.cleanups
+      generation.cleanups = undefined
+      generation = this.createGeneration()
+      entry.generation = generation
+    }
+    generation.started = true
+    generation.resolving = true
+    return { generation, cleanups }
+  }
+
+  private replaceGeneration<T>(entry: AtomEntry<T>): { generation: AtomGeneration<T>, cleanups: Cleanup[] | undefined } {
+    const previous = entry.generation
+    const cleanups = previous.cleanups
+    previous.cleanups = undefined
+    const generation = this.createGeneration<T>()
+    entry.generation = generation
+    return { generation, cleanups }
+  }
+
+  private getOrCreateEntry<T>(atom: Lite.Atom<T>): AtomEntry<T> {
+    let entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (!entry) {
+      entry = new AtomEntryImpl(this.createGeneration())
+      this.cache.set(atom, entry as AtomEntry<unknown>)
+    }
+    return entry
+  }
+
+  addListener<T, Args extends unknown[]>(
+    atom: Lite.Atom<T>,
+    event: ListenerEvent,
+    listener: (...args: Args) => void,
+    params: Args
+  ): () => void {
+    const entry = this.getOrCreateEntry(atom)
+    this.cancelGCTimer(entry)
+    entry.gcPending = false
+    const registered = bindListener(listener, params)
+    if (event === 'resolved') {
+      if (!entry.resolvedListener && !entry.resolvedListeners) {
+        entry.resolvedListener = registered
+      } else {
+        const listeners = entry.resolvedListeners ??= new Set(entry.resolvedListener ? [entry.resolvedListener] : undefined)
+        entry.resolvedListener = undefined
+        listeners.add(registered)
+      }
+      return () => {
+        if (entry.resolvedListener === registered) entry.resolvedListener = undefined
+        else {
+          const listeners = entry.resolvedListeners
+          listeners?.delete(registered)
+          if (listeners?.size === 1) {
+            entry.resolvedListener = listeners.values().next().value
+            entry.resolvedListeners = undefined
+          }
+        }
+        this.maybeScheduleGCEntry(atom, entry as AtomEntry<unknown>)
+      }
+    }
+    const listeners = event === 'resolving'
+      ? entry.resolvingListeners ??= new Set()
+      : entry.allListeners ??= new Set()
+    listeners.add(registered)
+    return () => {
+      listeners.delete(registered)
+      this.maybeScheduleGCEntry(atom, entry as AtomEntry<unknown>)
+    }
+  }
+
+  addValueListener<T>(atom: Lite.Atom<T>, listener: Listener): () => void {
+    const entry = this.getOrCreateEntry(atom)
+    this.cancelGCTimer(entry)
+    entry.gcPending = false
+    const listeners = entry.valueListeners ??= new Set()
+    if (!listeners.size) {
+      entry.valueReady = entry.hasValue
+      if (entry.hasValue) entry.notifiedValue = entry.value
+    }
+    listeners.add(listener)
+    return () => {
+      listeners.delete(listener)
+      this.maybeScheduleGCEntry(atom, entry as AtomEntry<unknown>)
+    }
+  }
+
+  private hasSubscribers(entry: AtomEntry<unknown>): boolean {
+    return !!(entry.resolvingListeners?.size || entry.resolvedListener || entry.resolvedListeners?.size || entry.allListeners?.size || entry.valueListeners?.size)
+  }
+
+  private canQueueGC<T>(atom: Lite.Atom<T>, entry: AtomEntry<unknown>): boolean {
+    return this.gcOptions.enabled
+      && !atom.keepAlive
+      && entry.state !== 'idle'
+      && !this.hasSubscribers(entry)
+      && !entry.dependents?.size
+      && !entry.gcScheduled
+      && !entry.gcQueued
+  }
+
+  private canStartGCTimer<T>(atom: Lite.Atom<T>, entry: AtomEntry<unknown>): boolean {
+    return !this.disposed
+      && this.cache.get(atom) === entry
+      && !this.hasSubscribers(entry)
+      && !entry.dependents?.size
+      && !entry.gcScheduled
+  }
+
+  private scheduleGCTimer<T>(atom: Lite.Atom<T>, entry: AtomEntry<unknown>): void {
+    entry.gcScheduled = setTimeout(() => {
+      void this.executeGC(atom)
+    }, this.gcOptions.graceMs)
+  }
+
+  private cancelGCTimer<T>(entry: AtomEntry<T>): void {
+    if (!entry.gcScheduled) return
+    clearTimeout(entry.gcScheduled)
+    entry.gcScheduled = null
+  }
+
+  private canExecuteGC(entry: AtomEntry<unknown>): boolean {
+    return !this.hasSubscribers(entry) && !entry.dependents?.size
+  }
+
+  private trackDependent<T>(atom: Lite.Atom<T>, dependentAtom?: Lite.Atom<unknown>): void {
+    if (!dependentAtom) return
+    const entry = this.getEntry(atom)
+    if (entry) (entry.dependents ??= new Set()).add(dependentAtom)
+  }
+
+  private maybeScheduleGCEntry<T>(atom: Lite.Atom<T>, entry?: AtomEntry<unknown>): void {
+    const gcEntry = entry ?? this.cache.get(atom)
+    if (!gcEntry || !this.canQueueGC(atom, gcEntry)) return
+
+    gcEntry.gcPending = true
+    gcEntry.gcQueued = true
+    queueMicrotask(() => {
+      gcEntry.gcQueued = false
+      if (!gcEntry.gcPending) return
+      gcEntry.gcPending = false
+      if (!this.canStartGCTimer(atom, gcEntry)) return
+      this.scheduleGCTimer(atom, gcEntry)
+    })
+  }
+
+  private async executeGC<T>(atom: Lite.Atom<T>): Promise<void> {
+    const entry = this.cache.get(atom)!
+
+    entry.gcScheduled = null
+    entry.gcPending = false
+
+    if (!this.canExecuteGC(entry)) return
+
+    await this.release(atom)
+
+    if (atom.deps) {
+      for (const key in atom.deps) {
+        const dep = atom.deps[key]!
+        const depAtom = isControllerDep(dep) && isAtomControllerDep(dep) ? dep.atom : dep
+        if (!isAtom(depAtom)) continue
+        this.cache.get(depAtom)?.dependents?.delete(atom)
+        this.maybeScheduleGCEntry(depAtom)
+      }
+    }
+  }
+
+  private notifyEntry(entry: AtomEntry<unknown>, event: 'resolving' | 'resolved', errors?: unknown[], cascade = false): void {
+    const listeners = event === 'resolving' ? entry.resolvingListeners : entry.resolvedListeners
+    if (!errors && !entry.watchers?.size && !entry.valueListeners?.size && !entry.allListeners?.size) {
+      if (event === 'resolved') notifyListener(this.notifyDepth, entry.resolvedListener)
+      notifyListeners(this.notifyDepth, listeners)
+      return
+    }
+    const failures = errors ?? []
+    const tainted = !cascade && (this.drainStarted || this.notifyDepth.count > 0)
+    if (event === 'resolved' && entry.watchers?.size) {
+      for (const edge of entry.watchers) {
+        try {
+          const previous = edge.previous
+          edge.previous = entry.value
+          if (!edge.eq(previous, entry.value)) {
+            if (cascade) this.invalidationChain?.delete(edge.target)
+            this.scheduleInvalidation(edge.target, undefined, tainted)
+          }
+        } catch (error) {
+          failures.push(error)
+        }
+      }
+    }
+    if (event === 'resolved' && entry.valueListeners?.size) {
+      if (!entry.valueReady || !Object.is(entry.notifiedValue, entry.value)) {
+        entry.valueReady = true
+        entry.notifiedValue = entry.value
+        notifyListeners(this.notifyDepth, entry.valueListeners, failures)
+      }
+    }
+    if (event === 'resolved') notifyListener(this.notifyDepth, entry.resolvedListener, failures)
+    notifyListeners(this.notifyDepth, listeners, failures)
+    notifyListeners(this.notifyDepth, entry.allListeners, failures)
+    if (!errors) throwListenerErrors(failures)
+  }
+
+  private notifyEntryAll(entry: AtomEntry<unknown>, errors?: unknown[]): void {
+    const failures = errors ?? []
+    entry.valueReady = false
+    notifyListeners(this.notifyDepth, entry.valueListeners, failures)
+    notifyListeners(this.notifyDepth, entry.allListeners, failures)
+    if (!errors) throwListenerErrors(failures)
+  }
+
+  private emitStateChange(state: AtomState, atom: Lite.Atom<unknown>, errors?: unknown[]): void {
+    const stateMap = this.stateListeners?.get(state)
+    if (!stateMap) return
+    notifyListeners(this.notifyDepth, stateMap.get(atom), errors)
+  }
+
+  on<Args extends unknown[]>(
+    event: AtomState,
+    atom: Lite.Atom<unknown>,
+    listener: (...args: Args) => void,
+    ...params: Args
+  ): () => void {
+    const stateListeners = this.stateListeners ??= new Map()
+    let stateMap = stateListeners.get(event)
+    if (!stateMap) {
+      stateMap = new Map()
+      stateListeners.set(event, stateMap)
+    }
+    let listeners = stateMap.get(atom)
+    if (!listeners) {
+      listeners = new Set()
+      stateMap.set(atom, listeners)
+    }
+    const registered = bindListener(listener, params)
+    listeners.add(registered)
+
+    const capturedStateMap = stateMap
+    const capturedListeners = listeners
+
+    return () => {
+      capturedListeners.delete(registered)
+      if (capturedListeners.size === 0) {
+        capturedStateMap.delete(atom)
+        if (capturedStateMap.size === 0) {
+          stateListeners.delete(event)
+        }
+      }
+    }
+  }
+
+  private onDispose<Args extends unknown[]>(listener: (...args: Args) => void, ...params: Args): () => void {
+    const registered = bindListener(listener, params)
+    const listeners = this.disposeListeners ??= new Set()
+    listeners.add(registered)
+    return () => {
+      listeners.delete(registered)
+    }
+  }
+
+  private emitDispose(): void {
+    if (!this.disposeListeners) return
+    const listeners = [...this.disposeListeners]
+    this.disposeListeners = undefined
+    for (let i = 0; i < listeners.length; i++) listeners[i]!()
+  }
+
+  private tryResolveSyncDeps(
+    graph: DepsGraph,
+    dependentAtom: Lite.Atom<unknown> | undefined,
+    path: Set<Lite.Atom<unknown>>,
+  ): Record<string, unknown> | null {
+    const result: Record<string, unknown> = {}
+
+    for (let i = 0; i < graph.atoms.length; i++) {
+      const [key, dep] = graph.atoms[i]!
+      let cachedEntry = this.cache.get(dep)
+      if (cachedEntry?.state !== 'resolved') {
+        if (isAsyncFactory(dep.factory)) return null
+        const pending = this.tryResolveCurrentTick(dep, path)
+        if (!pending) return null
+        cachedEntry = this.cache.get(dep)
+        if (cachedEntry?.state !== 'resolved') {
+          void pending.catch(() => undefined)
+          return null
+        }
+      }
+      result[key] = cachedEntry.value
+      this.trackDependent(dep, dependentAtom)
+    }
+
+    for (let i = 0; i < graph.controllers.length; i++) {
+      const [key, dep] = graph.controllers[i]!
+      if (!isAtomControllerDep(dep)) return null
+      if (dep.watch) {
+        if (!dependentAtom) return null
+        if (!dep.resolve) return null
+      }
+      const ctrl = this.controller(dep.atom)
+      if (dep.resolve) {
+        let cachedCtrlEntry = this.cache.get(dep.atom)
+        if (cachedCtrlEntry?.state !== 'resolved') {
+          if (isAsyncFactory(dep.atom.factory)) return null
+          const pending = this.tryResolveCurrentTick(dep.atom, path)
+          if (!pending) return null
+          cachedCtrlEntry = this.cache.get(dep.atom)
+          if (cachedCtrlEntry?.state !== 'resolved') {
+            void pending.catch(() => undefined)
+            return null
+          }
+        }
+        result[key] = ctrl
+        this.trackDependent(dep.atom, dependentAtom)
+        if (dep.watch) {
+          if (!dependentAtom) return null
+          this.wireWatch(dep, dependentAtom)
+        }
+      } else {
+        result[key] = ctrl
+        this.trackDependent(dep.atom, dependentAtom)
+      }
+    }
+
+    for (let i = 0; i < graph.tags.length; i++) {
+      const [key, tagExecutor] = graph.tags[i]!
+      switch (tagExecutor.mode) {
+        case "required": {
+          const value = tagExecutor.tag.find(this.tags)
+          if (value !== undefined) {
+            if (isFlow(value)) return null
+            result[key] = value
+          } else if (tagExecutor.tag.hasDefault) {
+            if (isFlow(tagExecutor.tag.defaultValue)) return null
+            result[key] = tagExecutor.tag.defaultValue
+          } else {
+            return null
+          }
+          break
+        }
+        case "optional": {
+          const value = tagExecutor.tag.find(this.tags) ?? tagExecutor.tag.defaultValue
+          if (isFlow(value)) return null
+          result[key] = value
+          break
+        }
+        case "all": {
+          const values = tagExecutor.tag.collect(this.tags)
+          if (values.some((value) => isFlow(value))) return null
+          result[key] = values
+          break
+        }
+      }
+    }
+
+    return result
+  }
+
+  private tryResolveCurrentTick<T>(atom: Lite.Atom<T>, path?: Set<Lite.Atom<unknown>>): Promise<T> | null {
+    if (this.hasResolvePipeline()) return null
+    if (this.presets?.has(atom) || this.releasing?.has(atom)) return null
+
+    const entry = this.getOrCreateEntry(atom)
+    if (entry.state !== 'idle') return null
+
+    let resolvedDeps: Record<string, unknown> | null = null
+    if (atom.deps) {
+      const active = path ?? new Set()
+      if (active.has(atom)) return null
+      active.add(atom)
+      const graph = classifyDeps(atom.deps)
+      if (!graph.syncable) {
+        active.delete(atom)
+        return null
+      }
+      resolvedDeps = this.tryResolveSyncDeps(graph, atom, active)
+      active.delete(atom)
+      if (!resolvedDeps) return null
+    }
+
+    const { generation } = this.beginGeneration(entry)
+    const listenerErrors: unknown[] = []
+    entry.state = 'resolving'
+    this.emitStateChange('resolving', atom, listenerErrors)
+    this.notifyEntry(entry as AtomEntry<unknown>, 'resolving', listenerErrors)
+
+    const ctx: Lite.ResolveContext = {
+      cleanup: (fn, ...params) => (generation.cleanups ??= []).push({ fn, params }),
+      invalidate: () => { this.scheduleInvalidation(atom, undefined, this.taintContext()) },
+      release: () => this.releaseGeneration(atom, entry, generation),
+      scope: this,
+      get data() {
+        if (!entry.data) entry.data = new ContextDataImpl()
+        return entry.data
+      },
+    }
+
+    const factory = atom.factory as (
+      ctx: Lite.ResolveContext,
+      deps?: Record<string, unknown>
+    ) => MaybePromise<T>
+
+    let value: MaybePromise<T>
+    try {
+      value = resolvedDeps ? factory(ctx, resolvedDeps) : factory(ctx)
+    } catch (err) {
+      entry.state = 'failed'
+      entry.error = err instanceof Error ? err : new Error(String(err))
+      entry.value = undefined
+      entry.hasValue = false
+      this.emitStateChange('failed', atom, listenerErrors)
+      this.notifyEntryAll(entry as AtomEntry<unknown>, listenerErrors)
+      this.handlePostResolveError(atom, entry)
+      this.finishGeneration(atom, entry, generation)
+      const failure = Promise.reject<T>(entry.error)
+      generation.pending = failure
+      void failure.catch(() => {
+        if (generation.pending === failure) generation.pending = undefined
+      })
+      return failure
+    }
+
+    if (value != null && typeof (value as any).then === 'function') {
+      const resolution = (value as Promise<T>).then(
+        (resolved) => {
+          entry.state = 'resolved'
+          entry.value = resolved
+          entry.hasValue = true
+          entry.error = undefined
+          entry.resolvedPromise = Promise.resolve(resolved)
+          this.emitStateChange('resolved', atom, listenerErrors)
+          this.notifyEntry(entry as AtomEntry<unknown>, 'resolved', listenerErrors, atom === this.drainTarget && !this.drainTainted)
+          this.handlePostResolve(atom, entry)
+          throwListenerErrors(listenerErrors)
+          return resolved
+        },
+        (err) => {
+          entry.state = 'failed'
+          entry.error = err instanceof Error ? err : new Error(String(err))
+          entry.value = undefined
+          entry.hasValue = false
+          this.emitStateChange('failed', atom, listenerErrors)
+          this.notifyEntryAll(entry as AtomEntry<unknown>, listenerErrors)
+          this.handlePostResolveError(atom, entry)
+          throw entry.error
+        }
+      )
+      let pending!: Promise<T>
+      pending = resolution.finally(() => {
+        if (generation.pending === pending) generation.pending = undefined
+        this.finishGeneration(atom, entry, generation)
+      })
+      generation.pending = pending
+      return pending
+    }
+
+    entry.state = 'resolved'
+    entry.value = value as T
+    entry.hasValue = true
+    entry.error = undefined
+    entry.resolvedPromise = Promise.resolve(value as T)
+    this.emitStateChange('resolved', atom, listenerErrors)
+    this.notifyEntry(entry as AtomEntry<unknown>, 'resolved', listenerErrors, atom === this.drainTarget && !this.drainTainted)
+    this.handlePostResolve(atom, entry)
+    this.finishGeneration(atom, entry, generation)
+
+    try {
+      throwListenerErrors(listenerErrors)
+    } catch (error) {
+      return Promise.reject(error)
+    }
+
+    return entry.resolvedPromise
+  }
+
+  private finishGeneration<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, generation: AtomGeneration<T>): void {
+    generation.resolving = false
+    if (!generation.releaseRequested) return
+    generation.releaseRequested = false
+    if (this.cache.get(atom) === entry && entry.generation === generation) void this.release(atom)
+  }
+
+  private handlePostResolve<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): void {
+    if (entry.pendingInvalidate) {
+      const tainted = entry.pendingInvalidate === 2
+      entry.pendingInvalidate = 0
+      this.invalidationChain?.delete(atom)
+      this.scheduleInvalidation(atom, undefined, tainted)
+    } else if (entry.pendingSet) {
+      this.invalidationChain?.delete(atom)
+      this.scheduleInvalidation(atom, undefined, true)
+    }
+  }
+
+  private handlePostResolveError<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>): void {
+    if (entry.pendingInvalidate) {
+      const tainted = entry.pendingInvalidate === 2
+      entry.pendingInvalidate = 0
+      this.invalidationChain?.delete(atom)
+      this.scheduleInvalidation(atom, undefined, tainted)
+    } else if (entry.pendingSet?.hasValue) {
+      this.invalidationChain?.delete(atom)
+      this.scheduleInvalidation(atom, undefined, true)
+    } else {
+      entry.pendingSet = undefined
+    }
+  }
+
+  resolve<T>(atom: Lite.Atom<T>): Promise<T> {
+    if (this.disposed) return Promise.reject(new Error("Scope is disposed"))
+
+    const flight = this.releasing?.get(atom)
+    if (flight) return flight.promise.then(() => this.resolve(atom))
+
+    if (!this.initialized) {
+      if (!this.ready) return this.resolveAndTrack(atom)
+      return this.ready.then(() => this.resolve(atom))
+    }
+
+    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (entry?.state === 'resolved') {
+      return entry.resolvedPromise ?? (entry.resolvedPromise = Promise.resolve(entry.value as T))
+    }
+
+    const pendingPromise = entry?.generation.pending
+    if (pendingPromise) {
+      return pendingPromise
+    }
+
+    if (entry?.generation.resolving) {
+      return Promise.reject(new Error("Circular dependency detected"))
+    }
+
+    if (this.presets?.has(atom)) {
+      const presetValue = this.presets.get(atom)
+      if (isAtom(presetValue)) {
+        return this.resolve(presetValue as Lite.Atom<T>)
+      }
+      const newEntry = this.getOrCreateEntry(atom)
+      newEntry.generation.started = true
+      newEntry.state = 'resolved'
+      newEntry.value = presetValue as T
+      newEntry.hasValue = true
+      this.emitStateChange('resolved', atom)
+      this.notifyEntry(newEntry as AtomEntry<unknown>, 'resolved')
+      return Promise.resolve(newEntry.value)
+    }
+
+    if (isAsyncFactory(atom.factory)) return this.resolveAndTrack(atom)
+
+    const syncResult = this.tryResolveCurrentTick(atom)
+    if (syncResult) return syncResult
+
+    return this.resolveAndTrack(atom)
+  }
+
+  private resolveAndTrack<T>(atom: Lite.Atom<T>): Promise<T> {
+    const entry = this.getOrCreateEntry(atom)
+    const { generation, cleanups } = this.beginGeneration(entry)
+    const resolution = this.doResolve(atom, entry, generation, cleanups)
+    let pending!: Promise<T>
+    pending = resolution.finally(() => {
+      if (generation.pending === pending) generation.pending = undefined
+      this.finishGeneration(atom, entry, generation)
+    })
+    generation.pending = pending
+    return pending
+  }
+
+  private async doResolve<T>(
+    atom: Lite.Atom<T>,
+    entry: AtomEntry<T>,
+    generation: AtomGeneration<T>,
+    cleanups: Cleanup[] | undefined,
+  ): Promise<T> {
+    const listenerErrors: unknown[] = []
+    const wasResolving = entry.state === 'resolving'
+    if (!wasResolving) {
+      if (cleanups?.length) await runCleanupsSafe(cleanups)
+      entry.state = 'resolving'
+      this.emitStateChange('resolving', atom, listenerErrors)
+      this.notifyEntry(entry as AtomEntry<unknown>, 'resolving', listenerErrors)
+    }
+
+    const ctx: Lite.ResolveContext = {
+      cleanup: (fn, ...params) => (generation.cleanups ??= []).push({ fn, params }),
+      invalidate: () => {
+        this.scheduleInvalidation(atom, undefined, this.taintContext())
+      },
+      release: () => this.releaseGeneration(atom, entry, generation),
+      scope: this,
+      get data() {
+        if (!entry.data) {
+          entry.data = new ContextDataImpl()
+        }
+        return entry.data
+      },
+    }
+
+    const factory = atom.factory as (
+      ctx: Lite.ResolveContext,
+      deps?: Record<string, unknown>
+    ) => MaybePromise<T>
+
+    try {
+      const depsResult = this.resolveDepsOptimistic(atom.deps, undefined, atom)
+      const resolvedDeps = depsResult != null && typeof (depsResult as any).then === 'function'
+        ? await (depsResult as Promise<Record<string, unknown>>)
+        : depsResult as Record<string, unknown>
+      let value: T
+      if (!this.hasResolvePipeline()) {
+        const raw = atom.deps ? factory(ctx, resolvedDeps) : factory(ctx)
+        value = raw != null && typeof (raw as any).then === 'function' ? await (raw as Promise<T>) : raw as T
+      } else {
+        const doResolve = async () => atom.deps ? factory(ctx, resolvedDeps) : factory(ctx)
+        const event: Lite.ResolveEvent = { kind: "atom", target: atom as Lite.Atom<unknown>, scope: this, ctx }
+        value = await this.applyResolvePipeline(event, doResolve)
+      }
+      entry.state = 'resolved'
+      entry.value = value
+      entry.hasValue = true
+      entry.error = undefined
+      entry.resolvedPromise = Promise.resolve(value)
+      this.emitStateChange('resolved', atom, listenerErrors)
+      this.notifyEntry(entry as AtomEntry<unknown>, 'resolved', listenerErrors, atom === this.drainTarget && !this.drainTainted)
+      this.handlePostResolve(atom, entry)
+      throwListenerErrors(listenerErrors)
+
+      return value
+    } catch (err) {
+      if (entry.state === 'resolved') throw err
+      entry.state = 'failed'
+      entry.error = err instanceof Error ? err : new Error(String(err))
+      entry.value = undefined
+      entry.hasValue = false
+      this.emitStateChange('failed', atom, listenerErrors)
+      this.notifyEntryAll(entry as AtomEntry<unknown>, listenerErrors)
+      this.handlePostResolveError(atom, entry)
+
+      throw entry.error
+    }
+  }
+
+  private hasResolvePipeline(): boolean {
+    return this.resolveExts.length > 0
+  }
+
+  private async applyResolvePipeline<T>(
+    event: Lite.ResolveEvent,
+    doResolve: () => Promise<T>
+  ): Promise<T> {
+    let next = doResolve
+
+    for (let i = this.resolveExts.length - 1; i >= 0; i--) {
+      const ext = this.resolveExts[i]!
+      const currentNext = next
+      next = ext.wrapResolve!.bind(ext, currentNext, event) as () => Promise<T>
+    }
+
+    return next()
+  }
+
+  resolveDepsOptimistic(
+    deps: Record<string, Lite.Dependency> | undefined,
+    ctx: Lite.ExecutionContext | undefined,
+    dependentAtom: Lite.Atom<unknown> | undefined,
+    resourcePath?: Set<Lite.Resource<unknown>>,
+    dependentResource?: ResourceDependencyConsumer,
+    flowPath?: Set<Lite.Flow<unknown, unknown, any, unknown>>,
+    activationTags?: Lite.Tagged<any>[],
+  ): Record<string, unknown> | Promise<Record<string, unknown>> {
+    if (!deps) return {}
+
+    const graph = classifyDeps(deps)
+    const result: Record<string, unknown> = {}
+    const parallel: Promise<void>[] = []
+
+    for (let i = 0; i < graph.atoms.length; i++) {
+      const [key, dep] = graph.atoms[i]!
+      const cachedEntry = this.cache.get(dep)
+      if (cachedEntry?.state === 'resolved') {
+        result[key] = cachedEntry.value
+        this.trackDependent(dep, dependentAtom)
+      } else {
+        parallel.push(
+          this.resolve(dep).then(value => {
+            result[key] = value
+            this.trackDependent(dep, dependentAtom)
+          })
+        )
+      }
+    }
+
+    for (let i = 0; i < graph.flows.length; i++) {
+      if (!ctx) throw new Error("Flow deps require an ExecutionContext")
+      const [key, dep, options] = graph.flows[i]!
+      result[key] = this.createFlowHandle(dep, ctx, options)
+      if (!options) {
+        const activation = this.activateFlowTree(dep, ctx, flowPath, activationTags)
+        if (activation) parallel.push(activation)
+      }
+    }
+
+    for (let i = 0; i < graph.controllers.length; i++) {
+      const [key, dep] = graph.controllers[i]!
+      if (!isAtomControllerDep(dep)) {
+        if (!ctx) throw new Error("Resource controller deps require an ExecutionContext")
+        if (dep.watch && !dep.resolve) throw new Error("Resource controller watch requires resolve: true")
+        if (dep.watch && !dependentResource) {
+          throw new Error("Resource controller watch is only supported in resource dependencies")
+        }
+        assertExecutionContextImpl(ctx)
+        const ctrl = ctx.controller(dep.resource)
+        if (dep.resolve) {
+          const found = ctx.findResourceEntry(dep.resource)
+          if (found?.entry.state === "resolved") {
+            result[key] = ctrl
+            if (dep.watch) this.wireResourceWatch(dep, ctrl, dependentResource!)
+          } else {
+            parallel.push(ctrl.resolve().then(() => {
+              result[key] = ctrl
+              if (dep.watch) this.wireResourceWatch(dep, ctrl, dependentResource!)
+            }))
+          }
+        } else {
+          result[key] = ctrl
+        }
+        continue
+      }
+
+      if (dep.watch) {
+        if (!dependentAtom) throw new Error("controller({ watch: true }) is only supported in atom dependencies")
+        if (!dep.resolve) throw new Error("controller({ watch: true }) requires resolve: true")
+      }
+      const ctrl = this.controller(dep.atom)
+      if (dep.resolve) {
+        const cachedCtrlEntry = this.cache.get(dep.atom)
+        if (cachedCtrlEntry?.state === 'resolved') {
+          result[key] = ctrl
+          this.trackDependent(dep.atom, dependentAtom)
+          if (dep.watch) {
+            this.wireWatch(dep, dependentAtom!)
+          }
+        } else {
+          parallel.push(
+            ctrl.resolve().then(() => {
+              result[key] = ctrl
+              this.trackDependent(dep.atom, dependentAtom)
+              if (dep.watch) {
+                this.wireWatch(dep, dependentAtom!)
+              }
+            })
+          )
+        }
+      } else {
+        result[key] = ctrl
+        this.trackDependent(dep.atom, dependentAtom)
+      }
+    }
+
+    for (let i = 0; i < graph.tags.length; i++) {
+      const [key, tagExecutor] = graph.tags[i]!
+      switch (tagExecutor.mode) {
+        case "required": {
+          const activationValue = this.findActivationTag(activationTags, tagExecutor.tag)
+          const value = activationTags?.length
+            ? activationValue !== undefined ? activationValue : ctx?.data.seekTag(tagExecutor.tag)
+            : ctx
+              ? ctx.data.seekTag(tagExecutor.tag)
+            : tagExecutor.tag.find(this.tags)
+          if (value !== undefined) {
+            result[key] = this.projectTagValue(value, ctx, flowPath, activationTags, parallel)
+          } else if (tagExecutor.tag.hasDefault) {
+            result[key] = this.projectTagValue(tagExecutor.tag.defaultValue, ctx, flowPath, activationTags, parallel)
+          } else {
+            throw new Error(`Tag "${tagExecutor.tag.label}" not found while activating "${ctx?.name ?? "scope"}"`)
+          }
+          break
+        }
+        case "optional": {
+          const activationValue = this.findActivationTag(activationTags, tagExecutor.tag)
+          const value = activationTags?.length
+            ? activationValue !== undefined ? activationValue : ctx?.data.seekTag(tagExecutor.tag)
+            : ctx
+              ? ctx.data.seekTag(tagExecutor.tag)
+            : tagExecutor.tag.find(this.tags)
+          result[key] = this.projectTagValue(value ?? tagExecutor.tag.defaultValue, ctx, flowPath, activationTags, parallel)
+          break
+        }
+        case "all": {
+          const values = ctx
+            ? [
+                ...tagExecutor.tag.collect(activationTags ?? []),
+                ...this.collectFromHierarchy(
+                  ctx,
+                  tagExecutor.tag,
+                  activationTags?.some((value) => value.key === tagExecutor.tag.key) ?? false,
+                ),
+              ]
+            : tagExecutor.tag.collect(this.tags)
+          result[key] = values.map((value) => this.projectTagValue(value, ctx, flowPath, activationTags, parallel))
+          break
+        }
+      }
+    }
+
+    if (graph.resources.length > 0) {
+      if (!ctx) throw new Error("Resource deps require an ExecutionContext")
+      const afterParallel = parallel.length > 0
+        ? (parallel.length === 1 ? parallel[0]!.then(() => {}) : Promise.all(parallel).then(() => {}))
+        : null
+      return this.resolveResourceDeps(graph, result, ctx, afterParallel, resourcePath)
+    }
+
+    if (parallel.length === 0) return result
+    if (parallel.length === 1) return parallel[0]!.then(() => result)
+    return Promise.all(parallel).then(() => result)
+  }
+
+  private projectTagValue(
+    value: unknown,
+    ctx: Lite.ExecutionContext | undefined,
+    flowPath: Set<Lite.Flow<unknown, unknown, any, unknown>> | undefined,
+    activationTags: Lite.Tagged<any>[] | undefined,
+    parallel: Promise<void>[]
+  ): unknown {
+    if (!isFlow(value)) return value
+    if (!ctx) throw new Error("Flow deps require an ExecutionContext")
+    const activation = this.activateFlowTree(value, ctx, flowPath, activationTags)
+    if (activation) parallel.push(activation)
+    return this.createFlowHandle(value, ctx)
+  }
+
+  private findActivationTag<T>(
+    values: Lite.Tagged<any>[] | undefined,
+    target: Lite.Tag<T, boolean>
+  ): T | undefined {
+    for (let i = 0; i < (values?.length ?? 0); i++) {
+      const value = values?.[i]
+      if (value?.key === target.key) return value.value as T
+    }
+    return undefined
+  }
+
+  private activateFlowTree(
+    flow: Lite.Flow<unknown, unknown, any, unknown>,
+    ctx: Lite.ExecutionContext,
+    path?: Set<Lite.Flow<unknown, unknown, any, unknown>>,
+    inheritedTags?: Lite.Tagged<any>[],
+    execTags?: Lite.Tagged<any>[]
+  ): Promise<void> | undefined {
+    if (path?.has(flow)) {
+      throw new Error(`Circular flow dependency detected: ${flow.name ?? "anonymous"}`)
+    }
+
+    const nextPath = new Set(path)
+    nextPath.add(flow)
+    const inherited = inheritedTags ?? []
+    const presetValue = this.getFlowPreset(flow)
+    const localTags = execTags?.length || flow.tags?.length
+      ? [
+          ...(execTags ?? []),
+          ...(flow.tags ?? []).filter((tagged) => !execTags?.some((value) => value.key === tagged.key)),
+        ]
+      : []
+    const activation = presetValue === undefined
+      ? this.resolveDepsOptimistic(
+          flow.deps,
+          ctx,
+          undefined,
+          undefined,
+          undefined,
+          nextPath,
+          localTags.length > 0 ? [...localTags, ...inherited] : inherited
+        )
+      : isFlow(presetValue)
+        ? this.activateFlowTree(presetValue, ctx, nextPath, inherited, execTags)
+        : undefined
+
+    return isPromiseLike(activation) ? Promise.resolve(activation).then(() => {}) : undefined
+  }
+
+  private createFlowHandle<Output, Input, Yield>(
+    flow: Lite.Flow<Output, Input, any, Yield>,
+    ctx: Lite.ExecutionContext,
+    defaults?: Lite.FlowControllerOptions<Input>
+  ): Lite.FlowHandle<Output, Input, Yield> {
+    return {
+      flow,
+      exec: (...args: Lite.FlowExecArgs<Input>) => {
+        return this.execFlowHandle(flow, ctx, this.mergeFlowOptions(defaults, args[0] ?? {}))
+      },
+      execStream: (...args: Lite.FlowExecArgs<Input>) => {
+        return ctx.execStream({ flow, ...this.mergeFlowOptions(defaults, args[0] ?? {}) } as Lite.ExecFlowOptions<Output, Input, Yield>)
+      },
+      prepare: (...args: Lite.FlowPrepareArgs<Input>) => {
+        const options = this.mergeFlowOptions(defaults, args[0] ?? {})
+        const preparedOptions = options as Lite.FlowPrepareOptions<Input> & { tags?: Lite.Tagged<any>[] }
+        const preparedCtx = new ExecutionContextImpl(this, {
+          parent: ctx,
+          boundary: false,
+          execName: ctx.name,
+          signal: preparedOptions.signal,
+        })
+        if (preparedOptions.tags) {
+          for (let i = 0; i < preparedOptions.tags.length; i++) {
+            preparedCtx.appendTagValue(preparedOptions.tags[i]!)
+          }
+        }
+        this.attachContextExtensions(preparedCtx)
+        const unregister = ctx.onClose((result, prepared) => prepared.close(result), preparedCtx)
+        const ready = Promise.resolve().then(async () => {
+          try {
+            await this.activateFlowTree(
+              flow as Lite.Flow<unknown, unknown, any, unknown>,
+              preparedCtx,
+              new Set(),
+              [],
+              preparedOptions.tags,
+            )
+          } catch (error) {
+            unregister()
+            await preparedCtx.close({ ok: false, error })
+            throw error
+          }
+        })
+        ready.catch(() => {})
+        let consumed = false
+        const consume = () => {
+          if (consumed) throw new Error("Prepared flow invocations can be consumed only once")
+          consumed = true
+        }
+        return {
+          flow,
+          options: preparedOptions,
+          key: preparedOptions.key,
+          ready,
+          exec: async () => {
+            consume()
+            await ready
+            try {
+              const output = await this.execFlowHandle(flow, preparedCtx, options)
+              unregister()
+              await preparedCtx.close({ ok: true })
+              return output
+            } catch (error) {
+              unregister()
+              await preparedCtx.close({ ok: false, error })
+              throw error
+            }
+          },
+          execStream: () => {
+            consume()
+            return this.execPreparedStream(flow, preparedCtx, options, ready, unregister)
+          },
+        }
+      },
+    }
+  }
+
+  private execPreparedStream<Output, Input, Yield>(
+    flow: Lite.Flow<Output, Input, any, Yield>,
+    preparedCtx: ExecutionContextImpl,
+    options: Lite.FlowPrepareOptions<Input> | Lite.FlowExecOptions<Input> | {},
+    ready: Promise<void>,
+    unregister: () => void,
+  ): Lite.FlowStream<Yield, Output> {
+    let started = false
+    let consumed = false
+    let settle!: (value: Output) => void
+    let fail!: (error: unknown) => void
+    const result = new Promise<Output>((resolve, reject) => {
+      settle = resolve
+      fail = reject
+    })
+    result.catch(() => {})
+    const { key: _key, ...execOptions } = options as Lite.FlowPrepareOptions<Input>
+
+    return {
+      get result() {
+        if (!started) throw streamResultBeforeStartError()
+        return result
+      },
+      [Symbol.asyncIterator]() {
+        if (consumed) throw new Error("execStream() results can be consumed only once.")
+        consumed = true
+        started = true
+        return (async function* () {
+          let settled = false
+          try {
+            await ready
+            const stream = preparedCtx.execStream({ flow, ...execOptions } as Lite.ExecFlowOptions<Output, Input, Yield>)
+            for await (const value of stream) yield value
+            const output = await stream.result
+            unregister()
+            await preparedCtx.close({ ok: true })
+            settle(output)
+            settled = true
+            return output
+          } catch (error) {
+            unregister()
+            await preparedCtx.close({ ok: false, error })
+            fail(error)
+            settled = true
+            throw error
+          } finally {
+            if (!settled) {
+              const error = new DOMException("Prepared flow stream aborted", "AbortError")
+              unregister()
+              await preparedCtx.close({ ok: false, error })
+              fail(error)
+            }
+          }
+        })()
+      },
+    }
+  }
+
+  private mergeFlowOptions<Input>(
+    defaults: Lite.FlowControllerOptions<Input> | undefined,
+    options: Lite.FlowPrepareOptions<Input> | Lite.FlowExecOptions<Input> | {}
+  ): Lite.FlowPrepareOptions<Input> | Lite.FlowExecOptions<Input> | {} {
+    const callOptions = options as Lite.FlowPrepareOptions<Input>
+    const defaultTags = normalizeTags(defaults?.tags) ?? []
+    const callTags = normalizeTags(callOptions.tags) ?? []
+    return {
+      ...(defaults ?? {}),
+      ...callOptions,
+      tags: defaultTags.length > 0 || callTags.length > 0
+        ? [...defaultTags, ...callTags]
+        : defaults?.tags !== undefined || callOptions.tags !== undefined ? [] : undefined,
+    }
+  }
+
+  private execFlowHandle<Output, Input>(
+    flow: Lite.Flow<Output, Input, any, any>,
+    ctx: Lite.ExecutionContext,
+    options: Lite.FlowPrepareOptions<Input> | Lite.FlowExecOptions<Input> | {}
+  ): Promise<Output> {
+    const { key: _key, ...execOptions } = options as Lite.FlowPrepareOptions<Input>
+    return ctx.exec({
+      flow,
+      ...execOptions,
+    } as Lite.ExecFlowOptions<Output, Input>)
+  }
+
+  private wireWatch(dep: Lite.AtomControllerDep<unknown>, dependentAtom: Lite.Atom<unknown>): void {
+    const entry = this.getEntry(dep.atom)!
+    const edge: WatchEdge = {
+      target: dependentAtom,
+      previous: entry.value,
+      eq: dep.eq ?? shallowEqual,
+    }
+    const watchers = entry.watchers ??= new Set()
+    watchers.add(edge)
+    const generation = this.getEntry(dependentAtom)?.generation
+    if (generation) (generation.cleanups ??= []).push({ fn: () => { watchers.delete(edge) }, params: [] })
+  }
+
+  private wireResourceWatch(
+    dep: Lite.ResourceControllerDep<unknown>,
+    ctrl: Lite.ResourceController<unknown>,
+    dependent: ResourceDependencyConsumer
+  ): void {
+    const eq = dep.eq ?? shallowEqual
+    let prev = ctrl.get()
+    const unsub = ctrl.on("resolved", () => {
+      const next = ctrl.get()
+      if (!eq(prev, next)) {
+        void dependent.ownerCtx.release(dependent.resource)
+      }
+      prev = next
+    })
+    dependent.entry.cleanups.push({ fn: unsub, params: [] })
+  }
+
+  private async resolveResourceDeps(
+    graph: DepsGraph,
+    result: Record<string, unknown>,
+    ctx: Lite.ExecutionContext,
+    afterParallel: Promise<void> | null,
+    resourcePath?: Set<Lite.Resource<unknown>>,
+  ): Promise<Record<string, unknown>> {
+    if (afterParallel) await afterParallel
+    assertExecutionContextImpl(ctx)
+
+    for (let i = 0; i < graph.resources.length; i++) {
+      const [key, resource] = graph.resources[i]!
+      const value = await this.resolveResource(resource, ctx, resourcePath)
+      result[key] = value
+    }
+
+    return result
+  }
+
+  async resolveDeps(
+    deps: Record<string, Lite.Dependency> | undefined,
+    ctx?: Lite.ExecutionContext,
+    dependentAtom?: Lite.Atom<unknown>
+  ): Promise<Record<string, unknown>> {
+    const r = this.resolveDepsOptimistic(deps, ctx, dependentAtom)
+    return r != null && typeof (r as any).then === 'function'
+      ? r as Promise<Record<string, unknown>>
+      : r as Record<string, unknown>
+  }
+
+  private collectFromHierarchy<T>(
+    ctx: Lite.ExecutionContext,
+    tag: Lite.Tag<T, boolean>,
+    skipCurrent = false,
+  ): T[] {
+    const results: T[] = []
+    let current: Lite.ExecutionContext | undefined = ctx
+    let first = true
+
+    while (current) {
+      assertExecutionContextImpl(current)
+      if (!first || !skipCurrent) results.push(...current.dataImpl().collectTag(tag))
+      first = false
+      current = current.parent
+    }
+
+    return results
+  }
+
+  controller<T>(atom: Lite.Atom<T>): Lite.Controller<T>
+  controller<T>(atom: Lite.Atom<T>, options: { resolve: true }): Promise<Lite.Controller<T>>
+  controller<T>(atom: Lite.Atom<T>, options?: Lite.ControllerOptions): Lite.Controller<T> | Promise<Lite.Controller<T>>
+  controller<T>(atom: Lite.Atom<T>, options?: Lite.ControllerOptions): Lite.Controller<T> | Promise<Lite.Controller<T>> {
+    if (this.disposed) throw new Error("Scope is disposed")
+    let ctrl = this.controllers.get(atom) as ControllerImpl<T> | undefined
+    if (!ctrl) {
+      ctrl = new ControllerImpl(atom, this)
+      this.controllers.set(atom, ctrl as ControllerImpl<unknown>)
+    }
+    if (options?.resolve) {
+      return ctrl.resolve().then(() => ctrl)
+    }
+    return ctrl
+  }
+
+  select<T, S>(
+    atom: Lite.Atom<T>,
+    selector: (value: T) => S,
+    options?: Lite.SelectOptions<S>
+  ): Lite.SelectHandle<S> {
+    const ctrl = this.controller(atom)
+    const eq = options?.eq ?? Object.is
+    return new SelectHandleImpl(ctrl, selector, eq, this.notifyDepth)
+  }
+
+  changes<T>(atom: Lite.Atom<T>): AsyncIterable<T>
+  changes<T>(atom: Lite.Atom<T>, options: Lite.ChangesOptions): AsyncIterable<Lite.AtomChange<T>>
+  changes<T>(handle: Lite.SelectHandle<T>): AsyncIterable<T>
+  changes<T>(
+    target: Lite.Atom<T> | Lite.SelectHandle<T>,
+    options?: Lite.ChangesOptions
+  ): AsyncIterable<T> | AsyncIterable<Lite.AtomChange<T>> {
+    if (this.disposed) throw new Error("Scope is disposed")
+    if (!isAtom(target)) return this.selectChanges(target)
+    return options ? this.atomChanges(target, options) : this.atomChanges(target)
+  }
+
+  private atomChanges<T>(atom: Lite.Atom<T>): Latest<T>
+  private atomChanges<T>(atom: Lite.Atom<T>, options: Lite.ChangesOptions): Latest<Lite.AtomChange<T>>
+  private atomChanges<T>(atom: Lite.Atom<T>, options?: Lite.ChangesOptions): Latest<T | Lite.AtomChange<T>> {
+    const presetValue = this.presets?.get(atom)
+    if (isAtom(presetValue)) {
+      return options ? this.atomChanges(presetValue as Lite.Atom<T>, options) : this.atomChanges(presetValue as Lite.Atom<T>)
+    }
+
+    const stream = latest<T | Lite.AtomChange<T>>()
+    const emit = () => {
+      const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+      if (!entry) return
+      if (options?.states) {
+        if (entry.state === "resolving") stream.push({ state: "resolving" })
+        if (entry.state === "resolved" && entry.hasValue) stream.push({ state: "resolved", value: entry.value as T })
+        if (entry.state === "failed" && entry.error) stream.push({ state: "failed", error: entry.error })
+        return
+      }
+      if (entry.state === "resolved" && entry.hasValue) stream.push(entry.value as T)
+      if (entry.state === "failed" && entry.error) stream.fail(entry.error)
+    }
+    const unsubs = [
+      this.on("resolving", atom, emit),
+      this.on("resolved", atom, emit),
+      this.on("failed", atom, emit),
+      this.onDispose((target) => target.close(), stream),
+    ]
+    stream.onClose((subscriptions) => {
+      for (let i = subscriptions.length - 1; i >= 0; i--) subscriptions[i]!()
+    }, unsubs)
+    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (entry?.state === "resolved" || entry?.state === "failed" || entry?.state === "resolving") {
+      emit()
+    }
+    if (!entry || entry.state === "idle") {
+      void this.resolve(atom).catch(() => {})
+    }
+    return stream
+  }
+
+  private selectChanges<T>(handle: Lite.SelectHandle<T>): Latest<T> {
+    const stream = latest<T>()
+    stream.push(handle.get())
+    const unsub = handle.subscribe((target, source) => target.push(source.get()), stream, handle)
+    const offDispose = this.onDispose((target) => target.close(), stream)
+    stream.onClose((dispose, unsubscribe) => {
+      dispose()
+      unsubscribe()
+    }, offDispose, unsub)
+    return stream
+  }
+
+  resolveStream<T>(atom: Lite.Atom<StreamSource<T>>): AsyncIterable<T> {
+    if (this.disposed) throw new Error("Scope is disposed")
+    const presetValue = this.presets?.get(atom as Lite.Atom<unknown>)
+    if (isAtom(presetValue)) return this.resolveStream(presetValue as Lite.Atom<StreamSource<T>>)
+    const hub = this.getStreamHub(atom)
+    const stream = latest<T>()
+    hub.views.add(stream)
+    stream.onClose((target, view) => {
+      target.views.delete(view)
+    }, hub, stream)
+    this.ensureStreamHub(hub)
+    return stream
+  }
+
+  async drain<T>(atom: Lite.Atom<StreamSource<T>>, options?: Lite.DrainOptions): Promise<T[]> {
+    const take = options?.take
+    if (take !== undefined && take <= 0) return []
+    const values: T[] = []
+    const iterator = this.resolveStream(atom)[Symbol.asyncIterator]()
+    while (take === undefined || values.length < take) {
+      const result = await iterator.next()
+      if (result.done) return values
+      values.push(result.value)
+    }
+    await iterator.return?.()
+    return values
+  }
+
+  private getStreamHub<T>(atom: Lite.Atom<StreamSource<T>>): StreamHub<T> {
+    const cached = this.streamHubs?.get(atom as Lite.Atom<unknown>) as StreamHub<T> | undefined
+    if (cached) return cached
+    const hub: StreamHub<T> = {
+      atom,
+      views: new Set(),
+      unsubs: [],
+      version: 0,
+    }
+    hub.unsubs = [
+      this.on("resolving", atom as Lite.Atom<unknown>, () => {
+        void this.stopStreamHub(hub)
+      }),
+      this.on("resolved", atom as Lite.Atom<unknown>, () => this.driveResolvedStreamHub(hub)),
+      this.on("failed", atom as Lite.Atom<unknown>, () => {
+        const entry = this.cache.get(atom as Lite.Atom<unknown>)
+        if (entry?.state === "failed" && entry.error) this.finishStreamHub(hub, true, entry.error)
+      }),
+    ]
+    ;(this.streamHubs ??= new Map()).set(atom as Lite.Atom<unknown>, hub as StreamHub<unknown>)
+    return hub
+  }
+
+  private ensureStreamHub<T>(hub: StreamHub<T>): void {
+    const entry = this.cache.get(hub.atom as Lite.Atom<unknown>) as AtomEntry<StreamSource<T>> | undefined
+    if (entry?.state === "resolved" && entry.hasValue) {
+      this.driveStreamHub(hub, entry.value as StreamSource<T>)
+      return
+    }
+    if (entry?.state === "failed" && entry.error) {
+      this.finishStreamHub(hub, true, entry.error)
+      return
+    }
+    void this.resolve(hub.atom).then(
+      source => this.driveStreamHub(hub, source),
+      error => this.finishStreamHub(hub, true, error)
+    )
+  }
+
+  private driveResolvedStreamHub<T>(hub: StreamHub<T>): void {
+    const entry = this.cache.get(hub.atom as Lite.Atom<unknown>) as AtomEntry<StreamSource<T>> | undefined
+    if (entry?.state !== "resolved" || !entry.hasValue) return
+    this.driveStreamHub(hub, entry.value as StreamSource<T>)
+  }
+
+  private driveStreamHub<T>(hub: StreamHub<T>, source: StreamSource<T>): void {
+    if (hub.unsubs.length === 0 || Object.is(hub.source, source)) return
+    void this.stopStreamHub(hub)
+    hub.source = source
+    hub.iterator = getAsyncIterator(source)
+    const version = ++hub.version
+    void this.runStreamHub(hub, hub.iterator, version)
+  }
+
+  private async runStreamHub<T>(
+    hub: StreamHub<T>,
+    iterator: AsyncIterator<T>,
+    version: number
+  ): Promise<void> {
+    try {
+      for (;;) {
+        const result = await iterator.next()
+        if (hub.unsubs.length === 0 || hub.version !== version || hub.iterator !== iterator) return
+        if (result.done) {
+          this.finishStreamHub(hub, false)
+          return
+        }
+        for (const view of hub.views) view.push(result.value)
+      }
+    } catch (error) {
+      if (hub.unsubs.length > 0 && hub.version === version && hub.iterator === iterator) {
+        this.finishStreamHub(hub, true, error)
+      }
+    }
+  }
+
+  private async stopStreamHub<T>(hub: StreamHub<T>): Promise<void> {
+    hub.version++
+    const iterator = hub.iterator
+    hub.iterator = undefined
+    hub.source = undefined
+    try {
+      await iterator?.return?.()
+    } catch {}
+  }
+
+  private stopStreamHubForAtom(atom: Lite.Atom<unknown>): Promise<void> {
+    const hub = this.streamHubs?.get(atom)
+    return hub ? this.stopStreamHub(hub) : Promise.resolve()
+  }
+
+  private releaseStreamHub(atom: Lite.Atom<unknown>): Promise<void> {
+    const hub = this.streamHubs?.get(atom)
+    return hub ? this.releaseStreamHubInstance(hub) : Promise.resolve()
+  }
+
+  private async releaseStreamHubInstance<T>(hub: StreamHub<T>): Promise<void> {
+    await this.stopStreamHub(hub)
+    this.finishStreamHub(hub, false)
+  }
+
+  private async releaseStreamHubs(): Promise<void> {
+    if (!this.streamHubs) return
+    for (const hub of [...this.streamHubs.values()]) {
+      await this.releaseStreamHubInstance(hub)
+    }
+  }
+
+  private finishStreamHub<T>(hub: StreamHub<T>, failed: boolean, error?: unknown): void {
+    if (hub.unsubs.length === 0) return
+    hub.version++
+    hub.iterator = undefined
+    hub.source = undefined
+    this.streamHubs?.delete(hub.atom as Lite.Atom<unknown>)
+    this.cleanupStreamHub(hub)
+    const views = [...hub.views]
+    hub.views.clear()
+    for (let i = 0; i < views.length; i++) {
+      if (failed) views[i]!.fail(error)
+      else views[i]!.close()
+    }
+  }
+
+  private cleanupStreamHub<T>(hub: StreamHub<T>): void {
+    for (let i = hub.unsubs.length - 1; i >= 0; i--) hub.unsubs[i]!()
+    hub.unsubs = []
+  }
+
+  getFlowPreset<O, I, Y>(flow: Lite.Flow<O, I, any, Y>): Lite.PresetValue<O, I, Y> | undefined {
+    return this.presets?.get(flow as Lite.Flow<unknown, unknown, any, unknown>) as Lite.PresetValue<O, I, Y> | undefined
+  }
+
+  resolveResource<T>(
+    resource: Lite.Resource<T>,
+    receiverCtx: ExecutionContextImpl,
+    resourcePath?: Set<Lite.Resource<unknown>>
+  ): Promise<T> {
+    if (this.disposed) return Promise.reject(new Error("Scope is disposed"))
+
+    try {
+      receiverCtx.assertOpen()
+    } catch (error) {
+      return Promise.reject(error)
+    }
+
+    if (resourcePath?.has(resource as Lite.Resource<unknown>)) {
+      return Promise.reject(new Error(`Circular resource dependency detected: ${resource.name ?? "anonymous"}`))
+    }
+
+    const found = receiverCtx.findResourceEntry(resource)
+    if (found) {
+      const entry = found.entry as ResourceEntry<T>
+      if (entry.state === "resolved") return Promise.resolve(entry.value as T)
+      if (entry.state === "failed") return Promise.reject(entry.error!)
+      if (entry.promise) return entry.promise
+    }
+
+    const ownerCtx = receiverCtx.resourceOwner(resource)
+    try {
+      ownerCtx.assertOpen()
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    const entry = ownerCtx.createResourceEntry(resource)
+    const nextPath = new Set(resourcePath)
+    nextPath.add(resource as Lite.Resource<unknown>)
+
+    entry.state = "resolving"
+    entry.promise = this.resolveResourceValue(resource, receiverCtx, ownerCtx, entry, nextPath).then(
+      (value) => {
+        if (ownerCtx.getLocalResourceEntry(resource) !== entry) {
+          throw new Error("Resource is released")
+        }
+        entry.state = "resolved"
+        entry.value = value
+        entry.hasValue = true
+        entry.error = undefined
+        entry.promise = undefined
+        ownerCtx.emitResourceState(resource, "resolved")
+        return value
+      },
+      async (error) => {
+        if (ownerCtx.getLocalResourceEntry(resource) === entry) {
+          entry.state = "failed"
+          entry.error = error instanceof Error ? error : new Error(String(error))
+          entry.value = undefined
+          entry.hasValue = false
+          entry.promise = undefined
+          if (entry.cleanups.length > 0) {
+            await runCleanupsSafe(entry.cleanups)
+            entry.cleanups = []
+          }
+          ownerCtx.emitResourceState(resource, "failed")
+          throw entry.error
+        }
+        throw error instanceof Error ? error : new Error(String(error))
+      }
+    )
+    ownerCtx.emitResourceState(resource, "resolving")
+
+    return entry.promise
+  }
+
+  private async resolveResourceValue<T>(
+    resource: Lite.Resource<T>,
+    receiverCtx: ExecutionContextImpl,
+    ownerCtx: ExecutionContextImpl,
+    entry: ResourceEntry<T>,
+    resourcePath: Set<Lite.Resource<unknown>>,
+  ): Promise<T> {
+    if (this.presets?.has(resource)) {
+      const presetValue = this.presets.get(resource)
+      if (isResource(presetValue)) {
+        return this.resolveResource(presetValue as Lite.Resource<T>, receiverCtx, resourcePath)
+      }
+      if (typeof presetValue === "function") {
+        const factory = presetValue as (ctx: Lite.ResourceContext) => MaybePromise<T>
+        if (!this.hasResolvePipeline()) {
+          return ownerCtx.runResourceFactory(resource, entry, factory)
+        }
+        const resourceCtx = ownerCtx.createResourceContext(resource, entry)
+        const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: resourceCtx }
+        const doResolve = async () => factory(resourceCtx)
+        return this.applyResolvePipeline(event, doResolve)
+      }
+      return presetValue as T
+    }
+
+    const depsResult = this.resolveDepsOptimistic(
+      resource.deps,
+      ownerCtx,
+      undefined,
+      resourcePath,
+      { ownerCtx, resource: resource as Lite.Resource<unknown>, entry: entry as ResourceEntry<unknown> }
+    )
+    const resourceDeps = depsResult != null && typeof (depsResult as any).then === 'function'
+      ? await (depsResult as Promise<Record<string, unknown>>)
+      : depsResult as Record<string, unknown>
+
+    const factory = resource.factory as (
+      ctx: Lite.ResourceContext,
+      deps?: Record<string, unknown>
+    ) => MaybePromise<T>
+
+    if (!this.hasResolvePipeline()) {
+      return ownerCtx.runResourceFactory(resource, entry, (ctx) => resource.deps ? factory(ctx, resourceDeps) : factory(ctx))
+    }
+    const resourceCtx = ownerCtx.createResourceContext(resource, entry)
+    const event: Lite.ResolveEvent = { kind: "resource", target: resource, ctx: resourceCtx }
+    const doResolve = async () => resource.deps ? factory(resourceCtx, resourceDeps) : factory(resourceCtx)
+    return this.applyResolvePipeline(event, doResolve)
+  }
+
+  invalidate<T>(atom: Lite.Atom<T>): void {
+    const entry = this.cache.get(atom)
+    if (!entry) return
+
+    if (entry.state === 'idle') return
+
+    if (entry.state === 'resolving') {
+      const level = this.taintContext() ? 2 : 1
+      if (level > entry.pendingInvalidate) entry.pendingInvalidate = level
+      return
+    }
+
+    this.scheduleInvalidation(atom, undefined, this.taintContext())
+  }
+
+  scheduleSet<T>(atom: Lite.Atom<T>, value: T, cachedEntry?: AtomEntry<T>): void {
+    const entry = cachedEntry ?? (this.cache.get(atom) as AtomEntry<T> | undefined)
+    if (!entry || entry.state === 'idle') {
+      throw new Error("Atom not resolved")
+    }
+    if (entry.state === 'failed' && entry.error) {
+      throw entry.error
+    }
+
+    if (entry.state === 'resolving') {
+      entry.pendingSet = { hasValue: true, value, updates: [] }
+      return
+    }
+
+    entry.value = value
+    entry.state = 'resolved'
+    entry.hasValue = true
+    entry.error = undefined
+    entry.pendingInvalidate = 0
+    entry.resolvedPromise = undefined
+    if (!this.stateListeners && !entry.watchers?.size && !entry.allListeners?.size && !entry.valueListeners?.size) {
+      notifyListener(this.notifyDepth, entry.resolvedListener)
+      notifyListeners(this.notifyDepth, entry.resolvedListeners)
+      return
+    }
+    if (this.stateListeners) this.emitStateChange('resolved', atom)
+    this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
+  }
+
+  scheduleUpdate<T>(
+    atom: Lite.Atom<T>,
+    fn: (prev: T) => T,
+    cachedEntry?: AtomEntry<T>
+  ): void {
+    const entry = cachedEntry ?? (this.cache.get(atom) as AtomEntry<T> | undefined)
+    if (!entry || entry.state === 'idle') {
+      throw new Error("Atom not resolved")
+    }
+    if (entry.state === 'failed' && entry.error) {
+      throw entry.error
+    }
+
+    if (entry.state === 'resolving') {
+      const pending = entry.pendingSet ?? { hasValue: false, updates: [] }
+      pending.updates.push({ fn })
+      entry.pendingSet = pending
+      return
+    }
+
+    entry.value = fn(entry.value as T)
+    entry.state = 'resolved'
+    entry.hasValue = true
+    entry.error = undefined
+    entry.pendingInvalidate = 0
+    entry.resolvedPromise = undefined
+    if (!this.stateListeners && !entry.watchers?.size && !entry.allListeners?.size && !entry.valueListeners?.size) {
+      notifyListener(this.notifyDepth, entry.resolvedListener)
+      notifyListeners(this.notifyDepth, entry.resolvedListeners)
+      return
+    }
+    if (this.stateListeners) this.emitStateChange('resolved', atom)
+    this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
+  }
+
+  private doInvalidateSequential<T>(atom: Lite.Atom<T>): void | Promise<void> {
+    const tainted = this.invalidationTainted?.delete(atom) === true
+    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (!entry) return
+
+    const previousValue = entry.value
+    const pendingSet = entry.pendingSet
+    entry.pendingSet = undefined
+
+    if (pendingSet) {
+      entry.value = applyUpdates(
+        pendingSet.hasValue ? pendingSet.value as T : previousValue as T,
+        pendingSet.updates,
+      )
+      entry.state = 'resolved'
+      entry.hasValue = true
+      entry.error = undefined
+      entry.pendingInvalidate = 0
+      entry.resolvedPromise = undefined
+      if (!this.stateListeners && !entry.watchers?.size && !entry.resolvedListener && !entry.resolvedListeners?.size && !entry.allListeners?.size && !entry.valueListeners?.size) return
+      this.drainTarget = atom
+      this.drainTainted = true
+      try {
+        if (this.stateListeners) this.emitStateChange('resolved', atom)
+        this.notifyEntry(entry as AtomEntry<unknown>, 'resolved')
+      } finally {
+        this.drainTarget = null
+        this.drainTainted = false
+      }
+      return
+    }
+
+    if (!this.invalidationChain) this.invalidationChain = new Set()
+    if (this.invalidationChain.has(atom)) {
+      const chainAtoms = Array.from(this.invalidationChain)
+      chainAtoms.push(atom)
+      const path = chainAtoms
+        .map(a => a.factory?.name || "<anonymous>")
+        .join(" → ")
+      throw new Error(`Infinite invalidation loop detected: ${path}`)
+    }
+    this.invalidationChain.add(atom)
+    return this.doInvalidateAsync(atom, entry, previousValue, tainted)
+  }
+
+  private async doInvalidateAsync<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, previousValue: T | undefined, tainted: boolean): Promise<void> {
+    this.drainTarget = atom
+    this.drainTainted = tainted
+    try {
+      if (this.streamHubs?.has(atom as Lite.Atom<unknown>)) await this.stopStreamHubForAtom(atom as Lite.Atom<unknown>)
+
+      const { generation, cleanups } = this.replaceGeneration(entry)
+      if (cleanups?.length) await runCleanupsSafe(cleanups)
+
+      if (this.cache.get(atom) !== entry || entry.generation !== generation) {
+        await this.resolve(atom)
+        return
+      }
+
+      const listenerErrors: unknown[] = []
+      entry.state = "resolving"
+      entry.value = previousValue
+      entry.error = undefined
+      entry.pendingInvalidate = 0
+      this.emitStateChange("resolving", atom, listenerErrors)
+      this.notifyEntry(entry as AtomEntry<unknown>, "resolving", listenerErrors)
+
+      try {
+        await this.resolve(atom)
+      } catch (e) {
+        if (!entry.pendingSet && !entry.pendingInvalidate) throw e
+      }
+      throwListenerErrors(listenerErrors)
+    } finally {
+      this.drainTarget = null
+      this.drainTainted = false
+    }
+  }
+
+  private releaseGeneration<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, generation: AtomGeneration<T>): Promise<void> {
+    const flight = this.releasing?.get(atom)
+    if (flight?.entry === entry && flight.generation === generation) return Promise.resolve()
+    if (this.cache.get(atom) !== entry || entry.generation !== generation) return Promise.resolve()
+    if (generation.resolving) {
+      generation.releaseRequested = true
+      return Promise.resolve()
+    }
+    return this.release(atom)
+  }
+
+  release<T>(atom: Lite.Atom<T>): Promise<void> {
+    const active = this.releasing?.get(atom)
+    if (active) return active.promise
+
+    const entry = this.cache.get(atom) as AtomEntry<T> | undefined
+    if (!entry) return Promise.resolve()
+    const generation = entry.generation
+    this.cache.delete(atom)
+
+    const releasePromise = Promise.resolve().then(() => this.releaseEntry(atom, entry, generation))
+    const releasing = this.releasing ??= new Map()
+    releasing.set(atom, { entry, generation, promise: releasePromise })
+    const finishRelease = () => {
+      if (releasing.get(atom)?.promise === releasePromise) {
+        releasing.delete(atom)
+        if (!releasing.size && this.releasing === releasing) this.releasing = undefined
+      }
+    }
+    void releasePromise.then(finishRelease, finishRelease)
+    return releasePromise
+  }
+
+  private async releaseEntry<T>(atom: Lite.Atom<T>, entry: AtomEntry<T>, generation: AtomGeneration<T>): Promise<void> {
+    if (this.streamHubs?.has(atom as Lite.Atom<unknown>)) await this.releaseStreamHub(atom as Lite.Atom<unknown>)
+
+    this.cancelGCTimer(entry)
+
+    if (generation.pending) {
+      try { await generation.pending } catch {}
+    }
+
+    const cleanups = generation.cleanups
+    generation.cleanups = undefined
+    if (cleanups?.length) await runCleanupsSafe(cleanups)
+
+    if (atom.deps) {
+      for (const key in atom.deps) {
+        const dep = atom.deps[key]!
+        const depAtom = isControllerDep(dep) && isAtomControllerDep(dep) ? dep.atom : dep
+        if (!isAtom(depAtom)) continue
+        this.cache.get(depAtom)?.dependents?.delete(atom)
+        this.maybeScheduleGCEntry(depAtom)
+      }
+    }
+
+    const listenerErrors: unknown[] = []
+    this.notifyEntryAll(entry as AtomEntry<unknown>, listenerErrors)
+
+    const ctrl = this.controllers.get(atom) as ControllerImpl<unknown> | undefined
+    ctrl?._invalidateEntryCache()
+
+    this.controllers.delete(atom)
+
+    if (this.stateListeners) for (const [state, stateMap] of this.stateListeners) {
+      stateMap.delete(atom)
+      if (stateMap.size === 0) this.stateListeners.delete(state)
+    }
+    throwListenerErrors(listenerErrors)
+  }
+
+  async dispose(): Promise<void> {
+    if (this.chainPromise) {
+      try { await this.chainPromise } catch {}
+    }
+
+    this.disposed = true
+    try {
+      if (this.streamHubs?.size) await this.releaseStreamHubs()
+      this.emitDispose()
+
+      this.invalidationQueue = undefined
+      this.invalidationQueued = undefined
+      this.invalidationIndex = 0
+      this.invalidationTainted = null
+      this.invalidationChain = null
+      this.chainPromise = null
+
+      if (this.pendingContextCloses?.size) {
+        await Promise.allSettled([...this.pendingContextCloses])
+      }
+
+      for (const ext of this.extensions) {
+        if (ext.dispose) {
+          await ext.dispose(this)
+        }
+      }
+
+      for (const entry of this.cache.values()) {
+        this.cancelGCTimer(entry)
+      }
+
+      const atoms = Array.from(this.cache.keys())
+      for (const atom of atoms) {
+        await this.release(atom as Lite.Atom<unknown>)
+      }
+      if (this.releasing) await Promise.all([...this.releasing.values()].map(({ promise }) => promise))
+    } finally {
+      await Promise.resolve()
+      while (this.pendingContextCloses?.size) {
+        await Promise.allSettled([...this.pendingContextCloses])
+      }
+    }
+  }
+
+  async flush(): Promise<void> {
+    if (this.chainPromise) {
+      await this.chainPromise
+    }
+    if (this.chainError !== null) {
+      const error = this.chainError
+      this.chainError = null
+      throw error
+    }
+  }
+
+  run<Output, Input, Yield = never>(options: Lite.ExecFlowOptions<Output, Input, Yield> & {
+    deps?: never
+    fn?: never
+    params?: never
+  }): Promise<Output>
+  run<
+    const Args extends unknown[],
+    Result,
+  >(options: Lite.ExecOptions<Args, Result>): Promise<Awaited<Result>>
+  run<
+    const D extends Record<string, Lite.ExecutionDependency>,
+    const Args extends unknown[],
+    Result,
+  >(options: Lite.ExecDepsOptions<D, Args, Result>): Promise<Awaited<Result>>
+  async run(options: ExecFlowRuntimeOptions | ExecRuntimeOptions | ExecDepsRuntimeOptions): Promise<unknown> {
+    const execTags = normalizeTags(options.tags)
+    const ctx = this.createContext(execTags || options.signal
+      ? { tags: execTags, signal: options.signal }
+      : undefined) as ExecutionContextImpl
+    try {
+      let execution: ExecFlowRuntimeOptions | ExecRuntimeOptions | ExecDepsRuntimeOptions
+      if ("flow" in options && options.flow !== undefined) {
+        execution = { ...options, tags: undefined, signal: undefined, blockedTags: execTags }
+      } else {
+        execution = { ...options, tags: undefined, signal: undefined }
+      }
+      const output = assertNoReturnedStream(await ctx.exec(execution))
+      await ctx.close({ ok: true })
+      return output
+    } catch (error) {
+      await ctx.close({ ok: false, error })
+      throw error
+    }
+  }
+
+  runStream<Output, Yield, Input>(options: Lite.ExecFlowOptions<Output, Input, Yield>): Lite.FlowStream<Yield, Output>
+  runStream(options: ExecFlowRuntimeOptions): Lite.FlowStream<unknown, unknown>
+  runStream(options: ExecFlowRuntimeOptions): Lite.FlowStream<unknown, unknown> {
+    let consumed = false
+    let started = false
+    let settleResult!: (value: unknown) => void
+    let failResult!: (error: unknown) => void
+    const result = new Promise<unknown>((resolve, reject) => {
+      settleResult = resolve
+      failResult = reject
+    })
+    result.catch(() => {})
+    const owner = this
+
+    return {
+      get result() {
+        if (!started) throw streamResultBeforeStartError()
+        return result
+      },
+      [Symbol.asyncIterator]() {
+        if (consumed) throw new Error("runStream() results can be consumed only once.")
+        consumed = true
+        return (async function* () {
+          started = true
+          let ctx: ExecutionContextImpl | undefined
+          let closed = false
+          try {
+            const execTags = normalizeTags(options.tags)
+            ctx = owner.createContext(execTags || options.signal
+              ? { tags: execTags, signal: options.signal }
+              : undefined) as ExecutionContextImpl
+            const stream = ctx.execStream({
+              ...options,
+              tags: undefined,
+              signal: undefined,
+              blockedTags: execTags,
+            })
+            for await (const value of stream) yield value
+            const output = await stream.result
+            await ctx.close({ ok: true })
+            closed = true
+            settleResult(output)
+            return output
+          } catch (error) {
+            try {
+              await ctx?.close({ ok: false, error })
+            } finally {
+              closed = true
+              failResult(error)
+            }
+            throw error
+          } finally {
+            if (!closed && ctx) {
+              const error = new DOMException("Flow stream aborted", "AbortError")
+              ctx.abort(error)
+              try {
+                await ctx.close({ ok: false, error })
+              } finally {
+                failResult(error)
+              }
+            }
+          }
+        })()
+      },
+    } as Lite.FlowStream<unknown, unknown>
+  }
+
+  createContext(options?: Lite.CreateContextOptions): Lite.ExecutionContext {
+    if (this.disposed) throw new Error("Scope is disposed")
+    assertCreateContextOptions(options)
+    if (options && "parent" in options && options.parent !== undefined) {
+      assertExecutionContextImpl(options.parent)
+      options.parent.assertOpen()
+      if (options.parent.scope !== this) {
+        throw new Error("createContext() parent must belong to the same scope")
+      }
+    }
+    const ctxTags = normalizeTags(options?.tags)
+    const ctx = new ExecutionContextImpl(this, options && { ...options, tags: ctxTags })
+
+    if (ctxTags && ctxTags.length > 0) {
+      for (let i = 0; i < ctxTags.length; i++) {
+        ctx.appendTagValue(ctxTags[i]!)
+      }
+    }
+
+    if (this.tags.length > 0) {
+      const blocked = new Set(this.tags.filter((tagged) => ctx.data.seekHas(tagged.key)).map((tagged) => tagged.key))
+      for (let i = 0; i < this.tags.length; i++) {
+        if (!blocked.has(this.tags[i]!.key)) ctx.appendTagValue(this.tags[i]!)
+      }
+    }
+
+    this.attachContextExtensions(ctx)
+    return ctx
+  }
+}
+
+function runDisposeContext(
+  result: Lite.CloseResult,
+  ext: Lite.Extension,
+  ctx: Lite.ExecutionContext
+): MaybePromise<void> {
+  return ext.disposeContext!(ctx, result)
+}
+
+function assertCreateContextOptions(options: unknown): asserts options is Lite.CreateContextOptions | undefined {
+  if (options === undefined) return
+  if (options === null || typeof options !== "object" || Array.isArray(options)) {
+    throw new Error("createContext() expects { tags, parent, signal }")
+  }
+
+  const record = options as Record<string, unknown>
+  const invalidKey = Object.keys(record).find((key) => key !== "tags" && key !== "parent" && key !== "signal")
+  if (invalidKey) {
+    throw new Error(`createContext() expects { tags, parent, signal }; received "${invalidKey}"`)
+  }
+  if (record["tags"] !== undefined && !isTagged(record["tags"]) && !Array.isArray(record["tags"])) {
+    throw new Error("createContext() expects { tags, parent, signal }")
+  }
+}
+
+class ExecutionContextImpl implements Lite.ExecutionContext {
+  private cleanups: CloseCleanup[] = []
+  private resources: Map<Lite.Resource<unknown>, ResourceEntry<unknown>> | undefined
+  private resourceListeners: Map<Lite.Resource<unknown>, ResourceListeners> | undefined
+  private resourceControllers: Map<Lite.Resource<unknown>, ResourceControllerImpl<unknown>> | undefined
+  private descendants: Set<Promise<unknown>> | undefined
+  private activeExecs = 0
+  private execWaiters: (() => void)[] | undefined
+  private activeIterators: Set<AsyncIterator<unknown, unknown, unknown>> | undefined
+  private children: Set<ExecutionContextImpl> | undefined
+  private readonly baselineMode: boolean
+  private abortController: AbortController | undefined
+  private abortReason: unknown = pendingAbort
+  private signalOverride: AbortSignal | undefined
+  private closePromise: Promise<void> | undefined
+  private closed = false
+  private storeFinalized = false
+  private readonly _input: unknown
+  private _store: ContextStore | undefined
+  private _data: ContextDataImpl | undefined
+  private _tags: ContextTagsImpl | undefined
+  private readonly _execName: string | undefined
+  private readonly _flowName: string | undefined
+  private readonly boundary: boolean
+  parent: Lite.ExecutionContext | undefined
+
+  constructor(
+    readonly scope: ScopeImpl,
+    options?: Lite.CreateContextOptions & {
+      parent?: Lite.ExecutionContext
+      input?: unknown
+      execName?: string
+      flowName?: string
+      boundary?: boolean
+      signal?: AbortSignal
+      detached?: boolean
+    }
+  ) {
+    this.parent = options?.parent
+    this._input = options?.input
+    this._execName = options?.execName
+    this._flowName = options?.flowName
+    this.boundary = options?.boundary ?? true
+    if (this.parent) assertExecutionContextImpl(this.parent)
+    this.baselineMode = options?.detached === true || options?.signal !== undefined || (this.parent?.baselineMode ?? false)
+    if (this.baselineMode) {
+      this.abortController = new AbortController()
+      const signals = [this.abortController.signal]
+      if (this.parent) signals.push(this.parent.signal)
+      if (options?.signal) signals.push(options.signal)
+      this.signalOverride = signals.length === 1 ? signals[0]! : combineAbortSignals(signals)
+    }
+    if (this.parent && options?.detached !== true) {
+      this.parent.children ??= new Set()
+      this.parent.children.add(this)
+      if (!this.baselineMode && this.parent.abortReason !== pendingAbort) {
+        this.captureAbort(this.parent.abortReason)
+      }
+    }
+  }
+
+  get input(): unknown {
+    return this._input
+  }
+
+  get name(): string | undefined {
+    return this._execName ?? this._flowName
+  }
+
+  get signal(): AbortSignal {
+    if (this.signalOverride) return this.signalOverride
+    if (!this.abortController) {
+      this.abortController = new AbortController()
+      if (this.abortReason !== pendingAbort) this.abortController.abort(this.abortReason)
+    }
+    return this.abortController.signal
+  }
+
+  get data(): Lite.ContextData {
+    if (!this._data) {
+      this._data = new ContextDataImpl(this.storeImpl())
+    }
+    return this._data
+  }
+
+  get tags(): Lite.ContextTags {
+    return this._tags ??= new ContextTagsImpl(this.storeImpl())
+  }
+
+  private storeImpl(): ContextStore {
+    if (!this._store) {
+      if (this.parent) assertExecutionContextImpl(this.parent)
+      this._store = new ContextStore(this.parent?.storeImpl())
+      if (this.storeFinalized) this._store.finalize()
+    }
+    return this._store
+  }
+
+  dataImpl(): ContextDataImpl {
+    void this.data
+    return this._data!
+  }
+
+  appendTagValue(tagged: Lite.Tagged<any>): void {
+    this.dataImpl().appendTagValue(tagged)
+  }
+
+  detachParent(): void {
+    this._store?.detachParent()
+    this.parent = undefined
+  }
+
+  assertOpen(): void {
+    if (this.closed) {
+      throw new Error("ExecutionContext is closed")
+    }
+  }
+
+  fail(fault: unknown): never {
+    throw new FlowFault(fault, this.name)
+  }
+
+  resourceOwner(resource?: Lite.Resource<unknown>): ExecutionContextImpl {
+    if (resource?.ownership === "current") return this
+    let owner: ExecutionContextImpl = this
+    while (!owner.boundary && owner.parent) {
+      assertExecutionContextImpl(owner.parent)
+      owner = owner.parent
+    }
+    return owner
+  }
+
+  findResourceEntry<T>(resource: Lite.Resource<T>): { owner: ExecutionContextImpl; entry: ResourceEntry<T> } | undefined {
+    let current: ExecutionContextImpl | undefined = this
+    while (current) {
+      const entry = current.resources?.get(resource as Lite.Resource<unknown>) as ResourceEntry<T> | undefined
+      if (entry) return { owner: current, entry }
+      if (current.boundary) return undefined
+      if (!current.parent) return undefined
+      assertExecutionContextImpl(current.parent)
+      current = current.parent
+    }
+    return undefined
+  }
+
+  createResourceEntry<T>(resource: Lite.Resource<T>): ResourceEntry<T> {
+    const entry: ResourceEntry<T> = {
+      state: "idle",
+      hasValue: false,
+      cleanups: [],
+    }
+    this.resources ??= new Map()
+    this.resources.set(resource as Lite.Resource<unknown>, entry as ResourceEntry<unknown>)
+    return entry
+  }
+
+  getLocalResourceEntry<T>(resource: Lite.Resource<T>): ResourceEntry<T> | undefined {
+    return this.resources?.get(resource as Lite.Resource<unknown>) as ResourceEntry<T> | undefined
+  }
+
+  controller<T>(resource: Lite.Resource<T>): Lite.ResourceController<T> {
+    let ctrl = this.resourceControllers?.get(resource as Lite.Resource<unknown>) as ResourceControllerImpl<T> | undefined
+    if (!ctrl) {
+      ctrl = new ResourceControllerImpl(resource, this)
+      this.resourceControllers ??= new Map()
+      this.resourceControllers.set(
+        resource as Lite.Resource<unknown>,
+        ctrl as ResourceControllerImpl<unknown>
+      )
+    }
+    return ctrl
+  }
+
+  private bindLatestToContextClose<T>(stream: Latest<T>): Latest<T> {
+    stream.onClose(this.onClose((_result, target) => target.close(), stream))
+    return stream
+  }
+
+  changes<T>(atom: Lite.Atom<T>): AsyncIterable<T>
+  changes<T>(atom: Lite.Atom<T>, options: Lite.ChangesOptions): AsyncIterable<Lite.AtomChange<T>>
+  changes<T>(handle: Lite.SelectHandle<T>): AsyncIterable<T>
+  changes<T>(
+    target: Lite.Atom<T> | Lite.SelectHandle<T>,
+    options?: Lite.ChangesOptions
+  ): AsyncIterable<T> | AsyncIterable<Lite.AtomChange<T>> {
+    this.assertOpen()
+    const iterable = isAtom(target)
+      ? (options ? this.scope.changes(target, options) : this.scope.changes(target))
+      : this.scope.changes(target)
+    const stream = this.bindLatestToContextClose(iterable as unknown as Latest<T | Lite.AtomChange<T>>)
+    return stream as unknown as AsyncIterable<T> | AsyncIterable<Lite.AtomChange<T>>
+  }
+
+  resolveStream<T>(atom: Lite.Atom<StreamSource<T>>): AsyncIterable<T> {
+    this.assertOpen()
+    return this.bindLatestToContextClose(this.scope.resolveStream(atom) as Latest<T>)
+  }
+
+  private getResourceListeners(resource: Lite.Resource<unknown>): ResourceListeners {
+    let listeners = this.resourceListeners?.get(resource)
+    if (!listeners) {
+      listeners = {
+        idle: new Set(),
+        resolving: new Set(),
+        resolved: new Set(),
+        failed: new Set(),
+        all: new Set(),
+      }
+      this.resourceListeners ??= new Map()
+      this.resourceListeners.set(resource, listeners)
+    }
+    return listeners
+  }
+
+  addResourceListener<Args extends unknown[]>(
+    resource: Lite.Resource<unknown>,
+    event: Lite.ResourceControllerEvent,
+    listener: (...args: Args) => void,
+    params: Args
+  ): () => void {
+    const owner = this.findResourceEntry(resource)?.owner ?? this.resourceOwner(resource)
+    const listeners = owner.getResourceListeners(resource)
+    const set = event === "*" ? listeners.all : listeners[event]
+    const registered = bindListener(listener, params)
+    set.add(registered)
+    return () => {
+      set.delete(registered)
+    }
+  }
+
+  emitResourceState(resource: Lite.Resource<unknown>, state: AtomState): void {
+    const listeners = this.resourceListeners?.get(resource)
+    if (!listeners) return
+    notifyListeners(this.scope.notifyDepth, listeners[state])
+    notifyListeners(this.scope.notifyDepth, listeners.all)
+  }
+
+  runResourceFactory<T>(
+    resource: Lite.Resource<unknown>,
+    entry: ResourceEntry<unknown>,
+    factory: (ctx: Lite.ResourceContext) => MaybePromise<T>
+  ): MaybePromise<T> {
+    return factory(this.createResourceContext(resource, entry))
+  }
+
+  createResourceContext(
+    resource: Lite.Resource<unknown>,
+    entry: ResourceEntry<unknown>
+  ): Lite.ResourceContext {
+    const owner = this
+    const resourceCtx = {
+      get input() { return owner.input },
+      get name() { return owner.name },
+      get scope() { return owner.scope },
+      get parent() { return owner.parent },
+      get signal() { return owner.signal },
+      get data() { return owner.data },
+      get tags() { return owner.tags },
+      exec: owner.exec.bind(owner) as Lite.ResourceContext["exec"],
+      execStream: owner.execStream.bind(owner) as Lite.ResourceContext["execStream"],
+      execDetachedStream: owner.execDetachedStream.bind(owner) as Lite.ResourceContext["execDetachedStream"],
+      resolve: owner.resolve.bind(owner) as Lite.ResourceContext["resolve"],
+      release: owner.release.bind(owner) as Lite.ResourceContext["release"],
+      controller: owner.controller.bind(owner),
+      changes: owner.changes.bind(owner) as Lite.ResourceContext["changes"],
+      resolveStream: owner.resolveStream.bind(owner),
+      onClose: owner.onClose.bind(owner) as Lite.ResourceContext["onClose"],
+      close: owner.close.bind(owner),
+      fail: owner.fail.bind(owner),
+      cleanup<Args extends unknown[]>(
+        fn: (...args: Args) => MaybePromise<void>,
+        ...params: Args
+      ) {
+        if (owner.getLocalResourceEntry(resource) !== entry) {
+          throw new Error("Resource is released")
+        }
+        entry.cleanups.push({ fn, params })
+      },
+    }
+    return resourceCtx as Lite.ResourceContext
+  }
+
+  resolve<T>(target: Lite.Atom<T>): Promise<T>
+  resolve<T>(target: Lite.Resource<T>): Promise<T>
+  resolve<T>(target: Lite.Atom<T> | Lite.Resource<T>): Promise<T> {
+    try {
+      this.assertOpen()
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    if (isAtom(target)) return this.scope.resolve(target)
+    if (isResource(target)) return this.scope.resolveResource(target, this)
+    return Promise.reject(new Error("ExecutionContext can only resolve atoms and resources"))
+  }
+
+  async release<T>(resource: Lite.Resource<T>): Promise<void> {
+    this.assertOpen()
+    const entry = this.resources?.get(resource as Lite.Resource<unknown>)
+    if (!entry) return
+    this.resources!.delete(resource as Lite.Resource<unknown>)
+    if (entry.cleanups.length > 0) {
+      await runCleanupsSafe(entry.cleanups)
+      entry.cleanups = []
+    }
+    this.emitResourceState(resource, "idle")
+  }
+
+  exec(options: ExecFlowRuntimeOptions | ExecRuntimeOptions | ExecDepsRuntimeOptions): Promise<unknown> {
+    try {
+      this.assertOpen()
+      return this.runExec({ ...options, tags: normalizeTags(options.tags) })
+    } catch (error) {
+      return Promise.reject(error)
+    }
+  }
+
+  private async runExec(options: ExecFlowRuntimeOptions | ExecRuntimeOptions | ExecDepsRuntimeOptions): Promise<unknown> {
+    this.activeExecs++
+    try {
+      if ("flow" in options) {
+        const invocation = this.createChildInvocation(options)
+        const { flow, presetValue, childCtx, streaming } = isPromiseLike(invocation)
+          ? await invocation
+          : invocation
+        const unregisterStreaming = streaming ? registerStreamingExec(flow, childCtx) : undefined
+        try {
+          const result = this.scope.execExts.length === 0
+            ? await (typeof presetValue === "function"
+                ? childCtx.execPresetFn(presetValue as (ctx: Lite.ExecutionContext) => unknown, flow)
+                : childCtx.execFlowInternal(flow))
+            : await childCtx.applyExecPipeline(
+                flow,
+                async () => typeof presetValue === "function"
+                  ? await childCtx.execPresetFn(presetValue as (ctx: Lite.ExecutionContext) => unknown, flow)
+                  : await childCtx.execFlowInternal(flow),
+              )
+          const closing = childCtx.closeSuccessfulExec()
+          if (closing) await closing
+          return result
+        } catch (error) {
+          await childCtx.close({ ok: false, error })
+          throw error
+        } finally {
+          unregisterStreaming?.()
+        }
+      } else {
+        const childCtx = new ExecutionContextImpl(this.scope, {
+          parent: this,
+          execName: options.name,
+          flowName: options.fn.name || undefined,
+          input: options.params,
+          boundary: false,
+          signal: options.signal
+        })
+
+        this.seedTags(childCtx, options.tags)
+        this.scope.attachContextExtensions(childCtx)
+
+        try {
+          const result = this.scope.execExts.length === 0
+            ? await childCtx.execInlineInternal(options)
+            : await childCtx.applyExecPipeline(
+                options.fn,
+                async () => await childCtx.execInlineInternal(options),
+              )
+          const closing = childCtx.closeSuccessfulExec()
+          if (closing) await closing
+          return result
+        } catch (error) {
+          await childCtx.close({ ok: false, error })
+          throw error
+        }
+      }
+    } finally {
+      this.activeExecs--
+      if (this.activeExecs === 0 && this.execWaiters) {
+        const waiters = this.execWaiters
+        this.execWaiters = undefined
+        for (let i = 0; i < waiters.length; i++) waiters[i]!()
+      }
+    }
+  }
+
+  execStream<Output, Yield, Input>(options: Lite.ExecFlowOptions<Output, Input, Yield>): Lite.FlowStream<Yield, Output>
+  execStream(options: ExecFlowRuntimeOptions): Lite.FlowStream<unknown, unknown>
+  execStream(options: ExecFlowRuntimeOptions): Lite.FlowStream<unknown, unknown> {
+    this.assertOpen()
+
+    let consumed = false
+    let started = false
+    let settleResult: (value: unknown) => void
+    let failResult: (error: unknown) => void
+
+    const result = new Promise<unknown>((resolve, reject) => {
+      settleResult = resolve
+      failResult = reject
+    })
+    result.catch(() => {})
+
+    const start = () => {
+      started = true
+      owner.trackDescendant(result)
+    }
+    const owner = this
+
+    return {
+      get result() {
+        if (!started) throw streamResultBeforeStartError()
+        return result
+      },
+      [Symbol.asyncIterator]() {
+        if (consumed) throw new Error("execStream() results can be consumed only once.")
+        consumed = true
+        const iterator = owner.iterateExecStream(
+          { ...options, tags: normalizeTags(options.tags) },
+          result,
+          settleResult!,
+          failResult!,
+          start,
+        )
+        owner.activeIterators ??= new Set()
+        owner.activeIterators.add(iterator)
+        return {
+          async next(value?: unknown) {
+            try {
+              const step = await iterator.next(value)
+              if (step.done) owner.activeIterators?.delete(iterator)
+              return step
+            } catch (error) {
+              owner.activeIterators?.delete(iterator)
+              throw error
+            }
+          },
+          async return(value?: unknown) {
+            owner.activeIterators?.delete(iterator)
+            return iterator.return?.(value) ?? { done: true, value }
+          },
+          async throw(error?: unknown) {
+            owner.activeIterators?.delete(iterator)
+            if (iterator.throw) return iterator.throw(error)
+            throw error
+          },
+        }
+      },
+    } as Lite.FlowStream<unknown, unknown>
+  }
+
+  execDetachedStream<Output, Yield, Input>(options: Lite.ExecFlowOptions<Output, Input, Yield>): Lite.FlowStream<Yield, Output>
+  execDetachedStream(options: ExecFlowRuntimeOptions): Lite.FlowStream<unknown, unknown>
+  execDetachedStream(options: ExecFlowRuntimeOptions): Lite.FlowStream<unknown, unknown> {
+    this.assertOpen()
+
+    let consumed = false
+    let started = false
+    let settleResult: (value: unknown) => void
+    let failResult: (error: unknown) => void
+    const result = new Promise<unknown>((resolve, reject) => {
+      settleResult = resolve
+      failResult = reject
+    })
+    result.catch(() => {})
+    const owner = this
+
+    return {
+      get result() {
+        if (!started) throw detachedStreamResultBeforeStartError()
+        return result
+      },
+      [Symbol.asyncIterator]() {
+        if (consumed) throw new Error("execDetachedStream() results can be consumed only once.")
+        consumed = true
+        const abandonment = new StreamAbandonment()
+        const iterator = owner.iterateExecStream(
+          { ...options, tags: normalizeTags(options.tags) },
+          result,
+          settleResult!,
+          failResult!,
+          () => { started = true },
+          abandonment,
+        )
+        let active = true
+        const detached: AsyncIterator<unknown, unknown, unknown> = {
+          async next(value?: unknown) {
+            try {
+              const step = await Promise.race([iterator.next(value), abandonment.pending])
+              if (step.done) {
+                active = false
+                owner.activeIterators?.delete(detached)
+              }
+              return step
+            } catch (error) {
+              active = false
+              owner.activeIterators?.delete(detached)
+              throw error
+            }
+          },
+          async return(value?: unknown) {
+            if (!active) return { done: true, value }
+            active = false
+            owner.activeIterators?.delete(detached)
+            const error = new DOMException("Detached flow stream abandoned", "AbortError")
+            abandonment.abandon(error)
+            failResult!(error)
+            void iterator.return?.(value).catch(() => {})
+            return { done: true, value }
+          },
+          async throw(error?: unknown) {
+            if (active) {
+              active = false
+              owner.activeIterators?.delete(detached)
+              abandonment.abandon(error)
+              failResult!(error)
+              if (iterator.throw) void iterator.throw(error).catch(() => {})
+              else void iterator.return?.(undefined).catch(() => {})
+            }
+            throw error
+          },
+        }
+        owner.activeIterators ??= new Set()
+        owner.activeIterators.add(detached)
+        return detached
+      },
+    } as Lite.FlowStream<unknown, unknown>
+  }
+
+  private seedTags(
+    childCtx: ExecutionContextImpl,
+    inputTags?: Lite.TagInput,
+    flowTags?: Lite.Tagged<any>[],
+    blockedTags?: Lite.Tagged<any>[]
+  ): void {
+    const execTags = normalizeTags(inputTags)
+    if (execTags) for (let i = 0; i < execTags.length; i++) {
+      childCtx.appendTagValue(execTags[i]!)
+    }
+    if (!flowTags?.length) return
+    if (!execTags?.length && !blockedTags?.length) {
+      for (let i = 0; i < flowTags.length; i++) {
+        childCtx.appendTagValue(flowTags[i]!)
+      }
+      return
+    }
+    const blocked = new Set<symbol>()
+    if (execTags) for (let i = 0; i < execTags.length; i++) {
+      blocked.add(execTags[i]!.key)
+    }
+    if (blockedTags) for (let i = 0; i < blockedTags.length; i++) {
+      blocked.add(blockedTags[i]!.key)
+    }
+    for (let i = 0; i < flowTags.length; i++) {
+      if (!blocked.has(flowTags[i]!.key)) childCtx.appendTagValue(flowTags[i]!)
+    }
+  }
+
+  private createChildInvocation(
+    options: ExecFlowRuntimeOptions,
+    detached = false,
+    abandonment?: StreamAbandonment,
+  ): MaybePromise<{
+    flow: Lite.Flow<unknown, unknown, any, unknown>
+    presetValue: unknown
+    childCtx: ExecutionContextImpl
+    streaming: boolean
+  }> {
+    this.assertOpen()
+    const { flow, input, rawInput, name: execName, tags: execTags, blockedTags } = options
+    const presetValue = this.scope.getFlowPreset(flow)
+    if (presetValue !== undefined && isFlow(presetValue)) {
+      return this.createChildInvocation({ ...options, flow: presetValue }, detached, abandonment)
+    }
+
+    const finish = (parsedInput: unknown) => {
+      if (abandonment?.isAbandoned) throw abandonment.reason
+      const childCtx = new ExecutionContextImpl(this.scope, {
+        parent: this,
+        input: parsedInput,
+        execName,
+        flowName: flow.name,
+        boundary: false,
+        signal: options.signal,
+        detached,
+      })
+
+      this.seedTags(childCtx, execTags, flow.tags, blockedTags)
+      this.scope.attachContextExtensions(childCtx)
+
+      return {
+        flow,
+        presetValue,
+        childCtx,
+        streaming: typeof presetValue === "function"
+          ? isAsyncGeneratorFunction(presetValue)
+          : isAsyncGeneratorFunction(flow.factory),
+      }
+    }
+
+    const rawValue = rawInput !== undefined ? rawInput : input
+    if (!flow.parse) return finish(rawValue)
+
+    const label = execName ?? flow.name ?? "anonymous"
+    const wrap = (err: unknown) => new ParseError(
+      `Failed to parse flow input "${label}"`,
+      "flow-input",
+      label,
+      err
+    )
+    let parsed: unknown
+    try {
+      parsed = flow.parse(rawValue)
+    } catch (err) {
+      throw wrap(err)
+    }
+    if (isPromiseLike(parsed)) {
+      return Promise.resolve(parsed).then(finish, (err) => {
+        throw wrap(err)
+      })
+    }
+    return finish(parsed)
+  }
+
+  private async *iterateExecStream(
+    options: ExecFlowRuntimeOptions,
+    result: Promise<unknown>,
+    settleResult: (value: unknown) => void,
+    failResult: (error: unknown) => void,
+    start: () => void,
+    abandonment?: StreamAbandonment,
+  ): AsyncGenerator<unknown, unknown, unknown> {
+    start()
+    let invocation: Awaited<ReturnType<ExecutionContextImpl["createChildInvocation"]>>
+    try {
+      const created = this.createChildInvocation(options, abandonment !== undefined, abandonment)
+      invocation = abandonment
+        ? await Promise.race([created, abandonment.pending])
+        : await created
+    } catch (error) {
+      if (!abandonment?.isAbandoned) failResult(error)
+      throw error
+    }
+
+    const { flow, presetValue, childCtx } = invocation
+    const unregisterStreaming = registerStreamingExec(flow, childCtx)
+    let settleRaw: (value: unknown) => void
+    let failRaw: (error: unknown) => void
+    const raw = new Promise<unknown>((resolve, reject) => {
+      settleRaw = resolve
+      failRaw = reject
+    })
+    raw.catch(() => {})
+    let iterator: AsyncGenerator<unknown, unknown, unknown> | undefined
+    let resolveSetup!: (value: IteratorReturnResult<unknown> | undefined) => void
+    let rejectSetup!: (error: unknown) => void
+    const setup = new Promise<IteratorReturnResult<unknown> | undefined>((resolve, reject) => {
+      resolveSetup = resolve
+      rejectSetup = reject
+    })
+
+    void (async () => {
+      try {
+        const runFlow = async () => {
+          iterator = typeof presetValue === "function"
+            ? await childCtx.execPresetStreamFn(presetValue as (ctx: Lite.ExecutionContext) => unknown)
+            : await childCtx.execFlowStreamInternal(flow)
+          resolveSetup(undefined)
+          return raw
+        }
+        const value = await (this.scope.execExts.length === 0
+          ? runFlow()
+          : childCtx.applyExecPipeline(flow, runFlow))
+        if (!iterator) resolveSetup({ done: true, value })
+        await childCtx.close({ ok: true })
+        settleResult(value)
+      } catch (error) {
+        await childCtx.close({ ok: false, error })
+        rejectSetup(error)
+        failResult(error)
+      } finally {
+        unregisterStreaming()
+      }
+    })()
+
+    const abandon = abandonment
+      ? (error: unknown) => {
+          childCtx.abort(error)
+          childCtx.detachParent()
+          const active = iterator
+          iterator = undefined
+          failRaw!(error)
+          unregisterStreaming()
+          if (active) void active.return?.(undefined).catch(() => {})
+          void childCtx.close({ ok: false, error }).catch(() => {})
+        }
+      : undefined
+
+    try {
+      const shortCircuit = abandonment
+        ? await Promise.race([setup, abandonment.pending])
+        : await setup
+      if (shortCircuit) {
+        if (abandonment) return await Promise.race([result, abandonment.pending])
+        await result
+        return shortCircuit.value
+      }
+
+      for (;;) {
+        const step = abandonment
+          ? await Promise.race([iterator!.next(), abandonment.pending])
+          : await iterator!.next()
+        if (step.done) {
+          settleRaw!(step.value)
+          const value = await result
+          iterator = undefined
+          return abandonment ? value : step.value
+        }
+        yield step.value
+      }
+    } catch (error) {
+      if (abandonment?.isAbandoned) {
+        abandon!(abandonment.reason)
+        throw abandonment.reason
+      }
+      if (iterator) {
+        iterator = undefined
+        failRaw!(error)
+        await result.catch(() => {})
+      }
+      throw error
+    } finally {
+      if (iterator) {
+        const error = abandonment?.isAbandoned
+          ? abandonment.reason
+          : new DOMException(
+              abandonment ? "Detached flow stream abandoned" : "Flow stream aborted",
+              "AbortError",
+            )
+        if (abandonment) {
+          abandon!(error)
+          return
+        }
+        childCtx.abort(error)
+        try {
+          await iterator.return?.(undefined)
+        } catch {}
+        failRaw!(error)
+        await result.catch(() => {})
+      }
+    }
+  }
+
+  private execFlowFactoryResult<T>(
+    flow: Lite.Flow<unknown, unknown, any, unknown>,
+    consume: (value: MaybePromise<unknown> | AsyncGenerator<unknown, unknown, unknown>) => MaybePromise<T>
+  ): MaybePromise<T> {
+    const depsResult = this.scope.resolveDepsOptimistic(flow.deps, this, undefined)
+    const factory = flow.factory as unknown as (
+      ctx: Lite.ExecutionContext,
+      deps?: Record<string, unknown>
+    ) => MaybePromise<unknown> | AsyncGenerator<unknown, unknown, unknown>
+    const run = (resolvedDeps: Record<string, unknown>) => {
+      return consume(flow.deps ? factory(this, resolvedDeps) : factory(this))
+    }
+
+    if (isPromiseLike(depsResult)) {
+      return (depsResult as Promise<Record<string, unknown>>).then(run)
+    }
+
+    return run(depsResult as Record<string, unknown>)
+  }
+
+  private execFlowInternal(flow: Lite.Flow<unknown, unknown, any, unknown>): MaybePromise<unknown> {
+    return this.execFlowFactoryResult(flow, (value) => {
+      if (isAsyncGenerator(value)) markStreamingExec(this, flow)
+      return consumeScalarResult(value)
+    })
+  }
+
+  private execFlowStreamInternal(flow: Lite.Flow<unknown, unknown, any, unknown>): MaybePromise<AsyncGenerator<unknown, unknown, unknown>> {
+    return this.execFlowFactoryResult(flow, (value) => requireAsyncGenerator(value))
+  }
+
+  private async execInlineInternal(options: ExecRuntimeOptions | ExecDepsRuntimeOptions): Promise<unknown> {
+    if (options.deps === undefined) {
+      return assertNoReturnedStream(await options.fn(...options.params))
+    }
+    const resolved = await this.scope.resolveDepsOptimistic(options.deps, this, undefined)
+    return assertNoReturnedStream(await options.fn(resolved, ...options.params))
+  }
+
+  private async execPresetFn(
+    fn: (ctx: Lite.ExecutionContext) => MaybePromise<unknown> | AsyncGenerator<unknown, unknown, unknown>,
+    target?: Lite.ExecTarget
+  ): Promise<unknown> {
+    const value = fn(this)
+    if (target && isAsyncGenerator(value)) markStreamingExec(this, target)
+    return consumeScalarResult(value)
+  }
+
+  private execPresetStreamFn(fn: (ctx: Lite.ExecutionContext) => unknown): AsyncGenerator<unknown, unknown, unknown> {
+    return requireAsyncGenerator(fn(this))
+  }
+
+  private async applyExecPipeline(
+    target: Lite.ExecTarget,
+    doExec: () => Promise<unknown>
+  ): Promise<unknown> {
+    let next = doExec
+
+    for (let i = this.scope.execExts.length - 1; i >= 0; i--) {
+      const ext = this.scope.execExts[i]!
+      const currentNext = next
+      next = ext.wrapExec!.bind(ext, currentNext, target, this) as () => Promise<unknown>
+    }
+
+    return next()
+  }
+
+  onClose<Args extends unknown[]>(
+    fn: (result: Lite.CloseResult, ...args: Args) => MaybePromise<void>,
+    ...params: Args
+  ): () => void {
+    const cleanup = { fn, params }
+    this.cleanups.push(cleanup)
+    return () => {
+      const index = this.cleanups.indexOf(cleanup)
+      if (index >= 0) this.cleanups.splice(index, 1)
+    }
+  }
+
+  close(result: Lite.CloseResult = { ok: true }): Promise<void> {
+    if (this.closePromise) return this.closePromise
+    if (this.closed) return Promise.resolve()
+
+    this.closed = true
+    const closeResult = this.classifyCloseResult(result)
+    this.abort(this.scope.executionContextCloseReason())
+    if (
+      !this.activeIterators?.size
+      && !this.descendants?.size
+      && this.activeExecs === 0
+      && !this.children?.size
+      && this.cleanups.length === 0
+      && !this.resources?.size
+    ) {
+      if (this.parent) {
+        assertExecutionContextImpl(this.parent)
+        this.parent.children?.delete(this)
+      }
+      this.finalizeStore()
+      return Promise.resolve()
+    }
+    const closing = (
+      !this.activeIterators?.size
+      && !this.descendants?.size
+      && this.activeExecs === 0
+      && !this.children?.size
+      && !this.resources?.size
+    )
+      ? this.runCloseCleanups(closeResult)
+      : this.runStructuredClose(
+          closeResult,
+          this.children ? [...this.children].filter((child) => child.boundary) : [],
+        )
+    this.closePromise = closing.finally(() => {
+      if (this.parent) {
+        assertExecutionContextImpl(this.parent)
+        this.parent.children?.delete(this)
+      }
+      this.finalizeStore()
+    })
+    this.closePromise.then(
+      () => { this.closePromise = undefined },
+      () => { this.closePromise = undefined }
+    )
+    return this.closePromise
+  }
+
+  private closeSuccessfulExec(): Promise<void> | undefined {
+    if (
+      this.closed
+      || this.closePromise
+      || this.activeIterators?.size
+      || this.descendants?.size
+      || this.activeExecs > 0
+      || this.children?.size
+      || this.cleanups.length > 0
+      || this.resources?.size
+    ) {
+      return this.close({ ok: true })
+    }
+    this.closed = true
+    this.abort(this.scope.executionContextCloseReason())
+    if (this.parent) {
+      assertExecutionContextImpl(this.parent)
+      this.parent.children?.delete(this)
+    }
+    this.finalizeStore()
+  }
+
+  private finalizeStore(): void {
+    this.storeFinalized = true
+    this._store?.finalize()
+  }
+
+  abort(reason: unknown): void {
+    if (this.baselineMode) {
+      if (!this.abortController!.signal.aborted) this.abortController!.abort(reason)
+      return
+    }
+    this.captureAbort(reason)
+  }
+
+  private captureAbort(reason: unknown): void {
+    if (this.abortReason !== pendingAbort) return
+    this.abortReason = reason
+    this.abortController?.abort(reason)
+    for (const child of this.children ?? []) {
+      if (!child.baselineMode) child.captureAbort(reason)
+    }
+  }
+
+  trackDescendant<T>(pending: Promise<T>): Promise<T> {
+    this.descendants ??= new Set()
+    this.descendants.add(pending)
+    pending.then(
+      () => this.descendants?.delete(pending),
+      () => this.descendants?.delete(pending)
+    )
+    return pending
+  }
+
+  private waitForExecs(): Promise<void> | undefined {
+    if (this.activeExecs === 0) return undefined
+    return new Promise((resolve) => {
+      this.execWaiters ??= []
+      this.execWaiters.push(resolve)
+    })
+  }
+
+  private classifyCloseResult(result: Lite.CloseResult): Lite.CloseResult {
+    if (result.ok) return result
+    const errorName = typeof result.error === "object" && result.error !== null && "name" in result.error
+      ? (result.error as { name?: unknown }).name
+      : undefined
+    return this.signal.aborted && (result.error === this.signal.reason || errorName === "AbortError")
+      ? { ok: false, error: result.error, aborted: true }
+      : { ok: false, error: result.error }
+  }
+
+  private async runStructuredClose(
+    result: Lite.CloseResult,
+    boundaryChildren: ExecutionContextImpl[]
+  ): Promise<void> {
+    const iterators = [...(this.activeIterators ?? [])]
+    this.activeIterators?.clear()
+    await Promise.allSettled(iterators.map((iterator) => iterator.return?.()))
+    const boundaryCloses = boundaryChildren.map((child) => child.close({ ok: false, error: child.signal.reason }))
+    const resourceResolutions = [...(this.resources?.values() ?? [])]
+      .flatMap((entry) => entry.promise ? [entry.promise] : [])
+    const execs = this.waitForExecs()
+    await Promise.allSettled([
+      ...(this.descendants ?? []),
+      ...boundaryCloses,
+      ...resourceResolutions,
+      ...(execs ? [execs] : []),
+    ])
+    await this.runCloseCleanups(result)
+  }
+
+  private async runCloseCleanups(result: Lite.CloseResult): Promise<void> {
+    const failures: unknown[] = []
+    for (let i = this.cleanups.length - 1; i >= 0; i--) {
+      try {
+        const cleanup = this.cleanups[i]
+        if (cleanup) await cleanup.fn(result, ...cleanup.params)
+      } catch (error) {
+        if (result.ok) failures.push(error)
+      }
+    }
+    const resources = Array.from(this.resources?.keys() ?? [])
+    for (let i = resources.length - 1; i >= 0; i--) {
+      const entry = this.resources!.get(resources[i]!)
+      this.resources!.delete(resources[i]!)
+      if (entry && entry.cleanups.length > 0) {
+        if (result.ok) {
+          for (let j = entry.cleanups.length - 1; j >= 0; j--) {
+            try { await runCleanup(entry.cleanups[j]!) } catch (error) {
+              failures.push(error)
+            }
+          }
+        } else {
+          await runCleanupsSafe(entry.cleanups)
+        }
+        entry.cleanups = []
+      }
+      this.emitResourceState(resources[i]!, "idle")
+    }
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1) throw new AggregateError(failures, "close settlement failed")
+  }
+}
+
+/**
+ * Registers or restores controller-read observers used by integrations that
+ * need to track `controller.get()` access.
+ */
+export function setControllerReadHook(fn: ((ctrl: Lite.Controller<unknown>) => void) | null): void {
+  if (fn) {
+    controllerReadHooks.push(fn)
+    return
+  }
+  controllerReadHooks.pop()
+}
+
+/**
+ * Creates a DI container that manages Atom resolution, caching, and lifecycle.
+ *
+ * The scope is returned synchronously, with a `ready` promise that resolves
+ * when all extensions have been initialized. Resolution methods automatically
+ * wait for `ready` before proceeding.
+ *
+ * @param options - Optional configuration for extensions, presets, and tags
+ * @returns A Scope instance with a `ready` promise for extension initialization
+ *
+ * @example
+ * ```typescript
+ * const scope = createScope({
+ *   extensions: [logging],
+ *   presets: [preset(db, testDb)]
+ * })
+ *
+ * // Option 1: resolve() waits for ready internally
+ * const pool = await scope.resolve(db)
+ *
+ * // Option 2: explicit wait
+ * await scope.ready
+ * const conn = await scope.resolve(db)
+ * ```
+ */
+export function createScope(options?: Lite.ScopeOptions): Lite.Scope {
+  return new ScopeImpl(options)
+}

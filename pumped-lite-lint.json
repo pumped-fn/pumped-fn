@@ -1,0 +1,14 @@
+{
+  "compositionPaths": [
+    "(?:^|/)packages/lite-react/src/context\\.tsx$",
+    "(?:^|/)scripts/act\\.mjs$"
+  ],
+  "rules": {
+    "pumped/no-ctx-argument": {
+      "severity": "off"
+    },
+    "pumped/no-scope-reach": {
+      "severity": "off"
+    }
+  }
+}

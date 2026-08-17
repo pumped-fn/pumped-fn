@@ -22,10 +22,10 @@ for (const [position, variant] of ["baseline", "candidate"].entries()) {
   const root = resolve(args[`${variant}-root`]);
   const env = {
     ...process.env,
-    PUMPED_PERF_LITE_DIST: resolve(root, "pkg/core/lite/dist/index.mjs"),
-    PUMPED_PERF_LITE_PACKAGE: resolve(root, "pkg/core/lite/package.json"),
-    PUMPED_PERF_LITE_REACT_DIST: resolve(root, "pkg/react/lite-react/dist/index.mjs"),
-    PUMPED_PERF_LITE_REACT_PACKAGE: resolve(root, "pkg/react/lite-react/package.json"),
+    PUMPED_PERF_LITE_DIST: artifact(root, "packages/lite/dist/index.mjs", "pkg/core/lite/dist/index.mjs"),
+    PUMPED_PERF_LITE_PACKAGE: artifact(root, "packages/lite/package.json", "pkg/core/lite/package.json"),
+    PUMPED_PERF_LITE_REACT_DIST: artifact(root, "packages/lite-react/dist/index.mjs", "pkg/react/lite-react/dist/index.mjs"),
+    PUMPED_PERF_LITE_REACT_PACKAGE: artifact(root, "packages/lite-react/package.json", "pkg/react/lite-react/package.json"),
   };
   for (const lane of ["lite", "lite-react"]) {
     run(capture, [
@@ -55,6 +55,11 @@ run(compare, [
   "--output",
   resolve(outputDir, "comparison.json"),
 ]);
+
+function artifact(root, current, legacy) {
+  const path = resolve(root, current);
+  return existsSync(path) ? path : resolve(root, legacy);
+}
 
 function run(script, nextArgs, env = process.env) {
   const result = spawnSync(process.execPath, [script, ...nextArgs], {

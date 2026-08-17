@@ -5,10 +5,10 @@ import { playwright } from "@vitest/browser-playwright"
 import { configDefaults, defineConfig } from "vitest/config"
 
 const liteDist = process.env.PUMPED_PERF_LITE_DIST ?? fileURLToPath(
-  new URL("../../pkg/core/lite/dist/index.mjs", import.meta.url),
+  new URL("../../packages/lite/dist/index.mjs", import.meta.url),
 )
 const liteReactDist = process.env.PUMPED_PERF_LITE_REACT_DIST ?? fileURLToPath(
-  new URL("../../pkg/react/lite-react/dist/index.mjs", import.meta.url),
+  new URL("../../packages/lite-react/dist/index.mjs", import.meta.url),
 )
 const benchmarkRoot = fileURLToPath(new URL(".", import.meta.url))
 const resolutionTrace = process.env.PUMPED_PERF_RESOLUTION_TRACE

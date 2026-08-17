@@ -50,8 +50,8 @@ function artifact(lane, variant) {
     package: name,
     path:
       name === "@pumped-fn/lite"
-        ? "pkg/core/lite/dist/index.mjs"
-        : "pkg/react/lite-react/dist/index.mjs",
+        ? "packages/lite/dist/index.mjs"
+        : "packages/lite-react/dist/index.mjs",
     sha256: sha256(`${variant}:${name}:module`),
     bytes: 100,
   }));
@@ -59,8 +59,8 @@ function artifact(lane, variant) {
     package: name,
     path:
       name === "@pumped-fn/lite"
-        ? "pkg/core/lite/package.json"
-        : "pkg/react/lite-react/package.json",
+        ? "packages/lite/package.json"
+        : "packages/lite-react/package.json",
     sha256: sha256(`${variant}:${name}:manifest`),
     bytes: 100,
   }));
@@ -639,7 +639,7 @@ test("comparison rejects wrong order, environment drift, artifact drift, row gap
 
   const sourceArtifact = observations("lite-only");
   const source = structuredClone(sourceArtifact[0].artifact);
-  source.modules[0].path = "pkg/core/lite/src/index.ts";
+  source.modules[0].path = "packages/lite/src/index.ts";
   source.artifact_fingerprint = hashObject({
     modules: source.modules,
     package_manifests: source.package_manifests,
