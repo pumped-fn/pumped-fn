@@ -1,5 +1,12 @@
 # @pumped-fn/pumped
 
+## 1.0.1
+
+### Patch Changes
+
+- fa68d45: Use the published `@pumped-fn/lite-extension-scheduler` after its move out of this repository, and document the `CliRuntime` and `HttpRuntime` host interfaces.
+  - @pumped-fn/lite-hmr@1.0.3
+
 ## 1.0.0
 
 ### Major Changes
