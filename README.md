@@ -9,12 +9,13 @@ Put your app behind a scope, and it becomes fully testable, fully traceable, wit
 
 ```text
 createScope({ presets, tags, extensions })
-  ├─ run / runStream -> owned execution context ─┐
-  │    └─ raw data + exact watched tag families     │
-  │         └─ flow or named inline { deps, fn, params }
-  └─ createContext -> exec / execStream ─────────┴─ session.run -> agent.turn
-                                                               ├─ role + selected capability flows
-                                                               └─ provider + backend adapters
+  ├─ run / runStream -> owned execution context ──────────┐
+  │    ├─ ctx.data -> raw scratch data                    │
+  │    ├─ ctx.tags -> exact watched tag families          │
+  │    └─ flow or named inline { deps, fn, params }        │
+  └─ createContext -> exec / execStream ──────────────────┴─ session.run -> agent.turn
+                                                                  ├─ role + selected capability flows
+                                                                  └─ provider + backend adapters
 ```
 
 Executing the entry flow activates its complete recursively declared dependency tree before the entry factory starts. Required tags are checked at runtime during activation. A missing provider, tool backend, validation engine, or session binding fails before semantic work begins. Tests replace the same graph edges at `createScope`; they do not mock the tree.

@@ -16,5 +16,10 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    server: {
+      deps: {
+        inline: ["@pumped-fn/lite-extension-scheduler"],
+      },
+    },
   },
 })

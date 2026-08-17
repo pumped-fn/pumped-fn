@@ -195,7 +195,10 @@ export namespace Lite {
 
   /** Typed tag-family storage owned by one execution context. */
   export interface ContextTags {
-    /** Replace every local family present in the input, preserving family value order. */
+    /**
+     * Replace every local family present in the input, preserving family value order.
+     * @throws After committing when a watcher fails, or when reentrant writes do not settle.
+     */
     set(input: TagInput): void
     /** Get the first local value without applying the tag default. */
     get<T>(tag: Tag<T, boolean>): T | undefined
@@ -207,9 +210,15 @@ export namespace Lite {
     seekMany<T>(tag: Tag<T, boolean>): readonly T[]
     /** Check whether the local context stores the tag family. */
     has<T, H extends boolean>(tag: Tag<T, H>): boolean
-    /** Delete the local tag family, returning true when it existed. */
+    /**
+     * Delete the local tag family, returning true when it existed.
+     * @throws After committing when a watcher fails.
+     */
     delete<T, H extends boolean>(tag: Tag<T, H>): boolean
-    /** Watch one local tag family. */
+    /**
+     * Watch one local tag family. Each listener receives its own value snapshot. Listeners
+     * present when delivery starts run once, even when another listener removes them.
+     */
     watch<T>(
       tag: Tag<T, boolean>,
       listener: (values: readonly T[]) => void,
@@ -219,7 +228,9 @@ export namespace Lite {
 
   /**
    * Context-local raw data storage. Tag helpers remain as compatibility shims;
-   * execution contexts should use `ctx.tags`.
+   * execution contexts should use `ctx.tags`. During the 6.x migration, raw operations
+   * using a tag symbol preserve the old bridge to a family that already exists. Such a
+   * write uses the same watcher and failure rules as `ctx.tags.set`.
    */
   export interface ContextData {
     /** Get value by key */
@@ -241,7 +252,7 @@ export namespace Lite {
      * Look up tag value, traversing parent chain if not found locally.
      * Returns first match or undefined (ignores tag defaults).
      *
-     * @deprecated Use `ctx.tags.seek(tag)` on execution contexts.
+     * @deprecated Move raw `tag.key` writes to `ctx.tags`, then use `ctx.tags.seek(tag)`.
      */
     seekTag<T>(tag: Tag<T, boolean>): T | undefined
     /**
@@ -252,7 +263,7 @@ export namespace Lite {
     /**
      * Get value by tag, returns undefined if not stored.
      *
-     * @deprecated Use `ctx.tags.get(tag)` on execution contexts.
+     * @deprecated Move raw `tag.key` writes to `ctx.tags`, then use `ctx.tags.get(tag)`.
      */
     getTag<T>(tag: Tag<T, boolean>): T | undefined
     /**
@@ -264,7 +275,7 @@ export namespace Lite {
     /**
      * Check if tag has stored value.
      *
-     * @deprecated Use `ctx.tags.has(tag)` on execution contexts.
+     * @deprecated Move raw `tag.key` writes to `ctx.tags`, then use `ctx.tags.has(tag)`.
      */
     hasTag<T, H extends boolean>(tag: Tag<T, H>): boolean
     /**
@@ -277,7 +288,7 @@ export namespace Lite {
      * Get existing value or initialize with tag's default.
      * Stores and returns the value.
      *
-     * @deprecated Use `ctx.tags.has(tag)` with `ctx.tags.set(tag(value))` on execution contexts.
+     * @deprecated Check `ctx.tags.has(tag)` and store `tag.defaultValue` with `ctx.tags.set` when absent.
      */
     getOrSetTag<T>(tag: Tag<T, true>): T
     /**

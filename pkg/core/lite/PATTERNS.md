@@ -351,8 +351,9 @@ sequenceDiagram
 Use `ctx.tags.set(input)` to replace complete local families. Use `ctx.tags.watch(tag, listener)` only
 for infrastructure that owns the context lifetime, such as an explicitly configured persistence extension.
 Watchers observe one local family; extensions attach at each context through `initContext`. Raw `ctx.data`
-is not watchable, and new code must not treat it as a tag source. Its tag helpers and raw-symbol bridging
-remain temporary compatibility shims.
+does not create watchable tag families, and new code must not treat it as a tag source. During the 6.x
+migration, writing a raw `tag.key` still replaces and notifies a family that already exists. Its tag helpers
+and this raw-symbol bridge remain temporary compatibility shims.
 
 ### Derived State (Select)
 

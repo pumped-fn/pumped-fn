@@ -87,6 +87,8 @@ interface ContextTagFamily {
 
 type ContextTagListener = (values: readonly any[]) => void
 
+const maxContextTagNotificationRounds = 1000
+
 class ContextStore {
   private readonly raw = new Map<string | symbol, unknown>()
   private readonly families = new Map<symbol, ContextTagFamily>()
@@ -232,28 +234,33 @@ class ContextStore {
       watchers.set(tag.key, listeners)
     }
     listeners.add(listener as ContextTagListener)
-    if (options?.initial) {
-      const failures: unknown[] = []
-      const root = !this.notifying
-      if (root) this.notifying = true
-      try {
-        listener(this.getMany(tag))
-      } catch (error) {
-        listeners.delete(listener as ContextTagListener)
-        if (listeners.size === 0) watchers.delete(tag.key)
-        failures.push(error)
-      }
-      if (root) {
-        this.notifying = false
-        this.flush(failures)
-      } else if (failures.length > 0) {
-        throw failures[0]
-      }
-    }
-    return () => {
+    const stop = () => {
       listeners!.delete(listener as ContextTagListener)
-      if (listeners!.size === 0) watchers.delete(tag.key)
+      if (watchers.get(tag.key) === listeners && listeners!.size === 0) watchers.delete(tag.key)
     }
+    if (options?.initial) {
+      try {
+        const failures: unknown[] = []
+        const root = !this.notifying
+        if (root) this.notifying = true
+        try {
+          listener(this.getMany(tag))
+        } catch (error) {
+          stop()
+          failures.push(error)
+        }
+        if (root) {
+          this.notifying = false
+          this.flush(failures)
+        } else if (failures.length > 0) {
+          throw failures[0]
+        }
+      } catch (error) {
+        stop()
+        throw error
+      }
+    }
+    return stop
   }
 
   getTagCompat<T>(tag: Lite.Tag<T, boolean>): T | undefined {
@@ -338,8 +345,14 @@ class ContextStore {
       return
     }
     this.notifying = true
+    let rounds = 0
     try {
       while (this.pending.size > 0) {
+        if (++rounds > maxContextTagNotificationRounds) {
+          this.pending.clear()
+          failures.push(new Error("Infinite context tag notification loop detected"))
+          break
+        }
         const pending = [...this.pending.values()]
         this.pending.clear()
         for (let i = 0; i < pending.length; i++) {
@@ -350,7 +363,7 @@ class ContextStore {
           for (const listener of [...listeners]) {
             if (this.finalized) break
             try {
-              listener(values)
+              listener(values.slice())
             } catch (error) {
               failures.push(error)
             }
@@ -3095,6 +3108,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     if (!this._store) {
       if (this.parent) assertExecutionContextImpl(this.parent)
       this._store = new ContextStore(this.parent?.storeImpl())
+      if (this.closed) this._store.finalize()
     }
     return this._store
   }

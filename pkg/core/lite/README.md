@@ -378,7 +378,9 @@ await scope.dispose()
 Watchers belong to one exact tag family in one context. `{ initial: true }` delivers the current local
 family synchronously during registration. A batch notifies each changed family once with its final values;
 reentrant writes queue until the active notification finishes. All listeners run before listener failures
-are rethrown. Closing the context drops its watchers after close cleanup settles.
+are rethrown. Each listener gets its own family snapshot. The listeners present when a delivery starts run
+once even if another listener removes them. An unbounded reentrant write loop throws instead of hanging.
+Closing the context drops its watchers after close cleanup settles.
 
 ```ts
 import { createScope, tag } from "@pumped-fn/lite"
@@ -398,7 +400,9 @@ await scope.dispose()
 
 Extensions that persist context state should watch only explicitly configured tag handles. Stable storage
 IDs and codecs belong to the extension; runtime tag symbols and labels are not durable identities. Raw
-`ctx.data` is not watchable. The tag helpers on `ctx.data` remain compatibility shims for this release.
+`ctx.data` does not create watchable tag families. The tag helpers on `ctx.data` remain compatibility shims
+for this release. The old raw-symbol bridge also remains: writing `tag.key` replaces and notifies that family
+only when it already exists. New code must use `ctx.tags` so this 6.x migration rule cannot affect it.
 
 ## Reactivity
 

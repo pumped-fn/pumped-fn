@@ -9,6 +9,7 @@ export interface CliIo {
   err(line: string): void
 }
 
+/** CLI host lifecycle plus the process-style exit code. */
 export interface CliRuntime extends HostRuntime {
   code: Promise<number>
 }
