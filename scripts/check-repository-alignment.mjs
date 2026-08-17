@@ -102,7 +102,7 @@ if (!/(?:^|&&\s*)pumped-lite-lint\s/u.test(lintScript) || /dist\/cli\.[cm]?js/u.
 if (!lintScript.includes("--config pumped-lite-lint.json") || !existsSync(join(root, "pumped-lite-lint.json"))) {
   fail("lint_config_mismatch", "root lint must use the checked-in pumped-lite-lint.json config")
 }
-for (const path of ["README.md", "docs", "scripts", "packages/*/README.md", "packages/*/src"]) {
+for (const path of ["README.md", "docs", "scripts", "packages/*/README.md", "packages/*/src", "packages/*/bin"]) {
   if (!lintScript.includes(path)) fail("lint_path_mismatch", `root lint must scan ${path}`)
 }
 const packedScript = rootPackage.scripts?.["packed-lite:check"] ?? ""

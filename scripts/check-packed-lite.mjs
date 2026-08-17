@@ -11,7 +11,7 @@ const root = await mkdtemp(join(tmpdir(), "pumped-lite-pack-"))
 const packages = [
   { dir: "packages/lite", name: "@pumped-fn/lite", files: ["README.md", "PATTERNS.md", "MIGRATION.md", "LICENSE", "CHANGELOG.md"] },
   { dir: "packages/lite-react", name: "@pumped-fn/lite-react", files: ["README.md", "LICENSE", "CHANGELOG.md"] },
-  { dir: "packages/lite-lint", name: "@pumped-fn/lite-lint", files: ["README.md", "LICENSE", "CHANGELOG.md", "dist/cli.mjs"] },
+  { dir: "packages/lite-lint", name: "@pumped-fn/lite-lint", files: ["README.md", "LICENSE", "CHANGELOG.md", "bin/pumped-lite-lint.mjs", "dist/cli.mjs"] },
   { dir: "packages/lite-logging", name: "@pumped-fn/lite-logging", files: ["README.md", "LICENSE", "CHANGELOG.md"] },
   { dir: "packages/lite-logging-pino", name: "@pumped-fn/lite-logging-pino", files: ["README.md", "LICENSE", "CHANGELOG.md"] },
   { dir: "packages/lite-observability", name: "@pumped-fn/lite-observability", files: ["README.md", "LICENSE", "CHANGELOG.md"] },
@@ -121,7 +121,7 @@ try {
 
   await writeFile(join(consumer, "lint-target.ts"), "export const value = 1\n")
   const lint = await exec(process.execPath, [
-    join(consumer, "node_modules", "@pumped-fn", "lite-lint", "dist", "cli.mjs"),
+    join(consumer, "node_modules", "@pumped-fn", "lite-lint", "bin", "pumped-lite-lint.mjs"),
     "--json",
     "lint-target.ts",
   ], { cwd: consumer })

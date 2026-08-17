@@ -39,7 +39,7 @@ describe("lint CLI", () => {
     const root = await mkdtemp(join(tmpdir(), "pumped-lite-lint-bin-"))
     roots.push(root)
     const bin = join(root, "pumped-lite-lint")
-    await symlink(fileURLToPath(new URL("../dist/cli.mjs", import.meta.url)), bin)
+    await symlink(fileURLToPath(new URL("../bin/pumped-lite-lint.mjs", import.meta.url)), bin)
 
     const { stdout } = await exec(process.execPath, [bin, "--help"])
 

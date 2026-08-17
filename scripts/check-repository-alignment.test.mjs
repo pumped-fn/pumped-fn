@@ -29,7 +29,7 @@ const fixture = (workflowSource = workflow) => {
   write(directory, "docs/README.md", "# Docs\n")
   write(directory, "package.json", {
     scripts: {
-      lint: "pumped-lite-lint --config pumped-lite-lint.json README.md docs scripts packages/*/README.md packages/*/src && pnpm alignment:check",
+      lint: "pumped-lite-lint --config pumped-lite-lint.json README.md docs scripts packages/*/README.md packages/*/src packages/*/bin && pnpm alignment:check",
       "packed-lite:check": "pnpm -r build && node scripts/check-packed-lite.mjs",
       "alignment:check": "node scripts/check-repository-alignment.mjs",
       "ci:changed-packages": "node scripts/check-changed-packages.mjs",

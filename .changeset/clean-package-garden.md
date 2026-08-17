@@ -8,7 +8,7 @@
 "@pumped-fn/lite-observability-otel": major
 ---
 
-Start the short-name logging and observability package lines, publish the flat package metadata, and expose immutable root tags through `scope.tags` for extension authors.
+Start the short-name logging and observability package lines, publish the flat package metadata, expose immutable root tags through `scope.tags` for extension authors, and keep the Lite Lint CLI available after a fresh workspace install.
 
 Retires: "@pumped-fn/codemod"
 Retires: "@pumped-fn/lite-extension-logging"

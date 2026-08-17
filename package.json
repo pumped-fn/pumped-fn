@@ -8,7 +8,7 @@
     "typecheck": "pnpm -r typecheck",
     "typecheck:full": "pnpm -r typecheck:full",
     "verify": "pnpm build && pnpm test && pnpm typecheck && pnpm typecheck:full && pnpm published-types:check && pnpm packed-lite:check",
-    "lint": "pnpm -F @pumped-fn/lite-lint build && pumped-lite-lint --config pumped-lite-lint.json README.md docs scripts packages/*/README.md packages/*/src packages/lite/PATTERNS.md packages/lite/MIGRATION.md packages/lite/tests packages/lite-logging/tests packages/lite-logging-pino/tests packages/lite-observability/tests packages/lite-observability-otel/tests && pnpm alignment:check",
+    "lint": "pnpm -F @pumped-fn/lite-lint build && pumped-lite-lint --config pumped-lite-lint.json README.md docs scripts packages/*/README.md packages/*/src packages/*/bin packages/lite/PATTERNS.md packages/lite/MIGRATION.md packages/lite/tests packages/lite-logging/tests packages/lite-logging-pino/tests packages/lite-observability/tests packages/lite-observability-otel/tests && pnpm alignment:check",
     "lint:check": "pnpm lint",
     "alignment:check": "node scripts/check-repository-alignment.mjs",
     "alignment:test": "node --test scripts/check-repository-alignment.test.mjs scripts/check-changed-packages.test.mjs",
