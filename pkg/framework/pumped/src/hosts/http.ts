@@ -59,6 +59,7 @@ function render(output: unknown, carrier: HttpResponseCarrier): Response {
   return new Response(JSON.stringify(output), { status: carrier.status ?? 200, headers: carrier.headers })
 }
 
+/** HTTP host lifecycle plus an in-process Fetch API entry point. */
 export interface HttpRuntime extends HostRuntime {
   fetch(request: Request): Promise<Response>
 }

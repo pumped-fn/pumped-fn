@@ -240,7 +240,7 @@ if (events.join(",") !== "rollback,release") throw new Error("expected rollback 
 await scope.dispose()
 ```
 
-Resource state is not stored in `ctx.data`. `ctx.data` is for tags and user data. The resolved value is stored on the owning execution context. Child executions can read visible resources, but `ctx.release(resource)` is owner-local.
+Resource state is not stored in `ctx.data` or `ctx.tags`. `ctx.data` is raw scratch data, while `ctx.tags` owns typed tag families. The resolved value is stored on the owning execution context. Child executions can read visible resources, but `ctx.release(resource)` is owner-local.
 
 > **`ctx.release(tx)` vs `ctx.close()`**: `ctx.release(tx)` runs only the resource's `ctx.cleanup` handlers (owner-local reset for mid-request recycle), but `onClose` handlers registered by that resource still fire when `ctx.close()` is eventually called. Do not follow `ctx.release(tx)` with `ctx.close()` if the resource registered an `onClose` side effect (e.g., commit) — the released resource will be committed again. Use `ctx.release` only when you need a fresh resource instance within the same open context and the `onClose` side effect is safe to run regardless.
 
@@ -328,7 +328,7 @@ sequenceDiagram
     participant Atom
     participant Ctx as ExecutionContext
     participant ChildCtx
-    participant Data as ctx.data
+    participant Tags as ctx.tags
 
     App->>Scope: createScope({ tags: config(cfg) })
     App->>Scope: resolve(db)
@@ -341,12 +341,19 @@ sequenceDiagram
     App->>Ctx: ctx.exec({ flow, tags: locale('en') })
     Ctx->>ChildCtx: create with merged tags
 
-    ChildCtx->>Data: ctx.data.seekTag(requestId)
-    Data-->>ChildCtx: rid (from parent)
+    ChildCtx->>Tags: ctx.tags.seek(requestId)
+    Tags-->>ChildCtx: rid (from parent)
 
-    ChildCtx->>Data: ctx.data.getTag(locale)
-    Data-->>ChildCtx: 'en'
+    ChildCtx->>Tags: ctx.tags.get(locale)
+    Tags-->>ChildCtx: 'en'
 ```
+
+Use `ctx.tags.set(input)` to replace complete local families. Use `ctx.tags.watch(tag, listener)` only
+for infrastructure that owns the context lifetime, such as an explicitly configured persistence extension.
+Watchers observe one local family; extensions attach at each context through `initContext`. Raw `ctx.data`
+does not create watchable tag families, and new code must not treat it as a tag source. During the 6.x
+migration, writing a raw `tag.key` still replaces and notifies a family that already exists. Its tag helpers
+and this raw-symbol bridge remain temporary compatibility shims.
 
 ### Derived State (Select)
 

@@ -33,12 +33,6 @@
       "@pumped-fn/lite-extension-observable-otel": [
         "./pkg/ext/observable-otel/src/index.ts"
       ],
-      "@pumped-fn/lite-extension-scheduler": [
-        "./pkg/ext/scheduler/src/index.ts"
-      ],
-      "@pumped-fn/lite-extension-scheduler-nats": [
-        "./pkg/ext/scheduler-nats/src/index.ts"
-      ],
       "@pumped-fn/lite-extension-suspense": [
         "./pkg/ext/suspense/src/index.ts"
       ],

@@ -9,11 +9,13 @@ Put your app behind a scope, and it becomes fully testable, fully traceable, wit
 
 ```text
 createScope({ presets, tags, extensions })
-  ├─ run / runStream -> owned execution context ─┐
-  │    └─ flow or named inline { deps, fn, params }  │
-  └─ createContext -> exec / execStream ─────────┴─ session.run -> agent.turn
-                                                               ├─ role + selected capability flows
-                                                               └─ provider + backend adapters
+  ├─ run / runStream -> owned execution context ──────────┐
+  │    ├─ ctx.data -> raw scratch data                    │
+  │    ├─ ctx.tags -> exact watched tag families          │
+  │    └─ flow or named inline { deps, fn, params }       │
+  └─ createContext -> exec / execStream ──────────────────┴─ session.run -> agent.turn
+                                                                  ├─ role + selected capability flows
+                                                                  └─ provider + backend adapters
 ```
 
 Executing the entry flow activates its complete recursively declared dependency tree before the entry factory starts. Required tags are checked at runtime during activation. A missing provider, tool backend, validation engine, or session binding fails before semantic work begins. Tests replace the same graph edges at `createScope`; they do not mock the tree.
@@ -170,8 +172,6 @@ Read the checklist: [How to review pumped-fn code](docs/code-review-guide.md).
 | `pkg/ext/logging-pino` | `@pumped-fn/lite-extension-logging-pino` | [README](pkg/ext/logging-pino/README.md) |
 | `pkg/ext/observable` | `@pumped-fn/lite-extension-observable` | [README](pkg/ext/observable/README.md) |
 | `pkg/ext/observable-otel` | `@pumped-fn/lite-extension-observable-otel` | [README](pkg/ext/observable-otel/README.md) |
-| `pkg/ext/scheduler` | `@pumped-fn/lite-extension-scheduler` | [README](pkg/ext/scheduler/README.md) |
-| `pkg/ext/scheduler-nats` | `@pumped-fn/lite-extension-scheduler-nats` | [README](pkg/ext/scheduler-nats/README.md) |
 | `pkg/ext/suspense` | `@pumped-fn/lite-extension-suspense` | [README](pkg/ext/suspense/README.md) |
 | `pkg/ext/sync` | `@pumped-fn/lite-extension-sync` | [README](pkg/ext/sync/README.md) |
 | `pkg/ext/sync-nats` | `@pumped-fn/lite-extension-sync-nats` | [README](pkg/ext/sync-nats/README.md) |

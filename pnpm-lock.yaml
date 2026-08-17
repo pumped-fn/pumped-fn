@@ -54,6 +54,9 @@ catalogs:
     '@opentelemetry/api':
       specifier: 1.9.1
       version: 1.9.1
+    '@pumped-fn/lite-extension-scheduler':
+      specifier: 1.0.2
+      version: 1.0.2
     '@standard-schema/spec':
       specifier: 1.1.0
       version: 1.1.0
@@ -114,9 +117,6 @@ catalogs:
     comlink:
       specifier: 4.4.2
       version: 4.4.2
-    croner:
-      specifier: 10.0.1
-      version: 10.0.1
     drizzle-kit:
       specifier: 0.31.8
       version: 0.31.8
@@ -298,8 +298,8 @@ importers:
         specifier: workspace:*
         version: link:../../pkg/ext/observable-otel
       '@pumped-fn/lite-extension-scheduler':
-        specifier: workspace:*
-        version: link:../../pkg/ext/scheduler
+        specifier: 'catalog:'
+        version: 1.0.2(@pumped-fn/lite@pkg+core+lite)
       '@pumped-fn/sdk':
         specifier: workspace:*
         version: link:../../pkg/sdk/core
@@ -411,8 +411,8 @@ importers:
         specifier: workspace:*
         version: link:../../pkg/core/lite
       '@pumped-fn/lite-extension-scheduler':
-        specifier: workspace:*
-        version: link:../../pkg/ext/scheduler
+        specifier: 'catalog:'
+        version: 1.0.2(@pumped-fn/lite@pkg+core+lite)
       '@pumped-fn/pumped':
         specifier: workspace:*
         version: link:../../pkg/framework/pumped
@@ -581,68 +581,6 @@ importers:
         specifier: 'catalog:'
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
 
-  pkg/ext/scheduler:
-    dependencies:
-      croner:
-        specifier: 'catalog:'
-        version: 10.0.1
-    devDependencies:
-      '@pumped-fn/lite':
-        specifier: workspace:*
-        version: link:../../core/lite
-      '@vitest/coverage-v8':
-        specifier: 'catalog:'
-        version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.22.14(tsx@4.22.3)(typescript@7.0.2)(unrun@0.3.1)
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vite:
-        specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
-
-  pkg/ext/scheduler-nats:
-    dependencies:
-      croner:
-        specifier: 'catalog:'
-        version: 10.0.1
-    devDependencies:
-      '@nats-io/kv':
-        specifier: 'catalog:'
-        version: 3.4.0
-      '@nats-io/transport-node':
-        specifier: 'catalog:'
-        version: 3.4.0
-      '@pumped-fn/lite':
-        specifier: workspace:*
-        version: link:../../core/lite
-      '@pumped-fn/lite-extension-scheduler':
-        specifier: workspace:*
-        version: link:../scheduler
-      '@types/node':
-        specifier: 'catalog:'
-        version: 25.9.1
-      '@vitest/coverage-v8':
-        specifier: 'catalog:'
-        version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.22.14(tsx@4.22.3)(typescript@7.0.2)(unrun@0.3.1)
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vite:
-        specifier: 'catalog:'
-        version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0)
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@25.9.1)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
-
   pkg/ext/suspense:
     devDependencies:
       '@pumped-fn/lite':
@@ -737,8 +675,8 @@ importers:
         specifier: workspace:*
         version: link:../../core/lite
       '@pumped-fn/lite-extension-scheduler':
-        specifier: workspace:*
-        version: link:../../ext/scheduler
+        specifier: 'catalog:'
+        version: 1.0.2(@pumped-fn/lite@pkg+core+lite)
       '@pumped-fn/lite-lint':
         specifier: workspace:*
         version: link:../../tool/lint
@@ -2208,6 +2146,11 @@ packages:
 
   '@protobufjs/utf8@1.1.2':
     resolution: {integrity: sha512-b1UQwcEZ4yCnMCD8DAL1VlbvBJE9/IX4FTIp7BG1xYpf29SLazLSrqUkj4w7Y5y7cCVP6E5tcqqcI0xemPkHug==}
+
+  '@pumped-fn/lite-extension-scheduler@1.0.2':
+    resolution: {integrity: sha512-8tNA20RY0jXWG/wxKnw+t638cYOI6Ioc9OGAlBJn7pd3Riq2k6Em97pJQlrkGyRYohXG0sbyDN3Dvc/IA34qTA==}
+    peerDependencies:
+      '@pumped-fn/lite': ^6.0.0
 
   '@quansync/fs@1.0.0':
     resolution: {integrity: sha512-4TJ3DFtlf1L5LDMaM6CanJ/0lckGNtJcMjQ1NAV6zDmA0tEHKZtxNKin8EgPaVX1YzljbxckyT2tJrpQKAtngQ==}
@@ -6480,6 +6423,11 @@ snapshots:
   '@protobufjs/pool@1.1.0': {}
 
   '@protobufjs/utf8@1.1.2': {}
+
+  '@pumped-fn/lite-extension-scheduler@1.0.2(@pumped-fn/lite@pkg+core+lite)':
+    dependencies:
+      '@pumped-fn/lite': link:pkg/core/lite
+      croner: 10.0.1
 
   '@quansync/fs@1.0.0':
     dependencies:

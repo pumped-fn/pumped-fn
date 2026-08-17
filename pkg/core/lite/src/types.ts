@@ -188,8 +188,55 @@ export namespace Lite {
 
   export type ResourceOwnership = "boundary" | "current"
 
+  export interface ContextTagWatchOptions {
+    /** Emit the current local family synchronously while registering. */
+    initial?: boolean
+  }
+
+  /** Typed tag-family storage owned by one execution context. */
+  export interface ContextTags {
+    /**
+     * Replace every local family present in the input, preserving family value order.
+     * @throws After committing when a watcher fails, or when reentrant writes do not settle.
+     * A write that does not settle stops delivery, so watchers may not observe the committed values.
+     */
+    set(input: TagInput): void
+    /** Get the first local value without applying the tag default. */
+    get<T>(tag: Tag<T, boolean>): T | undefined
+    /** Get a copy of all local values without applying the tag default. */
+    getMany<T>(tag: Tag<T, boolean>): readonly T[]
+    /** Get the first value from the nearest context without applying the tag default. */
+    seek<T>(tag: Tag<T, boolean>): T | undefined
+    /** Get copies of all values from the current context through its parents. */
+    seekMany<T>(tag: Tag<T, boolean>): readonly T[]
+    /** Check whether the local context stores the tag family. */
+    has<T, H extends boolean>(tag: Tag<T, H>): boolean
+    /**
+     * Delete the local tag family, returning true when it existed.
+     * @throws After committing when a watcher fails.
+     */
+    delete<T, H extends boolean>(tag: Tag<T, H>): boolean
+    /**
+     * Watch one local tag family. Each listener receives its own value snapshot. Listeners
+     * present when delivery starts run once, even when another listener removes them. Each call
+     * owns its own subscription, so the same function may be watched more than once.
+     *
+     * @throws When the context is closed, or when initial delivery fails. A failed initial
+     * delivery rolls the registration back, including when the failure comes from another
+     * watcher reached by the initial listener's own writes.
+     */
+    watch<T>(
+      tag: Tag<T, boolean>,
+      listener: (values: readonly T[]) => void,
+      options?: ContextTagWatchOptions,
+    ): () => void
+  }
+
   /**
-   * Unified context data storage with both raw Map operations and Tag-based DX.
+   * Context-local raw data storage. Tag helpers remain as compatibility shims;
+   * execution contexts should use `ctx.tags`. During the 6.x migration, raw operations
+   * using a tag symbol preserve the old bridge to a family that already exists. Such a
+   * write uses the same watcher and failure rules as `ctx.tags.set`.
    */
   export interface ContextData {
     /** Get value by key */
@@ -200,7 +247,11 @@ export namespace Lite {
     has(key: string | symbol): boolean
     /** Delete value by key, returns true if existed */
     delete(key: string | symbol): boolean
-    /** Remove all stored values */
+    /**
+     * Remove all stored values.
+     *
+     * @throws After committing when a watcher of a removed tag family fails.
+     */
     clear(): void
     /**
      * Look up value by key, traversing parent chain if not found locally.
@@ -210,6 +261,8 @@ export namespace Lite {
     /**
      * Look up tag value, traversing parent chain if not found locally.
      * Returns first match or undefined (ignores tag defaults).
+     *
+     * @deprecated Move raw `tag.key` writes to `ctx.tags`, then use `ctx.tags.seek(tag)`.
      */
     seekTag<T>(tag: Tag<T, boolean>): T | undefined
     /**
@@ -217,27 +270,49 @@ export namespace Lite {
      */
     seekHas(key: string | symbol): boolean
 
-    /** Get value by tag, returns undefined if not stored */
+    /**
+     * Get value by tag, returns undefined if not stored.
+     *
+     * @deprecated Move raw `tag.key` writes to `ctx.tags`, then use `ctx.tags.get(tag)`.
+     */
     getTag<T>(tag: Tag<T, boolean>): T | undefined
-    /** Set value by tag */
+    /**
+     * Set value by tag.
+     *
+     * @deprecated Use `ctx.tags.set(tag(value))` on execution contexts.
+     */
     setTag<T>(tag: Tag<T, boolean>, value: T): void
-    /** Check if tag has stored value */
+    /**
+     * Check if tag has stored value.
+     *
+     * @deprecated Move raw `tag.key` writes to `ctx.tags`, then use `ctx.tags.has(tag)`.
+     */
     hasTag<T, H extends boolean>(tag: Tag<T, H>): boolean
-    /** Delete value by tag, returns true if existed */
+    /**
+     * Delete value by tag, returns true if existed.
+     *
+     * @deprecated Use `ctx.tags.delete(tag)` on execution contexts.
+     */
     deleteTag<T, H extends boolean>(tag: Tag<T, H>): boolean
     /**
      * Get existing value or initialize with tag's default.
      * Stores and returns the value.
+     *
+     * @deprecated Check `ctx.tags.has(tag)` and store `tag.defaultValue` with `ctx.tags.set` when absent.
      */
     getOrSetTag<T>(tag: Tag<T, true>): T
     /**
      * Get existing value or initialize with provided value.
      * Stores and returns the value.
+     *
+     * @deprecated Use `ctx.tags.has(tag)` with `ctx.tags.set(tag(value))` on execution contexts.
      */
     getOrSetTag<T>(tag: Tag<T, true>, value: T): T
     /**
      * Get existing value or initialize with provided value.
      * Required for tags without defaults.
+     *
+     * @deprecated Use `ctx.tags.has(tag)` with `ctx.tags.set(tag(value))` on execution contexts.
      */
     getOrSetTag<T>(tag: Tag<T, false>, value: T): T
   }
@@ -269,6 +344,7 @@ export namespace Lite {
     readonly parent: ExecutionContext | undefined
     readonly signal: AbortSignal
     readonly data: ContextData
+    readonly tags: ContextTags
     resolve<T>(target: Atom<T>): Promise<T>
     resolve<T>(target: Resource<T>): Promise<T>
     release<T>(resource: Resource<T>): Promise<void>

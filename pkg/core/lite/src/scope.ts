@@ -79,101 +79,419 @@ async function runCleanupsSafe(cleanups: Cleanup[]): Promise<void> {
 
 type ListenerEvent = 'resolving' | 'resolved' | '*'
 
-class ContextDataImpl implements Lite.ContextData {
-  private readonly map = new Map<string | symbol, unknown>()
-  private readonly tagValues = new Map<symbol, unknown[]>()
+interface ContextTagFamily {
+  tag: Lite.Tag<any, boolean>
+  first: any
+  rest?: any[]
+}
 
-  constructor(
-    private parentData?: Lite.ContextData
-  ) {}
+type ContextTagListener = (values: readonly any[]) => void
+
+const maxContextTagNotificationRounds = 1000
+const maxContextTagNotifications = 1_000_000
+
+class ContextStore {
+  private readonly raw = new Map<string | symbol, unknown>()
+  private readonly families = new Map<symbol, ContextTagFamily>()
+  private watchers?: Map<symbol, Set<ContextTagListener>>
+  private pending?: Map<symbol, Lite.Tag<any, boolean>>
+  private notifying = false
+  private finalized = false
+
+  constructor(private parent?: ContextStore) {}
 
   detachParent(): void {
-    this.parentData = undefined
+    this.parent = undefined
   }
 
+  finalize(): void {
+    this.finalized = true
+    this.watchers?.clear()
+    this.pending?.clear()
+  }
+
+  getRaw(key: string | symbol): unknown {
+    if (this.raw.has(key)) return this.raw.get(key)
+    return typeof key === "symbol" ? this.families.get(key)?.first : undefined
+  }
+
+  setRaw(key: string | symbol, value: unknown): void {
+    if (typeof key === "symbol") {
+      const family = this.families.get(key)
+      if (family) {
+        this.replaceFamilies([{ tag: family.tag, values: [value] }])
+        return
+      }
+    }
+    this.raw.set(key, value)
+  }
+
+  hasRaw(key: string | symbol): boolean {
+    return this.raw.has(key) || (typeof key === "symbol" && this.families.has(key))
+  }
+
+  deleteRaw(key: string | symbol): boolean {
+    if (typeof key === "symbol") {
+      const family = this.families.get(key)
+      if (family) {
+        this.families.delete(key)
+        this.queue(family.tag)
+        this.flush()
+        return true
+      }
+    }
+    return this.raw.delete(key)
+  }
+
+  clearRaw(): void {
+    const changed = this.watchers?.size
+      ? [...this.families.values()].filter((family) => this.watchers?.get(family.tag.key)?.size)
+      : []
+    this.raw.clear()
+    this.families.clear()
+    for (let i = 0; i < changed.length; i++) this.queue(changed[i]!.tag)
+    this.flush()
+  }
+
+  seekRaw(key: string | symbol): unknown {
+    if (this.hasRaw(key)) return this.getRaw(key)
+    return this.parent?.seekRaw(key)
+  }
+
+  seekHasRaw(key: string | symbol): boolean {
+    return this.hasRaw(key) || (this.parent?.seekHasRaw(key) ?? false)
+  }
+
+  append(tagged: Lite.Tagged<any>): void {
+    this.raw.delete(tagged.key)
+    const family = this.families.get(tagged.key)
+    if (!family) {
+      this.families.set(tagged.key, { tag: tagged.tag, first: tagged.value })
+      return
+    }
+    if (family.rest) family.rest.push(tagged.value)
+    else family.rest = [tagged.value]
+  }
+
+  set(input: Lite.TagInput): void {
+    if (this.finalized) throw new Error("ExecutionContext is closed")
+    const taggedValues = normalizeTags(input)!
+    const grouped = new Map<symbol, { tag: Lite.Tag<any, boolean>; values: any[] }>()
+    for (let i = 0; i < taggedValues.length; i++) {
+      const tagged = taggedValues[i]!
+      const family = grouped.get(tagged.key)
+      if (family) family.values.push(tagged.value)
+      else grouped.set(tagged.key, { tag: tagged.tag, values: [tagged.value] })
+    }
+    this.replaceFamilies([...grouped.values()])
+  }
+
+  get<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    return this.families.get(tag.key)?.first as T | undefined
+  }
+
+  getMany<T>(tag: Lite.Tag<T, boolean>): readonly T[] {
+    return this.familyValues(this.families.get(tag.key)) as T[]
+  }
+
+  seek<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    const family = this.families.get(tag.key)
+    if (family) return family.first as T
+    return this.parent?.seek(tag)
+  }
+
+  seekMany<T>(tag: Lite.Tag<T, boolean>): readonly T[] {
+    const local = this.familyValues(this.families.get(tag.key)) as T[]
+    const inherited = this.parent?.seekMany(tag) ?? []
+    if (local.length === 0) return inherited
+    if (inherited.length === 0) return local
+    return [...local, ...inherited]
+  }
+
+  has<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.families.has(tag.key)
+  }
+
+  delete<T, H extends boolean>(tag: Lite.Tag<T, H>, enforceOpen = true): boolean {
+    if (enforceOpen && this.finalized) throw new Error("ExecutionContext is closed")
+    const family = this.families.get(tag.key)
+    if (!family) return false
+    this.families.delete(tag.key)
+    this.queue(family.tag)
+    this.flush()
+    return true
+  }
+
+  watch<T>(
+    tag: Lite.Tag<T, boolean>,
+    listener: (values: readonly T[]) => void,
+    options?: Lite.ContextTagWatchOptions,
+  ): () => void {
+    if (this.finalized) throw new Error("ExecutionContext is closed")
+    const watchers = this.watchers ??= new Map()
+    let listeners = watchers.get(tag.key)
+    if (!listeners) {
+      listeners = new Set()
+      watchers.set(tag.key, listeners)
+    }
+    const registered: ContextTagListener = (values) => listener(values)
+    listeners.add(registered)
+    const stop = () => {
+      listeners!.delete(registered)
+      if (watchers.get(tag.key) === listeners && listeners!.size === 0) watchers.delete(tag.key)
+    }
+    if (options?.initial) {
+      try {
+        const failures: unknown[] = []
+        const root = !this.notifying
+        if (root) this.notifying = true
+        try {
+          listener(this.getMany(tag))
+        } catch (error) {
+          stop()
+          failures.push(error)
+        }
+        if (root) {
+          this.notifying = false
+          this.flush(failures)
+        } else if (failures.length > 0) {
+          throw failures[0]
+        }
+      } catch (error) {
+        stop()
+        throw error
+      }
+    }
+    return stop
+  }
+
+  getTagCompat<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    const family = this.families.get(tag.key)
+    return (family ? family.first : this.raw.get(tag.key)) as T | undefined
+  }
+
+  setTagCompat<T>(tag: Lite.Tag<T, boolean>, value: T): void {
+    this.replaceFamilies([{ tag, values: [value] }])
+  }
+
+  hasTagCompat<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.families.has(tag.key) || this.raw.has(tag.key)
+  }
+
+  deleteTagCompat<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.delete(tag, false) || this.raw.delete(tag.key)
+  }
+
+  seekTagCompat<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    if (this.hasTagCompat(tag)) return this.getTagCompat(tag)
+    return this.parent?.seekTagCompat(tag)
+  }
+
+  collectTagCompat<T>(tag: Lite.Tag<T, boolean>): T[] {
+    const family = this.families.get(tag.key)
+    if (family) return this.familyValues(family) as T[]
+    return (this.raw.has(tag.key) ? [this.raw.get(tag.key)] : []) as T[]
+  }
+
+  private replaceFamilies(replacements: Array<{ tag: Lite.Tag<any, boolean>; values: any[] }>): void {
+    const changed: Lite.Tag<any, boolean>[] = []
+    for (let i = 0; i < replacements.length; i++) {
+      const replacement = replacements[i]!
+      if (this.watchers?.get(replacement.tag.key)?.size && !this.sameFamily(
+        replacement.tag,
+        this.families.get(replacement.tag.key),
+        replacement.values,
+      )) {
+        changed.push(replacement.tag)
+      }
+    }
+    for (let i = 0; i < replacements.length; i++) {
+      const { tag, values } = replacements[i]!
+      this.raw.delete(tag.key)
+      this.families.set(tag.key, values.length === 1
+        ? { tag, first: values[0] }
+        : { tag, first: values[0], rest: values.slice(1) })
+    }
+    for (let i = 0; i < changed.length; i++) this.queue(changed[i]!)
+    this.flush()
+  }
+
+  private sameFamily(
+    tag: Lite.Tag<any, boolean>,
+    family: ContextTagFamily | undefined,
+    values: any[],
+  ): boolean {
+    if (!family) return false
+    const length = 1 + (family.rest?.length ?? 0)
+    if (length !== values.length || !tag.eq(family.first, values[0])) return false
+    for (let i = 1; i < values.length; i++) {
+      if (!tag.eq(family.rest![i - 1], values[i])) return false
+    }
+    return true
+  }
+
+  private familyValues(family: ContextTagFamily | undefined): any[] {
+    if (!family) return []
+    return family.rest ? [family.first, ...family.rest] : [family.first]
+  }
+
+  private queue(tag: Lite.Tag<any, boolean>): void {
+    if (!this.watchers?.get(tag.key)?.size) return
+    ;(this.pending ??= new Map()).set(tag.key, tag)
+  }
+
+  private flush(failures: unknown[] = []): void {
+    if (this.notifying) return
+    if (!this.pending?.size) {
+      this.throwListenerFailures(failures)
+      return
+    }
+    this.notifying = true
+    let rounds = 0
+    let notifications = 0
+    try {
+      while (this.pending.size > 0) {
+        if (++rounds > maxContextTagNotificationRounds || notifications > maxContextTagNotifications) {
+          this.pending.clear()
+          failures.push(new Error("Context tag notification did not settle"))
+          break
+        }
+        const pending = [...this.pending.values()]
+        this.pending.clear()
+        for (let i = 0; i < pending.length; i++) {
+          const tag = pending[i]!
+          const listeners = this.watchers?.get(tag.key)
+          if (!listeners?.size) continue
+          const values = this.getMany(tag)
+          for (const listener of [...listeners]) {
+            if (this.finalized) break
+            notifications++
+            try {
+              listener(values.slice())
+            } catch (error) {
+              failures.push(error)
+            }
+          }
+        }
+      }
+    } finally {
+      this.notifying = false
+    }
+    this.throwListenerFailures(failures)
+  }
+
+  private throwListenerFailures(failures: unknown[]): void {
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1) throw new AggregateError(failures, "Context tag listener notification failed")
+  }
+}
+
+class ContextTagsImpl implements Lite.ContextTags {
+  constructor(private readonly store: ContextStore) {}
+
+  set(input: Lite.TagInput): void {
+    this.store.set(input)
+  }
+
+  get<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    return this.store.get(tag)
+  }
+
+  getMany<T>(tag: Lite.Tag<T, boolean>): readonly T[] {
+    return this.store.getMany(tag)
+  }
+
+  seek<T>(tag: Lite.Tag<T, boolean>): T | undefined {
+    return this.store.seek(tag)
+  }
+
+  seekMany<T>(tag: Lite.Tag<T, boolean>): readonly T[] {
+    return this.store.seekMany(tag)
+  }
+
+  has<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.store.has(tag)
+  }
+
+  delete<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
+    return this.store.delete(tag)
+  }
+
+  watch<T>(
+    tag: Lite.Tag<T, boolean>,
+    listener: (values: readonly T[]) => void,
+    options?: Lite.ContextTagWatchOptions,
+  ): () => void {
+    return this.store.watch(tag, listener, options)
+  }
+}
+
+class ContextDataImpl implements Lite.ContextData {
+  constructor(private readonly store = new ContextStore()) {}
+
   get(key: string | symbol): unknown {
-    return this.map.get(key)
+    return this.store.getRaw(key)
   }
 
   set(key: string | symbol, value: unknown): void {
-    this.map.set(key, value)
-    if (typeof key === "symbol" && this.tagValues.has(key)) this.tagValues.set(key, [value])
+    this.store.setRaw(key, value)
   }
 
-  appendTagValue(key: symbol, value: unknown): void {
-    const values = this.tagValues.get(key)
-    if (values) {
-      values.push(value)
-      return
-    }
-    this.tagValues.set(key, [value])
-    this.map.set(key, value)
+  appendTagValue(tagged: Lite.Tagged<any>): void {
+    this.store.append(tagged)
   }
 
   collectTag<T>(tag: Lite.Tag<T, boolean>): T[] {
-    return (this.tagValues.get(tag.key) ?? (this.map.has(tag.key) ? [this.map.get(tag.key)] : [])) as T[]
+    return this.store.collectTagCompat(tag)
   }
 
   has(key: string | symbol): boolean {
-    return this.map.has(key)
+    return this.store.hasRaw(key)
   }
 
   delete(key: string | symbol): boolean {
-    if (typeof key === "symbol") this.tagValues.delete(key)
-    return this.map.delete(key)
+    return this.store.deleteRaw(key)
   }
 
   clear(): void {
-    this.map.clear()
-    this.tagValues.clear()
+    this.store.clearRaw()
   }
 
   seek(key: string | symbol): unknown {
-    if (this.map.has(key)) {
-      return this.map.get(key)
-    }
-    return this.parentData?.seek(key)
+    return this.store.seekRaw(key)
   }
 
   seekHas(key: string | symbol): boolean {
-    if (this.map.has(key)) return true
-    return this.parentData?.seekHas(key) ?? false
+    return this.store.seekHasRaw(key)
   }
 
   getTag<T>(tag: Lite.Tag<T, boolean>): T | undefined {
-    return this.map.get(tag.key) as T | undefined
+    return this.store.getTagCompat(tag)
   }
 
   setTag<T>(tag: Lite.Tag<T, boolean>, value: T): void {
-    this.map.set(tag.key, value)
-    this.tagValues.set(tag.key, [value])
+    this.store.setTagCompat(tag, value)
   }
 
   hasTag<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
-    return this.map.has(tag.key)
+    return this.store.hasTagCompat(tag)
   }
 
   deleteTag<T, H extends boolean>(tag: Lite.Tag<T, H>): boolean {
-    this.tagValues.delete(tag.key)
-    return this.map.delete(tag.key)
+    return this.store.deleteTagCompat(tag)
   }
 
   seekTag<T>(tag: Lite.Tag<T, boolean>): T | undefined {
-    if (this.map.has(tag.key)) {
-      return this.map.get(tag.key) as T
-    }
-    return this.parentData?.seekTag(tag)
+    return this.store.seekTagCompat(tag)
   }
 
   getOrSetTag<T>(tag: Lite.Tag<T, true>): T
   getOrSetTag<T>(tag: Lite.Tag<T, true>, value: T): T
   getOrSetTag<T>(tag: Lite.Tag<T, false>, value: T): T
   getOrSetTag<T>(tag: Lite.Tag<T, boolean>, value?: T): T {
-    if (this.map.has(tag.key)) {
-      return this.map.get(tag.key) as T
-    }
+    if (this.store.hasTagCompat(tag)) return this.store.getTagCompat(tag) as T
     const storedValue = value !== undefined ? value : (tag.defaultValue as T)
-    this.setTag(tag, storedValue)
+    this.store.setTagCompat(tag, storedValue)
     return storedValue
   }
 }
@@ -1671,7 +1989,7 @@ class ScopeImpl implements Lite.Scope {
         })
         if (preparedOptions.tags) {
           for (let i = 0; i < preparedOptions.tags.length; i++) {
-            preparedCtx.appendTagValue(preparedOptions.tags[i]!.key, preparedOptions.tags[i]!.value)
+            preparedCtx.appendTagValue(preparedOptions.tags[i]!)
           }
         }
         this.attachContextExtensions(preparedCtx)
@@ -2662,14 +2980,14 @@ class ScopeImpl implements Lite.Scope {
 
     if (ctxTags && ctxTags.length > 0) {
       for (let i = 0; i < ctxTags.length; i++) {
-        ctx.appendTagValue(ctxTags[i]!.key, ctxTags[i]!.value)
+        ctx.appendTagValue(ctxTags[i]!)
       }
     }
 
     if (this.tags.length > 0) {
       const blocked = new Set(this.tags.filter((tagged) => ctx.data.seekHas(tagged.key)).map((tagged) => tagged.key))
       for (let i = 0; i < this.tags.length; i++) {
-        if (!blocked.has(this.tags[i]!.key)) ctx.appendTagValue(this.tags[i]!.key, this.tags[i]!.value)
+        if (!blocked.has(this.tags[i]!.key)) ctx.appendTagValue(this.tags[i]!)
       }
     }
 
@@ -2718,8 +3036,11 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   private signalOverride: AbortSignal | undefined
   private closePromise: Promise<void> | undefined
   private closed = false
+  private storeFinalized = false
   private readonly _input: unknown
+  private _store: ContextStore | undefined
   private _data: ContextDataImpl | undefined
+  private _tags: ContextTagsImpl | undefined
   private readonly _execName: string | undefined
   private readonly _flowName: string | undefined
   private readonly boundary: boolean
@@ -2779,9 +3100,22 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
   get data(): Lite.ContextData {
     if (!this._data) {
-      this._data = new ContextDataImpl(this.parent?.data)
+      this._data = new ContextDataImpl(this.storeImpl())
     }
     return this._data
+  }
+
+  get tags(): Lite.ContextTags {
+    return this._tags ??= new ContextTagsImpl(this.storeImpl())
+  }
+
+  private storeImpl(): ContextStore {
+    if (!this._store) {
+      if (this.parent) assertExecutionContextImpl(this.parent)
+      this._store = new ContextStore(this.parent?.storeImpl())
+      if (this.storeFinalized) this._store.finalize()
+    }
+    return this._store
   }
 
   dataImpl(): ContextDataImpl {
@@ -2789,12 +3123,12 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     return this._data!
   }
 
-  appendTagValue(key: symbol, value: unknown): void {
-    this.dataImpl().appendTagValue(key, value)
+  appendTagValue(tagged: Lite.Tagged<any>): void {
+    this.dataImpl().appendTagValue(tagged)
   }
 
   detachParent(): void {
-    this._data?.detachParent()
+    this._store?.detachParent()
     this.parent = undefined
   }
 
@@ -2943,6 +3277,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       get parent() { return owner.parent },
       get signal() { return owner.signal },
       get data() { return owner.data },
+      get tags() { return owner.tags },
       exec: owner.exec.bind(owner) as Lite.ResourceContext["exec"],
       execStream: owner.execStream.bind(owner) as Lite.ResourceContext["execStream"],
       execDetachedStream: owner.execDetachedStream.bind(owner) as Lite.ResourceContext["execDetachedStream"],
@@ -3218,12 +3553,12 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
   ): void {
     const execTags = normalizeTags(inputTags)
     if (execTags) for (let i = 0; i < execTags.length; i++) {
-      childCtx.appendTagValue(execTags[i]!.key, execTags[i]!.value)
+      childCtx.appendTagValue(execTags[i]!)
     }
     if (!flowTags?.length) return
     if (!execTags?.length && !blockedTags?.length) {
       for (let i = 0; i < flowTags.length; i++) {
-        childCtx.appendTagValue(flowTags[i]!.key, flowTags[i]!.value)
+        childCtx.appendTagValue(flowTags[i]!)
       }
       return
     }
@@ -3235,7 +3570,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       blocked.add(blockedTags[i]!.key)
     }
     for (let i = 0; i < flowTags.length; i++) {
-      if (!blocked.has(flowTags[i]!.key)) childCtx.appendTagValue(flowTags[i]!.key, flowTags[i]!.value)
+      if (!blocked.has(flowTags[i]!.key)) childCtx.appendTagValue(flowTags[i]!)
     }
   }
 
@@ -3532,6 +3867,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         assertExecutionContextImpl(this.parent)
         this.parent.children?.delete(this)
       }
+      this.finalizeStore()
       return Promise.resolve()
     }
     const closing = (
@@ -3551,6 +3887,7 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         assertExecutionContextImpl(this.parent)
         this.parent.children?.delete(this)
       }
+      this.finalizeStore()
     })
     this.closePromise.then(
       () => { this.closePromise = undefined },
@@ -3578,6 +3915,12 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       assertExecutionContextImpl(this.parent)
       this.parent.children?.delete(this)
     }
+    this.finalizeStore()
+  }
+
+  private finalizeStore(): void {
+    this.storeFinalized = true
+    this._store?.finalize()
   }
 
   abort(reason: unknown): void {

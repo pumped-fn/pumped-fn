@@ -63,7 +63,7 @@
   "devDependencies": {
     "@hono/node-server": "catalog:",
     "@pumped-fn/lite": "workspace:*",
-    "@pumped-fn/lite-extension-scheduler": "workspace:*",
+    "@pumped-fn/lite-extension-scheduler": "catalog:",
     "@pumped-fn/lite-lint": "workspace:*",
     "@types/node": "catalog:",
     "acorn": "catalog:",

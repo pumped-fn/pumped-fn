@@ -18,6 +18,32 @@ scope.createContext({ tags: contextTag("single") })
 scope.createContext({ tags: [contextTag("nested"), [contextTag("list")]] })
 const parentCtx = scope.createContext()
 scope.createContext({ parent: parentCtx, tags: [contextTag("child")] })
+const contextTags: Lite.ContextTags = parentCtx.tags
+contextTags.set([contextTag("one"), [contextTag("two")]])
+const contextTagValue: string | undefined = contextTags.get(contextTag)
+const contextTagValues: readonly string[] = contextTags.getMany(contextTag)
+const inheritedContextTagValue: string | undefined = contextTags.seek(contextTag)
+const inheritedContextTagValues: readonly string[] = contextTags.seekMany(contextTag)
+const hasContextTag: boolean = contextTags.has(contextTag)
+const deletedContextTag: boolean = contextTags.delete(contextTag)
+const stopContextTagWatch: () => void = contextTags.watch(contextTag, (values) => {
+  const watchedValues: readonly string[] = values
+  void watchedValues
+}, { initial: true })
+
+void contextTagValue
+void contextTagValues
+void inheritedContextTagValue
+void inheritedContextTagValues
+void hasContextTag
+void deletedContextTag
+void stopContextTagWatch
+
+// @ts-expect-error tag storage accepts bound tag values, not tag definitions
+contextTags.set(contextTag)
+
+// @ts-expect-error tag family values stay typed
+contextTags.watch(contextTag, (values: readonly number[]) => values)
 
 // @ts-expect-error createContext takes an options object, not bare tags
 scope.createContext([contextTag("legacy")])
