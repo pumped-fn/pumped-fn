@@ -1,6 +1,6 @@
 {
   "name": "@pumped-fn/lite-logging-pino",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": false,
   "description": "Pino sink adapter for @pumped-fn/lite-logging",
   "type": "module",
