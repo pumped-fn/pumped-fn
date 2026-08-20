@@ -517,15 +517,20 @@ export namespace Lite {
     | { readonly state: "resolved"; readonly value: T }
     | { readonly state: "failed"; readonly error: Error }
 
-  export interface Tag<T, HasDefault extends boolean = false> {
+  export interface Tag<
+    T,
+    HasDefault extends boolean = false,
+    Serializable extends boolean = boolean,
+  > {
     readonly [tagSymbol]: true
     readonly key: symbol
     readonly label: string
+    readonly serializable: Serializable
     readonly defaultValue: HasDefault extends true ? T : undefined
     readonly hasDefault: HasDefault
     readonly parse?: (raw: unknown) => T
     eq(a: T, b: T): boolean
-    (value: T, options?: TaggedOptions): Tagged<T>
+    (value: T, options?: TaggedOptions): Tagged<T, Serializable>
     same(a: Tagged<any>, b: Tagged<any>): boolean
     get(source: TagSource): T
     find(source: TagSource): HasDefault extends true ? T : T | undefined
@@ -533,11 +538,11 @@ export namespace Lite {
     atoms(): Atom<unknown>[]
   }
 
-  export interface Tagged<T> {
+  export interface Tagged<in out T, out Serializable extends boolean = boolean> {
     readonly [taggedSymbol]: true
     readonly key: symbol
     readonly value: T
-    readonly tag: Tag<T, boolean>
+    readonly tag: Tag<T, boolean, Serializable>
     readonly attributes?: readonly Attributed<any>[]
   }
 

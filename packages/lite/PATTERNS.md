@@ -319,7 +319,7 @@ Propagate values without wiring parameters. Tags serve three roles: scope-level 
 
 Every `tags` input accepts a bound tag, a list, or nested lists such as `tags: [requestId(rid), sharedTags]`. Flattening is stable and keeps duplicates. Unit metadata remains a flat tagged array.
 
-Use `tag({ eq })` only to define value equality inside that tag family. `tag.same(a, b)` compares two already-created tagged records; it does not change lookup, source precedence, defaults, parsing, `tags.all()` multiplicity, tag discovery, or cache identity. Equal values should be fully substitutable for every consumer of that tag.
+Use `tag({ eq })` only to define value equality inside that tag family. `eq` must be pure and must not mutate either input. `tag.same(a, b)` compares two already-created tagged records; it does not change lookup, source precedence, defaults, parsing, `tags.all()` multiplicity, tag discovery, or cache identity. Equal values should be fully substitutable for every consumer of that tag.
 
 ```mermaid
 sequenceDiagram
@@ -350,10 +350,11 @@ sequenceDiagram
 
 Use `ctx.tags.set(input)` to replace complete local families. Use `ctx.tags.watch(tag, listener)` only
 for infrastructure that owns the context lifetime, such as an explicitly configured persistence extension.
-Watchers observe one local family; extensions attach at each context through `initContext`. Raw `ctx.data`
-does not create watchable tag families, and new code must not treat it as a tag source. During the 6.x
-migration, writing a raw `tag.key` still replaces and notifies a family that already exists. Its tag helpers
-and this raw-symbol bridge remain temporary compatibility shims.
+Mark persisted families with `serializable: true`; this checks strict JSON shape but does not supply a stable
+storage ID or domain codec. Watchers observe one local family; extensions attach at each context through
+`initContext`. Raw `ctx.data` does not create watchable tag families, and new code must not treat it as a tag
+source. During the 6.x migration, writing a raw `tag.key` still replaces and notifies a family that already
+exists. Its tag helpers and this raw-symbol bridge remain temporary compatibility shims.
 
 ### Derived State (Select)
 

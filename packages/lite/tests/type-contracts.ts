@@ -1,16 +1,244 @@
-import { atom, controller } from "../src/atom"
-import { flow, typed } from "../src/flow"
-import { preset } from "../src/preset"
-import { resource } from "../src/resource"
-import { createScope } from "../src/scope"
-import { tag, tags } from "../src/tag"
-import type { Lite } from "../src/types"
+import { atom, controller, createScope, flow, preset, resource, tag, tags, typed, type Lite } from "../src"
 
 const sourceAtom = atom({
   factory: () => 1,
 })
 
 const contextTag = tag<string>({ label: "context" })
+
+interface SerializableContext {
+  readonly id: string
+  readonly revision: number
+  readonly active: boolean
+  readonly labels: readonly string[]
+  readonly parent: { readonly id: string } | null
+}
+
+interface SerializableTree {
+  readonly value: string
+  readonly children: readonly SerializableTree[]
+}
+
+interface SerializableLinked {
+  readonly next: SerializableLinked | null
+}
+
+interface SerializableLeft {
+  readonly value: string
+  readonly right: SerializableRight | null
+}
+
+interface SerializableRight {
+  readonly value: number
+  readonly left: SerializableLeft | null
+}
+
+interface InvalidRecursiveRoot {
+  readonly child: InvalidRecursiveChild
+}
+
+interface InvalidRecursiveChild extends InvalidRecursiveRoot {
+  readonly createdAt: Date
+}
+
+const serializableContext = tag<SerializableContext>({
+  label: "serializable-context",
+  serializable: true,
+})
+const serializableContextWithDefault = tag<SerializableContext>({
+  label: "serializable-context-default",
+  serializable: true,
+  default: {
+    id: "default",
+    revision: 0,
+    active: false,
+    labels: [],
+    parent: null,
+  },
+})
+const parsedSerializableContext = tag<SerializableContext>({
+  label: "serializable-context-parsed",
+  serializable: true,
+  parse: (raw: unknown) => raw as SerializableContext,
+})
+const serializableTree = tag<SerializableTree>({
+  label: "serializable-tree",
+  serializable: true,
+})
+const serializableLinked = tag<SerializableLinked>({
+  label: "serializable-linked",
+  serializable: true,
+})
+const serializableMutual = tag<SerializableLeft>({
+  label: "serializable-mutual",
+  serializable: true,
+})
+const inferredSerializable = tag({
+  label: "inferred-serializable",
+  serializable: true,
+  default: { nested: [1, 2, 3] },
+})
+const legacyTagOptions: { label: string } = { label: "legacy-tag-options" }
+const legacyOptionsTag = tag(legacyTagOptions)
+const optionalDefaultConfig: { label: string; default?: string } = { label: "optional-default" }
+const optionalDefaultTag: Lite.Tag<string, boolean, false> = tag<string>(optionalDefaultConfig)
+const serializableTagOptions: { label: string; serializable: true } = {
+  label: "serializable-tag-options",
+  serializable: true,
+}
+const serializableOptionsTag: Lite.Tag<SerializableContext, false, true> = tag<SerializableContext>(serializableTagOptions)
+const variableSerializableConfig = {
+  label: "variable-serializable-default",
+  serializable: true as const,
+  default: { id: "fallback" },
+}
+const variableSerializableTag: Lite.Tag<{ id: string }, true, true> = tag(variableSerializableConfig)
+const variableLocalConfig = { label: "variable-local-default", default: "fallback" }
+const variableLocalTag: Lite.Tag<string, true, false> = tag(variableLocalConfig)
+
+function jsonTag<T extends Lite.JsonValue>(): Lite.Tag<T, false, true> {
+  return tag<T>({ label: "generic-json-tag", serializable: true })
+}
+
+interface Wrap<T extends Lite.JsonValue> {
+  value: T
+}
+
+function wrapTag<T extends Lite.JsonValue>(): Lite.Tag<Wrap<T>, false, true> {
+  return tag<Wrap<T>>({ label: "generic-wrap-json-tag", serializable: true })
+}
+
+const optionalSerializableOptions: {
+  label: string
+  serializable: true
+  default?: SerializableContext
+} = {
+  label: "optional-serializable-options",
+  serializable: true,
+}
+const optionalSerializableTag: Lite.Tag<SerializableContext, boolean, true> = tag(optionalSerializableOptions)
+const optionalSerializableDefaultOptions: {
+  label: string
+  serializable: true
+  default?: SerializableContext
+} = {
+  label: "optional-serializable-default-options",
+  serializable: true,
+  default: {
+    id: "default",
+    revision: 0,
+    active: false,
+    labels: [],
+    parent: null,
+  },
+}
+const optionalSerializableDefaultTag: Lite.Tag<SerializableContext, boolean, true> = tag(optionalSerializableDefaultOptions)
+const serializableContextValue = serializableContext({
+  id: "ctx-1",
+  revision: 1,
+  active: true,
+  labels: ["one", "two"],
+  parent: { id: "root" },
+})
+const serializableContextTag: Lite.Tag<SerializableContext, false, true> = serializableContext
+const serializableDefaultTag: Lite.Tag<SerializableContext, true, true> = serializableContextWithDefault
+const serializableParsedTag: Lite.Tag<SerializableContext, false, true> = parsedSerializableContext
+const serializableTagged: Lite.Tagged<SerializableContext, true> = serializableContextValue
+const inferredSerializableContext: Lite.Utils.TagValue<typeof serializableContext> = serializableContextValue.value
+const ordinaryDate = tag<Date>({ label: "ordinary-date" })
+const explicitlyLocalDate = tag<Date>({ label: "explicitly-local-date", serializable: false })
+const ordinaryDateTag: Lite.Tag<Date, false, false> = ordinaryDate
+const explicitlyLocalTagged: Lite.Tagged<Date, false> = explicitlyLocalDate(new Date())
+const broadSerializableTag: Lite.Tag<SerializableContext, false, boolean> = serializableContext
+
+void serializableContextTag
+void serializableDefaultTag
+void serializableParsedTag
+void serializableTree
+void serializableLinked
+void serializableMutual
+void inferredSerializable
+void legacyOptionsTag
+void optionalDefaultTag
+void serializableOptionsTag
+void variableSerializableTag
+void variableLocalTag
+void jsonTag
+void wrapTag
+void optionalSerializableTag
+void optionalSerializableDefaultTag
+void serializableTagged
+void inferredSerializableContext
+void ordinaryDateTag
+void explicitlyLocalTagged
+void broadSerializableTag
+
+// @ts-expect-error local tagged values cannot be used as serializable holders
+const invalidSerializableHolder: Lite.Tagged<Date, true> = explicitlyLocalTagged
+
+void invalidSerializableHolder
+
+// @ts-expect-error serializable tags reject Date values
+tag<Date>({ label: "invalid-serializable-date", serializable: true })
+
+// @ts-expect-error serializable tags reject function values
+tag<() => void>({ label: "invalid-serializable-function", serializable: true })
+
+// @ts-expect-error serializable tags reject undefined values
+tag<string | undefined>({ label: "invalid-serializable-undefined", serializable: true })
+
+// @ts-expect-error serializable tags reject bigint values
+tag<bigint>({ label: "invalid-serializable-bigint", serializable: true })
+
+// @ts-expect-error serializable tags reject Map values
+tag<Map<string, string>>({ label: "invalid-serializable-map", serializable: true })
+
+// @ts-expect-error serializable tags reject invalid fields inside recursive values
+tag<InvalidRecursiveRoot>({ label: "invalid-serializable-recursive", serializable: true })
+
+// @ts-expect-error serializable tags reject inferred Date defaults
+tag({ label: "invalid-inferred-default", serializable: true, default: new Date() })
+
+// @ts-expect-error serializable tags reject inferred Date parser outputs
+tag({ label: "invalid-inferred-parser", serializable: true, parse: () => new Date() })
+
+const invalidVariableDefault = {
+  label: "invalid-variable-default",
+  serializable: true as const,
+  default: new Date(),
+}
+
+// @ts-expect-error serializable config variables reject Date defaults
+tag(invalidVariableDefault)
+
+const invalidVariableParser = {
+  label: "invalid-variable-parser",
+  serializable: true as const,
+  parse: () => new Date(),
+}
+
+// @ts-expect-error serializable config variables reject Date parser outputs
+tag(invalidVariableParser)
+
+// @ts-expect-error broad object types do not prove JSON-compatible fields
+tag<object>({ label: "invalid-broad-object", serializable: true })
+
+class SerializableConstructor {
+  constructor(readonly id: string) {}
+}
+
+// @ts-expect-error serializable tags reject constructor functions
+tag<typeof SerializableConstructor>({ label: "invalid-constructor", serializable: true })
+
+type CallableWithData = (() => void) & { id: string }
+type ConstructableWithData = (new () => object) & { id: string }
+
+// @ts-expect-error serializable tags reject callable objects with data fields
+tag<CallableWithData>({ label: "invalid-callable-data", serializable: true })
+
+// @ts-expect-error serializable tags reject constructable objects with data fields
+tag<ConstructableWithData>({ label: "invalid-constructable-data", serializable: true })
+
 const scope = createScope()
 
 scope.createContext({ tags: [contextTag("ok")] })

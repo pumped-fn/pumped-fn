@@ -3,7 +3,7 @@ import { isAtom, isControllerDep } from "./atom"
 import { classifyDeps, type DepsGraph } from "./deps-graph"
 import { isFlow } from "./flow"
 import { isResource } from "./resource"
-import { isTagged, normalizeTags } from "./tag"
+import { assertSerializable, isTagged, normalizeTags, readTagged, resolveTag } from "./tag"
 import { latest, type Latest } from "./latest"
 import { assertNoReturnedStream, consumeScalarResult, detachedStreamResultBeforeStartError, isAsyncGenerator, isAsyncGeneratorFunction, isPromiseLike, markStreamingExec, registerStreamingExec, requireAsyncGenerator, streamResultBeforeStartError } from "./streaming"
 export { isStreamingExec } from "./streaming"
@@ -163,14 +163,17 @@ class ContextStore {
   }
 
   append(tagged: Lite.Tagged<any>): void {
-    this.raw.delete(tagged.key)
-    const family = this.families.get(tagged.key)
+    const normalized = readTagged(tagged)
+    const family = this.families.get(normalized.key)
+    const tag = resolveTag(family?.tag ?? normalized.tag)
+    if (tag.serializable) assertSerializable(normalized.value)
+    this.raw.delete(normalized.key)
     if (!family) {
-      this.families.set(tagged.key, { tag: tagged.tag, first: tagged.value })
+      this.families.set(normalized.key, { tag, first: normalized.value })
       return
     }
-    if (family.rest) family.rest.push(tagged.value)
-    else family.rest = [tagged.value]
+    if (family.rest) family.rest.push(normalized.value)
+    else family.rest = [normalized.value]
   }
 
   set(input: Lite.TagInput): void {
@@ -294,6 +297,15 @@ class ContextStore {
   }
 
   private replaceFamilies(replacements: Array<{ tag: Lite.Tag<any, boolean>; values: any[] }>): void {
+    for (let i = 0; i < replacements.length; i++) {
+      const replacement = replacements[i]!
+      const family = this.families.get(replacement.tag.key)
+      replacement.tag = resolveTag(family?.tag ?? replacement.tag)
+      if (!replacement.tag.serializable) continue
+      for (let j = 0; j < replacement.values.length; j++) {
+        assertSerializable(replacement.values[j])
+      }
+    }
     const changed: Lite.Tag<any, boolean>[] = []
     for (let i = 0; i < replacements.length; i++) {
       const replacement = replacements[i]!
@@ -303,6 +315,13 @@ class ContextStore {
         replacement.values,
       )) {
         changed.push(replacement.tag)
+      }
+    }
+    for (let i = 0; i < replacements.length; i++) {
+      const replacement = replacements[i]!
+      if (!replacement.tag.serializable) continue
+      for (let j = 0; j < replacement.values.length; j++) {
+        assertSerializable(replacement.values[j])
       }
     }
     for (let i = 0; i < replacements.length; i++) {
@@ -1057,22 +1076,26 @@ class ScopeImpl implements Lite.Scope {
         }
       } catch (error) {
         unregister?.()
-        const closing = ctx.close({ ok: false, error })
-        closing.catch(() => {})
-        if (ctx.parent) {
-          assertExecutionContextImpl(ctx.parent)
-          ctx.parent.trackDescendant(closing)
-        } else {
-          const pending = this.pendingContextCloses ??= new Set()
-          pending.add(closing)
-          closing.then(
-            () => pending.delete(closing),
-            () => pending.delete(closing)
-          )
-        }
-        throw error
+        this.abandonContext(ctx, error)
       }
     }
+  }
+
+  abandonContext(ctx: ExecutionContextImpl, error: unknown): never {
+    const closing = ctx.close({ ok: false, error })
+    closing.catch(() => {})
+    if (ctx.parent) {
+      assertExecutionContextImpl(ctx.parent)
+      ctx.parent.trackDescendant(closing)
+    } else {
+      const pending = this.pendingContextCloses ??= new Set()
+      pending.add(closing)
+      closing.then(
+        () => pending.delete(closing),
+        () => pending.delete(closing)
+      )
+    }
+    throw error
   }
 
   private createGeneration<T>(): AtomGeneration<T> {
@@ -1358,88 +1381,97 @@ class ScopeImpl implements Lite.Scope {
     path: Set<Lite.Atom<unknown>>,
   ): Record<string, unknown> | null {
     const result: Record<string, unknown> = {}
+    const unwire: Array<() => void> = []
+    let succeeded = false
 
-    for (let i = 0; i < graph.atoms.length; i++) {
-      const [key, dep] = graph.atoms[i]!
-      let cachedEntry = this.cache.get(dep)
-      if (cachedEntry?.state !== 'resolved') {
-        if (isAsyncFactory(dep.factory)) return null
-        const pending = this.tryResolveCurrentTick(dep, path)
-        if (!pending) return null
-        cachedEntry = this.cache.get(dep)
+    try {
+      for (let i = 0; i < graph.atoms.length; i++) {
+        const [key, dep] = graph.atoms[i]!
+        let cachedEntry = this.cache.get(dep)
         if (cachedEntry?.state !== 'resolved') {
-          void pending.catch(() => undefined)
-          return null
-        }
-      }
-      result[key] = cachedEntry.value
-      this.trackDependent(dep, dependentAtom)
-    }
-
-    for (let i = 0; i < graph.controllers.length; i++) {
-      const [key, dep] = graph.controllers[i]!
-      if (!isAtomControllerDep(dep)) return null
-      if (dep.watch) {
-        if (!dependentAtom) return null
-        if (!dep.resolve) return null
-      }
-      const ctrl = this.controller(dep.atom)
-      if (dep.resolve) {
-        let cachedCtrlEntry = this.cache.get(dep.atom)
-        if (cachedCtrlEntry?.state !== 'resolved') {
-          if (isAsyncFactory(dep.atom.factory)) return null
-          const pending = this.tryResolveCurrentTick(dep.atom, path)
+          if (isAsyncFactory(dep.factory)) return null
+          const pending = this.tryResolveCurrentTick(dep, path)
           if (!pending) return null
-          cachedCtrlEntry = this.cache.get(dep.atom)
-          if (cachedCtrlEntry?.state !== 'resolved') {
+          cachedEntry = this.cache.get(dep)
+          if (cachedEntry?.state !== 'resolved') {
             void pending.catch(() => undefined)
             return null
           }
         }
-        result[key] = ctrl
-        this.trackDependent(dep.atom, dependentAtom)
+        result[key] = cachedEntry.value
+        this.trackDependent(dep, dependentAtom)
+      }
+
+      for (let i = 0; i < graph.controllers.length; i++) {
+        const [key, dep] = graph.controllers[i]!
+        if (!isAtomControllerDep(dep)) return null
         if (dep.watch) {
           if (!dependentAtom) return null
-          this.wireWatch(dep, dependentAtom)
+          if (!dep.resolve) return null
         }
-      } else {
-        result[key] = ctrl
-        this.trackDependent(dep.atom, dependentAtom)
+        const ctrl = this.controller(dep.atom)
+        if (dep.resolve) {
+          let cachedCtrlEntry = this.cache.get(dep.atom)
+          if (cachedCtrlEntry?.state !== 'resolved') {
+            if (isAsyncFactory(dep.atom.factory)) return null
+            const pending = this.tryResolveCurrentTick(dep.atom, path)
+            if (!pending) return null
+            cachedCtrlEntry = this.cache.get(dep.atom)
+            if (cachedCtrlEntry?.state !== 'resolved') {
+              void pending.catch(() => undefined)
+              return null
+            }
+          }
+          result[key] = ctrl
+          this.trackDependent(dep.atom, dependentAtom)
+          if (dep.watch) {
+            if (!dependentAtom) return null
+            unwire.push(this.wireWatch(dep, dependentAtom))
+          }
+        } else {
+          result[key] = ctrl
+          this.trackDependent(dep.atom, dependentAtom)
+        }
       }
-    }
 
-    for (let i = 0; i < graph.tags.length; i++) {
-      const [key, tagExecutor] = graph.tags[i]!
-      switch (tagExecutor.mode) {
-        case "required": {
-          const value = tagExecutor.tag.find(this.tags)
-          if (value !== undefined) {
+      for (let i = 0; i < graph.tags.length; i++) {
+        const [key, tagExecutor] = graph.tags[i]!
+        switch (tagExecutor.mode) {
+          case "required": {
+            const value = tagExecutor.tag.find(this.tags)
+            if (value !== undefined) {
+              if (isFlow(value)) return null
+              result[key] = value
+            } else if (tagExecutor.tag.hasDefault) {
+              if (isFlow(tagExecutor.tag.defaultValue)) return null
+              result[key] = tagExecutor.tag.defaultValue
+            } else {
+              return null
+            }
+            break
+          }
+          case "optional": {
+            const value = tagExecutor.tag.find(this.tags) ?? tagExecutor.tag.defaultValue
             if (isFlow(value)) return null
             result[key] = value
-          } else if (tagExecutor.tag.hasDefault) {
-            if (isFlow(tagExecutor.tag.defaultValue)) return null
-            result[key] = tagExecutor.tag.defaultValue
-          } else {
-            return null
+            break
           }
-          break
-        }
-        case "optional": {
-          const value = tagExecutor.tag.find(this.tags) ?? tagExecutor.tag.defaultValue
-          if (isFlow(value)) return null
-          result[key] = value
-          break
-        }
-        case "all": {
-          const values = tagExecutor.tag.collect(this.tags)
-          if (values.some((value) => isFlow(value))) return null
-          result[key] = values
-          break
+          case "all": {
+            const values = tagExecutor.tag.collect(this.tags)
+            if (values.some((value) => isFlow(value))) return null
+            result[key] = values
+            break
+          }
         }
       }
-    }
 
-    return result
+      succeeded = true
+      return result
+    } finally {
+      if (!succeeded) {
+        for (let i = unwire.length - 1; i >= 0; i--) unwire[i]!()
+      }
+    }
   }
 
   private tryResolveCurrentTick<T>(atom: Lite.Atom<T>, path?: Set<Lite.Atom<unknown>>): Promise<T> | null {
@@ -1459,8 +1491,13 @@ class ScopeImpl implements Lite.Scope {
         active.delete(atom)
         return null
       }
-      resolvedDeps = this.tryResolveSyncDeps(graph, atom, active)
-      active.delete(atom)
+      try {
+        resolvedDeps = this.tryResolveSyncDeps(graph, atom, active)
+      } catch {
+        return null
+      } finally {
+        active.delete(atom)
+      }
       if (!resolvedDeps) return null
     }
 
@@ -1988,10 +2025,14 @@ class ScopeImpl implements Lite.Scope {
           execName: ctx.name,
           signal: preparedOptions.signal,
         })
-        if (preparedOptions.tags) {
-          for (let i = 0; i < preparedOptions.tags.length; i++) {
-            preparedCtx.appendTagValue(preparedOptions.tags[i]!)
+        try {
+          if (preparedOptions.tags) {
+            for (let i = 0; i < preparedOptions.tags.length; i++) {
+              preparedCtx.appendTagValue(preparedOptions.tags[i]!)
+            }
           }
+        } catch (error) {
+          this.abandonContext(preparedCtx, error)
         }
         this.attachContextExtensions(preparedCtx)
         const unregister = ctx.onClose((result, prepared) => prepared.close(result), preparedCtx)
@@ -2130,7 +2171,7 @@ class ScopeImpl implements Lite.Scope {
     } as Lite.ExecFlowOptions<Output, Input>)
   }
 
-  private wireWatch(dep: Lite.AtomControllerDep<unknown>, dependentAtom: Lite.Atom<unknown>): void {
+  private wireWatch(dep: Lite.AtomControllerDep<unknown>, dependentAtom: Lite.Atom<unknown>): () => void {
     const entry = this.getEntry(dep.atom)!
     const edge: WatchEdge = {
       target: dependentAtom,
@@ -2139,8 +2180,10 @@ class ScopeImpl implements Lite.Scope {
     }
     const watchers = entry.watchers ??= new Set()
     watchers.add(edge)
+    const unwire = () => { watchers.delete(edge) }
     const generation = this.getEntry(dependentAtom)?.generation
-    if (generation) (generation.cleanups ??= []).push({ fn: () => { watchers.delete(edge) }, params: [] })
+    if (generation) (generation.cleanups ??= []).push({ fn: unwire, params: [] })
+    return unwire
   }
 
   private wireResourceWatch(
@@ -2977,23 +3020,36 @@ class ScopeImpl implements Lite.Scope {
       }
     }
     const ctxTags = normalizeTags(options?.tags)
-    const ctx = new ExecutionContextImpl(this, options && { ...options, tags: ctxTags })
-
-    if (ctxTags && ctxTags.length > 0) {
-      for (let i = 0; i < ctxTags.length; i++) {
-        ctx.appendTagValue(ctxTags[i]!)
-      }
-    }
-
+    const inherited: Lite.Tagged<any>[] = []
     if (this.tags.length > 0) {
-      const blocked = new Set(this.tags.filter((tagged) => ctx.data.seekHas(tagged.key)).map((tagged) => tagged.key))
+      const blocked = new Set<symbol>()
+      if (ctxTags) {
+        for (let i = 0; i < ctxTags.length; i++) blocked.add(ctxTags[i]!.key)
+      }
+      if (options && "parent" in options && options.parent !== undefined) {
+        assertExecutionContextImpl(options.parent)
+        for (let i = 0; i < this.tags.length; i++) {
+          if (options.parent.data.seekHas(this.tags[i]!.key)) blocked.add(this.tags[i]!.key)
+        }
+      }
       for (let i = 0; i < this.tags.length; i++) {
-        if (!blocked.has(this.tags[i]!.key)) ctx.appendTagValue(this.tags[i]!)
+        if (!blocked.has(this.tags[i]!.key)) inherited.push(this.tags[i]!)
       }
     }
-
-    this.attachContextExtensions(ctx)
-    return ctx
+    const inheritedTags = inherited.length > 0 ? normalizeTags(inherited) : undefined
+    const ctx = new ExecutionContextImpl(this, options && { ...options, tags: ctxTags })
+    try {
+      if (ctxTags) {
+        for (let i = 0; i < ctxTags.length; i++) ctx.appendTagValue(ctxTags[i]!)
+      }
+      if (inheritedTags) {
+        for (let i = 0; i < inheritedTags.length; i++) ctx.appendTagValue(inheritedTags[i]!)
+      }
+      this.attachContextExtensions(ctx)
+      return ctx
+    } catch (error) {
+      this.abandonContext(ctx, error)
+    }
   }
 }
 
@@ -3376,8 +3432,12 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
           signal: options.signal
         })
 
-        this.seedTags(childCtx, options.tags)
-        this.scope.attachContextExtensions(childCtx)
+        try {
+          this.seedTags(childCtx, options.tags)
+          this.scope.attachContextExtensions(childCtx)
+        } catch (error) {
+          this.scope.abandonContext(childCtx, error)
+        }
 
         try {
           const result = this.scope.execExts.length === 0
@@ -3557,12 +3617,6 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
       childCtx.appendTagValue(execTags[i]!)
     }
     if (!flowTags?.length) return
-    if (!execTags?.length && !blockedTags?.length) {
-      for (let i = 0; i < flowTags.length; i++) {
-        childCtx.appendTagValue(flowTags[i]!)
-      }
-      return
-    }
     const blocked = new Set<symbol>()
     if (execTags) for (let i = 0; i < execTags.length; i++) {
       blocked.add(execTags[i]!.key)
@@ -3570,8 +3624,14 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
     if (blockedTags) for (let i = 0; i < blockedTags.length; i++) {
       blocked.add(blockedTags[i]!.key)
     }
+    const pending: Lite.Tagged<any>[] = []
     for (let i = 0; i < flowTags.length; i++) {
-      if (!blocked.has(flowTags[i]!.key)) childCtx.appendTagValue(flowTags[i]!)
+      if (!blocked.has(flowTags[i]!.key)) pending.push(flowTags[i]!)
+    }
+    if (!pending.length) return
+    const seededFlowTags = normalizeTags(pending)!
+    for (let i = 0; i < seededFlowTags.length; i++) {
+      childCtx.appendTagValue(seededFlowTags[i]!)
     }
   }
 
@@ -3594,6 +3654,19 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
 
     const finish = (parsedInput: unknown) => {
       if (abandonment?.isAbandoned) throw abandonment.reason
+      const seededExecTags = normalizeTags(execTags)
+      const blocked = new Set<symbol>()
+      if (seededExecTags) for (let i = 0; i < seededExecTags.length; i++) {
+        blocked.add(seededExecTags[i]!.key)
+      }
+      if (blockedTags) for (let i = 0; i < blockedTags.length; i++) {
+        blocked.add(blockedTags[i]!.key)
+      }
+      const pendingFlowTags: Lite.Tagged<any>[] = []
+      if (flow.tags) for (let i = 0; i < flow.tags.length; i++) {
+        if (!blocked.has(flow.tags[i]!.key)) pendingFlowTags.push(flow.tags[i]!)
+      }
+      const seededFlowTags = pendingFlowTags.length > 0 ? normalizeTags(pendingFlowTags) : undefined
       const childCtx = new ExecutionContextImpl(this.scope, {
         parent: this,
         input: parsedInput,
@@ -3604,8 +3677,12 @@ class ExecutionContextImpl implements Lite.ExecutionContext {
         detached,
       })
 
-      this.seedTags(childCtx, execTags, flow.tags, blockedTags)
-      this.scope.attachContextExtensions(childCtx)
+      try {
+        this.seedTags(childCtx, seededExecTags, seededFlowTags, blockedTags)
+        this.scope.attachContextExtensions(childCtx)
+      } catch (error) {
+        this.scope.abandonContext(childCtx, error)
+      }
 
       return {
         flow,
