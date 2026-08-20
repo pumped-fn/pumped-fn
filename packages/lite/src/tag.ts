@@ -1,16 +1,79 @@
 import { normalizeAttributes } from "./attribute"
 import { tagSymbol, taggedSymbol, tagExecutorSymbol, ParseError, type Lite } from "./types"
 
-export interface TagOptions<T, HasDefault extends boolean> {
+interface TagBaseOptions<T> {
   label: string
   attributes?: Lite.AttributeInput
-  default?: HasDefault extends true ? T : never
   parse?: (raw: unknown) => T
   eq?: (a: T, b: T) => boolean
 }
 
-const registry = new WeakMap<Lite.Tag<unknown, boolean>, WeakRef<Lite.Atom<unknown>>[]>()
-const tagRegistry: WeakRef<Lite.Tag<unknown, boolean>>[] = []
+type JsonField<T> = T extends Lite.JsonValue ? T : JsonShape<T>
+
+type JsonShapeMember<T> =
+  [T] extends [(...args: never[]) => unknown] ? never
+    : [T] extends [abstract new (...args: never[]) => unknown] ? never
+      : [T] extends [readonly unknown[]] ? { readonly [K in keyof T]: JsonField<T[K]> }
+        : [T] extends [object]
+          ? Extract<keyof T, symbol> extends never
+            ? keyof T extends never ? never : { readonly [K in keyof T]: JsonField<T[K]> }
+            : never
+          : [T] extends [Lite.JsonValue] ? T : never
+
+type JsonShape<T> = T extends unknown ? JsonShapeMember<T> : never
+
+type JsonObjectFields<T> = { readonly [K in keyof T]: T[K] & Lite.JsonValue }
+
+type SerializableOption<T> =
+  [T] extends [JsonShape<T>] ? true
+    : [T] extends [(...args: never[]) => unknown] ? never
+      : [T] extends [abstract new (...args: never[]) => unknown] ? never
+        : [T] extends [readonly unknown[]] ? never
+          : [T] extends [object]
+            ? Extract<keyof T, symbol> extends never
+              ? keyof T extends never ? never : [T] extends [JsonObjectFields<T>] ? true : never
+              : never
+            : never
+
+type DefaultOptions<T, HasDefault extends boolean> = boolean extends HasDefault
+  ? { default?: T }
+  : HasDefault extends true ? { default: T } : { default?: never }
+
+type SerializableGate<T> = [SerializableOption<T>] extends [never] ? never : unknown
+
+type SerializableOptions<T, Serializable extends boolean> = boolean extends Serializable
+  ? { serializable?: boolean }
+  : Serializable extends true
+    ? { serializable: true } & SerializableGate<T>
+    : { serializable?: false }
+
+export type TagOptions<
+  T,
+  HasDefault extends boolean,
+  Serializable extends boolean = false,
+> = TagBaseOptions<T> & DefaultOptions<T, HasDefault> & SerializableOptions<T, Serializable>
+
+type SerializableWithoutDefault<T> =
+  TagBaseOptions<T> & { default?: never; serializable: true } & SerializableGate<T>
+
+type SerializableWithDefault<T> =
+  TagBaseOptions<T> & { default: T; serializable: true } & SerializableGate<T>
+
+type LocalWithoutDefault<T> = TagBaseOptions<T> & { default?: never; serializable?: false }
+
+type LocalWithDefault<T> = TagBaseOptions<T> & { default: T; serializable?: false }
+
+const atomRegistrySymbol = Symbol.for("@pumped-fn/lite/tag-atom-registry")
+const atomRegistryGlobal = globalThis as typeof globalThis & {
+  [atomRegistrySymbol]?: WeakMap<Lite.Tag<unknown, boolean>, WeakRef<Lite.Atom<unknown>>[]>
+}
+const registry = atomRegistryGlobal[atomRegistrySymbol] ??= new WeakMap()
+const tagRegistrySymbol = Symbol.for("@pumped-fn/lite/tag-registry")
+const tagRegistryGlobal = globalThis as typeof globalThis & {
+  [tagRegistrySymbol]?: WeakRef<Lite.Tag<unknown, boolean>>[]
+}
+const tagRegistry = tagRegistryGlobal[tagRegistrySymbol] ??= []
+const localTags = new WeakSet<object>()
 
 function isTagInputArray(value: unknown): value is readonly Lite.TagInput[] {
   return Array.isArray(value)
@@ -25,7 +88,7 @@ export function normalizeTags(input: Lite.TagInput | undefined): Lite.Tagged<any
   const active = new Set<readonly unknown[]>()
   const append = (value: unknown): void => {
     if (isTagged(value)) {
-      normalized.push(value)
+      normalized.push(readTagged(value))
       return
     }
     if (!isTagInputArray(value)) {
@@ -125,39 +188,34 @@ function getAtomsForTag(tag: Lite.Tag<unknown, boolean>): Lite.Atom<unknown>[] {
  * })
  * ```
  */
-export function tag<T>(options: {
-  label: string
-  attributes?: Lite.AttributeInput
-  eq?: (a: T, b: T) => boolean
-}): Lite.Tag<T, false>
-export function tag<T>(options: {
-  label: string
-  attributes?: Lite.AttributeInput
-  default: T
-  eq?: (a: T, b: T) => boolean
-}): Lite.Tag<T, true>
-export function tag<T>(options: {
-  label: string
-  attributes?: Lite.AttributeInput
-  parse: (raw: unknown) => T
-  eq?: (a: T, b: T) => boolean
-}): Lite.Tag<T, false>
-export function tag<T>(options: {
-  label: string
-  attributes?: Lite.AttributeInput
-  parse: (raw: unknown) => T
-  default: T
-  eq?: (a: T, b: T) => boolean
-}): Lite.Tag<T, true>
-export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
+export function tag<T extends Lite.JsonValue = Lite.JsonValue>(
+  options: SerializableWithoutDefault<T>
+): Lite.Tag<T, false, true>
+export function tag<T extends Lite.JsonValue>(
+  options: SerializableWithDefault<T>
+): Lite.Tag<T, true, true>
+export function tag<T>(
+  options: SerializableWithoutDefault<T>
+): Lite.Tag<T, false, true>
+export function tag<T>(
+  options: SerializableWithDefault<T>
+): Lite.Tag<T, true, true>
+export function tag<T>(options: TagOptions<T, boolean, true>): Lite.Tag<T, boolean, true>
+export function tag<T>(options: LocalWithoutDefault<T>): Lite.Tag<T, false, false>
+export function tag<T>(options: LocalWithDefault<T>): Lite.Tag<T, true, false>
+export function tag<T>(options: TagOptions<T, boolean, false>): Lite.Tag<T, boolean, false>
+export function tag<T>(options: TagOptions<T, boolean, boolean>): Lite.Tag<T, boolean, boolean> {
   const key = Symbol(`@pumped-fn/lite/tag/${options.label}`)
   const hasDefault = "default" in options
   const defaultValue = hasDefault ? options.default : undefined
   const parse = options.parse
   const eq = options.eq ?? Object.is
+  const serializable = options.serializable === true
   const declared = normalizeAttributes(options.attributes)
 
-  let tagInstance: Lite.Tag<T, boolean>
+  if (serializable && hasDefault) assertSerializable(defaultValue)
+
+  let tagInstance: Lite.Tag<T, boolean, boolean>
 
   function createTagged(value: T, taggedOptions?: Lite.TaggedOptions): Lite.Tagged<T> {
     let bound = declared
@@ -179,6 +237,7 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
         )
       }
     }
+    if (serializable) assertSerializable(validatedValue)
     if (bound.length > 0) {
       return {
         [taggedSymbol]: true,
@@ -256,11 +315,120 @@ export function tag<T>(options: TagOptions<T, boolean>): Lite.Tag<T, boolean> {
     find,
     collect,
     atoms,
-  }) as unknown as Lite.Tag<T, boolean>
+  }) as unknown as Lite.Tag<T, boolean, boolean>
+  Object.defineProperties(tagInstance, {
+    key: { value: key, enumerable: true },
+    serializable: { value: serializable, enumerable: true },
+  })
 
   tagRegistry.push(new WeakRef(tagInstance as Lite.Tag<unknown, boolean>))
+  localTags.add(tagInstance)
 
   return tagInstance
+}
+
+/** Asserts that a value contains only strict JSON data. */
+export function assertSerializable(value: unknown): asserts value is Lite.JsonValue {
+  assertSerializableValue(value, "$", new WeakSet<object>())
+}
+
+const nativeObject = Function.prototype.toString.call(Object)
+
+function isPlainJsonObject(value: object): boolean {
+  const prototype = Object.getPrototypeOf(value)
+  if (prototype === null) return true
+  if (Object.getPrototypeOf(prototype) !== null) return false
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, "constructor")
+  if (!descriptor || !("value" in descriptor)) return false
+  const ctor = descriptor.value
+  return typeof ctor === "function"
+    && ctor.prototype === prototype
+    && Function.prototype.toString.call(ctor) === nativeObject
+}
+
+export function readTagged(tagged: Lite.Tagged<any>): Lite.Tagged<any> {
+  const owner = tagged.tag
+  const key = tagged.key
+  const snapshot = tagged.value
+  const attributes = tagged.attributes
+  if (!isTag(owner) || key !== owner.key) {
+    throw new TypeError("tags must contain only tagged values and arrays")
+  }
+  const resolved = resolveTag(owner)
+  if (resolved.serializable) assertSerializable(snapshot)
+  if (resolved === owner && resolved.serializable === false) return tagged
+  return attributes
+    ? { [taggedSymbol]: true, key: resolved.key, value: snapshot, tag: resolved, attributes }
+    : { [taggedSymbol]: true, key: resolved.key, value: snapshot, tag: resolved }
+}
+
+function assertSerializableValue(value: unknown, path: string, seen: WeakSet<object>): void {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return
+
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new TypeError(`Non-finite number at ${path}`)
+    return
+  }
+
+  if (Array.isArray(value)) {
+    const prototype = Object.getPrototypeOf(value)
+    const parent = Array.isArray(prototype) ? Object.getPrototypeOf(prototype) : null
+    if (parent === null || Object.getPrototypeOf(parent) !== null) {
+      throw new TypeError(`Non-plain array at ${path}`)
+    }
+    if (seen.has(value)) throw new TypeError(`Circular value at ${path}`)
+    seen.add(value)
+    for (let i = 0; i < value.length; i++) {
+      const itemPath = `${path}[${i}]`
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(i))
+      if (!descriptor) throw new TypeError(`Non-serializable undefined at ${itemPath}`)
+      if (!("value" in descriptor)) throw new TypeError(`Accessor property at ${itemPath}`)
+      if (!descriptor.enumerable) throw new TypeError(`Non-enumerable property at ${itemPath}`)
+      assertSerializableValue(descriptor.value, itemPath, seen)
+    }
+    for (const key of Reflect.ownKeys(value)) {
+      if (key === "length") continue
+      if (typeof key === "symbol") throw new TypeError(`Symbol key at ${path}`)
+      const index = Number(key)
+      if (!Number.isInteger(index) || index < 0 || index >= value.length || String(index) !== key) {
+        throw new TypeError(`Non-index array key at ${path}.${key}`)
+      }
+    }
+    seen.delete(value)
+    return
+  }
+
+  if (typeof value !== "object") {
+    throw new TypeError(`Non-serializable ${typeof value} at ${path}`)
+  }
+
+  if (!isPlainJsonObject(value)) {
+    throw new TypeError(`Non-plain object at ${path}`)
+  }
+
+  if (seen.has(value)) throw new TypeError(`Circular value at ${path}`)
+  seen.add(value)
+
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key === "symbol") throw new TypeError(`Symbol key at ${path}`)
+    const childPath = `${path}.${key}`
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    if (!descriptor) throw new TypeError(`Missing property descriptor at ${childPath}`)
+    if (!("value" in descriptor)) throw new TypeError(`Accessor property at ${childPath}`)
+    if (!descriptor.enumerable) throw new TypeError(`Non-enumerable property at ${childPath}`)
+    assertSerializableValue(descriptor.value, childPath, seen)
+  }
+
+  seen.delete(value)
+}
+
+export function resolveTag<T>(tag: Lite.Tag<T, boolean>): Lite.Tag<T, boolean> {
+  if (localTags.has(tag)) return tag
+  for (let i = 0; i < tagRegistry.length; i++) {
+    const registered = tagRegistry[i]!.deref()
+    if (registered?.key === tag.key) return registered as unknown as Lite.Tag<T, boolean>
+  }
+  return tag
 }
 
 /**
@@ -297,11 +465,12 @@ export function isTag(value: unknown): value is Lite.Tag<unknown, boolean> {
  * ```
  */
 export function isTagged(value: unknown): value is Lite.Tagged<unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    (value as Record<symbol, unknown>)[taggedSymbol] === true
-  )
+  if (typeof value !== "object" || value === null) return false
+  const tagged = value as Record<PropertyKey, unknown>
+  const owner = tagged["tag"]
+  return tagged[taggedSymbol] === true
+    && isTag(owner)
+    && tagged["key"] === owner.key
 }
 
 /**

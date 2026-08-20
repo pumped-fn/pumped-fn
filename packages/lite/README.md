@@ -24,7 +24,7 @@ Lite owns the application boundary below framework adapters:
 - `atom()` defines scope-owned transports, capabilities, state, derived data, and caches.
 - `flow()` defines execution work with optional typed or parsed input.
 - `resource()` defines execution-context-owned values such as transactions, request loggers, spans, action buffers, and drafts.
-- `tag()` carries typed ambient values such as tenant, trace id, locale, config, and equality-aware boundary identity.
+- `tag()` carries typed ambient values such as tenant, trace id, locale, config, and equality-aware boundary identity. Serializable tags opt values into strict JSON checks for persistence and synchronization adapters.
 - `preset()` swaps atoms, flows, and resources at the scope seam for tests or composition.
 - Extensions wrap resolve and exec for logging, tracing, auth, metrics, and transactional policy.
 - Controllers and selects add reactivity where it is intentional.
@@ -57,7 +57,7 @@ scope
 execution context
   flow execution
   resource ownership
-  runtime tags
+  runtime tags: typed families, optional strict JSON control
   onClose/cleanup
 ```
 
@@ -312,6 +312,7 @@ await nested.dispose()
 ```
 
 Tags can define `eq` for value equality inside that tag family. `tag.eq(a, b)` compares raw values.
+`eq` must be pure and must not mutate either input.
 `tag.same(left, right)` first checks both tagged records belong to that family, then uses `eq`.
 
 Equality is intentionally narrow. It does not change tag lookup, defaults, parsing, `tags.all()`,
@@ -347,6 +348,37 @@ if (id !== "acct_1") throw new Error("unexpected account id")
 await ctx.close()
 await scope.dispose()
 ```
+
+Set `serializable: true` when a tag family may cross a storage or network boundary. TypeScript then
+constrains the declared type to JSON-compatible fields. At runtime, Lite checks defaults, parsed values,
+tagged holders, and context-family writes. The accepted shape is strict JSON: `null`, strings, booleans,
+finite numbers, dense arrays, and plain objects with enumerable string-keyed data fields.
+TypeScript is structural, so the runtime check is the final proof for exact properties and prototypes.
+
+```ts
+import { tag } from "@pumped-fn/lite"
+
+interface SessionSnapshot {
+  userId: string
+  roles: readonly string[]
+}
+
+const session = tag<SessionSnapshot>({
+  label: "session",
+  serializable: true,
+})
+
+const snapshot = session({ userId: "u1", roles: ["admin"] })
+
+if (!snapshot.tag.serializable) throw new Error("expected serializable tag")
+```
+
+`Date`, `Map`, functions, symbols, `undefined`, bigints, class instances, cycles, sparse arrays, accessors,
+hidden fields, extra array keys, `NaN`, and infinities fail. The `Tagged` wrapper, tag key, label, and
+attributes are not the wire value; only `tagged.value` has this guarantee. Values stay by reference, so an
+adapter must check again before encode in case application code mutated an object after validation. A
+receiving adapter must also run the tag's `parse` function or its own codec when it needs to prove domain
+shape, not only JSON shape.
 
 Execution contexts expose raw scratch data through `ctx.data` and typed tag families through `ctx.tags`.
 `get` and `getMany` read only the current context. `seek` and `seekMany` continue through parents, with
@@ -400,11 +432,12 @@ await ctx.close()
 await scope.dispose()
 ```
 
-Extensions that persist context state should watch only explicitly configured tag handles. Stable storage
-IDs and codecs belong to the extension; runtime tag symbols and labels are not durable identities. Raw
-`ctx.data` does not create watchable tag families. The tag helpers on `ctx.data` remain compatibility shims
-for this release. The old raw-symbol bridge also remains: writing `tag.key` replaces and notifies that family
-only when it already exists. New code must use `ctx.tags` so this 6.x migration rule cannot affect it.
+Extensions that persist context state should watch only explicitly configured serializable tag handles.
+Stable storage IDs and codecs belong to the extension; runtime tag symbols and labels are not durable
+identities. Raw `ctx.data` does not create watchable tag families. The tag helpers on `ctx.data` remain
+compatibility shims for this release. The old raw-symbol bridge also remains: writing `tag.key` replaces and
+notifies that family only when it already exists. New code must use `ctx.tags` so this 6.x migration rule
+cannot affect it.
 
 ## Reactivity
 
@@ -614,7 +647,8 @@ Extension hooks see the same seams as tests and composition roots. See
 | `atom(config)` | Define a scope-owned dependency or state node |
 | `flow(config)` | Define execution work with optional `parse` or `typed<T>()` input |
 | `resource(config)` | Define execution-context-owned state or lifecycle |
-| `tag(config)` | Define typed ambient values and optional value equality |
+| `tag(config)` | Define typed ambient values, optional value equality, and opt-in strict JSON enforcement |
+| `assertSerializable(value)` | Assert the same strict JSON value rule used by serializable tags |
 | `tags.required/optional/all` | Request tags as dependencies |
 | `scope.tags` | Read the root tag values through `tag.find(scope)` or `tag.collect(scope)` |
 | `ctx.tags` | Read, replace, delete, and watch local typed tag families |

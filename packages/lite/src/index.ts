@@ -15,7 +15,7 @@ export {
   ParseError,
   FlowFault,
 } from "./types"
-export { tag, tags, isTag, isTagged, isTagExecutor, getAllTags } from "./tag"
+export { tag, tags, isTag, isTagged, isTagExecutor, getAllTags, assertSerializable } from "./tag"
 export { atom, isAtom, controller, isControllerDep } from "./atom"
 export { flow, isFlow, typed, isFault } from "./flow"
 export { attribute, flag, isAttribute, isAttributed, normalizeAttributes } from "./attribute"

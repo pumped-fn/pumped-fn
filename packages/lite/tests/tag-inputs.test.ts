@@ -27,6 +27,45 @@ describe("tag inputs", () => {
     expect(marker.atoms()).toContain(taggedAtom)
   })
 
+  it("keeps unmarked tagged holder identity on atom, flow, and resource", () => {
+    const marker = tag<string>({ label: "tag-input-identity" })
+    const atomHolder = marker("atom")
+    const flowHolder = marker("flow")
+    const resourceHolder = marker("resource")
+    const taggedAtom = atom({ tags: atomHolder, factory: () => 1 })
+    const taggedFlow = flow({ tags: flowHolder, factory: () => 1 })
+    const taggedResource = resource({ tags: resourceHolder, factory: () => 1 })
+
+    expect(taggedAtom.tags?.[0]).toBe(atomHolder)
+    expect(taggedFlow.tags?.[0]).toBe(flowHolder)
+    expect(taggedResource.tags?.[0]).toBe(resourceHolder)
+  })
+
+  it("stores the first snapped serializable value from atom, flow, and resource tags", () => {
+    const state = tag<Lite.JsonValue>({ label: "tag-input-serializable-snapshot", serializable: true })
+    const valid = { id: "ok" }
+    const later = { id: "ok", bad: new Date(0) } as unknown as Lite.JsonValue
+    const flip = (tagged: Lite.Tagged<Lite.JsonValue>) => {
+      let reads = 0
+      return {
+        ...tagged,
+        get value() {
+          return reads++ === 0 ? valid : later
+        },
+      } as Lite.Tagged<Lite.JsonValue>
+    }
+    const taggedAtom = atom({ tags: flip(state(valid)), factory: () => 1 })
+    const taggedFlow = flow({ tags: flip(state(valid)), factory: () => 1 })
+    const taggedResource = resource({ tags: flip(state(valid)), factory: () => 1 })
+
+    expect(taggedAtom.tags?.[0]?.value).toEqual(valid)
+    expect(taggedFlow.tags?.[0]?.value).toEqual(valid)
+    expect(taggedResource.tags?.[0]?.value).toEqual(valid)
+    expect(taggedAtom.tags?.[0]?.value).toEqual(valid)
+    expect(taggedFlow.tags?.[0]?.value).toEqual(valid)
+    expect(taggedResource.tags?.[0]?.value).toEqual(valid)
+  })
+
   it("exposes scope tags without allowing cross-scope mutation", async () => {
     const marker = tag<string>({ label: "scope-tag-isolation" })
     const empty = createScope()
